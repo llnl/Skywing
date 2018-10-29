@@ -8,19 +8,28 @@
 
 namespace skynet
 {
-
-  class SocketCommunicator : public DeviceCommunicator
-  {
-  public:
-    SocketCommunicator(std::string ip_address)
-      : ip_address_(ip_address)
+    /** \class SocketCommunicator
+     *  \brief A DeviceCommunicator for using sockets.
+     */
+    class SocketCommunicator : public DeviceCommunicator
     {
-      // Need to implement peer-to-peer socket communications here.
-    }
+    public:
+	/** \brief Construct a new SocketCommunicator
+	 *
+	 *  \param ip_address The IP address of the Device.
+	 */
+	SocketCommunicator(std::string ip_address)
+	    : ip_address_(ip_address)
+	    {
+		// Need to implement peer-to-peer socket communications here.
+	    }
 
-  private:
-    std::string ip_address_;
-    int sock_;
-  }; // class SocketCommunicator
+    private:
+	std::string ip_address_;
+	int sock_;
+    }; // class SocketCommunicator
 
 } // namespace skynet
+
+
+#endif /* SKYNET_SOCKETCOMMUNICATOR_HPP__ */

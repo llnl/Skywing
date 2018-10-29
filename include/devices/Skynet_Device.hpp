@@ -2,41 +2,86 @@
 #define SKYNET_DEVICE_HPP__
 
 #include <memory>
-#include <Skynet_DeviceCommunicator.hpp>
+#include <cstddef>
+#include <type_traits>
+#include "Skynet_DeviceCommunicator.hpp"
+#include "Skynet_Serializer.hpp"
+#include "Skynet_Serializable.hpp"
 
 namepsace skynet
 {  
+  /** \class Device
+
+      A Device object represents a participating device in the Skynet
+      instance. This object contains information about the device
+      such as how to communicate with it and its computational
+      capabilities.
+  */
   class Device
   {
   public:
+    /** \brief Construct a new \c Device.
+     *
+     * \param comm A DeviceCommunicator representing this Device's
+     * communications policy.
+     */
     Device(std::unique_ptr<DeviceCommunicator> comm)
-      : comm(comm_)
+      : comm(comm_), is_believed_live_(true)
     { }
     
+    /** \brief Get the DeviceCommunicator policy object. */
     const DeviceCommunicator& get_comm() const
     { return *comm_; }
 
-    bool get_is_live() const
+    /** \brief Get if we believe this Device to be live. */
+    bool get_is_belived_live() const
     { return is_live_; }
 
-    void send_to(void* data, int id) const
-    { comm_->send_to(data, id); }
 
-    void* receive_from(int id) const
-    { return comm_->receive_from(id); }
 
-    // CVP: Future capability, don't want to debug it now
-    /*    void send_to(Serializable* data, int id)
-    { comm_->send_to(data, id); }
-    
-    template<typename Deserializer>
-    Deserializer::output_t receive_from(int id)
-    { return comm_->template receive_from<Deserializer>(id)}
-    */
+    template<typename T>
+    std::enable_if_t<std::is_base_of<Serializable, T>::value, void> 
+    send_to(T data, int tag) const
+    {
+      void* pv_d = data.serialize();
+      std::size_t pv_d_size = data.get_serialized_size();
+      comm_->send_to(pv_d, pv_d_size, tag);
+      data.clean_after_serialization();
+    }
+
+    template<typename T>
+    std::enable_if_t<not std::is_base_of<Serializable, T>::value, void> 
+    send_to(T data, int tag) const
+    {
+      comm_->send_to(serialize<T>(data), get_serialized_size<T>(data), tag);
+    }
+
+
+
+    template<typename T>
+    std::enable_if_t<std::is_base_of<Serializable, T>::value, T>
+    receive_from(int tag) const
+    {
+      std::pair<void*, std::size_t> ret = comm_->receive_from(tag);
+      T t = T::deserialize(ret);
+      delete ret.first;
+      return t;
+    }
+
+    template<typename T>
+    std::enable_if_t<not std::is_base_of<Serializable, T>::value, T> 
+    receive_from(int tag) const
+    {
+      return deserialize<T>(comm_->receive_from(tag));
+    }
+
     
   private:
-    bool is_live;
+    bool is_believed_live;
     std::unique_ptr<DeviceCommunicator> comm_;
     
   }; // class Device
 } // namespace skynet
+
+
+#endif /* SKYNET_DEVICE_HPP__ */
