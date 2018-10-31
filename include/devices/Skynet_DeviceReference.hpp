@@ -1,5 +1,5 @@
-#ifndef SKYNET_DEVICE_HPP__
-#define SKYNET_DEVICE_HPP__
+#ifndef SKYNET_DEVICEREFERENCE_HPP__
+#define SKYNET_DEVICEREFERENCE_HPP__
 
 #include <memory>
 #include <cstddef>
@@ -10,22 +10,22 @@
 
 namepsace skynet
 {  
-  /** \class Device
+  /** \class DeviceReference
 
-      A Device object represents a participating device in the Skynet
-      instance. This object contains information about the device
-      such as how to communicate with it and its computational
-      capabilities.
+      A DeviceReference object represents some other participating
+      device in the Skynet instance. This object contains information
+      about the device such as how to communicate with it and its
+      computational capabilities.
   */
-  class Device
+  class DeviceReference
   {
   public:
-    /** \brief Construct a new \c Device.
+    /** \brief Construct a new \c DeviceReference.
      *
-     * \param comm A DeviceCommunicator representing this Device's
-     * communications policy.
+     * \param comm A DeviceCommunicator representing this
+     * DeviceReference's communications policy.
      */
-    Device(std::unique_ptr<DeviceCommunicator> comm)
+    DeviceReference(std::unique_ptr<DeviceCommunicator> comm)
       : comm(comm_), is_believed_live_(true)
     { }
     
@@ -33,7 +33,7 @@ namepsace skynet
     const DeviceCommunicator& get_comm() const
     { return *comm_; }
 
-    /** \brief Get if we believe this Device to be live. */
+    /** \brief Get if we believe the referred device to be live. */
     bool get_is_belived_live() const
     { return is_live_; }
 
@@ -78,10 +78,11 @@ namepsace skynet
     
   private:
     bool is_believed_live;
+    id_t device_id_;
     std::unique_ptr<DeviceCommunicator> comm_;
     
-  }; // class Device
+  }; // class DeviceReference
 } // namespace skynet
 
 
-#endif /* SKYNET_DEVICE_HPP__ */
+#endif /* SKYNET_DEVICEREFERENCE_HPP__ */

@@ -1,31 +1,31 @@
-#ifndef SKYNET_MANAGER_HPP__
-#define SKYNET_MANAGER_HPP__
+#ifndef SKYNET_HEART_HPP__
+#define SKYNET_HEART_HPP__
 
 #include <utility>
 #include <vector>
-#include "Skynet_Device.hpp"
+#include "Skynet_DeviceReference.hpp"
 
 namespace skynet
 {
-    /** \class Manager
-     *  \brief Manages a Skynet instance.
+    /** \class Heart
+     *  \brief The center of a Skynet instance.
+     *
+     * A Heart, collectively across the Skynet instance, runs the
+     * heartbeat and manages the participating devices.
      */
-    class Manager
+    class Heart
     {
     public:
-	/** \brief Construct a new Skynet Manager
+	/** \brief Construct a new Skynet Heart
 	 *
-	 * \param nearby_devices A vector of Devices representing
-	 * other Skynet devices.
+	 * \param nearby_devices A vector of DeviceReferences
+	 * representing other Skynet devices.
 	 */
-	Manager(std::vector<Device> nearby_devices)
+	Heart(std::vector<DeviceReference> nearby_devices)
 	    : nearby_devices_(std::move(nearby_devices))
 	    {}
 
-	/** \brief Begin the Skynet Manager.
-	 *
-	 * Starts the heartbeat.
-	 */
+	/** \brief Begin the heartbeat. */
 	void begin();
 
     private:
@@ -47,6 +47,8 @@ namespace skynet
 
     private:
 	std::vector<Device> nearby_devices_;
-    }; // class Manager
+    }; // class Heart
 
 } // namespace skynet
+
+#endif /* SKYNET_HEART_HPP__ */
