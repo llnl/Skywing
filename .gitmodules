@@ -1,3 +1,6 @@
 [submodule "utils/catch2"]
 	path = utils/catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "utils/boost"]
+	path = utils/boost
+	url = https://github.com/boostorg/boost.git
