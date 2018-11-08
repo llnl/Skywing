@@ -4,7 +4,7 @@
 #include <Skynet_DeviceCommunicator.hpp>
 
 #include <string>
-#include <sys.socket.h>
+#include <sys/socket.h>
 
 namespace skynet
 {
