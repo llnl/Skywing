@@ -21,7 +21,7 @@ namespace skynet
 	TestCommunicator(std::string ip_address)
 	    : ip_address_(ip_address)
 	    {
-		     sock_ = 0;
+		    sock_ = 0;
 	    }
       /** \brief Send data to the associated Device.
        *
@@ -43,9 +43,19 @@ namespace skynet
        */
       std::pair<void*, std::size_t> receive_from(int tag) const
       {
-        double a = 100.0;
-        std::pair<void*, std::size_t> message(&a,100);
-        return message;
+          double a = 100.0;
+          std::pair<void*, std::size_t> message(&a,100);
+          return message;
+      }
+
+      void set_ip_address(std::string ip_address)
+      {
+          ip_address_ = ip_address;
+      }
+
+      std::string get_ip_address() const
+      {
+          return ip_address_;
       }
 
     private:
