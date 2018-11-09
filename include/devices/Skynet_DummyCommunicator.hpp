@@ -1,5 +1,5 @@
-#ifndef SKYNET_TESTCOMMUNICATOR_HPP__
-#define SKYNET_TESTCOMMUNICATOR_HPP__
+#ifndef SKYNET_DUMMYCOMMUNICATOR_HPP__
+#define SKYNET_DUMMYCOMMUNICATOR_HPP__
 
 #include <Skynet_DeviceCommunicator.hpp>
 
@@ -11,14 +11,14 @@ namespace skynet
     /** \class TestCommunicator
      *  \brief A DeviceCommunicator for testing purposes.
      */
-    class TestCommunicator : public DeviceCommunicator
+    class DummyCommunicator : public DeviceCommunicator
     {
     public:
-	/** \brief Construct a new TestCommunicator
+	/** \brief Construct a new DummyCommunicator
 	 *
 	 *  \param ip_address The IP address of the Device.
 	 */
-	TestCommunicator(std::string ip_address)
+	DummyCommunicator(std::string ip_address)
 	    : ip_address_(ip_address)
 	    {
 		    sock_ = 0;
@@ -61,9 +61,9 @@ namespace skynet
     private:
 	std::string ip_address_;
 	int sock_;
-    }; // class SocketCommunicator
+}; // class DummyCommunicator
 
 } // namespace skynet
 
 
-#endif /* SKYNET_SOCKETCOMMUNICATOR_HPP__ */
+#endif /* SKYNET_DUMMYCOMMUNICATOR_HPP__ */
