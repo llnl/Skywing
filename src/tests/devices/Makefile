@@ -22,13 +22,12 @@ RM ?= rm -f
 # add files to generate dependency lists
 CPP_FLAGS += -MMD -MP
 
-# finalize objects, dependency lists, and targets (used for "phony" rules)
+# finalize objects, dependency lists, and targets
 BOOST_OBJECTS = $(addsuffix $(BOOST_SUFFIX).cpp.o, $(TESTS))
 BOOST_DFILES = $(addsuffix $(BOOST_SUFFIX).cpp.d, $(TESTS))
 BOOST_TARGETS = $(addprefix $(TEST_PREFIX), $(addsuffix $(BOOST_SUFFIX), $(TESTS)))
-CATCH_OBJECTS = $(addsuffix $(CATCH_SUFFIX).cpp.o, $(TESTS))
-CATCH_DFILES = $(addsuffix $(CATCH_SUFFIX).cpp.d, $(TESTS))
-CATCH_TARGETS = $(addprefix $(TEST_PREFIX), $(addsuffix $(CATCH_SUFFIX), $(TESTS)))
+CATCH_OBJECTS = catch_main.cpp.o $(addsuffix $(CATCH_SUFFIX).cpp.o, $(TESTS))
+CATCH_DFILES = catch_main.cpp.d $(addsuffix $(CATCH_SUFFIX).cpp.d, $(TESTS))
 
 # finalize include flags
 BOOST_INCLUDE_FLAGS = $(addprefix -I, $(BOOST_INCLUDE_DIR))
@@ -45,13 +44,16 @@ CATCH_INCLUDE_FLAGS += -I$(DEVICES_INCLUDE_DIR)
 	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) -c $(CATCH_INCLUDE_FLAGS) $< -o $@
 
 # implicit rule to link Boost object files into executables
-$(TEST_PREFIX)%: %.cpp.o
+$(TEST_PREFIX)%$(BOOST_SUFFIX): %$(BOOST_SUFFIX).cpp.o
 	$(CXX) $(CPP_FLAGS) $(BOOST_CXX_FLAGS) $< -o $@
 
-# implicit rule to link Catch object files into executables
-$(TEST_PREFIX)%: %.cpp.o
-	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) $< -o $@
+# explicit rule to compile Catch main source file into object
+catch_main.cpp.o: catch_main.cpp
+	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) -c $(CATCH_INCLUDE_FLAGS) catch_main.cpp -o catch_main.cpp.o
 
+# explicit rule to link Catch object files into one single executable
+run_catch_tests: $(CATCH_OBJECTS)
+	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) $(CATCH_OBJECTS) -o run_catch_tests
 
 # include dependency lists created during compilation
 -include $(BOOST_DFILES) $(CATCH_DFILES)
@@ -73,9 +75,9 @@ boost:
 
 # make Catch targets
 catch:
-	$(MAKE) $(CATCH_TARGETS)
+	$(MAKE) run_catch_tests
 
 # delete all objects, dependency lists, and executables
 clean:
 	$(RM) $(BOOST_OBJECTS) $(BOOST_DFILES) $(BOOST_TARGETS)
-	$(RM) $(CATCH_OBJECTS) $(CATCH_DFILES) $(CATCH_TARGETS)
+	$(RM) $(CATCH_OBJECTS) $(CATCH_DFILES) run_catch_tests

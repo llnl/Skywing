@@ -1,9 +1,8 @@
-#define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
 #include "Skynet_TestCommunicator.hpp"
 
-TEST_CASE( "Communication methods work", "[member functions]" )
+TEST_CASE( "Communication methods work", "[Skynet_TestCommunicator]" )
 {
     skynet::TestCommunicator communicator("192.0.0.1");
     std::pair<void*, std::size_t> message;
@@ -13,7 +12,7 @@ TEST_CASE( "Communication methods work", "[member functions]" )
     REQUIRE( abs(b  - 100.0) < 1e-16);
 }
 
-TEST_CASE( "Get and Set methods work", "[get set methods]" )
+TEST_CASE( "Get and Set methods work", "[Skynet_TestCommunicator]" )
 {
     skynet::TestCommunicator communicator("192.0.0.1");
 
@@ -31,7 +30,7 @@ TEST_CASE( "Get and Set methods work", "[get set methods]" )
     }
 }
 
-TEST_CASE( "Get and Set methods work 2", "[!shouldfail]" )
+TEST_CASE( "Get and Set methods work 2", "[!shouldfail][Skynet_TestCommunicator]" )
 {
     skynet::TestCommunicator communicator("192.0.0.1");
     std::string ip_address = communicator.get_ip_address();
