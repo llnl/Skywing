@@ -1,83 +1,95 @@
-# user defined options
-BOOST_CXX_FLAGS = -Wall
-CATCH_CXX_FLAGS = -Wall -std=c++11
-
-# project specific options
+#-------------------------- Skynet project variables ---------------------------
 SKYNET_DIR = $(HOME)/workspace/skynet
 SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
+SKYNET_CXX_FLAGS = -Wall
+#-------------------------------------------------------------------------------
 
-# directory specific options
-TESTS = Skynet_TestCommunicator
-BOOST_INCLUDE_DIR = $(SKYNET_DIR)/utils/boost_1_68_0
-CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include
+#--------------------- List of variables for each Module -----------------------
+
+# Devices variables
+DEVICES_TESTS = Skynet_TestCommunicator
 DEVICES_INCLUDE_DIR = $(SKYNET_INCLUDE_DIR)/devices
-BOOST_SUFFIX = _boost
-CATCH_SUFFIX = _catch
-TEST_PREFIX = test_
 
-# default values for unset environment variables
+# <Module> variables
+# <MODULE>_TESTS = ...
+# <MODULE>_INCLUDE_DIR = $(SKYNET_INCLUDE_DIR)/<module>
+
+#-------------------------------------------------------------------------------
+
+#----------------------- Catch & Makefile variables ----------------------------
+CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include
+CATCH_INCLUDE_FLAG = -I$(CATCH_INCLUDE_DIR)
+CATCH_CXX_FLAGS = -std=c++11
 CXX ?= g++
 RM ?= rm -f
-
-# add files to generate dependency lists
 CPP_FLAGS += -MMD -MP
+CXX_FLAGS = $(CATCH_CXX_FLAGS) $(SKYNET_CXX_FLAGS)
+#-------------------------------------------------------------------------------
 
-# finalize objects, dependency lists, and targets
-BOOST_OBJECTS = $(addsuffix $(BOOST_SUFFIX).cpp.o, $(TESTS))
-BOOST_DFILES = $(addsuffix $(BOOST_SUFFIX).cpp.d, $(TESTS))
-BOOST_TARGETS = $(addprefix $(TEST_PREFIX), $(addsuffix $(BOOST_SUFFIX), $(TESTS)))
-CATCH_OBJECTS = catch_main.cpp.o $(addsuffix $(CATCH_SUFFIX).cpp.o, $(TESTS))
-CATCH_DFILES = catch_main.cpp.d $(addsuffix $(CATCH_SUFFIX).cpp.d, $(TESTS))
+#------------------- List of files to be created for each Module ---------------
 
-# finalize include flags
-BOOST_INCLUDE_FLAGS = $(addprefix -I, $(BOOST_INCLUDE_DIR))
-BOOST_INCLUDE_FLAGS += -I$(DEVICES_INCLUDE_DIR)
-CATCH_INCLUDE_FLAGS = $(addprefix -I, $(CATCH_INCLUDE_DIR))
-CATCH_INCLUDE_FLAGS += -I$(DEVICES_INCLUDE_DIR)
+# Devices lists
+DEVICES_OBJECTS = $(addsuffix _devices_test.cpp.o, $(DEVICES_TESTS))
+DEVICES_DFILES = $(addsuffix _devices_test.cpp.d, $(DEVICES_TESTS))
 
-# implicit rule to compile Boost source files into objects
-%$(BOOST_SUFFIX).cpp.o: %$(BOOST_SUFFIX).cpp
-	$(CXX) $(CPP_FLAGS) $(BOOST_CXX_FLAGS) -c $(BOOST_INCLUDE_FLAGS) $< -o $@
+# <Module> lists
+# <Module>_OBJECTS = $(addsuffix _<module>_test.cpp.o, $(<MODULE>_TESTS))
+# <Module>_DFILES = $(addsuffix _<module>_test.cpp.d, $(<MODULE>_TESTS))
 
-# implicit rule to compile Catch source files into objects
-%$(CATCH_SUFFIX).cpp.o: %$(CATCH_SUFFIX).cpp
-	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) -c $(CATCH_INCLUDE_FLAGS) $< -o $@
+# Master lists ***add additional module lists here***
+OBJECTS = $(DEVICES_OBJECTS) catch_main.cpp.o
+DFILES = $(DEVICES_DFILES) catch_main.cpp.d
 
-# implicit rule to link Boost object files into executables
-$(TEST_PREFIX)%$(BOOST_SUFFIX): %$(BOOST_SUFFIX).cpp.o
-	$(CXX) $(CPP_FLAGS) $(BOOST_CXX_FLAGS) $< -o $@
+#-------------------------------------------------------------------------------
 
-# explicit rule to compile Catch main source file into object
-catch_main.cpp.o: catch_main.cpp
-	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) -c $(CATCH_INCLUDE_FLAGS) catch_main.cpp -o catch_main.cpp.o
+#--------------------- List of includes for each Module ------------------------
 
-# explicit rule to link Catch object files into one single executable
-run_catch_tests: $(CATCH_OBJECTS)
-	$(CXX) $(CPP_FLAGS) $(CATCH_CXX_FLAGS) $(CATCH_OBJECTS) -o run_catch_tests
+# Devices includes
+DEVICES_INCLUDE_FLAGS = -I$(DEVICES_INCLUDE_DIR) $(CATCH_INCLUDE_FLAG)
 
-# include dependency lists created during compilation
--include $(BOOST_DFILES) $(CATCH_DFILES)
+# <Module> includes
+# <MODULE>_INCLUDE_FLAGS = -I$(<MODULE>_INCLUDE_DIR) $(CATCH_INCLUDE_FLAG)
 
-# declare rules that don't correspond to actual files
-.PHONY: all boost catch clean
+#-------------------------------------------------------------------------------
 
-# declare object files as secondary so make doesn't automatically delete them
-.SECONDARY: $(BOOST_OBJECTS)
+#----------------------------- Makefile Rules ----------------------------------
 
-# make all targets
+# Phony rules
+.PHONY: all devices clean
 all:
-	$(MAKE) boost
-	$(MAKE) catch
-
-# make Boost targets
-boost:
-	$(MAKE) $(BOOST_TARGETS)
-
-# make Catch targets
-catch:
 	$(MAKE) run_catch_tests
-
-# delete all objects, dependency lists, and executables
+devices:
+	$(MAKE) run_catch_devices_tests
+# <module>:
+#   $(MAKE) run_catch_<module>_tests
+# *** add additional module executables to clean below ***
 clean:
-	$(RM) $(BOOST_OBJECTS) $(BOOST_DFILES) $(BOOST_TARGETS)
-	$(RM) $(CATCH_OBJECTS) $(CATCH_DFILES) run_catch_tests
+	$(RM) run_catch_tests run_catch_devices_tests
+	$(RM) $(OBJECTS) $(DFILES)
+
+# Devices rules
+%_devices_test.cpp.o: %_test.cpp
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) -c $(DEVICES_INCLUDE_FLAGS) $< -o $@
+run_catch_devices_tests: $(DEVICES_OBJECTS) catch_main.cpp.o
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(DEVICES_OBJECTS) catch_main.cpp.o -o run_catch_devices_tests
+
+# <Module> rules
+# %_<module>_test.cpp.o: %_test.cpp
+#	  $(CXX) $(CPP_FLAGS) $(CXX_FLAGS) -c $(<MODULE>_INCLUDE_FLAGS) $< -o $@
+# run_catch_<module>_tests: $(<MOUDLE>_OBJECTS) catch_main.cpp.o
+#		$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(<MODULE>_OBJECTS) catch_main.cpp.o -o run_catch_<module>_tests
+
+# Catch rules
+run_catch_tests: $(OBJECTS) catch_main.cpp.o
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(OBJECTS) -o run_catch_tests
+catch_main.cpp.o: catch_main.cpp
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) -c $(CATCH_INCLUDE_FLAG) catch_main.cpp -o catch_main.cpp.o
+
+#-------------------------------------------------------------------------------
+
+#----------------------- For Makefile functionality ----------------------------
+# Declare object files as secondary so make doesn't automatically delete them
+.SECONDARY: $(OBJECTS)
+# Include dependency lists
+-include $(DFILES)
+#-------------------------------------------------------------------------------
