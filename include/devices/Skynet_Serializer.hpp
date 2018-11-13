@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <type_traits>
+#include <iterator>
 
 namespace skynet
 {
@@ -79,58 +80,59 @@ namespace skynet
   
 
   template<typename T>
-  T deserialize(std::pair<void*, std::size_t> data)
+  T deserialize(std::vector<char>& data)
   {
     throw std::runtime_error("deserialize: Unknown type.");
   }
 
   template<>
-  int deserialize(std::pair<void*, std::size_t> data)
+  int deserialize(std::vector<char>& data)
   {
 #ifdef DEBUG
-    if (data.second != 1) 
+    if (data.size() != 1) 
       throw std::runtime_error("deserialize: deserializing an int must have size 1.");
 #endif
-    return static_cast<int>(*data.first);
+    return static_cast<int>(data[0]);
   }
 
   template<>
-  double deserialize(std::pair<void*, std::size_t> data)
+  double deserialize(std::vector<char>& data)
   {
 #ifdef DEBUG
-    if (data.second != 1) 
+    if (data.size() != 1) 
       throw std::runtime_error("deserialize: deserializing a double must have size 1.");
 #endif
-    return static_cast<double>(*data.first);
+    return static_cast<double>(data[0]);
   }
 
   template<>
-  unsigned deserialize(std::pair<void*, std::size_t> data)
+  unsigned deserialize(std::vector<char>& data)
   {
 #ifdef DEBUG
-    if (data.second != 1) 
+    if (data.size() != 1) 
       throw std::runtime_error("deserialize: deserializing an unsigned must have size 1.");
 #endif
-    return static_cast<unsigned>(*data.first);
+    return static_cast<unsigned>(data[0]);
   }
 
   template<>
-  bool deserialize(std::pair<void*, std::size_t> data)
+  bool deserialize(std::vector<char>& data)
   {
 #ifdef DEBUG
-    if (data.second != 1) 
+    if (data.size() != 1) 
       throw std::runtime_error("deserialize: deserializing a bool must have size 1.");
 #endif
-    return static_cast<bool>(*data.first);
+    return static_cast<bool>(data[0]);
   }
 
   template<typename S>
-  std::vector<S> deserialize(std::pair<void*, std::size_t> data)
+  template<>
+  std::vector<S> deserialize(std::vector<char>& data)
   {
-    std::vector<S> v;
-    v.assign(data.first, data.first + data.second);
-    delete data.first;
-    return v;
+    std::vector<S> newVec;
+    newVec.insert(newVec.end(), std::make_move_iterator(data.begin()), 
+		  std::make_move_iterator(data.end()));
+    return newVec;
   }
   
 

@@ -96,7 +96,7 @@ namespace skynet
      * \return A pair providing the data received and the size of
      * the data received.
      */
-    virtual std::pair<std::unique_ptr<void*>, std::size_t> do_receive_from_() const = 0;
+    virtual std::vector<char> do_receive_from_() const = 0;
   }; // class DeviceCommunicator
 
 } // namespace skynet
