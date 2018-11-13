@@ -4,9 +4,10 @@
 #include <memory>
 #include <cstddef>
 #include <type_traits>
+#include <vector>
+#include <string>
 #include "Skynet_DeviceCommunicator.hpp"
-#include "Skynet_Serializer.hpp"
-#include "Skynet_Serializable.hpp"
+#include "Skynet_CommunicatorFactory.hpp"
 
 namepsace skynet
 {  
@@ -25,7 +26,7 @@ namepsace skynet
      * \param comm A DeviceCommunicator representing this
      * DeviceReference's communications policy.
      */
-    DeviceReference(std::unique_ptr<DeviceCommunicator> comm)
+    DeviceReference(std::unique_ptr<CommunicatorFactory> comm)
       : comm(comm_), is_believed_live_(true)
     { }
     
@@ -38,48 +39,18 @@ namepsace skynet
     { return is_live_; }
 
 
-
-    template<typename T>
-    std::enable_if_t<std::is_base_of<Serializable, T>::value, void> 
-    send_to(T data, int tag) const
+    /** \brief Request a new DeviceCommunicator for this DeviceReference. 
+     * \return A new DeviceCommunicator. */
+    std::unique_ptr<DeviceCommunicator> create_new_communicator()
     {
-      void* pv_d = data.serialize();
-      std::size_t pv_d_size = data.get_serialized_size();
-      comm_->send_to(pv_d, pv_d_size, tag);
-      data.clean_after_serialization();
+      return comm_factory_->create_new_communicator(comm_config_info_);
     }
-
-    template<typename T>
-    std::enable_if_t<not std::is_base_of<Serializable, T>::value, void> 
-    send_to(T data, int tag) const
-    {
-      comm_->send_to(serialize<T>(data), get_serialized_size<T>(data), tag);
-    }
-
-
-
-    template<typename T>
-    std::enable_if_t<std::is_base_of<Serializable, T>::value, T>
-    receive_from(int tag) const
-    {
-      std::pair<void*, std::size_t> ret = comm_->receive_from(tag);
-      T t = T::deserialize(ret);
-      delete ret.first;
-      return t;
-    }
-
-    template<typename T>
-    std::enable_if_t<not std::is_base_of<Serializable, T>::value, T> 
-    receive_from(int tag) const
-    {
-      return deserialize<T>(comm_->receive_from(tag));
-    }
-
     
   private:
     bool is_believed_live;
     id_t device_id_;
-    std::unique_ptr<DeviceCommunicator> comm_;
+    std::unique_ptr<CommunicatorFactory> comm_factory_;
+    std::vector<std::string> comm_config_info_;
     
   }; // class DeviceReference
 } // namespace skynet
