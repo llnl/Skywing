@@ -1,0 +1,3 @@
+run_catch*_tests
+*.o
+*.d
