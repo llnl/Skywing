@@ -1,5 +1,5 @@
 #-------------------------- Skynet project variables ---------------------------
-SKYNET_DIR = $(HOME)/workspace/skynet
+SKYNET_DIR ?= $(HOME)/workspace/skynet
 SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
 SKYNET_CXX_FLAGS = -Wall
 #-------------------------------------------------------------------------------
