@@ -13,31 +13,31 @@ namespace skynet
     throw std::runtime_error("serialize: Unknown type.");
   }
 
-  template<>
+  // template<>
   void* serialize(const int& data)
   {
-    return static_cast<void*>(&data);
+    return static_cast<void*>((void *) &data);
   }
   template<>
   void* serialize(const double& data)
   {
-    return static_cast<void*>(&data);
+    return static_cast<void*>((void *) &data);
   }
   template<>
   void* serialize(const unsigned& data)
   {
-    return static_cast<void*>(&data);
+    return static_cast<void*>((void *) &data);
   }
   template<>
   void* serialize(const bool& data)
   {
-    return static_cast<void*>(&data);
+    return static_cast<void*>((void *) &data);
   }
 
   template<typename S>
   void* serialize(const std::vector<S>& data)
   {
-    return static_cast<void*>(data.data());
+    return static_cast<void*>((void *) data.data());
   }
 
 
@@ -106,6 +106,16 @@ namespace skynet
   }
 
   template<>
+  char deserialize(std::vector<char>& data)
+  {
+#ifdef DEBUG
+    if (data.size() != 1) 
+      throw std::runtime_error("deserialize: deserializing a char must have size 1.");
+#endif
+    return static_cast<char>(data[0]);
+  }
+
+  template<>
   unsigned deserialize(std::vector<char>& data)
   {
 #ifdef DEBUG
@@ -125,15 +135,14 @@ namespace skynet
     return static_cast<bool>(data[0]);
   }
 
-  template<typename S>
-  template<>
-  std::vector<S> deserialize(std::vector<char>& data)
-  {
-    std::vector<S> newVec;
-    newVec.insert(newVec.end(), std::make_move_iterator(data.begin()), 
-		  std::make_move_iterator(data.end()));
-    return newVec;
-  }
+  // template<typename S>
+  // std::vector<S> deserialize(std::vector<char>& data)
+  // {
+  //   std::vector<S> newVec;
+  //   newVec.insert(newVec.end(), std::make_move_iterator(data.begin()), 
+    //   std::make_move_iterator(data.end()));
+  //   return newVec;
+  // }
   
 
 } // namespace skynet
