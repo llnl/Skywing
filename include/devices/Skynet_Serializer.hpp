@@ -13,17 +13,36 @@ namespace skynet
   {
     return static_cast<const void*>(&data);
   }
+
+
+
+<<<<<<< HEAD
   const void* serialize(const double& data)
   {
     return static_cast<const void*>(&data);
+=======
+
+  // template<>
+  void* serialize(const int& data)
+  {
+    return static_cast<void*>((void *) &data);
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   }
   const void* serialize(const unsigned& data)
   {
+<<<<<<< HEAD
     return static_cast<const void*>(&data);
+=======
+    return static_cast<void*>((void *) &data);
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   }
   const void* serialize(const bool& data)
   {
+<<<<<<< HEAD
     return static_cast<const void*>(&data);
+=======
+    return static_cast<void*>((void *) &data);
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   }
 
   template<typename S>
@@ -32,9 +51,19 @@ namespace skynet
     return static_cast<const void*>(data.data());
   }
 
+
+=======
+    return static_cast<void*>((void *) &data);
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
+  }
+
   std::vector<char> serialize(const Serializable* data)
   {
+<<<<<<< HEAD
     return data.serialize();
+=======
+    return static_cast<void*>((void *) data.data());
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   }
 
 
@@ -112,7 +141,21 @@ namespace skynet
   }
 
   template<>
+<<<<<<< HEAD
   unsigned deserialize<unsigned>(std::vector<char>& data)
+=======
+  char deserialize(std::vector<char>& data)
+  {
+#ifdef DEBUG
+    if (data.size() != 1) 
+      throw std::runtime_error("deserialize: deserializing a char must have size 1.");
+#endif
+    return static_cast<char>(data[0]);
+  }
+
+  template<>
+  unsigned deserialize(std::vector<char>& data)
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   {
 #ifdef DEBUG
     if (data.size() != 1) 
@@ -131,6 +174,7 @@ namespace skynet
     return *static_cast<bool*>(data.data());
   }
 
+<<<<<<< HEAD
   template<typename S>
   template<>
   std::vector<S> deserialize<std::vector<S>>(std::vector<char>& data)
@@ -140,6 +184,16 @@ namespace skynet
 		  std::make_move_iterator(data.end()));
     return newVec;
   }
+=======
+  // template<typename S>
+  // std::vector<S> deserialize(std::vector<char>& data)
+  // {
+  //   std::vector<S> newVec;
+  //   newVec.insert(newVec.end(), std::make_move_iterator(data.begin()), 
+    //   std::make_move_iterator(data.end()));
+  //   return newVec;
+  // }
+>>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
   
   
 } // namespace skynet

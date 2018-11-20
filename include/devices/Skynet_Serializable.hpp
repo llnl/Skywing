@@ -8,9 +8,8 @@ namespace skynet
   class Serializable
   {
   public:
-    virtual void* serialize() = 0;
-    virtual std::size_t get_serialized_size() = 0;
-    virtual void clean_after_serialization() = 0;
+    virtual std::vector<char> serialize() = 0;
+
   }; // class Serializable
 } // namespace skynet
 

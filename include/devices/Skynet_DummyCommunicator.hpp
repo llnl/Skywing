@@ -1,7 +1,7 @@
 #ifndef SKYNET_DUMMYCOMMUNICATOR_HPP__
 #define SKYNET_DUMMYCOMMUNICATOR_HPP__
 
-#include <Skynet_DeviceCommunicator.hpp>
+#include "Skynet_DeviceCommunicator.hpp"
 
 #include <string>
 #include <sys/socket.h>
@@ -29,7 +29,19 @@ namespace skynet
        * \param data_size Number of bytes of data to send.
        * \param tag A tag associated with the data.
        */
-      void send_to(void* data, std::size_t data_size, int tag) const
+
+      void set_ip_address(std::string ip_address)
+      {
+          ip_address_ = ip_address;
+      }
+
+      std::string get_ip_address() const
+      {
+          return ip_address_;
+      }
+
+      private:
+      void do_send_to_(void* data, std::size_t data_size) const override
       {
           // do nothing
       }
@@ -41,21 +53,12 @@ namespace skynet
        * \return A pair providing the data received and the size of
        * the data received.
        */
-      std::pair<void*, std::size_t> receive_from(int tag) const
+    std::pair<void*, std::size_t> do_receive_from_() const override
       {
-          double a = 100.0;
-          std::pair<void*, std::size_t> message(&a,100);
-          return message;
-      }
 
-      void set_ip_address(std::string ip_address)
-      {
-          ip_address_ = ip_address;
-      }
-
-      std::string get_ip_address() const
-      {
-          return ip_address_;
+        int a = 1100; 
+        std::pair<void*, std::size_t> message(&a,sizeof(int));
+        return message; 
       }
 
     private:
