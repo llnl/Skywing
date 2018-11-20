@@ -6,6 +6,7 @@ TEST_CASE( "Communication methods work", "[Skynet_DummyCommunicator]" )
 {
     skynet::DummyCommunicator communicator("192.0.0.1");
     std::pair<void*, std::size_t> message;
+    //ALF: This is incorrect syntax, use do_reveive_from (). I changed the Skynet_DummyCommunicator.hpp to reflect what it sould be. 
     message = communicator.receive_from(1);
     double* a = (double*) message.first;
     double b = *a;
