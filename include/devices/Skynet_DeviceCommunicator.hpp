@@ -2,7 +2,6 @@
 #define SKYNET_DEVICECOMMUNICATOR_HPP__
 
 #include <cstddef>
-#include "Skynet_Serializer.hpp"
 #include "Skynet_Serializable.hpp"
 
 namespace skynet
@@ -17,50 +16,16 @@ namespace skynet
   {
   public:
 
-
-    /** \brief Send a data through this communication channel.
-     *
-     * This function is only active is the data being sent (of type T)
-     * inherits from Serializable.
-     *
-     * \param data The data to send.
-     */
-    template<typename T>
-    std::enable_if_t<std::is_base_of<Serializable, T>::value, void> 
-    send_to(T data) const
-    {
-      void* pv_d = data.serialize();
-      std::size_t pv_d_size = data.get_serialized_size();
-      do_send_to_(pv_d, pv_d_size);
-      data.clean_after_serialization();
-    }
-
     /** \brief Send a data through this communication channel.
      *
      * This function is only active is the data being sent (of type T)
      * does NOT inherit from Serializable.
      */
     template<typename T>
-    std::enable_if_t<not std::is_base_of<Serializable, T>::value, void> 
-    send_to(T data) const
+    void send_to(const T& data) const
     {
-      do_send_to_(serialize<T>(data), get_serialized_size<T>(data));
-    }
-
-    /** \brief Receive data through this communication channel.
-     *
-     * This function is only active if T inherits from Serializable.
-     *
-     * \return An object of type T.
-     */
-    template<typename T>
-    std::enable_if_t<std::is_base_of<Serializable, T>::value, T>
-    receive_from() const
-    {
-      std::pair<void*, std::size_t> ret = do_receive_from_();
-      T t = T::deserialize(ret);
-      delete ret.first;
-      return t;
+      auto pData = serialize(data); // returns either a void* or a std::vector<char>
+      do_send_to_(convert_if_vec(pData), get_serialized_size(data, pData));
     }
 
     /** \brief Receive data through this communication channel.
@@ -70,8 +35,7 @@ namespace skynet
      * \return An object of type T.
      */
     template<typename T>
-    std::enable_if_t<not std::is_base_of<Serializable, T>::value, T> 
-    receive_from() const
+    T receive_from() const
     {
       return deserialize<T>(do_receive_from()_);
     }
