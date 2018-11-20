@@ -8,7 +8,8 @@ SKYNET_CXX_FLAGS = -Wall
 
 # Devices variables
 DEVICES_TESTS = \
-  devices/Skynet_DummyCommunicator
+  devices/Skynet_SocketCommunicator \
+#  devices/Skynet_DummyCommunicator
 DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 
 # <Module> variables
@@ -22,7 +23,7 @@ DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 #----------------------- Catch & Makefile variables ----------------------------
 CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include
 CATCH_INCLUDE_FLAG = -I$(CATCH_INCLUDE_DIR)
-CATCH_CXX_FLAGS = -std=c++11
+CATCH_CXX_FLAGS = -std=c++14
 CXX ?= g++
 RM ?= rm -f
 CPP_FLAGS += -MMD -MP
