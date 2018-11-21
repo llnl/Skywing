@@ -1,6 +1,6 @@
-#include "../../../utils/catch2/catch.hpp"
-#include "../../../include/devices/Skynet_DummyCommunicator.hpp"
-#include "../../../include/devices/Skynet_SocketCommunicator.hpp"
+#include "catch.hpp"
+#include "Skynet_DummyCommunicator.hpp"
+#include "Skynet_SocketCommunicator.hpp"
 
 #include <iostream>
 #include <unistd.h>  //Header file for sleep(). man 3 sleep for details. 

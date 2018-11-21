@@ -2,11 +2,6 @@
 #define SKYNET_DEVICECOMMUNICATOR_HPP__
 
 #include <cstddef>
-<<<<<<< HEAD
-=======
-#include<iostream>
-#include "Skynet_Serializer.hpp"
->>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
 #include "Skynet_Serializable.hpp"
 
 namespace skynet
@@ -20,82 +15,25 @@ namespace skynet
   class DeviceCommunicator
   {
   public:
-
+    
     /** \brief Send a data through this communication channel.
-     *
-     * This function is only active is the data being sent (of type T)
-     * does NOT inherit from Serializable.
      */
     template<typename T>
-<<<<<<< HEAD
     void send_to(const T& data) const
     {
       auto pData = serialize(data); // returns either a void* or a std::vector<char>
       do_send_to_(convert_if_vec(pData), get_serialized_size(data, pData));
     }
-=======
-    std::enable_if_t<not std::is_base_of<Serializable, T>::value, void> 
-    send_to(T data) const
-    {
-      do_send_to_(serialize<T>(data), get_serialized_size<T>(data));
-    }
-
-     /** \brief Receive data through this communication channel.
-     *
-     * This function is only active if T inherits from Serializable.
-     *
-     * \return An object of type T.
-     */
-    // ALF:: Commented out do to Deserializing code not working 
-    // template<typename T>
-    // std::enable_if_t<std::is_base_of<Serializable, T>::value, T>
-    // receive_from() const
-    // {
-    //   std::pair<void*, std::size_t> ret = do_receive_from_();
-    //   T t = T::deserialize(ret);
-    //   // delete ret.first;
-    //   return t;
-    // }
->>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
 
     /** \brief Receive data through this communication channel.
      *
-     * This function is only active if T does NOT inherit from Serializable.
-     *
      * \return An object of type T.
      */
-    // ALF:: Commented out do to Deserializing code not working 
-    // template<typename T>
-    // std::enable_if_t<not std::is_base_of<Serializable, T>::value, T> 
-    // receive_from() const
-    // {
-    //   // double a = 100.0;
-    //   // std::pair<void*, std::size_t> message(&a,100);
-    //   // return deserialize<T>(message.second);
-    //   return deserialize<T>(do_receive_from_());
-    // }
-
-
-    //ALF:: stand in code for receive from 
     template<typename T>
-<<<<<<< HEAD
     T receive_from() const
-=======
-     std::enable_if_t<not std::is_base_of<Serializable, T>::value, T> 
-     receive_from() const
->>>>>>> 498329fd7c2482ce1075e469712614fd1345738b
     {
-      std::pair<void*, std::size_t> ret = do_receive_from_();
-
-
-      std::cout<< "in reveive_from"<<std::endl; 
-       std::cout<< ret.second<<std::endl; 
-        // int value = reinterpret_cast<int *>(ret.first); 
-       int value = 1100; 
-      return value;
+      return deserialize<T>(do_receive_from_());
     }
-
-
 
   private:
       
@@ -114,7 +52,7 @@ namespace skynet
      * \return A pair providing the data received and the size of
      * the data received.
      */
-    virtual std::pair<void*, std::size_t> do_receive_from_() const = 0;
+    virtual std::vector<char> do_receive_from_() const = 0;
   }; // class DeviceCommunicator
 
 } // namespace skynet
