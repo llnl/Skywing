@@ -1,14 +1,15 @@
 #-------------------------- Skynet project variables ---------------------------
-SKYNET_DIR ?= $(HOME)/workspace/skynet
+SKYNET_DIR ?= $(HOME)/workspace/skynet/skynet
 SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
-SKYNET_CXX_FLAGS = -Wall -Werror
+SKYNET_CXX_FLAGS = -Wall -Werror -pthread
 #-------------------------------------------------------------------------------
 
 #--------------------- List of variables for each Module -----------------------
 
 # Devices variables
 DEVICES_TESTS = \
-  devices/Skynet_SocketCommunicator \
+  devices/Skynet_Serialization
+#  devices/Skynet_SocketCommunicator
 #  devices/Skynet_DummyCommunicator
 DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 

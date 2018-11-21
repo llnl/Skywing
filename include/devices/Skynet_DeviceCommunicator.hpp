@@ -2,7 +2,7 @@
 #define SKYNET_DEVICECOMMUNICATOR_HPP__
 
 #include <cstddef>
-#include "Skynet_Serializable.hpp"
+#include "Skynet_Serializer.hpp"
 
 namespace skynet
 {
@@ -43,7 +43,7 @@ namespace skynet
      * \param data_size Number of bytes of data to send.
      * \param tag A tag associated with the data.
      */
-    virtual void do_send_to_(void* data, std::size_t data_size) const = 0;
+    virtual void do_send_to_(const void* data, std::size_t data_size) const = 0;
 
     /** \brief Receive data from the associated Device.
      *

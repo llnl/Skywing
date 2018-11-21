@@ -32,6 +32,9 @@ namespace skynet
   template<typename S>
   const void* serialize(const std::vector<S>& data)
   {
+    static_assert(not std::is_same<S, bool>::value, 
+		  "serialize: std::vector<bool> is not necessarily byte-packed,"
+		  " so we're not currently supporting its serialization.");
     return static_cast<const void*>(data.data());
   }
 
@@ -130,6 +133,9 @@ namespace skynet
   {
     static unsigned deserializeImpl(const std::vector<char>& data)
     { return *(reinterpret_cast<const unsigned*>(data.data())); }
+
+    static unsigned deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const unsigned*>(data)); }
   };
 
   template<>
@@ -147,6 +153,9 @@ namespace skynet
   {
     static bool deserializeImpl(const std::vector<char>& data)
     { return *(reinterpret_cast<const bool*>(data.data())); }
+
+    static bool deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const bool*>(data)); }
   };
     
   template<>

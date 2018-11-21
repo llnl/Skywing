@@ -15,15 +15,17 @@ void *mySever(void *vargp)
     double a = (double) 100.0; 
     SocketCommunicator socketCom(ip_address);
     socketCom.send_to(a);
+    pthread_exit(NULL);
     // return NULL; 
 } 
 
 void *myClient(void *vargp) 
 { 
     std::string ip_address = "192.0.0.2"; 
-    double a = (double) 100.0; 
+    //    double a = (double) 100.0; 
     SocketCommunicator socketCom(ip_address);
     socketCom.receive_from<int>();
+    pthread_exit(NULL);
     // return NULL; 
 } 
    
