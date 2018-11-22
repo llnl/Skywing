@@ -4,147 +4,173 @@
 #include <cstddef>
 #include <type_traits>
 #include <iterator>
+#include <memory>
+#include <vector>
+#include <cstring>
+#include <iostream>
+#include "Skynet_Serializable.hpp"
 
 namespace skynet
 {
-  template<typename T>
-  void* serialize(const T& data)
+  const void* serialize(const int& data)
   {
-    throw std::runtime_error("serialize: Unknown type.");
+    return static_cast<const void*>(&data);
   }
-
-  // template<>
-  void* serialize(const int& data)
+  const void* serialize(const double& data)
   {
-    return static_cast<void*>((void *) &data);
+    return static_cast<const void*>(&data);
   }
-  template<>
-  void* serialize(const double& data)
+  const void* serialize(const unsigned& data)
   {
-    return static_cast<void*>((void *) &data);
+    return static_cast<const void*>(&data);
   }
-  template<>
-  void* serialize(const unsigned& data)
+  const void* serialize(const bool& data)
   {
-    return static_cast<void*>((void *) &data);
-  }
-  template<>
-  void* serialize(const bool& data)
-  {
-    return static_cast<void*>((void *) &data);
+    return static_cast<const void*>(&data);
   }
 
   template<typename S>
-  void* serialize(const std::vector<S>& data)
+  const void* serialize(const std::vector<S>& data)
   {
-    return static_cast<void*>((void *) data.data());
+    static_assert(not std::is_same<S, bool>::value, 
+		  "serialize: std::vector<bool> is not necessarily byte-packed,"
+		  " so we're not currently supporting its serialization.");
+    return static_cast<const void*>(data.data());
+  }
+
+  std::vector<char> serialize(const Serializable& data)
+  {
+    return data.serialize();
   }
 
 
 
+
+  const void* convert_if_vec(const void* p)
+  { return p; }
 
   template<typename T>
-  std::size_t get_serialized_size(const T&)
+  const void* convert_if_vec(const std::vector<char>& p)
   {
-    throw std::runtime_error("get_serialized_size: Unknown type.");
+    return static_cast<const void*>(p.data());
   }
 
-  template<>
-  std::size_t get_serialized_size(const int&)
+
+
+  std::size_t get_serialized_size(const int&, const void*)
   {
     return sizeof(int);
   }
-  template<>
-  std::size_t get_serialized_size(const double&)
+
+  std::size_t get_serialized_size(const double&, const void*)
   {
     return sizeof(double);
   }
-  template<>
-  std::size_t get_serialized_size(const unsigned&)
+
+  std::size_t get_serialized_size(const unsigned&, const void*)
   {
     return sizeof(unsigned);
   }
-  template<>
-  std::size_t get_serialized_size(const bool&)
+
+  std::size_t get_serialized_size(const bool&, const void*)
   {
     return sizeof(bool);
   }
 
   template<typename S>
-  std::size_t get_serialized_size(const std::vector<S>& data)
+  std::size_t get_serialized_size(const std::vector<S>& data, const void*)
   {
     return sizeof(S) * data.size();
   }
 
+  std::size_t get_serialized_size(const Serializable&, const std::vector<char>& pData)
+  {
+    return sizeof(char) * pData.size();
+  }
 
-  
+
+
+
 
   template<typename T>
-  T deserialize(std::vector<char>& data)
+  class deserializeImplClass;
+
+  template<typename T>
+  T deserialize(const std::vector<char>& data)
   {
-    throw std::runtime_error("deserialize: Unknown type.");
+    return deserializeImplClass<T>::deserializeImpl(data);
   }
+  template<typename T>
+  T deserialize(const char* data)
+  {
+    return deserializeImplClass<T>::deserializeImpl(data);
+  }
+
+
+  // Generic template to be used when passed something of type Serializable
+  template<typename T>
+  struct deserializeImplClass
+  {
+    static T deserializeImpl(const std::vector<char>& data)
+    {
+      return T::deserialize(data);
+    }
+  };
+
 
   template<>
-  int deserialize(std::vector<char>& data)
+  struct deserializeImplClass<int>
   {
-#ifdef DEBUG
-    if (data.size() != 1) 
-      throw std::runtime_error("deserialize: deserializing an int must have size 1.");
-#endif
-    return static_cast<int>(data[0]);
-  }
+    static int deserializeImpl(const std::vector<char>& data)
+    { return *(reinterpret_cast<const int*>(data.data())); }
+
+    static int deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const int*>(data)); }
+  };
 
   template<>
-  double deserialize(std::vector<char>& data)
+  struct deserializeImplClass<unsigned>
   {
-#ifdef DEBUG
-    if (data.size() != 1) 
-      throw std::runtime_error("deserialize: deserializing a double must have size 1.");
-#endif
-    return static_cast<double>(data[0]);
-  }
+    static unsigned deserializeImpl(const std::vector<char>& data)
+    { return *(reinterpret_cast<const unsigned*>(data.data())); }
+
+    static unsigned deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const unsigned*>(data)); }
+  };
 
   template<>
-  char deserialize(std::vector<char>& data)
+  struct deserializeImplClass<double>
   {
-#ifdef DEBUG
-    if (data.size() != 1) 
-      throw std::runtime_error("deserialize: deserializing a char must have size 1.");
-#endif
-    return static_cast<char>(data[0]);
-  }
+    static double deserializeImpl(const std::vector<char>& data)
+    { return *(reinterpret_cast<const double*>(data.data())); }
+
+    static double deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const double*>(data)); }
+  };
 
   template<>
-  unsigned deserialize(std::vector<char>& data)
+  struct deserializeImplClass<bool>
   {
-#ifdef DEBUG
-    if (data.size() != 1) 
-      throw std::runtime_error("deserialize: deserializing an unsigned must have size 1.");
-#endif
-    return static_cast<unsigned>(data[0]);
-  }
+    static bool deserializeImpl(const std::vector<char>& data)
+    { return *(reinterpret_cast<const bool*>(data.data())); }
 
+    static bool deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const bool*>(data)); }
+  };
+    
   template<>
-  bool deserialize(std::vector<char>& data)
+  template<typename S>
+  struct deserializeImplClass<std::vector<S>>
   {
-#ifdef DEBUG
-    if (data.size() != 1) 
-      throw std::runtime_error("deserialize: deserializing a bool must have size 1.");
-#endif
-    return static_cast<bool>(data[0]);
-  }
-
-  // template<typename S>
-  // std::vector<S> deserialize(std::vector<char>& data)
-  // {
-  //   std::vector<S> newVec;
-  //   newVec.insert(newVec.end(), std::make_move_iterator(data.begin()), 
-    //   std::make_move_iterator(data.end()));
-  //   return newVec;
-  // }
+    static std::vector<S> deserializeImpl(const std::vector<char>& data)
+    {
+      std::vector<S> newVec(data.size() / sizeof(S));
+      for (unsigned i = 0; i < newVec.size(); i++)
+	  newVec[i] = deserialize<S>(data.data() + i * sizeof(S));
+      return newVec;
+    }
+  };  
   
-
 } // namespace skynet
 
 

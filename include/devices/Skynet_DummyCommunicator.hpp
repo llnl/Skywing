@@ -41,7 +41,7 @@ namespace skynet
       }
 
       private:
-      void do_send_to_(void* data, std::size_t data_size) const override
+      void do_send_to_(const void* data, std::size_t data_size) const override
       {
           // do nothing
       }
@@ -53,12 +53,13 @@ namespace skynet
        * \return A pair providing the data received and the size of
        * the data received.
        */
-    std::pair<void*, std::size_t> do_receive_from_() const override
+      std::vector<char> do_receive_from_() const override
       {
 
         int a = 1100; 
-        std::pair<void*, std::size_t> message(&a,sizeof(int));
-        return message; 
+	std::vector<char> ret_vec(sizeof(int) / sizeof(char));
+	std::copy((char*) &a, ((char*)&a) + sizeof(int) / sizeof(char), ret_vec.data());
+        return ret_vec;
       }
 
     private:

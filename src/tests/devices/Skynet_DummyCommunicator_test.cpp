@@ -1,15 +1,12 @@
-#include "../../../utils/catch2/catch.hpp"
-#include "../../../include/devices/Skynet_DummyCommunicator.hpp"
+#include "catch.hpp"
+#include "Skynet_DummyCommunicator.hpp"
 
 TEST_CASE( "Communication methods work", "[Skynet_DummyCommunicator]" )
 {
-    // skynet::DummyCommunicator communicator("192.0.0.1");
-    // std::pair<void*, std::size_t> message;
-    //ALF: This is incorrect syntax, use do_reveive_from (). I changed the Skynet_DummyCommunicator.hpp to reflect what it sould be. 
-    // message = communicator.receive_from(1);
-    // double* a = (double*) message.first;
-    // double b = *a;
-    // REQUIRE( abs(b  - 100.0) < 1e-16);
+    skynet::DummyCommunicator communicator("192.0.0.1");
+    // ALF: This is incorrect syntax, use do_reveive_from (). I changed the Skynet_DummyCommunicator.hpp to reflect what it sould be. 
+    int recvd_int = communicator.receive_from<int>();
+    REQUIRE( recvd_int == 1100);
 }
 
 TEST_CASE( "Get and Set methods work", "[Skynet_DummyCommunicator]" )
