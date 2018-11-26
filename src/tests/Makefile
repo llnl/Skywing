@@ -22,7 +22,7 @@ DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 #-------------------------------------------------------------------------------
 
 #----------------------- Catch & Makefile variables ----------------------------
-CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include
+CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include/catch2
 CATCH_INCLUDE_FLAG = -I$(CATCH_INCLUDE_DIR)
 CATCH_CXX_FLAGS = -std=c++14
 CXX ?= g++
