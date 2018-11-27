@@ -93,7 +93,7 @@ namespace skynet
 
 
   template<typename T>
-  class deserializeImplClass;
+  struct deserializeImplClass;
 
   template<typename T>
   T deserialize(const std::vector<char>& data)
@@ -158,7 +158,6 @@ namespace skynet
     { return *(reinterpret_cast<const bool*>(data)); }
   };
     
-  template<>
   template<typename S>
   struct deserializeImplClass<std::vector<S>>
   {
