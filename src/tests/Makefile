@@ -1,7 +1,7 @@
 #-------------------------- Skynet project variables ---------------------------
 SKYNET_DIR ?= $(HOME)/workspace/skynet/skynet
 SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
-SKYNET_CXX_FLAGS = -Wall -Werror -pthread
+SKYNET_CXX_FLAGS = -Wall -Werror
 #-------------------------------------------------------------------------------
 
 #--------------------- List of variables for each Module -----------------------
