@@ -6,33 +6,35 @@ namespace skynet
   class MPICommunicator : public DeviceCommunicator
   {
   public:
-    MPICommunicator(MPI_Comm comm)
-      : comm_(comm)
+    MPICommunicator(MPI_Comm comm, int tag, int other_rank)
+      : comm_(comm), tag_(tag), other_rank_(other_rank)
     {}
 
   private:
     void do_send_to_(void* data, std::size_t data_size) const
     {
-      MPI_Send(data, data_size, MPI_BYTE, other_rank_, 0, comm_);
+      MPI_Send(data, data_size, MPI_BYTE, other_rank_, tag_, comm_);
     }
 
     std::vector<char> do_receive_from_() const
     {
       MPI_Status status;
-      MPI_Probe(other_rank_, 0, comm_, &status);
+      MPI_Probe(other_rank_, tag_, comm_, &status);
       int data_size;
       MPI_Get_count(&status, MPI_BYTE, &data_size);
       
       std::vector<char> data(data_size);
       MPI_Status status;
       MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_,
-	       0, comm_, &status);
+	       tag_, comm_, &status);
       return data;
     }
 
     private:
     MPI_Comm comm_;
+    int tag_;
     int other_rank_;
+
   }; // class MPICommunicator
 } // namespace skynet
 

@@ -11,22 +11,25 @@ namespace skynet
   class MPICommunicatorFactory : public CommunicatoryFactory
   {
   public:
-    MPICommunicatorFactory()
-      : tag_(0)
-    {}
+    MPICommunicatorFactory(int other_rank)
+      : comm_(MPI_COMM_WORLD), tag_(0), other_rank_(other_rank)
+    { }
+
+    MPICommunicatorFactory(MPI_Comm comm, int other_rank)
+      : comm_(comm), tag_(0), other_rank_(other_rank)
+    { }
 
     std::unique_ptr<DeviceCommunicator> 
     create_new_communicator(std::vector<std::string> comm_config_info)
     {
-      MPI_Comm newcomm;
-      MPI_Comm_create_group(world_comm_, p2p_group_, 0, &newcomm);
+
       return MPICommunicator(newcomm);
     }
 
   private:
-    MPI_Comm world_comm_;
-    MPI_Group p2p_group_; // group containing just this and the other device
+    MPI_Comm comm_;
     int tag_;
+    int other_rank_;
 
   }; // MPICommunicatorFactory
 } // namespace skynet
