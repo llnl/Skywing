@@ -16,14 +16,15 @@ DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 
 #-------------------------------------------------------------------------------
 
-#----------------------- Catch & Makefile variables ----------------------------
+#---------------------------- Catch variables ----------------------------------
 CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include/catch2
 CATCH_INCLUDE_FLAG = -I$(CATCH_INCLUDE_DIR)
 # Set CATCH_CXX_FLAGS to -std=c++11 if no standard specified in SKYNET_CXX_FLAGS
 CATCH_CXX_FLAGS =
-CXX ?= g++
-RM ?= rm -f
-CPP_FLAGS += -MMD -MP
+#-------------------------------------------------------------------------------
+
+#---------------------------- Makefile variables -------------------------------
+CPP_FLAGS = $(SKYNET_CPP_FLAGS)
 CXX_FLAGS = $(CATCH_CXX_FLAGS) $(SKYNET_CXX_FLAGS)
 #-------------------------------------------------------------------------------
 
