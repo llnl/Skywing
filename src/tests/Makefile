@@ -1,8 +1,4 @@
-#-------------------------- Skynet project variables ---------------------------
-SKYNET_DIR ?= $(HOME)/workspace/skynet/skynet
-SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
-SKYNET_CXX_FLAGS = -Wall -Werror
-#-------------------------------------------------------------------------------
+include $(SKYNET_DIR)/src/Makefile
 
 #--------------------- List of variables for each Module -----------------------
 
@@ -24,7 +20,8 @@ DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 #----------------------- Catch & Makefile variables ----------------------------
 CATCH_INCLUDE_DIR = $(SKYNET_DIR)/utils/catch2/single_include/catch2
 CATCH_INCLUDE_FLAG = -I$(CATCH_INCLUDE_DIR)
-CATCH_CXX_FLAGS = -std=c++14
+# Set CATCH_CXX_FLAGS to -std=c++11 if no standard specified in SKYNET_CXX_FLAGS
+CATCH_CXX_FLAGS =
 CXX ?= g++
 RM ?= rm -f
 CPP_FLAGS += -MMD -MP
