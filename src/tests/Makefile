@@ -6,7 +6,6 @@ include $(SKYNET_DIR)/src/Makefile
 DEVICES_TESTS = \
   devices/Skynet_Serialization
 #  devices/Skynet_SocketCommunicator
-#  devices/Skynet_DummyCommunicator
 DEVICES_INCLUDE_DIRS = $(SKYNET_INCLUDE_DIR)/devices
 
 # <Module> variables
