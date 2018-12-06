@@ -8,19 +8,45 @@
 
 namespace skynet
 {
+
+  /** \class MPICommunicatorFactory
+   * \brief Implements CommunicatorFactory for MPI-based communications.
+   *
+   * Note that an MPI Communicator and a Skynet Communicator are NOT
+   * analogous.
+   */
   class MPICommunicatorFactory : public CommunicatoryFactory
   {
   public:
+
+    /** \brief Create a new MPICommunicatorFactory.
+     *
+     * \param other_rank The MPI rank of the device with which we'll
+     * be communicating.
+     */
     MPICommunicatorFactory(int other_rank)
       : comm_(MPI_COMM_WORLD), tag_(0), other_rank_(other_rank)
     { }
 
+    /** \brief Create a new MPICommunicatorFactory.
+     *
+     * \param comm The MPI Communicator used for this Skynet
+     * Communicator.  
+     * \param other_rank The MPI rank of the device
+     *  with which we'll be communicating.
+     */
     MPICommunicatorFactory(MPI_Comm comm, int other_rank)
       : comm_(comm), tag_(0), other_rank_(other_rank)
     { }
 
+    /** \brief Create a new DeviceCommunicator.
+     *
+     * From the CommunicatorFactory interface.
+     *
+     * \param comm_config_info Not used here.
+     */
     std::unique_ptr<DeviceCommunicator> 
-    create_new_communicator(std::vector<std::string> comm_config_info)
+    create_new_communicator(std::vector<std::string> /*comm_config_info*/)
     {
 
       return MPICommunicator(newcomm);
