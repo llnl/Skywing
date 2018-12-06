@@ -1,12 +1,12 @@
-#include "catch.hpp"
-#include "Skynet_Serializer.hpp"
+#include "catch2/catch.hpp"
+#include "devices/Skynet_Serializer.hpp"
 #include <iostream>
 #include <cstring>
 
 using namespace skynet;
 
 template < class T >
-inline std::ostream& operator << (std::ostream& os, const std::vector<T>& v) 
+inline std::ostream& operator << (std::ostream& os, const std::vector<T>& v)
 {
     os << "[";
     for (typename std::vector<T>::const_iterator ii = v.begin(); ii != v.end(); ++ii)
@@ -114,6 +114,6 @@ TEST_CASE( "Vector of POD Serialization/Deserialization works", "[Skynet_Seriali
 //   test_serialization(test_bool);
 //   test_serialization(intvec);
 //   test_serialization(doublevec);
-    
+
 //   return 0;
 // }
