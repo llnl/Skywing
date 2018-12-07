@@ -1,10 +1,9 @@
 include $(SKYNET_DIR)/src/Makefile
-
 #--------------------- List of variables for each Module -----------------------
 
 # Devices variables
 DEVICES_TESTS = \
-  devices/Skynet_Serialization
+	devices/Skynet_Serialization
 #  devices/Skynet_SocketCommunicator
 
 # <Module> variables
