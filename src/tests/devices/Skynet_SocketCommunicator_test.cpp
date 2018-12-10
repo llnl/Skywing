@@ -1,5 +1,4 @@
 #include "catch2/catch.hpp"
-#include "devices/Skynet_DummyCommunicator.hpp"
 #include "devices/Skynet_SocketCommunicator.hpp"
 
 #include <iostream>
@@ -12,43 +11,68 @@ using namespace skynet;
 void *mySever(void *vargp)
 {
     std::string ip_address = "192.0.0.1";
-    double a = (double) 100.0;
-    SocketCommunicator socketCom(ip_address);
-    socketCom.send_to(a);
+    // double a = (double) 100.0;
+    SocketCommunicator socketCom;
+    sleep(5);
+
+    // char server [4][10] = {"Blue", "Red", "Orange",  "Yellow"};   
+     int server [4] = {11,12,13,14};   
+
+    for(int i = 0; i<1; i++){
+        std::cout<<"Sending message "<<server[i]<<std::endl; 
+        socketCom.send_to<int>(server[i]);
+        sleep(3);
+
+    }
+
+    sleep(5);
+    int a; 
+  
+    a = socketCom.receive_from<int>();
+    std::cout<<"message Received =  "<<a <<std::endl;
+        // std::cout<<"done sending"<<std::endl; 
+
     pthread_exit(NULL);
     // return NULL;
 }
 
 void *myClient(void *vargp)
 {
-    std::string ip_address = "192.0.0.2";
-    //    double a = (double) 100.0;
+  
+    std::string ip_address = "192.0.0.1";
+
     SocketCommunicator socketCom(ip_address);
-    socketCom.receive_from<int>();
+    sleep(6);
+    int a; 
+  
+    a = socketCom.receive_from<int>();
+    std::cout<<"message Received =  "<<a <<std::endl; 
+    int server [4] = {11,12,13,14};   
+    std::cout<<"Sending message "<<server[2]<<std::endl; 
+    socketCom.send_to<int>(server[2]);
+
+    
+    
+
     pthread_exit(NULL);
     // return NULL;
 }
 
+
 TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
 {
-
-
-    std::string ip_address = "192.0.0.1";
-    DummyCommunicator Communicator(ip_address);
-    double a = (double) 100.0;
-
-    Communicator.send_to(a);
-    int t  = Communicator.receive_from<int>();
-    std::cout<< "message  = " <<t<<std::endl;
+ 
 
 
     std::cout<<"testing"<<std::endl;
-    pthread_t thread_id;
+    pthread_t thread_id= nullptr;
     printf("Before Thread\n");
-    pthread_t thread_id2;
+    pthread_t thread_id2= nullptr;
 
-    pthread_create(&thread_id, NULL, myClient, NULL);
     pthread_create(&thread_id2, NULL, mySever, NULL);
+    sleep(3);
+    pthread_create(&thread_id, NULL, myClient, NULL);
+
 
     pthread_join(thread_id, NULL);
     pthread_join(thread_id2, NULL);

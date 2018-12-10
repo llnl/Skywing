@@ -18,7 +18,7 @@ namespace skynet
     
     /** \brief Send a data through this communication channel.
      */
-    template<typename T>
+    template<typename T> 
     void send_to(const T& data) const
     {
       auto pData = serialize(data); // returns either a void* or a std::vector<char>

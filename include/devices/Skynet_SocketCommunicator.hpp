@@ -19,7 +19,7 @@
 #include <sys/types.h> 
  #include <arpa/inet.h> 
 #define MAX 80 
-#define PORT 8080 
+#define PORT 4086 
 #define SA struct sockaddr 
 
 namespace skynet
@@ -27,19 +27,68 @@ namespace skynet
   class SocketCommunicator : public DeviceCommunicator
   {
   public:
-    SocketCommunicator(std::string ip_address) : ip_address_{std::move(ip_address)}
-    {
+    SocketCommunicator(){ 
 
+      //Socket stucture  
+      int connfd;
+      struct sockaddr_in servaddr, cli; 
+  
+      // socket create and verification 
+      connfd = socket(AF_INET, SOCK_STREAM, 0); 
+      if (sockfd == -1) { 
+        printf("socket creation failed...\n"); 
+        exit(0); 
+      } 
+      else
+        printf("Socket successfully created..\n"); 
+      bzero(&servaddr, sizeof(servaddr)); 
+  
+
+      //[TODO] AF: Need to make this universal 
+      // assign IP, PORT 
+      servaddr.sin_family = AF_INET; 
+      servaddr.sin_addr.s_addr = (INADDR_ANY); 
+      servaddr.sin_port = htons(PORT); 
+      std::cout<<"In Server adress"<<std::endl; 
+      // Binding newly created socket to given IP and verification 
+      if ((bind(connfd, (SA*)&servaddr, sizeof(servaddr))) != 0) { 
+        printf("socket bind failed...\n"); 
+        exit(0); 
+      } 
+      else
+      printf("Server Socket successfully binded..\n"); 
+      //listening for a connection 
+      listen(connfd, 5);
+
+      //[TODO] AF: Vericatication was not working, need to look into this! 
+      // Now server is ready to listen and verification 
+      // if ((listen(sockfd, 5)) != 0) { 
+      //     printf("Listen failed...\n"); 
+      //     exit(0); 
+      // } 
+      // else
+      //     printf("Server listening..\n"); 
+      socklen_t len = sizeof(cli); 
+  
+      // Accept the data packet from client and verification 
+      sockfd = accept(connfd, (struct sockaddr *) &cli, &len); 
+      if (sockfd < 0) { 
+        printf("server acccept failed...\n"); 
+        exit(0); 
+      } 
+      else
+        printf("server acccept the client...\n"); 
+  
+       //[TODO] AF: Typically the sockets are closed at some point but I am not sure where or when yet to do that... May cause problems. 
+      // close(sockfd_);
     }
 
-  private:
+    SocketCommunicator(std::string ip_address) 
+    // : ip_address_{std::move(ip_address)} 
+    { 
 
-    void do_send_to_(const void* data, std::size_t data_size) const override
-    {
-      std::cout<<"In Client send_to"<<std::endl; 
-
-      int sockfd; //, connfd; 
-      struct sockaddr_in servaddr; //, cli; 
+      //Socket stucture  
+      struct sockaddr_in servaddr; 
   
       // socket create and varification 
       sockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -51,6 +100,8 @@ namespace skynet
         printf("Socket successfully created..\n"); 
       bzero(&servaddr, sizeof(servaddr)); 
   
+
+       //[TODO] AF: Need to make this universal 
       // assign IP, PORT 
       servaddr.sin_family = AF_INET; 
       servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
@@ -64,112 +115,48 @@ namespace skynet
       else
         printf("connected to the server..\n"); 
   
-      // function for chat 
-      char buff[MAX]; 
-      int n; 
-      for (;;) { 
-	bzero(buff, sizeof(buff)); 
-	printf("Enter the string : "); 
-	n = 0; 
-	while ((buff[n++] = getchar()) != '\n') 
-	  ; 
-	write(sockfd, buff, sizeof(buff)); 
-	bzero(buff, sizeof(buff)); 
-	read(sockfd, buff, sizeof(buff)); 
-	printf("From Server : %s", buff); 
-	if ((strncmp(buff, "exit", 4)) == 0) { 
-	  printf("Client Exit...\n"); 
-	  break; 
-	} 
-      } 
-  
-      // close the socket 
-      close(sockfd); 
+    }
+
+
+  private:
+
+    void do_send_to_(const void* data, std::size_t data_size) const override
+    {
+
+    uint16_t networkLen = htons(data_size); // convert to network byte order
+    write(sockfd, &networkLen, sizeof(networkLen)); //sends the size of the data first 
+    write(sockfd, data, data_size); //sends the seralized data 
       
     }
 
+
     std::vector<char> do_receive_from_() const override
     {
-      int sockfd, connfd; 
-      struct sockaddr_in servaddr, cli; 
-  
-      // socket create and verification 
-      sockfd = socket(AF_INET, SOCK_STREAM, 0); 
-      if (sockfd == -1) { 
-        printf("socket creation failed...\n"); 
-        exit(0); 
-      } 
-      else
-        printf("Socket successfully created..\n"); 
-      bzero(&servaddr, sizeof(servaddr)); 
-  
-      // assign IP, PORT 
-      servaddr.sin_family = AF_INET; 
-      servaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
-      servaddr.sin_port = htons(PORT); 
-  
-      // Binding newly created socket to given IP and verification 
-      if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) { 
-        printf("socket bind failed...\n"); 
-        exit(0); 
-      } 
-      else
-        printf("Socket successfully binded..\n"); 
-      listen(sockfd, 5);
-      // Now server is ready to listen and verification 
-      // if ((listen(sockfd, 5)) != 0) { 
-      //     printf("Listen failed...\n"); 
-      //     exit(0); 
-      // } 
-      // else
-      //     printf("Server listening..\n"); 
-      socklen_t len = sizeof(cli); 
-  
-      // Accept the data packet from client and verification 
-      connfd = accept(sockfd, (struct sockaddr *) &cli, &len); 
-      if (connfd < 0) { 
-        printf("server acccept failed...\n"); 
-        exit(0); 
-      } 
-      else
-        printf("server acccept the client...\n"); 
-  
-      // Function for chatting between client and server 
-      char buff[MAX]; 
-      int n; 
-      // infinite loop for chat 
-      for (;;) { 
-        bzero(buff, MAX); 
-  
-        // read the message from client and copy it in buffer 
-        read(connfd, buff, sizeof(buff)); 
-        // print buffer which contains the client contents 
-        printf("From client: %s\t To client : ", buff); 
-        bzero(buff, MAX); 
-        n = 0; 
-        // copy server message in the buffer 
-        while ((buff[n++] = getchar()) != '\n') 
-	  ; 
-  
-        // and send that buffer to client 
-        write(connfd, buff, sizeof(buff)); 
-  
-        // if msg contains "Exit" then server exit and chat ended. 
-        if (strncmp("exit", buff, 4) == 0) { 
-	  printf("Server Exit...\n"); 
-	  break; 
-        } 
-      } 
-  
-      // After chatting close the socket 
-      close(sockfd); 
-      
-      std::vector<char> data;
+    
+    //[TODO] AF: this could be more efficent, the read() fucntion seems to only take a array of char and not a vector....
+      char msg[1024];
+      std::cout<<"in receiving "<<std::endl; 
+
+      uint16_t networkLen;
+      read(sockfd, &networkLen, sizeof(networkLen));
+      std::cout<<"networkLen "<<networkLen<<std::endl; 
+
+      uint16_t len = ntohs(networkLen); // convert back to host byte order
+      read(sockfd, msg, sizeof(len) - 1);
+
+      msg[len] = '\0';
+
+      //Hack way to get it into the correct format for the serialzier. 
+      std::vector<char> data(len);
+      for(int i = 0; i<len; i++)
+        data[i] = msg[i];
       return data;
     }
 
   private:
-    std::string ip_address_;
+    // char ip_address_[4];
+    int sockfd;
+
     
   }; // class MPICommunicator
 } // namespace skynet
