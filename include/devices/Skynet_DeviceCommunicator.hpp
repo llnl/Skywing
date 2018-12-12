@@ -21,7 +21,10 @@ namespace skynet
     template<typename T> 
     void send_to(const T& data) const
     {
+      // std::cout<<"in send to data = "<<data<<std::endl;
       auto pData = serialize(data); // returns either a void* or a std::vector<char>
+      // std::cout<<"Seralized data = "<<pData<<std::endl;
+
       do_send_to_(convert_if_vec(pData), get_serialized_size(data, pData));
     }
 
@@ -32,7 +35,10 @@ namespace skynet
     template<typename T>
     T receive_from() const
     {
-      return deserialize<T>(do_receive_from_());
+      auto pdata  = do_receive_from_();
+    // std::cout<<"in receive from data = "<<pdata[0]<<std::endl;
+
+      return deserialize<T>(pdata);
     }
 
   private:

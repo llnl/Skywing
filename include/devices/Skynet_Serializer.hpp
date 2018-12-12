@@ -18,6 +18,7 @@ namespace skynet
   }
   const void* serialize(const double& data)
   {
+    // std::cout<<"in serlize double"<<std::endl; 
     return static_cast<const void*>(&data);
   }
   const void* serialize(const unsigned& data)
@@ -40,7 +41,11 @@ namespace skynet
 
   std::vector<char> serialize(const Serializable& data)
   {
-    return data.serialize();
+    std::vector<char> st = data.serialize(); 
+    for(int i = 0; i<st.size(); i++){
+      std::cout<<st[i]<<std::endl; 
+    }
+    return st;
   }
 
 
@@ -64,6 +69,7 @@ namespace skynet
 
   std::size_t get_serialized_size(const double&, const void*)
   {
+    // std::cout<<"in size of doulbe"<<std::endl; 
     return sizeof(double);
   }
 

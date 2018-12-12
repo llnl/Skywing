@@ -19,7 +19,7 @@
 #include <sys/types.h> 
  #include <arpa/inet.h> 
 #define MAX 80 
-#define PORT 4086 
+#define PORT 5086 
 #define SA struct sockaddr 
 
 namespace skynet
@@ -134,22 +134,28 @@ namespace skynet
     {
     
     //[TODO] AF: this could be more efficent, the read() fucntion seems to only take a array of char and not a vector....
-      char msg[1024];
-      std::cout<<"in receiving "<<std::endl; 
+      // char msg[1024];
+      // std::cout<<"in receiving "<<std::endl; 
 
       uint16_t networkLen;
       read(sockfd, &networkLen, sizeof(networkLen));
-      std::cout<<"networkLen "<<networkLen<<std::endl; 
+      // std::cout<<"networkLen "<<networkLen<<std::endl; 
 
       uint16_t len = ntohs(networkLen); // convert back to host byte order
-      read(sockfd, msg, sizeof(len) - 1);
+      char msg[len];
 
+      int a = read(sockfd, msg, len);
+      if(a ==-1){
+        std::cout<<"Error in reading data"<<std::endl; 
+      }
       msg[len] = '\0';
 
       //Hack way to get it into the correct format for the serialzier. 
       std::vector<char> data(len);
-      for(int i = 0; i<len; i++)
+      for(int i = 0; i<len; i++){
         data[i] = msg[i];
+        // std::cout<<"data[i] ="<<data[i]<<std::endl; 
+      }
       return data;
     }
 
