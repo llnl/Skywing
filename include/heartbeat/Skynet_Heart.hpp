@@ -1,14 +1,16 @@
 #ifndef SKYNET_HEART_HPP__
 #define SKYNET_HEART_HPP__
 
-#include <utility>
 #include <vector>
 #include "Skynet_DeviceReference.hpp"
+#include "Skynet_DeviceManager.hpp"
+#include "Skynet_Heartbeat.hpp"
+#include "Skynet_Pulse.hpp"
 
 namespace skynet
 {
     /** \class Heart
-     *  \brief The center of a Skynet instance.
+     *  \brief The center of a Skynet instance
      *
      * A Heart, collectively across the Skynet instance, runs the
      * heartbeat and manages the participating devices.
@@ -16,37 +18,32 @@ namespace skynet
     class Heart
     {
     public:
-	/** \brief Construct a new Skynet Heart
-	 *
-	 * \param nearby_devices A vector of DeviceReferences
-	 * representing other Skynet devices.
-	 */
-	Heart(std::vector<DeviceReference> nearby_devices)
-	    : nearby_devices_(std::move(nearby_devices))
-	    {}
-
+      /** \brief Construct a new Skynet Heart
+       *
+       *  \param device_heartbeat type of heartbeat that this device has
+       *  \param device_pulse type of pulse that this device has
+       *  \param nearby_devices neigboring devices that this devices is aware of
+       * QUESTION: should we use std::move here? Colin used that in the initial 
+       * heart constructor, but I'm not sure why.
+       */
+      Heart(Heartbeat device_heartbeat, Pulse device_pulse, std::vector<DeviceReference> nearby_devices)
+	: device_heartbeat_(device_heartbeat), device_pulse_(device_pulse)
+      {
+	device_manager_ = DeviceManager::DeviceManager(nearby_devices);
+	
+      }
+      
 	/** \brief Begin the heartbeat. */
 	void begin();
 
     private:
-	/** \brief Send a heartbeat pulse to a Device and measure the
-	 *         response time.
-	 */
-	double send_heartbeat_pulse(const Device& device);
 
-	/** \brief Accept a new Skynet Device that has come online. */
-	Device accept_new_device();
-
-	/** \brief Pronounce a Skynet Device no longer online.
-	 *
-	 * This gets called either because a Device informs others it
-	 * is going offline, or because it has failed to respond to
-	 * enough heartbeat pulses.
-	 */
-	void pronounce_device_terminated(Device& device);
 
     private:
-	std::vector<Device> nearby_devices_;
+      Heartbeat device_heartbeat_;
+      Pulse device_pulse_;
+      DeviceManager device_manager_;
+      //QUESTION: Should we also include a property list within the heart
     }; // class Heart
 
 } // namespace skynet

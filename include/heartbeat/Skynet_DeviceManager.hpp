@@ -31,17 +31,27 @@ namespace skynet
      
      virtual ~DeviceManager() = default;
 
+     //Get number of nearby devices
      unsigned long get_number_of_devices() const
      {
        return do_get_number_of_devices();
      }
 
+     //Get set of nearby devices
      std::vector<DeviceReference> get_device_list() const
      {
        return nearby_devices_;
      }
 
-     
+     //Add a device to the nearby_device list
+     //Question: should we have do_add_device and do_remove device
+     // functions in the private section?
+     virtual void add_device(DeviceReference new_device) const = 0;
+
+     //Remove a device from the nearby_device list
+     virtual void remove_device(DeviceReference old_device) const = 0;
+
+     //Get list of communicator types for nearby devices
      /**NOTE: Changed get_communicator_type to get_com_list since
       * (I believe) the communicator type doesn't have to be the same 
       * for all devices in your device list. Also DeviceReference already
