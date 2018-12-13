@@ -13,22 +13,30 @@ namespace skynet
    {
    public:
 
-     /** \brief Send a 
+     /** \brief Send a signal to a device from the nearby
+     *   device list and receive response.
+     */
+     template<typename T>
+     T send_heartbeat(const Device& device);
 
-     	/** \brief Send a heartbeat pulse to a Device and measure the
-	 *         response time.
-	 */
-	double send_heartbeat_pulse(const Device& device);
+     /** \brief Determine the status of a device based on its
+      * responses to the heartbeat
+      *
+      * \param response_history History (probably a vector) of responses
+      *	from the device that will be used to determine device status
+      *
+      * \return 1 if device is alive or at least we are not ready to
+      *	pronounce it dead, 0 if device is determined to be dead
+      */
+     template<typename T>
+     virtual bool determine_device_status(const T& response_history);
 
-     	/** \brief Pronounce a Skynet Device no longer online.
-	 *
-	 * This gets called either because a Device informs others it
-	 * is going offline, or because it has failed to respond to
-	 * enough heartbeat pulses.
-	 */
-	void pronounce_device_terminated(Device& device);
 
-    
+     //
+     
+     //      run pulse: send heartbeat
+      
+
    private:
 
    };// class Heartbeat

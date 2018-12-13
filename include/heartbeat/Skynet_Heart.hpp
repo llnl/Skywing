@@ -2,10 +2,13 @@
 #define SKYNET_HEART_HPP__
 
 #include <vector>
+
 #include "Skynet_DeviceReference.hpp"
 #include "Skynet_DeviceManager.hpp"
 #include "Skynet_Heartbeat.hpp"
 #include "Skynet_Pulse.hpp"
+#include "Skynet_InitializeHeart.hpp"
+#include "Skynet_GraphProperty.hpp"
 
 namespace skynet
 {
@@ -26,15 +29,17 @@ namespace skynet
        * QUESTION: should we use std::move here? Colin used that in the initial 
        * heart constructor, but I'm not sure why.
        */
-      Heart(Heartbeat device_heartbeat, Pulse device_pulse, std::vector<DeviceReference> nearby_devices)
+      //QUESTION: Should we use templates here, and should heart just take a configuration file as input
+      template<typename T>
+      Heart(const Heartbeat device_heartbeat, const Pulse device_pulse, const T& config)
 	: device_heartbeat_(device_heartbeat), device_pulse_(device_pulse)
       {
-	device_manager_ = DeviceManager::DeviceManager(nearby_devices);
+	device_manager_ = DeviceManager::DeviceManager(config);
 	
       }
       
 	/** \brief Begin the heartbeat. */
-	void begin();
+      void IntializeHeart::begin_heartbeat();
 
     private:
 
@@ -43,7 +48,7 @@ namespace skynet
       Heartbeat device_heartbeat_;
       Pulse device_pulse_;
       DeviceManager device_manager_;
-      //QUESTION: Should we also include a property list within the heart
+      std::vector<GraphProperty> property_list_;
     }; // class Heart
 
 } // namespace skynet

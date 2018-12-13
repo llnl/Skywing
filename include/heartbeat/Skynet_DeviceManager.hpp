@@ -26,11 +26,17 @@ namespace skynet
       * QUESTION: Before Colin had std::move(nearby_devices) here.
       * 	I'm not sure why. Should we do that instead?
       */
-     DeviceManager(std::vector<DeviceReference> nearby_devices)
-       : nearby_devices_(nearby_devices){}
+     template<typename T>
+     DeviceManager(const T& config) const
+     {
+       set_device_list(config);
+     }
      
      virtual ~DeviceManager() = default;
 
+     template<typename T>
+     virtual void set_device_list(const T& config) const = 0;
+     
      //Get number of nearby devices
      unsigned long get_number_of_devices() const
      {
@@ -90,4 +96,3 @@ namespace skynet
 }// namespace skynet
 
 #endif /* SKYNET_DEVICEMANANGER_HPP__ */
-
