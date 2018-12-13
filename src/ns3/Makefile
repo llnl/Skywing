@@ -1,11 +1,15 @@
 include $(SKYNET_DIR)/src/Makefile
 
-#--------------------- List of variables for each Module -----------------------
+#-------------------- List of variables for all simulators ---------------------
 NS3_PREFIX = ns3-dev
-NS3_SCRIPTS = \
-  first.cpp
-NS3_LIBS = \
-  core \
+NS3_INCLUDE_DIR = $(SKYNET_DIR)/utils/ns3/include/$(NS3_PREFIX)
+NS3_LIB_DIR = $(SKYNET_DIR)/utils/ns3/lib64
+#-------------------------------------------------------------------------------
+
+#--------------- List of variables specific to each simulator ------------------
+UDP_ECHO_SRC = udp_echo.cpp
+UDP_ECHO_LIBS = \
+	core \
 	network \
 	point-to-point \
 	internet \
@@ -15,42 +19,27 @@ NS3_LIBS = \
 	traffic-control \
 	applications \
 	config-store
-NS3_INCLUDE_DIR = $(SKYNET_DIR)/utils/ns3/include/$(NS3_PREFIX)
-NS3_LIB_DIR = $(SKYNET_DIR)/utils/ns3/lib64
-
-# <Module> variables
-# <MODULE>_TESTS = \
-#   path_to_test_file1_without_file_extension \
-#   path_to_test_file2_without_file_extension
-# <MODULE>_INCLUDE_DIRS = ... list of include directories ...
-
 #-------------------------------------------------------------------------------
 
-#----------------------- Makefile variables ----------------------------
+#---------------- List of files to be created for each simulator ---------------
+UDP_ECHO_OBJECTS = $(addsuffix .o, $(UDP_ECHO_SRC))
+UDP_ECHO_DFILES = $(addsuffix .d, $(UDP_ECHO_SRC))
+#-------------------------------------------------------------------------------
+
+#--------------------- List of lib flags for each simulator --------------------
+TMP = $(addprefix $(NS3_PREFIX)-, $(UDP_ECHO_LIBS))
+UDP_ECHO_LIB_FLAGS = $(addprefix -l, $(TMP))
+UDP_ECHO_DEBUG_LIB_FLAGS = $(addsuffix -debug,$(UDP_ECHO_LIB_FLAGS))
+UDO_ECHO_OPTIMIZED_LIB_FLAGS = $(addsuffix -optimized,$(UDP_ECHO_LIB_FLAGS))
+#-------------------------------------------------------------------------------
+
+#--------------------------- Makefile variables --------------------------------
 CPP_FLAGS = $(SKYNET_CPP_FLAGS)
 CXX_FLAGS = $(SKYNET_CXX_FLAGS)
 INCLUDE_FLAGS = -I$(SKYNET_INCLUDE_DIR) -I$(NS3_INCLUDE_DIR)
 LIBPATH_FLAGS = -L$(NS3_LIB_DIR)
-LIB_FLAGS = $(addprefix -l$(NS3_PREFIX)-,$(NS3_LIBS))
-DEBUG_LIB_FLAGS = $(addsuffix -debug,$(LIB_FLAGS))
-OPTIMIZED_LIB_FLAGS = $(addsuffix -optimized,$(LIB_FLAGS))
-#-------------------------------------------------------------------------------
-
-#------------------- List of files to be created for each Module ---------------
-
-OBJECTS = $(addsuffix .o, $(NS3_SCRIPTS))
-DFILES = $(addsuffix .d, $(NS3_SCRIPTS))
-
-#-------------------------------------------------------------------------------
-
-#--------------------- List of includes for each Module ------------------------
-
-# Devices includes
-
-# <Module> includes
-# <MODULE>_INCLUDE_FLAGS = $(addprefix -I,$(<MODULE>_INCLUDE_DIRS))
-# <MODULE>_INCLUDE_FLAGS += $(CATCH_INCLUDE_FLAG)
-
+OBJECTS = $(UDP_ECHO_OBJECTS)
+DFILES = $(UDP_ECHO_DFILES)
 #-------------------------------------------------------------------------------
 
 #----------------------------- Makefile Rules ----------------------------------
@@ -58,10 +47,9 @@ DFILES = $(addsuffix .d, $(NS3_SCRIPTS))
 # Phony rules
 .PHONY: all clean
 all:
-	$(MAKE) sim_debug
-	$(MAKE) sim_optimized
+	$(MAKE) udp_echo_debug udp_echo_optimized
 clean:
-	$(RM) sim_debug sim_optimized
+	$(RM) udp_echo_debug udp_echo_optimized
 	$(RM) $(OBJECTS) $(DFILES)
 
 # implicit rule
@@ -69,10 +57,9 @@ clean:
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 
 # explicit rules
-sim_debug: $(OBJECTS)
-	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(OBJECTS) $(LIBPATH_FLAGS) \
-	  $(DEBUG_LIB_FLAGS) -o sim_debug
-
+udp_echo_debug: $(UDP_ECHO_OBJECTS)
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIBPATH_FLAGS) \
+	$(UDP_ECHO_DEBUG_LIB_FLAGS) $< -o $@
 
 #-------------------------------------------------------------------------------
 
