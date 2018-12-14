@@ -1,6 +1,7 @@
 #include "HeartHelper.hpp"
 
 #include "ns3/ptr.h"
+#include "Ns3_Heart.hpp"
 
 namespace ns3
 {
