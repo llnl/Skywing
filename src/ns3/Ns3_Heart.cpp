@@ -1,11 +1,12 @@
 #include "Ns3_Heart.hpp"
 
 #include "ns3/log.h"
+#include "ns3/simulator.h"
 
 namespace ns3 
 {
   NS_LOG_COMPONENT_DEFINE("HeartApplication");
-  NS_OBJECT_ENSURE_REGISTERED(Heart)
+  NS_OBJECT_ENSURE_REGISTERED(Heart);
 
   TypeId Heart::GetTypeId()
   {
@@ -36,7 +37,6 @@ namespace ns3
   void Heart::StartApplication()
   {
     NS_LOG_FUNCTION(this);
-    heart_ = skynet::Heart();
     begin_heartbeat_event_ = Simulator::Schedule(Seconds(0.0), &Heart::begin_heartbeat, this);
   }
 
@@ -46,10 +46,10 @@ namespace ns3
     Simulator::Cancel(begin_heartbeat_event_);
   }
 
-  void Heart::begin_heartbeat() const
+  void Heart::begin_heartbeat()
   {
     NS_LOG_FUNCTION(this);
     NS_ASSERT(begin_heartbeat_event_.IsExpired());
-    _heart.begin_heartbeat();
+    heart_.begin_heartbeat();
   }
 } // namespace ns3

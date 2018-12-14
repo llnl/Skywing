@@ -23,7 +23,7 @@ namespace ns3
   private:
     virtual void StartApplication();
     virtual void StopApplication();
-    void begin_heartbeat() const;
+    void begin_heartbeat();
     EventId begin_heartbeat_event_;
     skynet::Heart heart_;
   }; // class Heart
