@@ -3,12 +3,11 @@
 
 #include <vector>
 
-#include "Skynet_DeviceReference.hpp"
+#include "Skynet_BeatSender.hpp"
+#include "Skynet_BeatInterpreter.hpp"
+#include "Skynet_PulseTimer.hpp"
 #include "Skynet_DeviceManager.hpp"
-#include "Skynet_Heartbeat.hpp"
-#include "Skynet_Pulse.hpp"
-#include "Skynet_InitializeHeart.hpp"
-#include "Skynet_GraphProperty.hpp"
+#include "Skynet_PropertyChecker.hpp"
 
 namespace skynet
 {
@@ -23,32 +22,67 @@ namespace skynet
     public:
       /** \brief Construct a new Skynet Heart
        *
-       *  \param device_heartbeat type of heartbeat that this device has
-       *  \param device_pulse type of pulse that this device has
-       *  \param nearby_devices neigboring devices that this devices is aware of
-       * QUESTION: should we use std::move here? Colin used that in the initial 
-       * heart constructor, but I'm not sure why.
+       *  \param beat_sender type of BeatSender used by this device
+       *  \param beat_interpreter type of BeatInterpreter used by this device
+       *  \param pulse_timer type of PulseTimer used by this device
+       *  \param device_manager type of DeviceManager used by this device
+       *  \param property_checker type of PropertyChecker used by this device
        */
-      //QUESTION: Should we use templates here, and should heart just take a configuration file as input
-      template<typename T>
-      Heart(const Heartbeat device_heartbeat, const Pulse device_pulse, const T& config)
-	: device_heartbeat_(device_heartbeat), device_pulse_(device_pulse)
+      Heart(const BeatSender beat_sender, const BeatInterpreter beat_interpreter,
+	    const PulseTimer pulse_timer, const DeviceManager device_manager,
+	    const PropertyChecker property_checker)
+	: beat_sender_(std::move(beat_sender_)),
+	  beat_interpreter_(std::move(beat_interpreter)),
+	  pulse_timer_(std::move(pulse_timer)),
+	  device_manager_(std::move(device_manager)),
+	  property_checker_(std::move(property_checker)),
       {
-	device_manager_ = DeviceManager::DeviceManager(config);
-	
+	run_heartbeat();
       }
-      
-	/** \brief Begin the heartbeat. */
-      void IntializeHeart::begin_heartbeat();
+
+      /** \brief Begin the heartbeat and run until device dies. */
+      void run_heartbeat() const
+      {
+	/*
+	 * Steps:
+	 * 1. Check graph properties and update graph if necesary (PropertyChecker)
+	 * 2. Get nearby device list (DeviceManager). For each device in this list:
+	 * 	a. Send beat (BeatSender)
+	 * 	b. Record response and decide what to do with it (BeatInterpreter)
+	 *	c. Re-check properties and update graph if necessary (PropertyChecker)
+	 * 3. Get new nearby device list (DeviceManager), which could have been modified by BeatInterpreter and PropertyChecker. For each device in this list:
+	 *	a. Check pulse to determine next time to send beat to that device (PulseTimer).
+	 * 4. Keep a list of (time, device) pairs, ordered by time, where time is the next time to send a beat to the corresponding device.
+	 * 5. Once first time in (time, device) list is reached:
+	 *	a. Send a beat to that device (BeatSender)
+	 * 	b. Record response and decide what to do with it (BeatInterpreter)
+	 *	c. Re-check properties and update graph if necessary (PropertyChecker)
+	 * 	d. Get new nearby device list (DeviceManager)
+	 *	e. Check pulse of new devices in device list
+	 *	f. Update (time, device) list by adding (time, device) pairs for new devices and removing (time, device) pairs for devices that were removed
+	 * 6. Repeat step 5 each time a the next pulse time is reached.
+	 *
+	 * COMMENTS:
+	 *	1. I'm not sure what the best way to store the (time, device) list is since we need to be able to add and remove devices from the list as well as update the times. I'm also not sure if this is something that should be included in the heart or if we should make a separate class for it. I'm thinking we should either make a separate class that stores this list and has functions to add and remove devices from the list as well as get the time of the next pulse and which device that pulse should be sent to, or that these capabilities should be added to the DeviceManager.
+	 *	2. Need to figure out when/how new devices that come online can contact this device and be added to its  nearby device list.
+	 */
+
+	
+	//Wait to send out next heartbeat
+	  // (Reference: https://stackoverflow.com/questions/10073136/how-to-execute-a-particular-code-in-c-after-every-1-minute)
+	//  std::this_thread::sleep_for(std::chrono::seconds(pulse));
+
+      }
 
     private:
 
 
     private:
-      Heartbeat device_heartbeat_;
-      Pulse device_pulse_;
+      BeatSender beat_sender_;
+      BeatInterpreter beat_interpreter_;
+      PulseTimer pulse_timer_;
       DeviceManager device_manager_;
-      std::vector<GraphProperty> property_list_;
+      PropertyChecker property_checker_;
     }; // class Heart
 
 } // namespace skynet
