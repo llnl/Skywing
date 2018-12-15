@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include "Heart.hpp"
+
 namespace skynet
 {
     /** \class InitializeHeart
@@ -12,7 +14,14 @@ namespace skynet
     class InitializeHeart
     {
     public:
-
+      
+       /** \brief Read configuration file and use it to create a Heart object
+       *
+       *  \param config configuration file used to create heart object
+       */
+      template<typename T>
+      const Heart& void create_heart(const T& config);
+      
     private:
 
     }; // class InitializeHeart
