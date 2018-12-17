@@ -25,8 +25,8 @@ namespace skynet
       *	\param nearby_devices a vector of devices that DeviceManager
       *	       will keep track of.
       */
-     DeviceManager(const std::vector<DeviceReference> nearby_devices)
-       : nearby_devices(nearby_devices_) const
+     DeviceManager(std::vector<DeviceReference> nearby_devices)
+       : nearby_devices_(std::move(nearby_devices))
      {
      }
 
@@ -43,7 +43,7 @@ namespace skynet
       *
       * \return a vector of DeviceReferences
       */
-     std::vector<DeviceReference> get_known_devices() const
+     const std::vector<DeviceReference>& get_known_devices() const
      {
        return nearby_devices_;
      }
@@ -52,7 +52,7 @@ namespace skynet
       *
       * \return a vector of DeviceReferences
       */
-     std::vector<DeviceReference> get_live_devices() const
+     const std::vector<DeviceReference>& get_live_devices() const
      {
        return do_get_live_devices();
      }
@@ -61,7 +61,7 @@ namespace skynet
       *
       * \param new_device Device to add to the nearby devices list
       */
-     void add_device(DeviceReference new_device) const
+     void add_device(DeviceReference& new_device)
      {
        nearby_devices_.push_back(new_device);
      }
@@ -83,7 +83,7 @@ namespace skynet
       * If the DeviceManager only keeps track of live devices this function
       * will be equivalent to get_live_devices.
       */
-     virtual std::vector<DeviceReference> do_get_live_devices() const = 0;
+     virtual const std::vector<DeviceReference>& do_get_live_devices() const = 0;
      
 
    private:
