@@ -22,7 +22,7 @@ bool compare_vecs(std::vector<S>& v1, std::vector<S> v2)
 
 
 struct thread_client_msg {
-    int number_msg; 
+    int number_msg;
     int test_int;
     double test_double ;
     unsigned test_unsigned ;
@@ -37,9 +37,10 @@ void *mySever(void *vargp)
 {
     std::string ip_address = "192.0.0.1";
     SocketCommunicator socketCom(5086);
-    sleep(10);
+    sleep_for(10);
 
-    struct thread_client_msg *rc_msg = (struct thread_client_msg *) malloc(sizeof(struct thread_client_msg)); 
+    // struct thread_client_msg *rc_msg = (struct thread_client_msg *) malloc(sizeof(struct thread_client_msg));
+    struct thread_client_msg *rc_msg = std::vector<unsigned char>(sizeof(struct thread_client_msg));
 
     rc_msg->test_int  = socketCom.receive_from<int>();
     rc_msg->test_double = socketCom.receive_from<double>();
@@ -54,25 +55,25 @@ void *mySever(void *vargp)
 
 void *myClient(void *send_msg)
 {
-    sleep(3);
+    sleep_for(3);
         // std::string ip_address = "192.0.0.1";
 
     const char * ip_address = "127.0.0.1";
     // const char * ip_address = INADDR_ANY;
     SocketCommunicator socketCom(ip_address,5086);
     // sleep(6);
-    
+
     struct thread_client_msg *my_msg;
-    my_msg = (struct thread_client_msg *) send_msg; 
-    sleep(11);
+    my_msg = (struct thread_client_msg *) send_msg;
+    sleep_for(11);
 
     socketCom.send_to<int>(my_msg->test_int);
-    socketCom.send_to<double>(my_msg->test_double); 
-    socketCom.send_to<unsigned>(my_msg->test_unsigned); 
-    socketCom.send_to<bool>(my_msg->test_bool); 
-    socketCom.send_to<std::vector<int>>(my_msg->intvec); 
-    socketCom.send_to<std::vector<double>>(my_msg->doublevec); 
-    socketCom.send_to<std::vector<unsigned>>(my_msg->unsignedvec); 
+    socketCom.send_to<double>(my_msg->test_double);
+    socketCom.send_to<unsigned>(my_msg->test_unsigned);
+    socketCom.send_to<bool>(my_msg->test_bool);
+    socketCom.send_to<std::vector<int>>(my_msg->intvec);
+    socketCom.send_to<std::vector<double>>(my_msg->doublevec);
+    socketCom.send_to<std::vector<unsigned>>(my_msg->unsignedvec);
 
     pthread_exit(NULL);
 }
@@ -81,7 +82,7 @@ void *myClient(void *send_msg)
 
 TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
 {
- 
+
 
 
     std::cout<<"Creating threads for testing...."<<std::endl;
@@ -92,7 +93,7 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
     struct thread_client_msg tsm;
 
 
-    tcm.number_msg = 6; 
+    tcm.number_msg = 6;
     tcm.test_int = -9;
     tcm.test_double = -11.11;
     tcm.test_unsigned = 2;
@@ -103,30 +104,30 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
     std::vector<unsigned> unsignedvec_main {7, 5, 9};
 
 
-    tcm.intvec = intvec_main; 
-    tcm.doublevec = doublevec_main; 
-    tcm.unsignedvec = unsignedvec_main; 
+    tcm.intvec = intvec_main;
+    tcm.doublevec = doublevec_main;
+    tcm.unsignedvec = unsignedvec_main;
 
 
     void *vptr;
 
     pthread_create(&thread_id2, NULL, mySever, NULL);
-    sleep(3);
+    sleep_for(3);
     pthread_create(&thread_id, NULL, myClient, (void *)&tcm);
 
 
     pthread_join(thread_id, NULL);
     pthread_join(thread_id2, &vptr);
 
-    tsm = *((struct thread_client_msg *)vptr); 
-    free(vptr); 
+    tsm = *((struct thread_client_msg *)vptr);
+    free(vptr);
 
     std::cout<<"Testing output...."<<std::endl;
 
-    REQUIRE(tcm.test_int== tsm.test_int); 
-    REQUIRE( tcm.test_double== tsm.test_double); 
-    REQUIRE( tcm.test_unsigned== tsm.test_unsigned); 
-    REQUIRE( tcm.test_bool== tsm.test_bool); 
+    REQUIRE(tcm.test_int== tsm.test_int);
+    REQUIRE( tcm.test_double== tsm.test_double);
+    REQUIRE( tcm.test_unsigned== tsm.test_unsigned);
+    REQUIRE( tcm.test_bool== tsm.test_bool);
     REQUIRE(compare_vecs(tcm.intvec, tsm.intvec));
     REQUIRE(compare_vecs(tcm.doublevec, tsm.doublevec));
     REQUIRE(compare_vecs(tcm.unsignedvec, tsm.unsignedvec));

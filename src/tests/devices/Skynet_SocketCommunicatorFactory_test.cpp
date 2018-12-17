@@ -2,9 +2,8 @@
 // #include "devices/Skynet_SocketCommunicator.hpp"
 #include "devices/Skynet_SocketCommunicatorFactory.hpp"
 
-
+#include <thread>
 #include <iostream>
-#include <unistd.h>  //Header file for sleep(). man 3 sleep for details.
 #include <pthread.h>
 using namespace skynet;
 
@@ -15,13 +14,21 @@ void *dev1(void *vargp)
 {
     int local_ref = 40;
     // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
-    std::vector<int> device_ref_dev1(2);
-    device_ref_dev1[0] = 45;
-    device_ref_dev1[1] = 50;
-    // SocketCommunicatorFactory();
-    SocketCommunicatorFactory factory1(local_ref,device_ref_dev1);
+    std::vector<int> device_ref(2);
+    device_ref[0] = 45;
+    device_ref[1] = 50;
+    std::vector<int> port_ref = {5000, 6000};
+    std::vector<std::string> config(0);
+    std::vector<SocketCommunicator> comm_list;
 
-    std::cout<<"checking vector = "<<factory1.size()<<std::endl;
+    // SocketCommunicatorFactory();
+    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
+    // comm_list.push_back(std::make_unique<SocketCommunicator>(500));
+    // comm_list.push_back(SocketCommunicator(port_ref[0]));
+    comm_list.push_back((factory1.create_new_communicator(config)));
+    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
+    comm_list.push_back((factory2.create_new_communicator(config)));
+
 
     pthread_exit(NULL);
 }
@@ -32,7 +39,19 @@ void *dev2(void *vargp)
     // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
 
     std::vector<int> device_ref = {40, 50} ;
-    SocketCommunicatorFactory factory2(local_ref, device_ref);
+    std::vector<int> port_ref = {5000, 7000};
+    std::vector<std::string> config(0);
+    std::vector<SocketCommunicator> comm_list;
+
+    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
+    comm_list.push_back((factory1.create_new_communicator(config)));
+
+    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
+    comm_list.push_back((factory2.create_new_communicator(config)));
+
+    // SocketCommunicator a = factory1.create_new_communicator();
+
+    // SocketCommunicatorFactory factory2(local_ref, device_ref,port_ref);
 
     pthread_exit(NULL);
 }
@@ -43,8 +62,16 @@ void *dev3(void *vargp)
     // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
 
     std::vector<int> device_ref = {40, 45} ;
-    SocketCommunicatorFactory factory3(local_ref, device_ref);
+    std::vector<int> port_ref = {6000, 7000};
+    std::vector<std::string> config(0);
+    std::vector<SocketCommunicator> comm_list;
 
+    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
+    comm_list.push_back((factory1.create_new_communicator(config)));
+    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
+    comm_list.push_back((factory2.create_new_communicator(config)));
+
+    // SocketCommunicatorFactory factory3(local_ref, device_ref,port_ref);
     pthread_exit(NULL);
 }
 
@@ -57,8 +84,13 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
 
 
     pthread_create(&thread_id1, NULL, dev1, NULL);
-    sleep(10);
+    std::this_thread::sleep_for (std::chrono::seconds(10));
     pthread_create(&thread_id2, NULL, dev2, NULL);
+    std::this_thread::sleep_for (std::chrono::seconds(10));
     pthread_create(&thread_id3, NULL, dev3, NULL);
+
+
+    std::this_thread::sleep_for (std::chrono::seconds(100));
+
 
 }
