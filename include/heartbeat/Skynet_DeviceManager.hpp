@@ -70,10 +70,10 @@ namespace skynet
       *
       * \param old_device device remove from nearby devices list
       */
-     void remove_device(DeviceReference old_device) const
+     void remove_device(const DeviceReference& old_device)
      {
        //Use erase on top of remove to shorten vector after removing device
-       nearby_devices.erase(std::remove(nearby_devices.begin(), nearby_devices.end(), old_device), nearby_devices_.end());
+       nearby_devices_.erase(std::remove(nearby_devices_.begin(), nearby_devices_.end(), old_device), nearby_devices_.end());
      }
 
 
