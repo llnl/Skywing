@@ -14,8 +14,8 @@ namespace skynet
     /** \class Heart
      *  \brief The center of a Skynet instance
      *
-     * A Heart, collectively across the Skynet instance, runs the
-     * heartbeat and manages the participating devices.
+     * \param nearby_devices A vector of DeviceReferences
+     * representing other Skynet devices.
      */
     class Heart
     {
@@ -67,7 +67,7 @@ namespace skynet
 	 *	2. Need to figure out when/how new devices that come online can contact this device and be added to its  nearby device list.
 	 */
 
-	
+
 	//Wait to send out next heartbeat
 	  // (Reference: https://stackoverflow.com/questions/10073136/how-to-execute-a-particular-code-in-c-after-every-1-minute)
 	//  std::this_thread::sleep_for(std::chrono::seconds(pulse));
