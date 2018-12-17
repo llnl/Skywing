@@ -14,8 +14,8 @@ namespace skynet
     /** \class Heart
      *  \brief The center of a Skynet instance
      *
-     * \param nearby_devices A vector of DeviceReferences
-     * representing other Skynet devices.
+     * A Heart, collectively across the Skynet instance, runs the
+     * heartbeat and manages the participating devices.
      */
     class Heart
     {
