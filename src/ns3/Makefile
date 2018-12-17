@@ -89,7 +89,6 @@ udp_echo_debug: $(UDP_ECHO_OBJECTS)
 	$(UDP_ECHO_DEBUG_LIB_FLAGS) $^ -o $@
 
 skynet_startup_debug: $(SKYNET_STARTUP_OBJECTS)
-	echo $(SKYNET_STARTUP_OBJECTS)
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIBPATH_FLAGS) \
 	$(SKYNET_STARTUP_DEBUG_LIB_FLAGS) $^ -o $@
 

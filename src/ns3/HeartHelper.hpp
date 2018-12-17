@@ -4,7 +4,6 @@
 #include "ns3/application-container.h"
 #include "ns3/node-container.h"
 #include "ns3/object-factory.h"
-#include "heartbeat/Skynet_Heart.hpp"
 
 namespace ns3
 {
@@ -19,4 +18,3 @@ namespace ns3
 } // namespace ns3
 
 #endif /* HEART_HELPER_HPP__ */
-
