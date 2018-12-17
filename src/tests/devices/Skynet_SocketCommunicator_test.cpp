@@ -36,66 +36,30 @@ struct thread_client_msg {
 void *mySever(void *vargp)
 {
     std::string ip_address = "192.0.0.1";
-    // double a = (double) 100.0;
-    SocketCommunicator socketCom;
+    SocketCommunicator socketCom(5086);
     sleep(10);
 
-    struct thread_client_msg *rc_msg = (struct thread_client_msg *) 
-   malloc(sizeof(struct thread_client_msg)); 
-    // struct thread_client_msg rc_msg; 
+    struct thread_client_msg *rc_msg = (struct thread_client_msg *) malloc(sizeof(struct thread_client_msg)); 
 
     rc_msg->test_int  = socketCom.receive_from<int>();
-    // std::cout<<"received_int = "<<received_int<<std::endl; 
-
     rc_msg->test_double = socketCom.receive_from<double>();
-        // std::cout<<"received_double = "<<received_double<<std::endl; 
-
     rc_msg->test_unsigned = socketCom.receive_from<unsigned>();
-            // std::cout<<"received_unsigned = "<<received_unsigned<<std::endl; 
-
     rc_msg->test_bool = socketCom.receive_from<bool>();
-            // std::cout<<"received_unsigned = "<<received_bool<<std::endl; 
-
     rc_msg->intvec = socketCom.receive_from<std::vector<int>>();
-
-    // std::cout<<"received_intvec = "; 
-    // for(int i = 0; i<received_intvec.size(); i++)
-    //     std::cout<<received_intvec[i]<< "\t"; 
-    // std::cout<<"\n"; 
     rc_msg->doublevec = socketCom.receive_from<std::vector<double>>();
     rc_msg->unsignedvec = socketCom.receive_from<std::vector<unsigned>>();
 
-
-
-
-    // // char server [4][10] = {"Blue", "Red", "Orange",  "Yellow"};   
-    //  int server [4] = {11,12,13,14};   
-
-    // for(int i = 0; i<1; i++){
-    //     std::cout<<"Sending message "<<server[i]<<std::endl; 
-    //     socketCom.send_to<int>(server[i]);
-    //     sleep(3);
-
-    // }
-
-    // sleep(5);
-    // int a; 
-  
-    // a = socketCom.receive_from<int>();
-    // std::cout<<"message Received =  "<<a <<std::endl;
-        // std::cout<<"done sending"<<std::endl; 
-
-
     pthread_exit((void *)rc_msg);
-    // return (void *) &rc_msg; 
-    // return NULL;
 }
 
 void *myClient(void *send_msg)
 {
     sleep(3);
-    std::string ip_address = "192.0.0.1";
-    SocketCommunicator socketCom(ip_address);
+        // std::string ip_address = "192.0.0.1";
+
+    const char * ip_address = "127.0.0.1";
+    // const char * ip_address = INADDR_ANY;
+    SocketCommunicator socketCom(ip_address,5086);
     // sleep(6);
     
     struct thread_client_msg *my_msg;
@@ -110,15 +74,7 @@ void *myClient(void *send_msg)
     socketCom.send_to<std::vector<double>>(my_msg->doublevec); 
     socketCom.send_to<std::vector<unsigned>>(my_msg->unsignedvec); 
 
-
-    // int a; 
-    // a = socketCom.receive_from<int>();
-    // std::cout<<"message Received =  "<<a <<std::endl; 
-    // int server [4] = {11,12,13,14};   
-    // std::cout<<"Sending message "<<server[2]<<std::endl; 
-    // socketCom.send_to<int>(server[2]);
     pthread_exit(NULL);
-    // return NULL;
 }
 
 
@@ -133,7 +89,7 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
     pthread_t thread_id2= nullptr;
 
     struct thread_client_msg tcm;
-        struct thread_client_msg tsm;
+    struct thread_client_msg tsm;
 
 
     tcm.number_msg = 6; 
@@ -174,11 +130,5 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
     REQUIRE(compare_vecs(tcm.intvec, tsm.intvec));
     REQUIRE(compare_vecs(tcm.doublevec, tsm.doublevec));
     REQUIRE(compare_vecs(tcm.unsignedvec, tsm.unsignedvec));
-
-
-    // printf("After Thread\n");
-    // exit(0);
-
-
 
 }
