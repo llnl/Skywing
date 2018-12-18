@@ -78,9 +78,9 @@ void *dev3(void *vargp)
 TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
 {
     std::cout<<"Creating threads for testing...."<<std::endl;
-    pthread_t thread_id1= nullptr;
-    pthread_t thread_id2= nullptr;
-    pthread_t thread_id3= nullptr;
+    pthread_t thread_id1= 0;
+    pthread_t thread_id2= 0;
+    pthread_t thread_id3= 0;
 
 
     pthread_create(&thread_id1, NULL, dev1, NULL);
