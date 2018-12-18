@@ -18,6 +18,7 @@ namespace skynet
   }
   const void* serialize(const double& data)
   {
+    // std::cout<<"in serlize double"<<std::endl;
     return static_cast<const void*>(&data);
   }
   const void* serialize(const unsigned& data)
@@ -32,7 +33,7 @@ namespace skynet
   template<typename S>
   const void* serialize(const std::vector<S>& data)
   {
-    static_assert(not std::is_same<S, bool>::value, 
+    static_assert(not std::is_same<S, bool>::value,
 		  "serialize: std::vector<bool> is not necessarily byte-packed,"
 		  " so we're not currently supporting its serialization.");
     return static_cast<const void*>(data.data());
@@ -40,7 +41,11 @@ namespace skynet
 
   std::vector<char> serialize(const Serializable& data)
   {
-    return data.serialize();
+    std::vector<char> st = data.serialize();
+    for(unsigned int i = 0; i<st.size(); i++){
+      std::cout<<st[i]<<std::endl;
+    }
+    return st;
   }
 
 
@@ -64,6 +69,7 @@ namespace skynet
 
   std::size_t get_serialized_size(const double&, const void*)
   {
+    // std::cout<<"in size of doulbe"<<std::endl;
     return sizeof(double);
   }
 
@@ -157,7 +163,7 @@ namespace skynet
     static bool deserializeImpl(const char* data)
     { return *(reinterpret_cast<const bool*>(data)); }
   };
-    
+
   template<typename S>
   struct deserializeImplClass<std::vector<S>>
   {
@@ -168,8 +174,8 @@ namespace skynet
 	  newVec[i] = deserialize<S>(data.data() + i * sizeof(S));
       return newVec;
     }
-  };  
-  
+  };
+
 } // namespace skynet
 
 

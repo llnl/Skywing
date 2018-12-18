@@ -1,11 +1,11 @@
 include $(SKYNET_DIR)/src/Makefile
-
 #--------------------- List of variables for each Module -----------------------
 
 # Devices variables
 DEVICES_TESTS = \
-  devices/Skynet_Serialization
-#  devices/Skynet_SocketCommunicator
+	devices/Skynet_SocketCommunicatorFactory \
+#	devices/Skynet_Serialization \
+#	devices/Skynet_SocketCommunicator
 
 # <Module> variables
 # <MODULE>_TESTS = \
@@ -24,6 +24,7 @@ CATCH_CXX_FLAGS =
 CPP_FLAGS = $(SKYNET_CPP_FLAGS)
 CXX_FLAGS = $(CATCH_CXX_FLAGS) $(SKYNET_CXX_FLAGS)
 INCLUDE_FLAGS = -I$(SKYNET_INCLUDE_DIR) -I$(CATCH_INCLUDE_DIR)
+LIB_FLAGS = -l$(SKYNET_LIBS)
 #-------------------------------------------------------------------------------
 
 #------------------- List of files to be created for each Module ---------------
@@ -61,17 +62,19 @@ clean:
 devices/%_test.cpp.o: devices/%_test.cpp
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 run_catch_devices_tests: $(DEVICES_OBJECTS) catch_main.cpp.o
-	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(DEVICES_OBJECTS) catch_main.cpp.o -o devices/run_catch_devices_tests
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
+	$(DEVICES_OBJECTS) catch_main.cpp.o -o devices/run_catch_devices_tests
 
 # <Module> rules
 # %_<module>_test.cpp.o: %_test.cpp
 #	  $(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 # run_catch_<module>_tests: $(<MOUDLE>_OBJECTS) catch_main.cpp.o
-#		$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(<MODULE>_OBJECTS) catch_main.cpp.o -o <devices>/run_catch_<module>_tests
+#		$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
+#   $(<MODULE>_OBJECTS) catch_main.cpp.o -o <devices>/run_catch_<module>_tests
 
 # Catch rules
 run_catch_tests: $(OBJECTS) catch_main.cpp.o
-	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(OBJECTS) -o run_catch_tests
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) $(OBJECTS) -o run_catch_tests
 catch_main.cpp.o: catch_main.cpp
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c catch_main.cpp -o catch_main.cpp.o
 
