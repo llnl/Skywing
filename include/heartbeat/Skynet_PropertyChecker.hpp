@@ -25,7 +25,7 @@ namespace skynet
        *	to get list of nearby devices and update this list if properties
        *	aren't satisfied. 
        */
-        PropertyChecker(const std::vector<GraphProperty> property_list) :
+        PropertyChecker(std::vector<GraphProperty> property_list) :
         poperty_list_(std::move(property_list))
       {
       }
