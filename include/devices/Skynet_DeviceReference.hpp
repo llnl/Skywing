@@ -9,8 +9,8 @@
 #include "Skynet_DeviceCommunicator.hpp"
 #include "Skynet_CommunicatorFactory.hpp"
 
-namepsace skynet
-{  
+namespace skynet
+{
   /** \class DeviceReference
 
       A DeviceReference object represents some other participating
@@ -23,35 +23,31 @@ namepsace skynet
   public:
     /** \brief Construct a new \c DeviceReference.
      *
-     * \param comm A DeviceCommunicator representing this
+     * \param comm_factory A CommuncatorFactory representing this
      * DeviceReference's communications policy.
      */
-    DeviceReference(std::unique_ptr<CommunicatorFactory> comm)
-      : comm(comm_), is_believed_live_(true)
+    DeviceReference(std::unique_ptr<CommunicatorFactory> comm_factory)
+      : is_believed_live_(true), comm_factory_(std::move(comm_factory))
     { }
-    
-    /** \brief Get the DeviceCommunicator policy object. */
-    const DeviceCommunicator& get_comm() const
-    { return *comm_; }
 
     /** \brief Get if we believe the referred device to be live. */
     bool get_is_belived_live() const
-    { return is_live_; }
+    { return is_believed_live_; }
 
 
-    /** \brief Request a new DeviceCommunicator for this DeviceReference. 
+    /** \brief Request a new DeviceCommunicator for this DeviceReference.
      * \return A new DeviceCommunicator. */
     std::unique_ptr<DeviceCommunicator> create_new_communicator()
     {
       return comm_factory_->create_new_communicator(comm_config_info_);
     }
-    
+
   private:
-    bool is_believed_live;
+    bool is_believed_live_;
     id_t device_id_;
     std::unique_ptr<CommunicatorFactory> comm_factory_;
     std::vector<std::string> comm_config_info_;
-    
+
   }; // class DeviceReference
 } // namespace skynet
 
