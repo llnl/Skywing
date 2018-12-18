@@ -15,8 +15,10 @@ namespace skynet
 
       /** \brief Check if the reference graph satisfies this
        *   property using information from the device manager
+       *
+       *  \return 1 if graph property is satisfied 0 otherwise
        */
-      virtual bool check_property(const DeviceManager& device_manager) const = 0; 
+      virtual bool is_property_satisfied(const DeviceManager& device_manager) const = 0; 
 				      
     private:
       
