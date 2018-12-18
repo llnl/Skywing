@@ -22,7 +22,6 @@ UDP_ECHO_LIBS = \
 
 SKYNET_STARTUP_SRC = \
 	skynet_startup.cpp \
-	HeartHelper.cpp \
 	Ns3_Heart.cpp
 SKYNET_STARTUP_LIBS = \
 	core \
