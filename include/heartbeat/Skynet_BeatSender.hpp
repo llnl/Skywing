@@ -14,11 +14,17 @@ namespace skynet
    {
    public:
 
+     //QUESTION: Can/should this structure be virtual and can/should
+     //	response_val be a template?
+     struct BeatResponse
+     {
+       int response_val;
+     };
+     
      /** \brief Send a signal to a device from the nearby
      *   device list and receive response.
      */
-     template<typename T>
-     T send_heartbeat(const DeviceReference& device);
+     virtual BeatResponse send_heartbeat(const DeviceReference& device) = 0;
 
    private:
 
