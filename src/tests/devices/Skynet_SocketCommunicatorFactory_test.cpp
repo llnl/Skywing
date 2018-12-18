@@ -19,7 +19,7 @@ void *dev1(void *vargp)
     device_ref[1] = 50;
     std::vector<int> port_ref = {5000, 6000};
     std::vector<std::string> config(0);
-    std::vector<SocketCommunicator> comm_list;
+    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // SocketCommunicatorFactory();
     SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
@@ -41,7 +41,7 @@ void *dev2(void *vargp)
     std::vector<int> device_ref = {40, 50} ;
     std::vector<int> port_ref = {5000, 7000};
     std::vector<std::string> config(0);
-    std::vector<SocketCommunicator> comm_list;
+      std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
     comm_list.push_back((factory1.create_new_communicator(config)));
@@ -64,7 +64,7 @@ void *dev3(void *vargp)
     std::vector<int> device_ref = {40, 45} ;
     std::vector<int> port_ref = {6000, 7000};
     std::vector<std::string> config(0);
-    std::vector<SocketCommunicator> comm_list;
+      std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
     comm_list.push_back((factory1.create_new_communicator(config)));

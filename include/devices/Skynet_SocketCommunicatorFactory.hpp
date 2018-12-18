@@ -29,8 +29,8 @@ namespace skynet
     }
 
     //AF: ToDo: discuss with group about return value
-    // std::unique_ptr<SocketCommunicator>
-    SocketCommunicator
+    std::unique_ptr<DeviceCommunicator>
+    // SocketCommunicator
     create_new_communicator(std::vector<std::string> /* comm_config_info*/)
     {
       port_ +=1;
@@ -42,13 +42,13 @@ namespace skynet
         if(local_ip_<remote_ip_){
 
             // communicators_[k] = std::make_unique<SocketCommunicator>(SocketCommunicator(port_ref_[k]));
-            return SocketCommunicator(port_);
+            return std::make_unique<SocketCommunicator>(SocketCommunicator(port_));
             // std::cout<<"Finsihed setting up Communication Server Side"<<std::endl;
           }
           else{
 
             // communicators_[k] = std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1,port_ref_[k]));
-            return SocketCommunicator(ip_address1,port_);
+            return std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1,port_));
 
           }
         // return std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1,port));
