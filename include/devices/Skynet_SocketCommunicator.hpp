@@ -111,6 +111,7 @@ namespace skynet
       servaddr.sin_family = AF_INET;
       // servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
       servaddr.sin_addr.s_addr = INADDR_ANY;
+      //AF: This needs to be uncommented for NS3 testing 
       // servaddr.sin_addr.s_addr = inet_addr(ip_address);
       servaddr.sin_port = ntohs(port);
 
