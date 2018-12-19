@@ -8,14 +8,27 @@
 
 namespace ns3
 {
+  /** \class HeartHelper
+   * \brief Provides helper routines for the Ns3_Heart class
+   *
+   * Contains installation method and an ObjectFactory for use  of Ns3_Heart
+   * applications in ns3
+   */
   class HeartHelper
   {
   public:
+    /** \brief Construct a new HeartHelper.
+     *
+     */
     HeartHelper()
     {
       factory_.SetTypeId(Heart::GetTypeId());
     }
 
+    /** \brief Install an Ns3_Heart in each Node in a NodeContainer
+     *
+     * \param c NodeContainer containing Nodes to install Ns3_Hearts into
+     */
     ApplicationContainer Install(NodeContainer c) const
     {
       ApplicationContainer apps;

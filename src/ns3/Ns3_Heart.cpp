@@ -3,7 +3,7 @@
 #include "ns3/log.h"
 #include "ns3/simulator.h"
 
-namespace ns3 
+namespace ns3
 {
   NS_LOG_COMPONENT_DEFINE("HeartApplication");
   NS_OBJECT_ENSURE_REGISTERED(Heart);
@@ -37,7 +37,9 @@ namespace ns3
   void Heart::StartApplication()
   {
     NS_LOG_FUNCTION(this);
-    begin_heartbeat_event_ = Simulator::Schedule(Seconds(0.0), &Heart::begin_heartbeat, this);
+    // schedule the begin_heartbeat event to occur at time 0
+    begin_heartbeat_event_ = Simulator::Schedule(Seconds(0.0),
+                                                 &Heart::begin_heartbeat, this);
   }
 
   void Heart::StopApplication()
@@ -50,6 +52,7 @@ namespace ns3
   {
     NS_LOG_FUNCTION(this);
     NS_ASSERT(begin_heartbeat_event_.IsExpired());
+    // begin the Skynet Heartbeat
     heart_.begin_heartbeat();
   }
 } // namespace ns3

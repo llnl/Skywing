@@ -3,14 +3,21 @@
 
 #include "ns3/application.h"
 #include "ns3/event-id.h"
-#include "heartbeat/Skynet_Heart.hpp"
+//TODO: swap these includes once Heart Module is developed
+//#include "heartbeat/Skynet_Heart.hpp"
+#include "tmp/Skynet_Heart.hpp"
 
 namespace ns3
 {
+  /** \class (ns3) Heart
+   * \brief An ns3 wrapper for the Skynet Heart class
+   *
+   * This wraps the Skynet Heart as an ns3 Application
+   */
   class Heart : public Application
   {
   public:
-  
+
     static TypeId GetTypeId();
 
     Heart();
