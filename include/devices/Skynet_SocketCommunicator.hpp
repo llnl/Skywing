@@ -29,6 +29,7 @@ namespace skynet
   public:
     SocketCommunicator(uint16_t port, int type){
       printf("In Server....\n");
+      success_ = false;
 
       port_ = port;
       //Socket stucture
@@ -64,12 +65,13 @@ namespace skynet
       // Binding newly created socket to given IP and verification
       if ((bind(connfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
         printf("socket bind failed...\n");
-        exit(0);
+        return;
+        //exit(0);
       }
       else
       printf("Server Socket successfully binded..\n");
       //listening for a connection
-      listen(connfd, 5);
+      listen(connfd, 5); //TODO: is this needed? CJV
 
       //[TODO] AF: Vericatication was not working, need to look into this!
       // Now server is ready to listen and verification
@@ -92,6 +94,8 @@ namespace skynet
 
        //[TODO] AF: Typically the sockets are closed at some point but I am not sure where or when yet to do that... May cause problems.
       // close(sockfd__);
+
+      success_ = true;
     }
 
 
@@ -100,6 +104,7 @@ namespace skynet
     // : ip_address_{std::move(ip_address)}
     {
       printf("In Client....\n");
+      success_ = false;
 
       port_ = port;
       std::cout<<"Client port = "<<port_<<std::endl;
@@ -137,13 +142,17 @@ namespace skynet
       // connect the client socket to server socket
       if (connect(sockfd_, (SA*)&servaddr, sizeof(servaddr)) != 0) {
         printf("connection with the server failed...\n");
-        exit(0);
+        //exit(0);
+        return;
       }
       else
         printf("connected to the server..\n");
+      success_ = true;
 
     }
 
+    const bool success() const
+    { return success_; }
 
   private:
 
@@ -190,6 +199,9 @@ namespace skynet
     // char ip_address_[4];
     int sockfd_;
     int port_;
+
+    // TODO: replace this with error checking
+    bool success_;
 
   }; // class MPICommunicator
 } // namespace skynet

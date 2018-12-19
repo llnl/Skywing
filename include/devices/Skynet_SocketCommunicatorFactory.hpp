@@ -15,7 +15,7 @@ namespace skynet
   {
   public:
     using data_type = std::vector<std::unique_ptr<DeviceCommunicator>>;
-    static const int IPv4 = 1;
+    static const int IPv4 = AF_INET;
   public:
       SocketCommunicatorFactory() = default;
  /** \brief Create a new SocketCommunicatorFactory.
@@ -24,67 +24,64 @@ namespace skynet
      * For now the ip_addresses are a list of its that can be sorted easily.
      * This will need to change once we are not working on one machine.
      */
-    SocketCommunicatorFactory(int type, const char * server_ip, uint16_t port_start):
-        server_ip_{server_ip}, port_{port_start}
-    {
-      // check that type is supported
-      switch (type)
-      {
-        case (IPv4): type_ = AF_INET; break;
-        default: printf("incorrect socket type\n"); exit(-1); //TODO: error handling
-      }
-    }
+    SocketCommunicatorFactory(int type, uint16_t port_start) :
+      type_(type), server_address_{""}, port_{port_start}
+    { check_for_supported_type(); }
+
+    SocketCommunicatorFactory(int type, const char * server_address,
+      uint16_t port_start) : type_(type), server_address_{server_address}, port_{port_start}
+    { check_for_supported_type(); }
 
     std::unique_ptr<DeviceCommunicator>
     create_new_communicator(std::vector<std::string> /* comm_config_info*/)
     {
-          port_ +=1;
-            // int port = 4000;
-            const char * ip_address1 = "192.0.0.1";
-
-            // AF: this is not universal for ip_address since we are still on one machine. This needs to be
-
-            if(local_ip_<remote_ip_){
-
-                // communicators_[k] = std::make_unique<SocketCommunicator>(SocketCommunicator(port_ref_[k])
-                return std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
-                // std::cout<<"Finsihed setting up Communication Server Side"<<std::endl;
-              }
-              else{
-
-                // communicators_[k] = std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1,p
-                return std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1, port_, type_));
-
-              }
-            // return std::make_unique<SocketCommunicator>(SocketCommunicator(ip_address1,port));
-     }
-
-
-
-    //AF: ToDo: discuss with group about return value
-    std::unique_ptr<DeviceCommunicator>
-    // SocketCommunicator
-    create_new_server_communicator(std::vector<std::string> /* comm_config_info*/)
-    {
-      return std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
+      // if factory is server side
+      if ( std::strcmp(server_address_ ,"") == 0)
+      {
+        // create server socket by trying increasing port numbers
+        do
+        {
+          std::unique_ptr<SocketCommunicator> sc =
+            std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
+          port_++;
+          if (sc->success()) return sc; // TODO: replace this with exception catching
+        }while(port_ < 65536);
+        printf("Could not find open port for server socket\n");
+        exit(-1);
+      }
+      // if factory is client side
+      else
+      {
+        // create client socket by trying increasing port numbers
+        do
+        {
+            std::unique_ptr<SocketCommunicator> sc =
+              std::make_unique<SocketCommunicator>(SocketCommunicator(server_address_, port_, type_));
+            port_++;
+            if (sc->success()) return sc; // TODO: replace this with exception catching
+        }while(port_ < 65536);
+        printf("Could not connect to server socket on any ports\n");
+        exit(-1);
+      }
     }
-
-    std::unique_ptr<DeviceCommunicator>
-    create_new_client_communicator(std::vector<std::string> /* comm_config_info*/)
-    {
-      return std::make_unique<SocketCommunicator>(SocketCommunicator(server_ip_, port_, type_));
-    }
-
     // data_type& get_as_nonconst_vector() { return communicators_; }
 
 
   private:
-    const char * server_ip_;
-    const char * local_ip_;
-    const char * remote_ip_;
-    uint16_t port_;
-    int type_;
 
+    void check_for_supported_type() const
+    {
+      // check that socket type is supported
+      if (type_ != IPv4)
+      {
+        printf("incorrect socket type\n");
+        exit(-1);
+      }
+    }
+
+    int type_;
+    const char * server_address_;
+    uint16_t port_;
     // std::vector<int> ip_address_;
     // std::vector<int> port_ref_;
     // std::vector<std::unique_ptr<DeviceCommunicator>> communicators_ = data_type();
