@@ -12,66 +12,94 @@ using namespace skynet;
 
 void *dev1(void *vargp)
 {
-    int local_ref = 40;
-    // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
-    std::vector<int> device_ref(2);
-    device_ref[0] = 45;
-    device_ref[1] = 50;
-    std::vector<int> port_ref = {5000, 6000};
+    // This device starts second and has nobody to connect to
+    const char * my_ip = "127.0.0.1";
+    int port = 5000;
+
     std::vector<std::string> config(0);
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
+    // Create a communicator on "standard Skynet port" and start listening
+    SocketCommunicatorFactory listen_factory(SocketCommunicatorFactory::IPv4, my_ip, port);
+    comm_list.push_back((listen_factory.create_new_server_communicator(config)));
 
-    // SocketCommunicatorFactory();
-    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
-    // comm_list.push_back(std::make_unique<SocketCommunicator>(500));
-    // comm_list.push_back(SocketCommunicator(port_ref[0]));
-    comm_list.push_back((factory1.create_new_communicator(config)));
-    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
-    comm_list.push_back((factory2.create_new_communicator(config)));
+    // Once dev2 comes online and pings dev1 on port 5000, instruct dev2 to
+    // communicate on port 5001
+    SocketCommunicatorFactory dev2_factory(SocketCommunicatorFactory::IPv4, my_ip, 5001);
+    comm_list.push_back((dev2_factory.create_new_server_communicator(config)));
 
+    // Once dev3 comes online and pings dev1 on port 5000, instruct dev3 to
+    // communicate on port 5002
+    SocketCommunicatorFactory dev3_factory(SocketCommunicatorFactory::IPv4, my_ip, 5002);
+    comm_list.push_back((dev3_factory.create_new_server_communicator(config)));
 
     pthread_exit(NULL);
 }
 
 void *dev2(void *vargp)
 {
-    int local_ref = 45;
-    // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
+    // This device starts seconds and knows it needs to connect to dev1
+    const char * dev1_ip = "127.0.0.1";
+    const char * my_ip = "127.0.0.1";
 
-    std::vector<int> device_ref = {40, 50} ;
-    std::vector<int> port_ref = {5000, 7000};
     std::vector<std::string> config(0);
       std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
-    comm_list.push_back((factory1.create_new_communicator(config)));
+    // Create a communicator on "standard Skynet port" and connect to dev1
+    SocketCommunicatorFactory shout_dev1_factory(SocketCommunicatorFactory::IPv4, dev1_ip, 5000);
+    comm_list.push_back((shout_dev1_factory.create_new_client_communicator(config)));
+    std::this_thread::sleep_for (std::chrono::seconds(2));
 
-    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
-    comm_list.push_back((factory2.create_new_communicator(config)));
+    // Dev1 instructs dev2 to communicate on port 5001
+    comm_list.pop_back();
+    SocketCommunicatorFactory dev1_factory(SocketCommunicatorFactory::IPv4, dev1_ip, 5001);
+    comm_list.push_back((dev1_factory.create_new_client_communicator(config)));
 
-    // SocketCommunicator a = factory1.create_new_communicator();
+    // Create communicator on "standard Skynet port" and start listening
+    SocketCommunicatorFactory listen_factory(SocketCommunicatorFactory::IPv4, my_ip, 6000);
+    comm_list.push_back((listen_factory.create_new_server_communicator(config)));
 
-    // SocketCommunicatorFactory factory2(local_ref, device_ref,port_ref);
+    // Once dev3 comes online and pings dev2 on port 6000, instruct dev3 to
+    // communicate on port 6001
+    SocketCommunicatorFactory dev3_factory(SocketCommunicatorFactory::IPv4, my_ip, 6001);
+    comm_list.push_back((dev3_factory.create_new_server_communicator(config)));
 
     pthread_exit(NULL);
 }
 
 void *dev3(void *vargp)
 {
-    int local_ref = 50;
-    // std::cout<<"Creating Communication for device_ref = "<<local_ref<<std::endl;
+    // This device starts third and knows it needs to connect to dev1 & dev2
+    const char * dev1_ip = "127.0.0.1";
+    const char * dev2_ip = "127.0.0.1";
+    const char * my_ip = "127.0.0.1";
 
-    std::vector<int> device_ref = {40, 45} ;
-    std::vector<int> port_ref = {6000, 7000};
     std::vector<std::string> config(0);
-      std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
+    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    SocketCommunicatorFactory factory1(local_ref,device_ref[0],port_ref[0]);
-    comm_list.push_back((factory1.create_new_communicator(config)));
-    SocketCommunicatorFactory factory2(local_ref,device_ref[1],port_ref[1]);
-    comm_list.push_back((factory2.create_new_communicator(config)));
+    // Create a communicator on "standard Skynet port" and connect to dev1
+    SocketCommunicatorFactory shout_dev1_factory(SocketCommunicatorFactory::IPv4, dev1_ip, 5000);
+    comm_list.push_back((shout_dev1_factory.create_new_client_communicator(config)));
+    std::this_thread::sleep_for (std::chrono::seconds(2));
 
-    // SocketCommunicatorFactory factory3(local_ref, device_ref,port_ref);
+    // Dev1 instructs dev3 to communicate on port 5002
+    comm_list.pop_back();
+    SocketCommunicatorFactory dev1_factory(SocketCommunicatorFactory::IPv4, dev1_ip, 5002);
+    comm_list.push_back((dev1_factory.create_new_client_communicator(config)));
+
+    // Create a communicator on "standard Skynet port" and connect to dev2
+    SocketCommunicatorFactory shout_dev2_factory(SocketCommunicatorFactory::IPv4, dev2_ip, 6000);
+    comm_list.push_back((shout_dev2_factory.create_new_client_communicator(config)));
+    std::this_thread::sleep_for (std::chrono::seconds(2));
+
+    // Dev2 instructs dev3 to communicate on port 5003
+    comm_list.pop_back();
+    SocketCommunicatorFactory dev2_factory(SocketCommunicatorFactory::IPv4, dev2_ip, 6001);
+    comm_list.push_back((dev2_factory.create_new_client_communicator(config)));
+
+    // Create communicator on "standard Skynet port" and start listening
+    SocketCommunicatorFactory listen_factory(SocketCommunicatorFactory::IPv4, my_ip, 7000);
+    comm_list.push_back((listen_factory.create_new_server_communicator(config)));
+
     pthread_exit(NULL);
 }
 
@@ -84,13 +112,13 @@ TEST_CASE( "Communication methods work", "[Skynet_SocketCommunicator]" )
 
 
     pthread_create(&thread_id1, NULL, dev1, NULL);
-    std::this_thread::sleep_for (std::chrono::seconds(10));
+    std::this_thread::sleep_for (std::chrono::seconds(5));
     pthread_create(&thread_id2, NULL, dev2, NULL);
-    std::this_thread::sleep_for (std::chrono::seconds(10));
+    std::this_thread::sleep_for (std::chrono::seconds(5));
     pthread_create(&thread_id3, NULL, dev3, NULL);
 
 
-    std::this_thread::sleep_for (std::chrono::seconds(100));
+    std::this_thread::sleep_for (std::chrono::seconds(10));
 
 
 }

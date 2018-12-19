@@ -4,6 +4,7 @@
 #include "Skynet_DeviceCommunicator.hpp"
 // #include "Skynet_SocketCommunicatorFactory.hpp"
 
+#include <cstdint>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ namespace skynet
   class SocketCommunicator : public DeviceCommunicator
   {
   public:
-    SocketCommunicator(int port){
+    SocketCommunicator(uint16_t port, int type){
       printf("In Server....\n");
 
       port_ = port;
@@ -35,7 +36,7 @@ namespace skynet
       struct sockaddr_in servaddr, cli;
 
       // socket create and verification
-      connfd = socket(AF_INET, SOCK_STREAM, 0);
+      connfd = socket(type, SOCK_STREAM, 0);
       if (sockfd_ == -1) {
         printf("socket creation failed...\n");
         exit(0);
@@ -47,8 +48,17 @@ namespace skynet
 
       //[TODO] AF: Need to make this universal for IP!
       // assign IP, PORT
-      servaddr.sin_family = AF_INET;
-      servaddr.sin_addr.s_addr = (INADDR_ANY);
+      switch(type)
+      {
+        case AF_INET:
+          servaddr.sin_family = AF_INET;
+          servaddr.sin_addr.s_addr= INADDR_ANY;
+          break;
+        default:
+          // TODO: error handling
+          printf("incorrect socket type\n");
+          exit(-1);
+      }
       std::cout<<"Server port = "<<port_<<std::endl;
       servaddr.sin_port = htons(port_);
       // Binding newly created socket to given IP and verification
@@ -84,7 +94,9 @@ namespace skynet
       // close(sockfd__);
     }
 
-    SocketCommunicator(const char * ip_address, int port)
+
+    // for IPv4 addresses
+    SocketCommunicator(const char * ip_address, uint16_t port, int type)
     // : ip_address_{std::move(ip_address)}
     {
       printf("In Client....\n");
@@ -108,11 +120,18 @@ namespace skynet
 
        //[TODO] AF: Need to make this universal
       // assign IP, PORT
-      servaddr.sin_family = AF_INET;
-      // servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-      servaddr.sin_addr.s_addr = INADDR_ANY;
-      //AF: This needs to be uncommented for NS3 testing 
-      // servaddr.sin_addr.s_addr = inet_addr(ip_address);
+      switch(type)
+      {
+        case AF_INET:
+          servaddr.sin_family = AF_INET;
+          inet_pton(AF_INET, ip_address, &(servaddr.sin_addr));
+          //servaddr.sin_addr.s_addr = inet_addr(ip_address);
+          break;
+        default:
+          // TODO: error handling
+          printf("incorrect socket type\n");
+          exit(-1);
+      }
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
