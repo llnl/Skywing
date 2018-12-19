@@ -19,11 +19,10 @@ void *dev1(void *vargp)
     std::vector<std::string> config(0);
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    // Create three server communicators
+    // Continually create server communicators as clients connect to them
     SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
-    comm_list.push_back((server_factory.create_new_communicator(config)));
-    comm_list.push_back((server_factory.create_new_communicator(config)));
-    comm_list.push_back((server_factory.create_new_communicator(config)));
+    while (true)
+      comm_list.push_back((server_factory.create_new_communicator(config)));
 
     pthread_exit(NULL);
 }
@@ -40,10 +39,10 @@ void *dev2(void *vargp)
     SocketCommunicatorFactory client_factory(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT);
     comm_list.push_back((client_factory.create_new_communicator(config)));
 
-    // Create two server communicators
+    // Continually create server communicators as clients connect to them
     SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
-    comm_list.push_back((server_factory.create_new_communicator(config)));
-    comm_list.push_back((server_factory.create_new_communicator(config)));
+    while (true)
+      comm_list.push_back((server_factory.create_new_communicator(config)));
 
     pthread_exit(NULL);
 }
@@ -65,9 +64,10 @@ void *dev3(void *vargp)
     SocketCommunicatorFactory client_factory2(SocketCommunicatorFactory::IPv4, dev2_ip, SKYNET_PORT);
     comm_list.push_back((client_factory2.create_new_communicator(config)));
 
-    // Create one server communicator
+    // Continually create server communicators as clients connect to them
     SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
-    comm_list.push_back((server_factory.create_new_communicator(config)));
+    while (true)
+      comm_list.push_back((server_factory.create_new_communicator(config)));
 
     pthread_exit(NULL);
 }
