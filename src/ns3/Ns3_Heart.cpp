@@ -1,5 +1,6 @@
 #include "Ns3_Heart.hpp"
 
+#include <arpa/inet.h>
 #include "ns3/log.h"
 #include "ns3/simulator.h"
 #include "ns3/uinteger.h"
@@ -15,17 +16,22 @@ namespace ns3
       .SetParent<Application>()
       .SetGroupName("Applications")
       .AddConstructor<Heart>()
-      .AddAttribute("LocalAddress",
-                    "The source Address of the outbound packets",
-                    Ipv4AddressValue(),
-                    MakeIpv4AddressAccessor(&Heart::local_ip_),
-                    MakeIpv4AddressChecker())
-      .AddAttribute("RemoteAddress",
-                    "The destination Address of the outbound packets",
-                    Ipv4AddressValue(),
-                    MakeIpv4AddressAccessor(&Heart::remote_ip_),
-                    MakeIpv4AddressChecker())
-      .AddAttribute("PortStart",
+      .AddAttribute("ServerAddress1",
+                    "The first server address",
+                    AddressValue(),
+                    MakeAddressAccessor(&Heart::server_address1_),
+                    MakeAddressChecker())
+      .AddAttribute("ServerAddress2",
+                    "The second server address",
+                    AddressValue(),
+                    MakeAddressAccessor(&Heart::server_address2_),
+                    MakeAddressChecker())
+      .AddAttribute("ServerAddress3",
+                    "The second server address",
+                    AddressValue(),
+                    MakeAddressAccessor(&Heart::server_address3_),
+                    MakeAddressChecker())
+      .AddAttribute("Port",
                     "The port number to start with",
                     UintegerValue(100),
                     MakeUintegerAccessor(&Heart::port_),
@@ -69,8 +75,25 @@ namespace ns3
     NS_LOG_FUNCTION(this);
     NS_ASSERT(begin_heartbeat_event_.IsExpired());
 
+    // TODO: generalize this to other address formats
+    std::vector<const char *> server_addresses;
+    if (!server_address1_.IsInvalid())
+    {
+      if (Ipv4Address::IsMatchingType(server_address1_) )
+      {
+        // use arpa/inet to convert from uint32_t to const char *
+        struct sockaddr_in sa;
+        char str[INET_ADDRSTRLEN];
+        sa.sin_addr.s_addr = (Ipv4Address::ConvertFrom(server_address1_)).Get();
+        // add to server_addresses vector
+        server_addresses.push_back(
+          inet_ntop(AF_INET, &sa.sin_addr, str, INET_ADDRSTRLEN) );
+      }
+      else
+        NS_FATAL_ERROR ("Unrecognized address format");
+    }
+
     // begin the Skynet Heartbeat
-    std::vector<const char *> ip_addresses(0);
-    heart_.begin_heartbeat(ip_addresses, port_);
+    heart_.begin_heartbeat(server_addresses, port_);
   }
 } // namespace ns3

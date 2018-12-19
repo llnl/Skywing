@@ -20,12 +20,34 @@ namespace ns3
     /** \brief Construct a new HeartHelper.
      *
      */
-    HeartHelper(Address local_ip, Address remote_ip, uint16_t port)
+    HeartHelper(uint16_t port)
     {
       factory_.SetTypeId(Heart::GetTypeId());
-      SetAttribute("LocalAddress", AddressValue(local_ip));
-      SetAttribute("RemoteAddress", AddressValue(remote_ip));
-      SetAttribute("PortStart", UintegerValue(port));
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, Address server2, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("ServerAddress2", AddressValue(server2));
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, Address server2, Address server3, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("ServerAddress2", AddressValue(server2));
+      SetAttribute("ServerAddress3", AddressValue(server3));
+      SetAttribute("Port", UintegerValue(port));
     }
 
     /** \brief Install an Ns3_Heart in each Node in a NodeContainer

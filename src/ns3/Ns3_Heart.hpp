@@ -34,8 +34,9 @@ namespace ns3
     void begin_heartbeat();
     EventId begin_heartbeat_event_;
     skynet::Heart heart_;
-    Ipv4Address local_ip_;
-    Ipv4Address remote_ip_;
+    Address server_address1_;
+    Address server_address2_;
+    Address server_address3_;
     uint16_t port_;
   }; // class Heart
 } // namespace ns3
