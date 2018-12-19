@@ -2,6 +2,7 @@
 
 #include "ns3/log.h"
 #include "ns3/simulator.h"
+#include "ns3/uinteger.h"
 
 namespace ns3
 {
@@ -14,6 +15,21 @@ namespace ns3
       .SetParent<Application>()
       .SetGroupName("Applications")
       .AddConstructor<Heart>()
+      .AddAttribute("LocalAddress",
+                    "The source Address of the outbound packets",
+                    Ipv4AddressValue(),
+                    MakeIpv4AddressAccessor(&Heart::local_ip_),
+                    MakeIpv4AddressChecker())
+      .AddAttribute("RemoteAddress",
+                    "The destination Address of the outbound packets",
+                    Ipv4AddressValue(),
+                    MakeIpv4AddressAccessor(&Heart::remote_ip_),
+                    MakeIpv4AddressChecker())
+      .AddAttribute("PortStart",
+                    "The port number to start with",
+                    UintegerValue(100),
+                    MakeUintegerAccessor(&Heart::port_),
+                    MakeUintegerChecker<uint16_t>())
     ;
     return tid;
   }
@@ -52,7 +68,9 @@ namespace ns3
   {
     NS_LOG_FUNCTION(this);
     NS_ASSERT(begin_heartbeat_event_.IsExpired());
+
     // begin the Skynet Heartbeat
-    heart_.begin_heartbeat();
+    std::vector<const char *> ip_addresses(0);
+    heart_.begin_heartbeat(ip_addresses, port_);
   }
 } // namespace ns3

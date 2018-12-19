@@ -3,6 +3,7 @@
 
 #include "ns3/application.h"
 #include "ns3/event-id.h"
+#include "ns3/ipv4-address.h"
 //TODO: swap these includes once Heart Module is developed
 //#include "heartbeat/Skynet_Heart.hpp"
 #include "tmp/Skynet_Heart.hpp"
@@ -33,6 +34,9 @@ namespace ns3
     void begin_heartbeat();
     EventId begin_heartbeat_event_;
     skynet::Heart heart_;
+    Ipv4Address local_ip_;
+    Ipv4Address remote_ip_;
+    uint16_t port_;
   }; // class Heart
 } // namespace ns3
 

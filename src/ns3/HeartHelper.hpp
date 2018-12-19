@@ -20,9 +20,12 @@ namespace ns3
     /** \brief Construct a new HeartHelper.
      *
      */
-    HeartHelper()
+    HeartHelper(Address local_ip, Address remote_ip, uint16_t port)
     {
       factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("LocalAddress", AddressValue(local_ip));
+      SetAttribute("RemoteAddress", AddressValue(remote_ip));
+      SetAttribute("PortStart", UintegerValue(port));
     }
 
     /** \brief Install an Ns3_Heart in each Node in a NodeContainer
@@ -43,6 +46,11 @@ namespace ns3
     }
 
   private:
+    void SetAttribute (std::string name, const AttributeValue &value)
+    {
+      factory_.Set (name, value);
+    }
+
     ObjectFactory factory_;
   }; // class HeartHelper
 } // namespace ns3

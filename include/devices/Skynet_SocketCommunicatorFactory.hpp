@@ -35,14 +35,14 @@ namespace skynet
     std::unique_ptr<DeviceCommunicator>
     create_new_communicator(std::vector<std::string> /* comm_config_info*/)
     {
+      std::unique_ptr<SocketCommunicator> sc;
       // if factory is server side
       if ( std::strcmp(server_address_ ,"") == 0)
       {
         // create server socket by trying increasing port numbers
         do
         {
-          std::unique_ptr<SocketCommunicator> sc =
-            std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
+          sc = std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
           port_++;
           if (sc->success()) return sc; // TODO: replace this with exception catching
         }while(port_ < 65536);
@@ -55,8 +55,7 @@ namespace skynet
         // create client socket by trying increasing port numbers
         do
         {
-            std::unique_ptr<SocketCommunicator> sc =
-              std::make_unique<SocketCommunicator>(SocketCommunicator(server_address_, port_, type_));
+            sc = std::make_unique<SocketCommunicator>(SocketCommunicator(server_address_, port_, type_));
             port_++;
             if (sc->success()) return sc; // TODO: replace this with exception catching
         }while(port_ < 65536);
