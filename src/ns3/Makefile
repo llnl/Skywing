@@ -3,6 +3,8 @@ include $(SKYNET_DIR)/src/Makefile
 #-------------------- List of variables for all simulators ---------------------
 NS3_PREFIX = ns3-dev
 NS3_INCLUDE_DIR = $(SKYNET_DIR)/utils/ns3/include/$(NS3_PREFIX)
+#[ToDo:] AF:I had to change this for MAC to lib not lib64. Need to make this line universal.
+# NS3_LIB_DIR = $(SKYNET_DIR)/utils/ns3/lib
 NS3_LIB_DIR = $(SKYNET_DIR)/utils/ns3/lib64
 #-------------------------------------------------------------------------------
 

@@ -12,26 +12,26 @@
 
 namespace skynet
 {
-  const void* serialize(const int& data)
+  inline const void* serialize(const int& data)
   {
     return static_cast<const void*>(&data);
   }
-  const void* serialize(const double& data)
+  inline const void* serialize(const double& data)
   {
     // std::cout<<"in serlize double"<<std::endl;
     return static_cast<const void*>(&data);
   }
-  const void* serialize(const unsigned& data)
+  inline const void* serialize(const unsigned& data)
   {
     return static_cast<const void*>(&data);
   }
-  const void* serialize(const bool& data)
+  inline const void* serialize(const bool& data)
   {
     return static_cast<const void*>(&data);
   }
 
   template<typename S>
-  const void* serialize(const std::vector<S>& data)
+  inline const void* serialize(const std::vector<S>& data)
   {
     static_assert(not std::is_same<S, bool>::value,
 		  "serialize: std::vector<bool> is not necessarily byte-packed,"
@@ -39,7 +39,7 @@ namespace skynet
     return static_cast<const void*>(data.data());
   }
 
-  std::vector<char> serialize(const Serializable& data)
+  inline std::vector<char> serialize(const Serializable& data)
   {
     std::vector<char> st = data.serialize();
     for(unsigned int i = 0; i<st.size(); i++){
@@ -51,45 +51,45 @@ namespace skynet
 
 
 
-  const void* convert_if_vec(const void* p)
+  inline const void* convert_if_vec(const void* p)
   { return p; }
 
   template<typename T>
-  const void* convert_if_vec(const std::vector<char>& p)
+  inline const void* convert_if_vec(const std::vector<char>& p)
   {
     return static_cast<const void*>(p.data());
   }
 
 
 
-  std::size_t get_serialized_size(const int&, const void*)
+  inline std::size_t get_serialized_size(const int&, const void*)
   {
     return sizeof(int);
   }
 
-  std::size_t get_serialized_size(const double&, const void*)
+  inline std::size_t get_serialized_size(const double&, const void*)
   {
     // std::cout<<"in size of doulbe"<<std::endl;
     return sizeof(double);
   }
 
-  std::size_t get_serialized_size(const unsigned&, const void*)
+  inline std::size_t get_serialized_size(const unsigned&, const void*)
   {
     return sizeof(unsigned);
   }
 
-  std::size_t get_serialized_size(const bool&, const void*)
+  inline std::size_t get_serialized_size(const bool&, const void*)
   {
     return sizeof(bool);
   }
 
   template<typename S>
-  std::size_t get_serialized_size(const std::vector<S>& data, const void*)
+  inline std::size_t get_serialized_size(const std::vector<S>& data, const void*)
   {
     return sizeof(S) * data.size();
   }
 
-  std::size_t get_serialized_size(const Serializable&, const std::vector<char>& pData)
+  inline std::size_t get_serialized_size(const Serializable&, const std::vector<char>& pData)
   {
     return sizeof(char) * pData.size();
   }
@@ -102,12 +102,12 @@ namespace skynet
   struct deserializeImplClass;
 
   template<typename T>
-  T deserialize(const std::vector<char>& data)
+  inline T deserialize(const std::vector<char>& data)
   {
     return deserializeImplClass<T>::deserializeImpl(data);
   }
   template<typename T>
-  T deserialize(const char* data)
+  inline T deserialize(const char* data)
   {
     return deserializeImplClass<T>::deserializeImpl(data);
   }
