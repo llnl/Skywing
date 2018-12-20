@@ -1,12 +1,9 @@
 #ifndef SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__
 #define SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__
 
-// #include "mpi.h"
-// #include <memory>
-#include <vector>
+#include <arpa/inet.h>
 #include "Skynet_CommunicatorFactory.hpp"
 #include "Skynet_SocketCommunicator.hpp"
-#include <thread>
 
 
 namespace skynet

@@ -3,6 +3,7 @@
 
 #-------------------------- Skynet project variables ---------------------------
 SKYNET_INCLUDE_DIR = $(SKYNET_DIR)/include
+SKYNET_SRC_DIR = $(SKYNET_DIR)/src
 SKYNET_LIBS = pthread
 SKYNET_CXX_FLAGS = -Wall -Werror -std=c++14
 SKYNET_CPP_FLAGS = -MMD -MP
