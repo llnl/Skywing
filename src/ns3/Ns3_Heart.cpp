@@ -12,7 +12,7 @@ namespace ns3
 
   TypeId Heart::GetTypeId()
   {
-    static TypeId tid = TypeId("Heart")
+    static TypeId tid = TypeId("ns3::Heart")
       .SetParent<Application>()
       .SetGroupName("Applications")
       .AddConstructor<Heart>()

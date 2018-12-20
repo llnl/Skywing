@@ -24,6 +24,7 @@ namespace skynet
     /** \brief Begin the heartbeat. */
     void begin_heartbeat(std::vector<const char *> ip_addresses, uint16_t port)
     {
+      std::cout << "I'm alive!!" << std::endl;
       std::vector<std::string> config(0);
 
       // for each ip_address, create a client communicator
