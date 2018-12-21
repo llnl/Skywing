@@ -5,6 +5,13 @@
 
 namespace skynet
 {
+
+  /** \brief Defines what a response from another device looks like */
+  struct BeatResponse
+  {
+    double response_val;
+  };
+  
   /** \class BeatSender
    *  \brief Abstract class for operting the heartbeat.
    *	Defines the sequence of events that occurs each
@@ -13,13 +20,6 @@ namespace skynet
    class BeatSender
    {
    public:
-
-     //QUESTION: Can/should this structure be virtual and can/should
-     //	response_val be a template?
-     struct BeatResponse
-     {
-       int response_val;
-     };
      
      /** \brief Send a signal to a device from the nearby
      *   device list and receive response.
