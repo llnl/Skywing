@@ -28,17 +28,15 @@ namespace skynet
        *  \param device_manager type of DeviceManager used by this device
        *  \param property_checker type of PropertyChecker used by this device
        */
-      Heart(const BeatSender beat_sender, const BeatInterpreter beat_interpreter,
-	    const PulseTimer pulse_timer, const DeviceManager device_manager,
-	    const PropertyChecker property_checker)
+      Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
+	    PulseTimer pulse_timer, DeviceManager device_manager,
+	    PropertyChecker property_checker)
 	: beat_sender_(std::move(beat_sender_)),
 	  beat_interpreter_(std::move(beat_interpreter)),
 	  pulse_timer_(std::move(pulse_timer)),
 	  device_manager_(std::move(device_manager)),
-	  property_checker_(std::move(property_checker)),
-      {
-	run_heartbeat();
-      }
+	  property_checker_(std::move(property_checker))
+      {}
 
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
