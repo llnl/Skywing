@@ -1,15 +1,6 @@
 #!/bin/bash
-#
-#  Follow these steps to populate the utils/ns3 directory
-#
-#  1) Clone ns3 repository at https://github.com/GMLC-TDC/ns-3-dev-git
-#  2) Clone waf repository at https://gitlab.com/ita1024/waf
-#  3) Run this script from the utils/ns3 directory as follows:
-#     ./build_ns3.sh <path_to_ns3_dir> <path_to_waf_dir>
-#
-#  NOTE: THIS SCRIPT WILL MODIFY THE NS3_DIR!  This because a newer version of
-#  waf is required to address an issue with md5 and FIPS.
-#
+#  
+#  This script will use the latest waf to build and install the ns3 simulator
 # ------------------------------------------------------------------------------
 
 # check usage
