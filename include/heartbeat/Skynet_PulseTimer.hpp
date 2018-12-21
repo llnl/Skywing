@@ -2,6 +2,7 @@
 #define SKYNET_PULSETIMER_HPP__
 
 #include <vector>
+#include <ctime>
 
 #include "devices/Skynet_DeviceReference.hpp"
 
@@ -20,7 +21,7 @@ namespace skynet
     {
     public:
 
-      virtual double get_next_time(const DeviceReference& device) const = 0;
+      virtual std::time_t get_next_time(const DeviceReference& device) const = 0;
       
     private:
 
