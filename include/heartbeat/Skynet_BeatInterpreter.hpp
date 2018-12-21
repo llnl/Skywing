@@ -19,16 +19,15 @@ namespace skynet
       * responses to the heartbeat
       *
       * \param device the device that we want to determine the status of
-      * \param response_history Vector of responses from the device to 
+      * \param device_history Vector of responses from the device to 
       *	 be used in determining device status
       *
       * \return 1 if device is alive or at least we are not ready to
       *	 pronounce it dead, 0 if we have decided device is dead
       */
-     //TO DO: Figure out where response_history should be stored
-     virtual bool should_device_remain(const DeviceReference& device,
-				       const std::vector<BeatSender::BeatResponse>& response_history)
-     	                               = 0;
+     virtual bool should_device_remain(
+	     const DeviceReference& device,
+	     const std::vector<BeatSender::BeatResponse>& device_history) = 0;
 
    private:
 
