@@ -47,7 +47,7 @@ namespace skynet
      */
     void set_is_believed_live(bool status)
     {
-      is_believed_live = status;
+      is_believed_live_ = status;
     }    
 
     /** Get device ID */
