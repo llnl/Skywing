@@ -39,10 +39,11 @@ namespace skynet
         // create server socket by trying increasing port numbers
         do
         {
+          printf("Attempting server port on %d of %d\n", port_, UINT16_MAX);
           sc = std::make_unique<SocketCommunicator>(SocketCommunicator(port_, type_));
           port_++;
           if (sc->success()) return sc; // TODO: replace this with exception catching
-        }while(port_ < uint16_t(65536));
+        }while(port_ < UINT16_MAX);
         printf("Could not find open port for server socket\n");
         exit(-1);
       }
@@ -55,7 +56,7 @@ namespace skynet
             sc = std::make_unique<SocketCommunicator>(SocketCommunicator(server_address_, port_, type_));
             port_++;
             if (sc->success()) return sc; // TODO: replace this with exception catching
-        }while(port_ < uint16_t(65536));
+        }while(port_ < UINT16_MAX);
         printf("Could not connect to server socket on any ports\n");
         exit(-1);
       }
