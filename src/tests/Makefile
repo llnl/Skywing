@@ -7,9 +7,6 @@ DEVICES_TESTS = \
 #	devices/Skynet_Serialization \
 #	devices/Skynet_SocketCommunicator
 
-DEVICES_SRCS = \
-  $(SKYNET_SRC_DIR)/devices/Skynet_SocketCommunicator.cpp
-
 # <Module> variables
 # <MODULE>_TESTS = \
 #   path_to_test_file1_without_file_extension \
@@ -33,10 +30,8 @@ LIB_FLAGS = -l$(SKYNET_LIBS)
 #------------------- List of files to be created for each Module ---------------
 
 # Devices lists
-DEVICES_OBJECTS = $(addsuffix _test.cpp.o, $(DEVICES_TESTS)) \
-                  $(addsuffix .o, $(DEVICES_SRCS))
-DEVICES_DFILES = $(addsuffix _test.cpp.d, $(DEVICES_TESTS)) \
-                 $(addsuffix .d, $(DEVICES_SRCS))
+DEVICES_OBJECTS = $(addsuffix _test.cpp.o, $(DEVICES_TESTS))
+DEVICES_DFILES = $(addsuffix _test.cpp.d, $(DEVICES_TESTS))
 
 # <Module> lists
 # <Module>_OBJECTS = $(addsuffix _test.cpp.o, $(<MODULE>_TESTS))
@@ -63,16 +58,16 @@ clean:
 	$(RM) run_catch_tests devices/run_catch_devices_tests
 	$(RM) $(OBJECTS) $(DFILES)
 
-# implicit rule
-%.cpp.o: %.cpp
+# Devices rules
+devices/%_test.cpp.o: devices/%_test.cpp
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
-
-# Devices rule
 run_catch_devices_tests: $(DEVICES_OBJECTS) catch_main.cpp.o
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
 	$(DEVICES_OBJECTS) catch_main.cpp.o -o devices/run_catch_devices_tests
 
 # <Module> rules
+# %_<module>_test.cpp.o: %_test.cpp
+#	  $(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 # run_catch_<module>_tests: $(<MOUDLE>_OBJECTS) catch_main.cpp.o
 #		$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
 #   $(<MODULE>_OBJECTS) catch_main.cpp.o -o <devices>/run_catch_<module>_tests
