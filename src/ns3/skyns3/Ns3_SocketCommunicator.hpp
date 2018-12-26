@@ -1,8 +1,7 @@
 #ifndef SKYNET_SOCKETCOMMUNICATOR_HPP__
 #define SKYNET_SOCKETCOMMUNICATOR_HPP__
 
-#include "Skynet_DeviceCommunicator.hpp"
-// #include "Skynet_SocketCommunicatorFactory.hpp"
+#include "devices/Skynet_SocketCommunicator.hpp"
 
 #include <cstdint>
 #include <stdio.h>
@@ -22,9 +21,9 @@
 #define MAX 80
 #define SA struct sockaddr
 
-namespace skynet
+namespace ns3
 {
-  class SocketCommunicator : public DeviceCommunicator
+  class SocketCommunicator : public skynet::SocketCommunicator
   {
   public:
     SocketCommunicator(uint16_t port, int type){

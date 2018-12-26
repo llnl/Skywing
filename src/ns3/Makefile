@@ -22,8 +22,7 @@ UDP_ECHO_LIBS = \
 	config-store
 
 SKYNET_STARTUP_SRC = \
-	skynet_startup.cpp \
-	$(SKYNET_SRC_DIR)/devices/Skynet_SocketCommunicator.cpp
+	skynet_startup.cpp
 SKYNET_STARTUP_LIBS = \
 	core \
 	network \
