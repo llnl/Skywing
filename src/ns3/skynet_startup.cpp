@@ -19,7 +19,7 @@
 #include "ns3/internet-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
-#include "HeartHelper.hpp"
+#include "skyns3/HeartHelper.hpp"
 
 NS_LOG_COMPONENT_DEFINE ("SkynetStartup");
 
