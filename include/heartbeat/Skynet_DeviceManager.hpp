@@ -1,4 +1,4 @@
-A#ifndef SKYNET_DEVICEMANANGER_HPP__
+#ifndef SKYNET_DEVICEMANANGER_HPP__
 #define SKYNET_DEVICEMANANGER_HPP__
 
 #include <vector>
@@ -11,9 +11,6 @@ A#ifndef SKYNET_DEVICEMANANGER_HPP__
 
 namespace skynet
 {
-  // Some types that will be used by the DeviceManager
-  typedef std::vector<BeatSender::BeatResponse> history_t; //Device history
-  typedef DeviceReference::id_t id_t; //Device ID
   
   /** \class DeviceManager
    *  \brief Abstract class for keeping track of devices
@@ -24,6 +21,12 @@ namespace skynet
    */
    class DeviceManager
    {
+   public:
+     // Some types that will be used by the DeviceManager
+     using history_t = std::vector<BeatSender::BeatResponse>; //Device history
+     using id_t = typename DeviceReference::id_t; //Device ID
+
+     
    public:     
      
      /** \brief Construct a new DeviceManager
