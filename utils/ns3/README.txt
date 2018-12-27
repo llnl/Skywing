@@ -11,6 +11,6 @@ simulator.  Follow these steps to first populate this directory:
   3) In a directory outside of the Skynet directory, clone waf repository at 
      https://gitlab.com/ita1024/waf
   4) From the $SKYNET_DIR/utils/ns3 directory, run the build_ns3.sh script: 
-     (ie ./build_ns3.sh <path_to_ns3_dir> <path_to_waf_dir>)
+     (ie ./build_ns3.sh <absolute_path_to_ns3_dir> <absolute_path_to_waf_dir>)
      NOTE: THIS SCRIPT WILL MODIFY THE NS3_DIR!  This because a newer version of
      waf is required to address an issue with md5 and FIPS.
