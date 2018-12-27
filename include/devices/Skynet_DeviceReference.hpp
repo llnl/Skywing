@@ -10,13 +10,7 @@
 #include "Skynet_CommunicatorFactory.hpp"
 
 namespace skynet
-{
-
-  //Some types that will be used by DeviceReference
-  //NOTE: For the == operator to work below, id_t must be a type for
-  // which comparison is defined.
-  typedef unsigned int id_t; //Device ID type
-  
+{  
   /** \class DeviceReference
 
       A DeviceReference object represents some other participating
@@ -26,6 +20,14 @@ namespace skynet
   */
   class DeviceReference
   {
+
+  public:
+    //Some types that will be used by DeviceReference
+    //NOTE: For the == operator to work below, id_t must be a type for
+    // which comparison is defined.
+    using id_t = unsigned int; //Device ID type
+
+    
   public:
     /** \brief Construct a new \c DeviceReference.
      *
@@ -51,23 +53,17 @@ namespace skynet
     }    
 
     /** Get device ID */
-    const id_t get_id()
+    id_t get_id() const
     {
       return device_id_;
     }
 
     bool operator ==(const DeviceReference& other_device) const
-    {
-      id_t other_id = other_device.get_id();
-      if (device_id_ == other_id){
-	return 1;
-      }
-      return 0;
-    }
+    { return device_id_ == other_device.get_id(); }
     
     /** \brief Request a new DeviceCommunicator for this DeviceReference.
      * \return A new DeviceCommunicator. */
-    std::unique_ptr<DeviceCommunicator> create_new_communicator()
+    const std::unique_ptr<DeviceCommunicator> create_new_communicator()
     {
       return comm_factory_->create_new_communicator(comm_config_info_);
     }
