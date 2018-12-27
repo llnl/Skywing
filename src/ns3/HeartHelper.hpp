@@ -4,7 +4,7 @@
 #include "ns3/application-container.h"
 #include "ns3/node-container.h"
 #include "ns3/object-factory.h"
-#include "Ns3_Heart.hpp"
+#include "skyns3/Ns3_Heart.hpp"
 
 namespace ns3
 {

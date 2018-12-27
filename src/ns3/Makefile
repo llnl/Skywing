@@ -22,7 +22,10 @@ UDP_ECHO_LIBS = \
 	config-store
 
 SKYNET_STARTUP_SRC = \
-	skynet_startup.cpp
+	skynet_startup.cpp \
+	$(SKYNS3_DIR)/Ns3_Heart.cpp \
+	$(SKYNS3_DIR)/Ns3_SocketCommunicator.cpp
+
 SKYNET_STARTUP_LIBS = \
 	core \
 	network \

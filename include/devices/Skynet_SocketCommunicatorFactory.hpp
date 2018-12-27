@@ -63,6 +63,10 @@ namespace skynet
     }
     // data_type& get_as_nonconst_vector() { return communicators_; }
 
+  protected:
+    int type_;
+    const char * server_address_;
+    uint16_t port_;
 
   private:
 
@@ -76,9 +80,6 @@ namespace skynet
       }
     }
 
-    int type_;
-    const char * server_address_;
-    uint16_t port_;
     // std::vector<int> ip_address_;
     // std::vector<int> port_ref_;
     // std::vector<std::unique_ptr<DeviceCommunicator>> communicators_ = data_type();
