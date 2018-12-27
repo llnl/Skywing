@@ -72,6 +72,12 @@ namespace skynet
 
       }
 
+      /** \brief Runs the thread that sends regular heartbeats
+       */
+      void send_heartbeat() const
+      {
+      }
+      
     private:
 
 
