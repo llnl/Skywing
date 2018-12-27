@@ -8,7 +8,9 @@
 using namespace skynet;
 
 
-#define SKYNET_PORT 5000
+#define SKYNET_PORT_DEV1 5000
+#define SKYNET_PORT_DEV2 6000
+#define SKYNET_PORT_DEV3 7000
 
 // A normal C function that is executed as a thread
 // when its name is specified in pthread_create()
@@ -20,7 +22,7 @@ void *dev1(void *vargp)
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
+    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV1);
     while (true)
       comm_list.push_back((server_factory.create_new_communicator(config)));
 
@@ -36,11 +38,11 @@ void *dev2(void *vargp)
       std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Create one client communicator for dev1
-    SocketCommunicatorFactory client_factory(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT);
+    SocketCommunicatorFactory client_factory(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT_DEV1);
     comm_list.push_back((client_factory.create_new_communicator(config)));
 
     // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
+    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV2);
     while (true)
       comm_list.push_back((server_factory.create_new_communicator(config)));
 
@@ -57,15 +59,15 @@ void *dev3(void *vargp)
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Create one client communicator for dev1
-    SocketCommunicatorFactory client_factory1(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT);
+    SocketCommunicatorFactory client_factory1(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT_DEV1);
     comm_list.push_back((client_factory1.create_new_communicator(config)));
 
     // Create second client communicator for dev2
-    SocketCommunicatorFactory client_factory2(SocketCommunicatorFactory::IPv4, dev2_ip, SKYNET_PORT);
+    SocketCommunicatorFactory client_factory2(SocketCommunicatorFactory::IPv4, dev2_ip, SKYNET_PORT_DEV2);
     comm_list.push_back((client_factory2.create_new_communicator(config)));
 
     // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT);
+    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV3);
     while (true)
       comm_list.push_back((server_factory.create_new_communicator(config)));
 
