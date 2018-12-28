@@ -41,6 +41,12 @@ namespace skynet
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
+      }
+
+      /** \brief Runs the thread that sends regular heartbeats
+       */
+      void send_heartbeat() const
+      {
 	/*
 	 * Steps:
 	 * 1. Check graph properties and update graph if necesary (PropertyChecker)
@@ -70,12 +76,6 @@ namespace skynet
 	  // (Reference: https://stackoverflow.com/questions/10073136/how-to-execute-a-particular-code-in-c-after-every-1-minute)
 	//  std::this_thread::sleep_for(std::chrono::seconds(pulse));
 
-      }
-
-      /** \brief Runs the thread that sends regular heartbeats
-       */
-      void send_heartbeat() const
-      {
       }
       
     private:
