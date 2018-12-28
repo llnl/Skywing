@@ -63,7 +63,7 @@ namespace skynet
     
     /** \brief Request a new DeviceCommunicator for this DeviceReference.
      * \return A new DeviceCommunicator. */
-    std::unique_ptr<DeviceCommunicator> create_new_communicator() const
+    std::unique_ptr<DeviceCommunicator> create_new_communicator()
     {
       return comm_factory_->create_new_communicator(comm_config_info_);
     }
