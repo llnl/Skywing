@@ -23,27 +23,26 @@ namespace skynet
      * This will need to change once we are not working on one machine.
      */
     SocketCommunicatorFactory(int type, const char * client_address,
-      std::unique_ptr<SocketCommunicator> gateway) :
-        type_(type), client_address_(client_address), gateway_(std::move(gateway))
+      SocketCommunicator gateway) : type_(type), client_address_(client_address)
     {
       is_server = true;
+      gateway_ = std::make_unique<SocketCommunicator>(std::move(gateway));
       gateway_->listen_for_clients(QUEUE_LENGTH);
     }
 
-    SocketCommunicatorFactory(int type, const char * server_address, uint16_t skynet_port) :
-      type_(type), server_address_(server_address)
+    SocketCommunicatorFactory(int type, const char * server_address,
+      uint16_t skynet_port) : type_(type), server_address_(server_address)
     {
       confirm_supported_type();
       is_server = false;
-      // connect to Gatekeeper on server device
-      std::unique_ptr<SocketCommunicator> tmp =
-        std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
-      // TODO: check if bind is necessary
-      //tmp->bind_communicator(skynet_port+1);
-      tmp->connect_to_server(server_address_, skynet_port);
-      // obtain gateway port on server via server Gatekeeper, then close tmp socket
-      server_port_ = tmp->receive_from<uint16_t>();
-      tmp->close_communicator();
+      // connect to Gatekeeper on server device using handshake SocketCommunicator
+      std::unique_ptr<SocketCommunicator> handshake =
+        std::make_unique<SocketCommunicator>(type_);
+      handshake->connect_to_server(server_address_, skynet_port);
+      // obtain gateway port on server via server Gatekeeper, then close
+      // handshake SocketCommunicator
+      server_port_ = handshake->receive_from<uint16_t>();
+      handshake->close_communicator();
     }
 
     std::unique_ptr<DeviceCommunicator>
@@ -73,7 +72,7 @@ namespace skynet
     {
       std::unique_ptr<SocketCommunicator> new_communicator;
       // Create new communicator and accept client via gateway socket
-      new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
+      new_communicator = std::make_unique<SocketCommunicator>(type_);
       new_communicator->wait_for_client(gateway_->get_socket_handle());
       return new_communicator;
     }
@@ -83,7 +82,7 @@ namespace skynet
     {
       std::unique_ptr<SocketCommunicator> new_communicator;
       // Create new communicator and connect via server gateway
-      new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
+      new_communicator = std::make_unique<SocketCommunicator>(type_);
       new_communicator->connect_to_server(server_address_, server_port_);
       return new_communicator;
     }
