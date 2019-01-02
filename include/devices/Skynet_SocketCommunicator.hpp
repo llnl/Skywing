@@ -27,10 +27,10 @@ namespace skynet
   class SocketCommunicator : public DeviceCommunicator
   {
   public:
-    
-    SocketCommunicator(int type) 
-    { 
-      type_ = type; 
+
+    SocketCommunicator(int type)
+    {
+      type_ = type;
       socket_ = socket(AF_INET, SOCK_STREAM, 0);
       // socket create and verification
       if (socket_ == -1) {
@@ -41,7 +41,7 @@ namespace skynet
         printf("Socket successfully created..\n");
     }
 
-    uint16_t bind_communicator(uint16_t port, const char * client_address = "")
+    uint16_t bind_communicator(uint16_t port, const char * client_address = NULL)
     {
       //Socket stucture
       struct sockaddr_in servaddr;
@@ -51,20 +51,20 @@ namespace skynet
       {
         case AF_INET:
           servaddr.sin_family = AF_INET;
-          if (std::strcmp(client_address, "") != 0)
+          if (client_address != NULL)
             inet_pton(AF_INET, client_address, &(servaddr.sin_addr));
           else
             servaddr.sin_addr.s_addr = INADDR_ANY;
           break;
         default:
           // TODO: error handling
-          printf("incorrect socket type\n");
+          printf("Incorrect socket type in SocketCommunnicator::bind_communicator\n");
           exit(-1);
       }
-     
+
       bool bound = false;
       while (!bound && port < UINT16_MAX)
-      { 
+      {
         printf("trying server port %d\n", port);
         servaddr.sin_port = htons(port);
         // Binding newly created socket to given IP and verification
@@ -81,24 +81,50 @@ namespace skynet
       return port;
     }
 
-    void wait_for_client()
-    { wait_for_client_and_get_address(); }
-
-    const char * wait_for_client(char * buf)
+    void listen_for_clients(int queue_length)
     {
-      struct sockaddr_in client_address = wait_for_client_and_get_address();
-      switch(type_)
+      //listening for a connection
+      listen(socket_, queue_length);
+      //[TODO] AF: Vericatication was not working, need to look into this!
+      // Now server is ready to listen and verification
+      // if ((listen(sockfd_, 5)) != 0) {
+      //     printf("Listen failed...\n");
+      //     exit(0);
+      // }
+      // else
+      //     printf("Server listening..\n");
+    }
+
+    const char * wait_for_client(int listener_socket, char * buf = NULL)
+    {
+      struct sockaddr_in client_address;
+      socklen_t len = sizeof(client_address);
+
+      // Accept the data packet from client and verification
+      socket_ = accept(listener_socket, (struct sockaddr *) &client_address, &len);
+      if (socket_ < 0)
       {
-        case AF_INET:
-          return inet_ntop(AF_INET, &(client_address.sin_addr), buf, INET_ADDRSTRLEN);
-        default:
-          printf("incorrect socket type\n");
-          exit(-1);
+        printf("server acccept failed...\n");
+        exit(0);
       }
+      else
+        printf("server acccept the client...\n");
+
+      if (buf != NULL)
+      {
+        switch(type_)
+        {
+          case AF_INET:
+            return inet_ntop(AF_INET, &(client_address.sin_addr), buf, INET_ADDRSTRLEN);
+          default:
+            printf("Incorrect socket type in SocketCommunicator::wait_for_client\n");
+            exit(-1);
+        }
+      }
+      return NULL;
     }
 
     void connect_to_server(const char * server_address, uint16_t port)
-    // : ip_address_{std::move(ip_address)}
     {
       //Socket stucture
       struct sockaddr_in servaddr;
@@ -112,13 +138,13 @@ namespace skynet
           //servaddr.sin_addr.s_addr = inet_addr(ip_address);
           break;
         default:
-          printf("incorrect socket type\n");
+          printf("Incorrect socket type in SocketCommunicator::connect_to_server\n");
           exit(-1);
       }
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
-      if (connect(socket_, (SA*)&servaddr, sizeof(servaddr)) != 0) 
+      if (connect(socket_, (SA*)&servaddr, sizeof(servaddr)) != 0)
       {
         printf("connection with the server failed...\n");
         exit(-1);
@@ -126,46 +152,31 @@ namespace skynet
       printf("connected to the server..\n");
     }
 
-  private:
-
-    struct sockaddr_in wait_for_client_and_get_address()
+    int count_pending_clients()
     {
-      struct sockaddr_in client_address;
+      fd_set set;
+      struct timeval timeout;
+      FD_ZERO(&set);
+      FD_SET(socket_, &set);
+      timeout.tv_sec = 0;
+      timeout.tv_usec = 0;
 
-      //listening for a connection
-      listen(socket_, 5);
-      //[TODO] AF: Vericatication was not working, need to look into this!
-      // Now server is ready to listen and verification
-      // if ((listen(sockfd_, 5)) != 0) {
-      //     printf("Listen failed...\n");
-      //     exit(0);
-      // }
-      // else
-      //     printf("Server listening..\n");
-      socklen_t len = sizeof(client_address);
-
-      // Accept the data packet from client and verification
-      socket_ = accept(socket_, (struct sockaddr *) &client_address, &len);
-      if (socket_ < 0) {
-        printf("server acccept failed...\n");
-        exit(0);
-      }
-      else
-        printf("server acccept the client...\n");
- 
-       //[TODO] AF: Typically the sockets are closed at some point but I am not sure where or when yet to do that... May cause problems.
-      // close(sockfd__);
-      return client_address;
+      return select(socket_ + 1, &set, NULL, NULL, &timeout);
     }
 
+    int get_socket_handle()
+    { return socket_; }
+
+    void close_communicator()
+    { close(socket_); }
+
+  private:
 
     void do_send_to_(const void* data, std::size_t data_size) const override
     {
-
-    uint16_t networkLen = htons(data_size); // convert to network byte order
-    write(socket_, &networkLen, sizeof(networkLen)); //sends the size of the data first
-    write(socket_, data, data_size); //sends the seralized data
-
+      uint16_t networkLen = htons(data_size); // convert to network byte order
+      write(socket_, &networkLen, sizeof(networkLen)); //sends the size of the data first
+      write(socket_, data, data_size); //sends the seralized data
     }
 
 
@@ -199,14 +210,10 @@ namespace skynet
     }
 
   private:
-    // char ip_address_[4];
     int socket_;
     int type_;
 
-    // TODO: replace this with error checking
-    bool success_;
-
-  }; // class MPICommunicator
+  }; // class SocketCommunicator
 } // namespace skynet
 
 

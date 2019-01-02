@@ -1,5 +1,5 @@
 #include "catch2/catch.hpp"
-// #include "devices/Skynet_SocketCommunicator.hpp"
+#include "devices/Skynet_SocketGatekeeper.hpp"
 #include "devices/Skynet_SocketCommunicatorFactory.hpp"
 
 #include <thread>
@@ -17,14 +17,19 @@ using namespace skynet;
 
 void *dev1(void *vargp)
 {
-    // This device starts second and has nobody to connect to
+    // This device starts first and has nobody to connect to
     std::vector<std::string> config(0);
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV1);
+    // Create SocketGatekeeper to listen for new clients
+    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV1);
+
+    // Periodically have gatekeeper collect new connections
     while (true)
-      comm_list.push_back((server_factory.create_new_communicator(config)));
+    {
+      std::this_thread::sleep_for (std::chrono::seconds(1));
+      gatekeeper.collect_connections();
+    }
 
     pthread_exit(NULL);
 }
@@ -37,14 +42,19 @@ void *dev2(void *vargp)
     std::vector<std::string> config(0);
       std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    // Create one client communicator for dev1
+    // Connect to dev1
     SocketCommunicatorFactory client_factory(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT_DEV1);
     comm_list.push_back((client_factory.create_new_communicator(config)));
 
-    // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV2);
+    // Create SocketGatekeeper to listen for new clients
+    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV2);
+
+    // Periodically have gatekeeper collect new connections
     while (true)
-      comm_list.push_back((server_factory.create_new_communicator(config)));
+    {
+      std::this_thread::sleep_for (std::chrono::seconds(1));
+      gatekeeper.collect_connections();
+    }
 
     pthread_exit(NULL);
 }
@@ -66,10 +76,15 @@ void *dev3(void *vargp)
     SocketCommunicatorFactory client_factory2(SocketCommunicatorFactory::IPv4, dev2_ip, SKYNET_PORT_DEV2);
     comm_list.push_back((client_factory2.create_new_communicator(config)));
 
-    // Continually create server communicators as clients connect to them
-    SocketCommunicatorFactory server_factory(SocketCommunicatorFactory::IPv4, SKYNET_PORT_DEV3);
+    // Create SocketGatekeeper to listen for new clients
+    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV3);
+
+    // Periodically have gatekeeper collect new connections
     while (true)
-      comm_list.push_back((server_factory.create_new_communicator(config)));
+    {
+      std::this_thread::sleep_for (std::chrono::seconds(1));
+      gatekeeper.collect_connections();
+    }
 
     pthread_exit(NULL);
 }

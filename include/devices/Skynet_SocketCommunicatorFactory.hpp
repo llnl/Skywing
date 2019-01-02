@@ -1,5 +1,5 @@
-#ifndef SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__
-#define SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__
+#ifndef SKYNET_SOCKETCOMMUNICATORSERVERFACTORY_HPP__
+#define SKYNET_SOCKETCOMMUNICATORSERVERFACTORY_HPP__
 
 #include <arpa/inet.h>
 #include "Skynet_CommunicatorFactory.hpp"
@@ -13,6 +13,7 @@ namespace skynet
   public:
     using data_type = std::vector<std::unique_ptr<DeviceCommunicator>>;
     static const int IPv4 = AF_INET;
+    static const int QUEUE_LENGTH = 10;
   public:
       SocketCommunicatorFactory() = default;
  /** \brief Create a new SocketCommunicatorFactory.
@@ -21,85 +22,80 @@ namespace skynet
      * For now the ip_addresses are a list of its that can be sorted easily.
      * This will need to change once we are not working on one machine.
      */
-    SocketCommunicatorFactory(int type, uint16_t port_for_negotiator) :
-      type_(type), server_address_{""}
-    { 
-      check_for_supported_type(); 
-      // create and bind server port negotiator SocketCommunicator
-      port_negotiator_ = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
-      current_port_ = port_negotiator_->bind_communicator(port_for_negotiator);
-      if (current_port_ != port_for_negotiator)
-      {
-        printf("Server SocketComunicatorFactory created on non-negotiator port\n");
-        exit(-1);
-      }
-      printf("Server port negotiator created on port %d\n", port_for_negotiator);
-      current_port_++;
-      // wait for connection from client port negotiator socket
-      client_address_ = port_negotiator_->wait_for_client(ipv4Buf_); //TODO: generalize from IPv4
-      printf("Server port negotiator connected to %s on port %d\n", client_address_, port_for_negotiator);
+    SocketCommunicatorFactory(int type, const char * client_address,
+      std::unique_ptr<SocketCommunicator> gateway) :
+        type_(type), client_address_(client_address), gateway_(std::move(gateway))
+    {
+      is_server = true;
+      gateway_->listen_for_clients(QUEUE_LENGTH);
     }
 
-    SocketCommunicatorFactory(int type, const char * server_address, uint16_t port_for_negotiator) :
-      type_(type), server_address_{server_address}
-    { 
-      check_for_supported_type(); 
-      // create client port negotiator SocketCommunicator
-      port_negotiator_ = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
-      // wait for connection to server port negotiator SocketCommunicator
-      port_negotiator_->connect_to_server(server_address, port_for_negotiator);
-      printf("Client port negotiator connected to %s on port %d\n", server_address_, port_for_negotiator);
+    SocketCommunicatorFactory(int type, const char * server_address, uint16_t skynet_port) :
+      type_(type), server_address_(server_address)
+    {
+      confirm_supported_type();
+      is_server = false;
+      // connect to Gatekeeper on server device
+      std::unique_ptr<SocketCommunicator> tmp =
+        std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
+      // TODO: check if bind is necessary
+      //tmp->bind_communicator(skynet_port+1);
+      tmp->connect_to_server(server_address_, skynet_port);
+      // obtain gateway port on server via server Gatekeeper, then close tmp socket
+      server_port_ = tmp->receive_from<uint16_t>();
+      tmp->close_communicator();
     }
 
     std::unique_ptr<DeviceCommunicator>
     create_new_communicator(std::vector<std::string> /* comm_config_info*/)
     {
-      std::unique_ptr<SocketCommunicator> new_communicator;
-      // if factory is server side
-      if ( std::strcmp(server_address_ ,"") == 0)
-      {
-        // create and bind new server SocketCommunicator
-        new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
-        current_port_ = new_communicator->bind_communicator(current_port_, client_address_);
-        printf("Server created on port %d, listening for %s\n", current_port_, client_address_);
-        // communicate port that server bound to over to client port negotiator
-        port_negotiator_->send_to<uint16_t>(current_port_);
-        new_communicator->wait_for_client(); 
-        current_port_++;
-      }
-      // if factory is client side
+      if (is_server)
+        return create_new_communicator_as_server();
       else
-      {
-        // create new client SocketCommunicator and connect 
-        new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
-        current_port_ = port_negotiator_->receive_from<uint16_t>();
-        new_communicator->connect_to_server(server_address_, current_port_);
-        printf("Client created and connected to %s on port %d\n", server_address_, current_port_);
-      }
-
-      return new_communicator;
+        return create_new_communicator_as_client();
     }
-    // data_type& get_as_nonconst_vector() { return communicators_; }
+
 
   private:
 
-    void check_for_supported_type() const
+    void confirm_supported_type() const
     {
       // check that socket type is supported
       if (type_ != IPv4)
       {
-        printf("incorrect socket type\n");
+        printf("Incorrect socket type in SocketCommunicatorFactory\n");
         exit(-1);
       }
+    }
+
+    std::unique_ptr<SocketCommunicator>
+    create_new_communicator_as_server()
+    {
+      std::unique_ptr<SocketCommunicator> new_communicator;
+      // Create new communicator and accept client via gateway socket
+      new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
+      new_communicator->wait_for_client(gateway_->get_socket_handle());
+      return new_communicator;
+    }
+
+    std::unique_ptr<SocketCommunicator>
+    create_new_communicator_as_client()
+    {
+      std::unique_ptr<SocketCommunicator> new_communicator;
+      // Create new communicator and connect via server gateway
+      new_communicator = std::make_unique<SocketCommunicator>(SocketCommunicator(type_));
+      new_communicator->connect_to_server(server_address_, server_port_);
+      return new_communicator;
     }
 
     int type_;
     const char * client_address_;
     const char * server_address_;
-    uint16_t current_port_;
-    std::unique_ptr<SocketCommunicator> port_negotiator_;
+    bool is_server;
+    uint16_t server_port_;
+    std::unique_ptr<SocketCommunicator> gateway_;
     char ipv4Buf_[INET_ADDRSTRLEN];
   }; // SocketCommunicatorFactory
 } // namespace skynet
 
-#endif /* SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__ */
+#endif /* SKYNET_SOCKETCOMMUNICATORSERVERFACTORY_HPP__ */
