@@ -23,10 +23,16 @@ namespace skynet
      
      /** \brief Send a signal to a device from the nearby
      *   device list and receive response.
+     *
+     * \param device Device to send beat to and get response from
      */
-     virtual BeatResponse send_heartbeat(const DeviceReference& device) = 0;
+     BeatResponse send_heartbeat(const DeviceReference& device)
+     {
+       do_send_heartbeat(device);
+     }
 
    private:
+     virtual BeatResponse do_send_heartbeat(const DeviceReference& device) = 0;
 
    };// class BeatSender
 

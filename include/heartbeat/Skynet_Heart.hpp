@@ -2,6 +2,8 @@
 #define SKYNET_HEART_HPP__
 
 #include <vector>
+#include <thread>
+#include <chrono> //For timing pulse
 
 #include "Skynet_BeatSender.hpp"
 #include "Skynet_BeatInterpreter.hpp"
@@ -41,45 +43,71 @@ namespace skynet
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
+	std::thread sending_thread(send_heartbeat);
       }
 
-      /** \brief Runs the thread that sends regular heartbeats
+      /** \brief Function to send regular heartbeats
        */
       void send_heartbeat() const
       {
-	/*
-	 * Steps:
-	 * 1. Check graph properties and update graph if necesary (PropertyChecker)
-	 * 2. Get nearby device list (DeviceManager). For each device in this list:
-	 * 	a. Send beat (BeatSender)
-	 * 	b. Record response and decide what to do with it (BeatInterpreter)
-	 *	c. Re-check properties and update graph if necessary (PropertyChecker)
-	 * 3. Get new nearby device list (DeviceManager), which could have been modified by BeatInterpreter and PropertyChecker. For each device in this list:
-	 *	a. Check pulse to determine next time to send beat to that device (PulseTimer).
-	 * 4. Keep a list of (time, device) pairs, ordered by time, where time is the next time to send a beat to the corresponding device.
-	 * 5. Once first time in (time, device) list is reached:
-	 *	a. Send a beat to that device (BeatSender)
-	 * 	b. Record response and decide what to do with it (BeatInterpreter)
-	 *	c. Re-check properties and update graph if necessary (PropertyChecker)
-	 * 	d. Get new nearby device list (DeviceManager)
-	 *	e. Check pulse of new devices in device list
-	 *	f. Update (time, device) list by adding (time, device) pairs for new devices and removing (time, device) pairs for devices that were removed
-	 * 6. Repeat step 5 each time a the next pulse time is reached.
-	 *
-	 * COMMENTS:
-	 *	1. I'm not sure what the best way to store the (time, device) list is since we need to be able to add and remove devices from the list as well as update the times. I'm also not sure if this is something that should be included in the heart or if we should make a separate class for it. I'm thinking we should either make a separate class that stores this list and has functions to add and remove devices from the list as well as get the time of the next pulse and which device that pulse should be sent to, or that these capabilities should be added to the DeviceManager.
-	 *	2. Need to figure out when/how new devices that come online can contact this device and be added to its  nearby device list.
-	 */
+	//Run the heartbeat indefinitely
+	while (true)
+	{
 
+	  //Get list of nearby devices
+	  //NOTE: The DeviceManager also has a function get_known_devices, which
+	  // gets all devices including those that have been pronounced dead.
+	  // In later versions we may want to consider if devices that have been
+	  // pronounced dead should ever be queried to see if they've come back online.
+	  std::vector<DeviceReference>& device_list = device_manager_.get_live_devices()
 
-	//Wait to send out next heartbeat
-	  // (Reference: https://stackoverflow.com/questions/10073136/how-to-execute-a-particular-code-in-c-after-every-1-minute)
-	//  std::this_thread::sleep_for(std::chrono::seconds(pulse));
+	  //Send heartbeat to each device in device list and process responses
+	  for (DeviceReference& device : device_list)
+	  {
+	   //Send beat and record response
+	   BeatResponse& response = beat_sender_.send_heartbeat(device);
 
+	   //Add response to response history for the given device
+	   device_manager_.add_response(device, response);
+
+	   //Get the complete history for the device including the new response
+	   typename DeviceManager::history_t device_history = device_manager_.get_history(device);
+
+	   //Decide what to do with the device based on its history
+	   bool keep_device = beat_interpreter_.should_device_remain(device, device_history);
+
+	   //If we have decided not to keep the device, remove it using the device manager
+	   if (!keep_device)
+	     { device_manager_.remove_device(device); }
+	  }
+
+	  //Check graph properties and update reference graph if necessary
+	  property_checker_.validate_graph(device_manager_);
+
+	  //Get pulse for all nearby devices and decide how long to wait to send next
+	  // heartbeat based on responses.
+	  // NOTE 1: Currently we wait the same amount of time to send the next heartbeat
+	  //       to all nearby devices. We may want to modify this later to allow us
+	  //       to send heartbeats at different times to different devices.
+	  // NOTE 2: The wait time will actually be longer for some devices because we
+	  //         will wait this long to start sending beats to devices again, but
+	  //	     beats are sent sequentially some devices will have to wait longer.
+	  double wait_time = 0; //Default time to wait until next heartbeart 
+	  for (DeviceReference& device : device_list)
+	  {
+	    double temp_time = pulse_timer_.millisecs_to_next_beat(device);
+
+	    // Use the minimum pulse as the time to send the next heartbeat
+	    if (temp_time < wait_time)
+	    {
+	      wait_time = temp_time;
+	    }
+	  }
+
+	  //Wait to send the next heartbeat
+	  std::this_thread::sleep_for(std::chrono::milliseconds(pulse)); 
+	}
       }
-      
-    private:
-
 
     private:
       BeatSender beat_sender_;

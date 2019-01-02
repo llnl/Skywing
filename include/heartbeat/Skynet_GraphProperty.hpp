@@ -18,9 +18,14 @@ namespace skynet
        *
        *  \return 1 if graph property is satisfied 0 otherwise
        */
-      virtual bool is_property_satisfied(const DeviceManager& device_manager) const = 0; 
+      bool is_property_satisfied(const DeviceManager& device_manager)
+      {
+	return do_is_property_satisfied(device_manager);
+      }
 				      
     private:
+      virtual bool do_is_property_satisfied(const DeviceManager&
+					    device_manager) const = 0;
       
     }; // class GraphProperty
 

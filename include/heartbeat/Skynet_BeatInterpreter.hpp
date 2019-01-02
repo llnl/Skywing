@@ -25,12 +25,18 @@ namespace skynet
       * \return 1 if device is alive or at least we are not ready to
       *	 pronounce it dead, 0 if we have decided device is dead
       */
-     virtual bool should_device_remain(
+     bool should_device_remain(const DeviceReference& device,
+			       const std::vector<BeatSender::BeatResponse>& device_history)
+     {
+       return do_should_device_remain(device, device_history);
+     }
+
+   private:
+     virtual bool do_should_device_remain(
 	     const DeviceReference& device,
 	     const std::vector<BeatSender::BeatResponse>& device_history) = 0;
 
-   private:
-
+     
    };// class BeatInterpreter
 
 

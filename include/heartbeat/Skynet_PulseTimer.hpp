@@ -2,7 +2,6 @@
 #define SKYNET_PULSETIMER_HPP__
 
 #include <vector>
-#include <ctime>
 
 #include "devices/Skynet_DeviceReference.hpp"
 
@@ -21,10 +20,26 @@ namespace skynet
     {
     public:
 
-      virtual std::time_t get_next_time(const DeviceReference& device) const = 0;
-      
+      //NOTE: Decided to use relative time for now to avoid the situation
+      // where the next beat for this device comes before we've received a
+      // response from the rest of the devices, also because it seems more
+      // intuitive to define beats in this way. Currently beats are sent in
+      // sequence. If beats are sent in parallel in future implementations
+      // this could be changed.      
+      /** \brief Get the time to wait until the next heartbeat is sent to
+       *   the input device
+       *
+       * \param device Nearby device to get the pulse (time to wait) for
+       */
+      double  millisecs_to_next_beat(const DeviceReference& device)
+      {
+	return do_milliseconds_to_next_pulse(device);
+      }
+
     private:
 
+      virtual double do_millisecs_to_next_beat(const DeviceReference& device) const = 0;
+      
     }; // class PulseTimer
 
 } // namespace skynet

@@ -50,7 +50,7 @@ namespace skynet
      /** \brief DeviceManager destructor
       */
      //QUESTION: Is the constructor too complicated for the default
-     // to work?
+     // to work? Also is it okay to have virtual here?
      virtual ~DeviceManager() = default;
 
      /** \brief Get devices that the DeviceManager is currently keeping
@@ -129,7 +129,17 @@ namespace skynet
        do_add_response(device, response);
      }
        
-    /** \brief Clear the response history for a device
+     /** \brief Get the response history for a device
+     *
+     * \param device Device to get history of
+     * \return Response history for the input device
+     */
+     history_t get_history(const DeviceReference& device)
+     {
+       return response_history_[device.get_id()];
+     }
+     
+     /** \brief Clear the response history for a device
      *
      * \param device Device to clear history of
      */
@@ -139,7 +149,6 @@ namespace skynet
        id_t device_id = device.get_id();
        history_t empty_history;
        response_history_[device_id] = empty_history;
-
      }
 
 

@@ -41,24 +41,47 @@ namespace skynet
           return property_list_;
       }
 
-      /** NOTE: Excluding this function for now because I think we might want
-       * check the properties of the reference graph and update simultaneously
-       * save time. Some implementations of PropertyChecker may separate this
-       * from the graph update.
-      virtual bool check_properties(const DeviceManager& device_manager) const
-      {
-	for (std::vector<GraphProperty>::iterator it = property_list.begin(); it != property_list.end(); it++){
-
-	  GraphProperty.check_property(device_manager);
-	}
-      }
-      */
-
-      /** \brief Update reference graph to satisfy properties
-       * NOTE: This function will probably use the device manager to
-       *       change the reference graph.
+      /** NOTE: Combining check_properties and update_graph functions for now
+       * because I think it could save time to perform the two functions
+       * simultaneously and I expect anytime we checked the graph properties we
+       * would also want to update the graph if they weren't satisfied. Change
+       * this later if not true.
        */
-      virtual void update_graph(const DeviceManager& device_manager) const = 0;
+//      /** \brief Check that reference graph satisfies the desired properties
+//       *
+//       * \param device_manager Device manager that will be used to get the list
+//       *  of nearby devices, which is required to check the properties
+//       */
+//      virtual bool check_properties(const DeviceManager& device_manager) const
+//      {
+//	for (std::vector<GraphProperty>::iterator it = property_list.begin(); it != property_list.end(); it++){
+//
+//	  GraphProperty.check_property(device_manager);
+//	}
+//      }
+
+//      /** \brief Update reference graph to satisfy properties
+//       *
+//       * \param device_manager Device manager that will be used to update nearby
+//       *  device list if the properties are not satisfied
+//       */
+//      virtual void update_graph(const DeviceManager& device_manager) const = 0;
+
+
+       /** \brief Check that reference graph satisfies properties and update
+	*   as necessary if now.
+	*
+	* \param device_manager Device manager that will be used to get the nearby
+	*  devices to check the properties and update the nearby device list if the 
+	*  properties are not satisfied
+       */
+      void validate_graph(DeviceManager& device_manager)
+      {
+	do_validate_graph(device_manager);
+      }
+
+    private:
+      virtual void do_validate_graph(DeviceManager& device_manager) const = 0;
       
     private:
       std::vector<GraphProperty> property_list_;
