@@ -94,7 +94,7 @@ namespace skynet
 	 {
 	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> 
 		     p(dr.get_id(), dr.create_new_communicator());
-	   nearby_device_communicators_.insert(p);
+	   nearby_device_communicators_.insert(std::move(p));
 	 }
        }
      }

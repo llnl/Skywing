@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <thread>
+#include <memory>
 #include <chrono> //For timing pulse
 
 #include "Skynet_BeatSender.hpp"
@@ -30,9 +31,11 @@ namespace skynet
        *  \param device_manager type of DeviceManager used by this device
        *  \param property_checker type of PropertyChecker used by this device
        */
-      Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
-	    PulseTimer pulse_timer, DeviceManager device_manager,
-	    PropertyChecker property_checker)
+      Heart(std::unique_ptr<BeatSender> beat_sender, 
+	    std::unique_ptr<BeatInterpreter> beat_interpreter,
+	    std::unique_ptr<PulseTimer> pulse_timer, 
+	    DeviceManager device_manager,
+	    std::unique_ptr<PropertyChecker> property_checker)
 	: beat_sender_(std::move(beat_sender_)),
 	  beat_interpreter_(std::move(beat_interpreter)),
 	  pulse_timer_(std::move(pulse_timer)),
@@ -132,11 +135,11 @@ namespace skynet
       }
 
     private:
-      BeatSender beat_sender_;
-      BeatInterpreter beat_interpreter_;
-      PulseTimer pulse_timer_;
+      std::unique_ptr<BeatSender> beat_sender_;
+      std::unique_ptr<BeatInterpreter> beat_interpreter_;
+      std::unique_ptr<PulseTimer> pulse_timer_;
       DeviceManager device_manager_;
-      PropertyChecker property_checker_;
+      std::unique_ptr<PropertyChecker> property_checker_;
 
       std::thread new_device_listener_thread_;
     }; // class Heart
