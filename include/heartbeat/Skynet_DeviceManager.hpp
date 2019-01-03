@@ -2,6 +2,7 @@
 #define SKYNET_DEVICEMANANGER_HPP__
 
 #include <vector>
+#include <memory>
 #include <algorithm> //For remove function used to remove devices from device used
 #include <unordered_map>
 
@@ -199,7 +200,7 @@ namespace skynet
      
 
    private:
-     std::vector<DeviceReference> nearby_devices_;
+     std::vector<std::unique_ptr<DeviceReference>> nearby_devices_;
      std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>> 
        nearby_device_communicators_;
 
