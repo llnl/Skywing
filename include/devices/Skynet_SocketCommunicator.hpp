@@ -31,19 +31,6 @@ namespace skynet
     static const int IPv4 = AF_INET; // redefinition of AF_INET const
     static const int QUEUE_LENGTH = 10; // length of listening socket queue
 
-    /** \brief Confirm the this object's address type is supported.
-     *
-     * Exits with an error message if the type is not supported
-     */
-    static void confirm_supported_type(uint16_t type)
-    {
-      if (type != IPv4)
-      {
-        printf("Incorrect socket type in SocketCommunicator\n");
-        exit(-1);
-      }
-    }
-
     /** \brief Construct a new SocketCommunicator.
      *
      * \param type Specifies the address type to be used.
@@ -51,6 +38,7 @@ namespace skynet
     SocketCommunicator(int type)
     {
       type_ = type;
+      confirm_supported_type();
       socket_ = socket(type_, SOCK_STREAM, 0);
       // socket create and verification
       if (socket_ == -1) {
@@ -220,6 +208,20 @@ namespace skynet
     { close(socket_); }
 
   private:
+
+    /** \brief Confirm that this object's address type is supported.
+     *
+     * Exits with an error message if the type is not supported
+     */
+    void confirm_supported_type()
+    {
+      if (type_ != IPv4)
+      {
+        printf("Incorrect socket type in SocketCommunicator\n");
+        exit(-1);
+      }
+    }
+
 
     void do_send_to_(const void* data, std::size_t data_size) const override
     {

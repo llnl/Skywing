@@ -25,7 +25,6 @@ namespace skynet
     SocketGatekeeper(int type, uint16_t skynet_port) :
       type_(type), skynet_port_(skynet_port)
     {
-      SocketCommunicator::confirm_supported_type(type_);
       gatekeeper_ = std::make_unique<SocketCommunicator>(type_);
       if (gatekeeper_->bind_communicator(skynet_port) != skynet_port)
       {

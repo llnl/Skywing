@@ -32,7 +32,6 @@ namespace skynet
       uint16_t skynet_port) : type_(type), server_address_(server_address)
     {
       is_server = false;
-      SocketCommunicator::confirm_supported_type(type_);
       // connect to Gatekeeper on server device using handshake SocketCommunicator
       std::unique_ptr<SocketCommunicator> handshake =
         std::make_unique<SocketCommunicator>(type_);
