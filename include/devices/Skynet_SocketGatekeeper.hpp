@@ -2,6 +2,8 @@
 #define SKYNET_SOCKETGATEKEEPER_HPP__
 
 #include <arpa/inet.h>
+#include "Skynet_DeviceReference.hpp"
+#include "Skynet_Gatekeeper.hpp"
 #include "Skynet_SocketCommunicator.hpp"
 #include "Skynet_SocketCommunicatorFactory.hpp"
 
@@ -12,7 +14,7 @@ namespace skynet
    * SocketCommunicator.
    *
    */
-  class SocketGatekeeper
+  class SocketGatekeeper : public Gatekeeper
   {
   public:
 
@@ -45,14 +47,14 @@ namespace skynet
      * \return Vector of SocketCommunicatorFactory objects, one for each
      * connection request in the gatekeeper queue
      */
-    std::vector<std::unique_ptr<SocketCommunicatorFactory>>
-    collect_connections()
+    std::vector<std::unique_ptr<DeviceReference>> collect_connections()
     {
       int count;
       uint16_t port;
       const char * client_address;
       std::unique_ptr<SocketCommunicator> handshake;
-      std::vector<std::unique_ptr<SocketCommunicatorFactory>>
+      std::unique_ptr<SocketCommunicatorFactory> factory;
+      std::vector<std::unique_ptr<DeviceReference>>
         new_factories(SocketCommunicator::QUEUE_LENGTH);
       do
       {
@@ -66,11 +68,12 @@ namespace skynet
           // bind a new gateway socket
           SocketCommunicator gateway = SocketCommunicator(type_);
           port = gateway.bind_communicator(skynet_port_+1, client_address);
-          // Create server SocketCommunicatorFactory with bound gateway socket
+          // create new server SocketCommunicatorFactory with bound gateway socket
+          factory = std::make_unique<SocketCommunicatorFactory>(type_,client_address, gateway);
+          // create DeviceReference using new server SocketCommunicatorFactory
           new_factories.push_back(
-            std::make_unique<SocketCommunicatorFactory>(type_, client_address,
-            gateway));
-          // Inform client of port the server SocketCommunicatorFactory is using
+            std::make_unique<DeviceReference>(std::move(factory)));
+          // inform client of port the server SocketCommunicatorFactory is using
           handshake->send_to<uint16_t>(port);
           handshake->close_communicator();
         }
