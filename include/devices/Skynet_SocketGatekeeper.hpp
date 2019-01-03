@@ -7,29 +7,45 @@
 
 namespace skynet
 {
+  /** \class SocketGatekeeper
+   * \brief Object responsible for creating and maintaining a gatekeeper
+   * SocketCommunicator.
+   *
+   */
   class SocketGatekeeper
   {
   public:
 
-    static const int IPv4 = AF_INET;
-    static const int QUEUE_LENGTH = 10;
-
+    /** \brief Construct a new SocketGatekeeper.
+     *
+     * \param type Specifies the address type to be used (IPv4).
+     * \param skynet_port The specific port that all SocketGatekeepers will be
+     * listening on
+     */
     SocketGatekeeper(int type, uint16_t skynet_port) :
       type_(type), skynet_port_(skynet_port)
     {
-      confirm_supported_type();
+      SocketCommunicator::confirm_supported_type(type_);
       gatekeeper_ = std::make_unique<SocketCommunicator>(type_);
       if (gatekeeper_->bind_communicator(skynet_port) != skynet_port)
       {
         printf("Skynet socket port is not open for gatekeeper SocketCommunicator\n");
         exit(-1);
       }
-      gatekeeper_->listen_for_clients(QUEUE_LENGTH);
+      gatekeeper_->listen_for_clients();
     }
 
+    /** \brief Deconstruct a SocketGatekeeper.
+     *
+     */
     ~SocketGatekeeper()
     { gatekeeper_->close_communicator(); }
 
+    /** \brief Collect all connection requests that in the gatekeeper queue.
+     *
+     * \return Vector of SocketCommunicatorFactory objects, one for each
+     * connection request in the gatekeeper queue
+     */
     std::vector<std::unique_ptr<SocketCommunicatorFactory>>
     collect_connections()
     {
@@ -37,8 +53,8 @@ namespace skynet
       uint16_t port;
       const char * client_address;
       std::unique_ptr<SocketCommunicator> handshake;
-      std::vector<
-        std::unique_ptr<SocketCommunicatorFactory>> new_factories(QUEUE_LENGTH);
+      std::vector<std::unique_ptr<SocketCommunicatorFactory>>
+        new_factories(SocketCommunicator::QUEUE_LENGTH);
       do
       {
         count = gatekeeper_->count_pending_clients();
@@ -64,16 +80,6 @@ namespace skynet
     }
 
   private:
-
-    void confirm_supported_type() const
-    {
-      // check that socket type is supported
-      if (type_ != IPv4)
-      {
-        printf("Incorrect socket type in SocketGatekeeper\n");
-        exit(-1);
-      }
-    }
 
     int type_;
     uint16_t skynet_port_;

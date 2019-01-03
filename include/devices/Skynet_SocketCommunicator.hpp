@@ -28,10 +28,30 @@ namespace skynet
   {
   public:
 
+    static const int IPv4 = AF_INET; // redefinition of AF_INET const
+    static const int QUEUE_LENGTH = 10; // length of listening socket queue
+
+    /** \brief Confirm the this object's address type is supported.
+     *
+     * Exits with an error message if the type is not supported
+     */
+    static void confirm_supported_type(uint16_t type)
+    {
+      if (type != IPv4)
+      {
+        printf("Incorrect socket type in SocketCommunicator\n");
+        exit(-1);
+      }
+    }
+
+    /** \brief Construct a new SocketCommunicator.
+     *
+     * \param type Specifies the address type to be used.
+     */
     SocketCommunicator(int type)
     {
       type_ = type;
-      socket_ = socket(AF_INET, SOCK_STREAM, 0);
+      socket_ = socket(type_, SOCK_STREAM, 0);
       // socket create and verification
       if (socket_ == -1) {
         printf("socket creation failed...\n");
@@ -41,6 +61,11 @@ namespace skynet
         printf("Socket successfully created..\n");
     }
 
+    /** \brief Bind the socket that belongs to this communicator.
+     *
+     * \param port Which port number to start trying to bind to.
+     * \param client_address Optional parameter to specify client address.
+     */
     uint16_t bind_communicator(uint16_t port, const char * client_address = NULL)
     {
       //Socket stucture
@@ -81,10 +106,13 @@ namespace skynet
       return port;
     }
 
-    void listen_for_clients(int queue_length)
+    /** \brief Set socket that belongs to this communictor to listen for clients
+     *
+     */
+    void listen_for_clients()
     {
       //listening for a connection
-      listen(socket_, queue_length);
+      listen(socket_, QUEUE_LENGTH);
       //[TODO] AF: Vericatication was not working, need to look into this!
       // Now server is ready to listen and verification
       // if ((listen(sockfd_, 5)) != 0) {
@@ -95,6 +123,15 @@ namespace skynet
       //     printf("Server listening..\n");
     }
 
+    /** \brief Wait for client to connect this communicator
+     *
+     * \param listener_socket Identifier that specifies listener socket.
+     * \param buf Optional buffer used to store client address.
+     *
+     * \return Address of client that has connected.
+     *
+     * Note that this function will block until a client connects.
+     */
     const char * wait_for_client(int listener_socket, char * buf = NULL)
     {
       struct sockaddr_in client_address;
@@ -124,6 +161,11 @@ namespace skynet
       return NULL;
     }
 
+    /** \brief Connect the socket that belongs to this communicator.
+     *
+     * \param server_address The address of the server communicator.
+     * \param port Which port number to connect to on the server.
+     */
     void connect_to_server(const char * server_address, uint16_t port)
     {
       //Socket stucture
@@ -152,6 +194,13 @@ namespace skynet
       printf("connected to the server..\n");
     }
 
+    /** \brief Count the number of connection requests that are pending.
+     *
+     * \param port Which port number to start trying to bind to.
+     * \param client_address Optional parameter to specify client address.
+     *
+     * \return Number of connection requests that are pending.
+     */
     int count_pending_clients()
     {
       fd_set set;

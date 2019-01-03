@@ -22,7 +22,7 @@ void *dev1(void *vargp)
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Create SocketGatekeeper to listen for new clients
-    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV1);
+    SocketGatekeeper gatekeeper(SocketCommunicator::IPv4, SKYNET_PORT_DEV1);
 
     // Periodically have gatekeeper collect new connections
     while (true)
@@ -43,11 +43,11 @@ void *dev2(void *vargp)
       std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Connect to dev1
-    SocketCommunicatorFactory client_factory(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT_DEV1);
+    SocketCommunicatorFactory client_factory(SocketCommunicator::IPv4, dev1_ip, SKYNET_PORT_DEV1);
     comm_list.push_back((client_factory.create_new_communicator(config)));
 
     // Create SocketGatekeeper to listen for new clients
-    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV2);
+    SocketGatekeeper gatekeeper(SocketCommunicator::IPv4, SKYNET_PORT_DEV2);
 
     // Periodically have gatekeeper collect new connections
     while (true)
@@ -69,15 +69,15 @@ void *dev3(void *vargp)
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Create one client communicator for dev1
-    SocketCommunicatorFactory client_factory1(SocketCommunicatorFactory::IPv4, dev1_ip, SKYNET_PORT_DEV1);
+    SocketCommunicatorFactory client_factory1(SocketCommunicator::IPv4, dev1_ip, SKYNET_PORT_DEV1);
     comm_list.push_back((client_factory1.create_new_communicator(config)));
 
     // Create second client communicator for dev2
-    SocketCommunicatorFactory client_factory2(SocketCommunicatorFactory::IPv4, dev2_ip, SKYNET_PORT_DEV2);
+    SocketCommunicatorFactory client_factory2(SocketCommunicator::IPv4, dev2_ip, SKYNET_PORT_DEV2);
     comm_list.push_back((client_factory2.create_new_communicator(config)));
 
     // Create SocketGatekeeper to listen for new clients
-    SocketGatekeeper gatekeeper(SocketGatekeeper::IPv4, SKYNET_PORT_DEV3);
+    SocketGatekeeper gatekeeper(SocketCommunicator::IPv4, SKYNET_PORT_DEV3);
 
     // Periodically have gatekeeper collect new connections
     while (true)

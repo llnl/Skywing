@@ -12,8 +12,6 @@ namespace skynet
   {
   public:
     using data_type = std::vector<std::unique_ptr<DeviceCommunicator>>;
-    static const int IPv4 = AF_INET;
-    static const int QUEUE_LENGTH = 10;
   public:
       SocketCommunicatorFactory() = default;
  /** \brief Create a new SocketCommunicatorFactory.
@@ -27,14 +25,14 @@ namespace skynet
     {
       is_server = true;
       gateway_ = std::make_unique<SocketCommunicator>(std::move(gateway));
-      gateway_->listen_for_clients(QUEUE_LENGTH);
+      gateway_->listen_for_clients();
     }
 
     SocketCommunicatorFactory(int type, const char * server_address,
       uint16_t skynet_port) : type_(type), server_address_(server_address)
     {
-      confirm_supported_type();
       is_server = false;
+      SocketCommunicator::confirm_supported_type(type_);
       // connect to Gatekeeper on server device using handshake SocketCommunicator
       std::unique_ptr<SocketCommunicator> handshake =
         std::make_unique<SocketCommunicator>(type_);
@@ -56,16 +54,6 @@ namespace skynet
 
 
   private:
-
-    void confirm_supported_type() const
-    {
-      // check that socket type is supported
-      if (type_ != IPv4)
-      {
-        printf("Incorrect socket type in SocketCommunicatorFactory\n");
-        exit(-1);
-      }
-    }
 
     std::unique_ptr<SocketCommunicator>
     create_new_communicator_as_server()
