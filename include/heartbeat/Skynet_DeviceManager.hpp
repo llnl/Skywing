@@ -76,11 +76,33 @@ namespace skynet
        return do_get_live_devices();
      }
 
+     /** \brief Listen for new devices to add to list of devices.
+      *
+      *  We expect this to be called as part of a new thread.
+      */
+     void listen_for_devices()
+     {
+       // TODO
+     }
+
+     void establish_device_connections()
+     {
+       for (DeviceReference& dr : nearby_devices_)
+       {
+	 if (not nearby_device_communicators_.count(dr.get_id()))
+	 {
+	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> 
+		     p(dr.get_id(), dr.create_new_communicator());
+	   nearby_device_communicators_.insert(p);
+	 }
+       }
+     }
+
      /** Add a device to the nearby devices list and initialize its history
       *
       * \param new_device Device to add to the nearby devices list
       */
-     void add_device(const DeviceReference& new_device)
+     void add_device(DeviceReference&& new_device)
      {
        //Add new device to device list
        nearby_devices_.push_back(new_device);
@@ -178,6 +200,8 @@ namespace skynet
 
    private:
      std::vector<DeviceReference> nearby_devices_;
+     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>> 
+       nearby_device_communicators_;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known

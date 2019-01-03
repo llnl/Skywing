@@ -21,14 +21,21 @@ namespace skynet
   class DeviceReference
   {
   public:
+    using id_t = unsigned int;
+
+  public:
     /** \brief Construct a new \c DeviceReference.
      *
      * \param comm_factory A CommuncatorFactory representing this
      * DeviceReference's communications policy.
      */
-    DeviceReference(std::unique_ptr<CommunicatorFactory> comm_factory)
-      : is_believed_live_(true), comm_factory_(std::move(comm_factory))
+    DeviceReference(id_t device_id,
+		    std::unique_ptr<CommunicatorFactory> comm_factory)
+      : device_id_(device_id),
+	is_believed_live_(true), comm_factory_(std::move(comm_factory))
     { }
+
+    id_t get_id() const { return device_id_; }
 
     /** \brief Get if we believe the referred device to be live. */
     bool get_is_belived_live() const
@@ -44,7 +51,7 @@ namespace skynet
 
   private:
     bool is_believed_live_;
-    id_t device_id_;
+    const id_t device_id_;
     std::unique_ptr<CommunicatorFactory> comm_factory_;
     std::vector<std::string> comm_config_info_;
 

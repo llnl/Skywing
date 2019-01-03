@@ -40,6 +40,28 @@ namespace skynet
 	  property_checker_(std::move(property_checker))
       {}
 
+      /** \brief Perform heartbeat initalization steps.
+       *
+       * These steps are the following:
+       * 1. Start a thread to listen for new devices.
+       * 2. Establish connections (DeviceCommunicators) with nearby devices.
+       * 3. Check that reference graph properties are satisfied.
+       * 4. While reference graph properties are not satisfied, modify
+       *    nearby devices and repeat steps 2 and 3 until satisfied.
+       */
+      void initalize_heartbeat()
+      {
+	// Step 1
+	std::thread t(&DeviceManager::listen_for_devices, std::ref(device_manager_));
+	new_device_listener_thread_ = std::move(t);
+
+	// Step 2
+	device_manager_.establish_device_connections();
+
+	// Step 3
+	
+      }
+
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
@@ -115,6 +137,8 @@ namespace skynet
       PulseTimer pulse_timer_;
       DeviceManager device_manager_;
       PropertyChecker property_checker_;
+
+      std::thread new_device_listener_thread_;
     }; // class Heart
 
 } // namespace skynet
