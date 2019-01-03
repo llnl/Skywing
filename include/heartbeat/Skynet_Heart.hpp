@@ -34,7 +34,7 @@ namespace skynet
       Heart(std::unique_ptr<BeatSender> beat_sender, 
 	    std::unique_ptr<BeatInterpreter> beat_interpreter,
 	    std::unique_ptr<PulseTimer> pulse_timer, 
-	    DeviceManager device_manager,
+	    std::unique_ptr<DeviceManager> device_manager,
 	    std::unique_ptr<PropertyChecker> property_checker)
 	: beat_sender_(std::move(beat_sender_)),
 	  beat_interpreter_(std::move(beat_interpreter)),
@@ -138,7 +138,7 @@ namespace skynet
       std::unique_ptr<BeatSender> beat_sender_;
       std::unique_ptr<BeatInterpreter> beat_interpreter_;
       std::unique_ptr<PulseTimer> pulse_timer_;
-      DeviceManager device_manager_;
+      std::unique_ptr<DeviceManager> device_manager_;
       std::unique_ptr<PropertyChecker> property_checker_;
 
       std::thread new_device_listener_thread_;
