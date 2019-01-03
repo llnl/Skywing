@@ -3,7 +3,7 @@ include $(SKYNET_DIR)/src/Makefile
 
 # Devices variables
 DEVICES_TESTS = \
-	devices/Skynet_SocketCommunicatorFactory \
+	devices/Skynet_SocketGateway 
 #	devices/Skynet_Serialization \
 #	devices/Skynet_SocketCommunicator
 
