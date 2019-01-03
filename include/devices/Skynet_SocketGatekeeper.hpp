@@ -25,57 +25,54 @@ namespace skynet
      * listening on
      */
     SocketGatekeeper(int type, uint16_t skynet_port) :
-      type_(type), skynet_port_(skynet_port)
+      type_(type), skynet_port_(skynet_port), gatekeeper_(type_)
     {
-      gatekeeper_ = std::make_unique<SocketCommunicator>(type_);
-      if (gatekeeper_->bind_communicator(skynet_port) != skynet_port)
+      if (gatekeeper_.bind_communicator(skynet_port) != skynet_port)
       {
         printf("Skynet socket port is not open for gatekeeper SocketCommunicator\n");
         exit(-1);
       }
-      gatekeeper_->listen_for_clients();
+      gatekeeper_.listen_for_clients();
     }
 
-    /** \brief Deconstruct a SocketGatekeeper.
+    /** \brief Destruct a SocketGatekeeper.
      *
      */
     ~SocketGatekeeper()
-    { gatekeeper_->close_communicator(); }
+    { gatekeeper_.close_communicator(); }
 
     /** \brief Collect all connection requests that in the gatekeeper queue.
      *
      * \return Vector of SocketCommunicatorFactory objects, one for each
      * connection request in the gatekeeper queue
      */
-    std::vector<std::unique_ptr<DeviceReference>> collect_connections()
+    const std::vector<DeviceReference> collect_connections()
     {
       int count;
       uint16_t port;
       const char * client_address;
-      std::unique_ptr<SocketCommunicator> handshake;
-      std::unique_ptr<SocketCommunicatorFactory> factory;
-      std::vector<std::unique_ptr<DeviceReference>>
-        new_factories(SocketCommunicator::QUEUE_LENGTH);
+      std::vector<DeviceReference> new_factories;
+      std::unique_ptr<CommunicatorFactory> factory;
       do
       {
-        count = gatekeeper_->count_pending_clients();
+        count = gatekeeper_.count_pending_clients();
         if (count > 0)
         {
-          // have the handshake SocketCommunicator accept the next client
-          handshake = std::make_unique<SocketCommunicator>(type_);
-          client_address = handshake->wait_for_client(
-            gatekeeper_->get_socket_handle(), ipv4Buf_); //TODO: generalize from IPv4
+          // creeate a handshake SocketCommunicator to accept the next client
+          SocketCommunicator handshake(type_);
+          client_address = handshake.wait_for_client(
+            gatekeeper_.get_socket_handle(), ipv4Buf_); //TODO: generalize from IPv4
           // bind a new gateway socket
-          SocketCommunicator gateway = SocketCommunicator(type_);
+          SocketCommunicator gateway(type_);
           port = gateway.bind_communicator(skynet_port_+1, client_address);
           // create new server SocketCommunicatorFactory with bound gateway socket
-          factory = std::make_unique<SocketCommunicatorFactory>(type_,client_address, gateway);
+          factory = std::make_unique<SocketCommunicatorFactory>(type_,
+            client_address, std::move(gateway));
           // create DeviceReference using new server SocketCommunicatorFactory
-          new_factories.push_back(
-            std::make_unique<DeviceReference>(std::move(factory)));
+          new_factories.push_back(DeviceReference(std::move(factory)));
           // inform client of port the server SocketCommunicatorFactory is using
-          handshake->send_to<uint16_t>(port);
-          handshake->close_communicator();
+          handshake.send_to<uint16_t>(port);
+          handshake.close_communicator();
         }
       }while (count > 0);
       return new_factories;
@@ -85,7 +82,7 @@ namespace skynet
 
     int type_;
     uint16_t skynet_port_;
-    std::unique_ptr<SocketCommunicator> gatekeeper_;
+    SocketCommunicator gatekeeper_;
     char ipv4Buf_[INET_ADDRSTRLEN];
 
   }; // class SocketGateKeeper
