@@ -28,7 +28,7 @@ void *dev1(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      gatekeeper.collect_connections();
+      gatekeeper.collect_new_connections();
     }
 
     pthread_exit(NULL);
@@ -53,7 +53,7 @@ void *dev2(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      gatekeeper.collect_connections();
+      gatekeeper.collect_new_connections();
     }
 
     pthread_exit(NULL);
@@ -83,7 +83,7 @@ void *dev3(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      gatekeeper.collect_connections();
+      gatekeeper.collect_new_connections();
     }
 
     pthread_exit(NULL);
