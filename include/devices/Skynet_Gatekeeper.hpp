@@ -19,7 +19,7 @@ namespace skynet
      * \return a vector of DeviceReference objects that correspond to Devices
      * that have connected since the last time this method was called.
      */
-    virtual const std::vector<DeviceReference> collect_new_connections() = 0;
+    virtual std::vector<DeviceReference> collect_new_connections() = 0;
 
   protected:
     std::unique_ptr<DeviceListener> gatekeeper_;

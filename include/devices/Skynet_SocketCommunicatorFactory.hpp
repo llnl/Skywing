@@ -17,13 +17,12 @@ namespace skynet
     /** \brief Create a new server SocketCommunicatorFactory.
      *
      * \param type Specifies the address type to be used (IPv4).
-     * \param client_address The IP address of the client to connect to this
-     * \param gateway The SocketCommunicator for listening for incoming connections
+     * \param gateway The SocketDeviceListener for incoming connections
      */
     SocketCommunicatorFactory(int type, SocketDeviceListener&& gateway) :
       type_(type)
     {
-      gateway_ = std::make_unique<SocketDeviceListener>(std::move(gateway));
+      gateway_ = std::make_unique<SocketDeviceListener>(gateway);
       is_server = true;
     }
 
@@ -34,7 +33,6 @@ namespace skynet
      * \param skynet_port The specific port that all SocketGatekeepers will be
      * listening on
      *
-     * Note that gateway_ here is instantiated but not used
      */
     SocketCommunicatorFactory(int type, const char * server_address,
       uint16_t skynet_port) : type_(type), server_address_(server_address)
@@ -69,7 +67,6 @@ namespace skynet
     bool is_server;
     uint16_t server_port_;
     std::unique_ptr<SocketDeviceListener> gateway_;
-    char ipv4Buf_[INET_ADDRSTRLEN];
   }; // SocketCommunicatorFactory
 } // namespace skynet
 

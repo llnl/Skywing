@@ -17,12 +17,18 @@ namespace skynet
     SocketCommunicator(int type) : Socket(type)
     {}
 
+    /** \brief Construct a new SocketCommunicator.
+     *
+     * \param type Specifies the address type to be used.
+     * \param socket Specifies socket handle to existing connected socket
+     * \param address Specifies the address that socket is connected to
+     */
     SocketCommunicator(int type, int socket, const char * address) : Socket(type, socket, address)
     {}
 
-    /** \brief Connect the socket that belongs to this communicator.
+    /** \brief Connect to a server SocketCommunicator.
      *
-     * \param server_address The address of the server communicator.
+     * \param server_address The address of the server SocketCommunicator.
      * \param port Which port number to connect to on the server.
      */
     void connect_to_server(const char * server_address, uint16_t port)
@@ -33,25 +39,23 @@ namespace skynet
 
       switch(type_)
       {
-        case AF_INET:
-          servaddr.sin_family = AF_INET;
-          inet_pton(AF_INET, server_address, &(servaddr.sin_addr));
-          //servaddr.sin_addr.s_addr = inet_addr(ip_address);
+        case Socket::IPv4:
+          servaddr.sin_family = Socket::IPv4;
+          inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
           break;
         default:
-          printf("Incorrect socket type in SocketCommunicator::connect_to_server\n");
+          // This should not be reachable because of a check in Socket constructor
+          printf("Error in SocketCommunicator.hpp:41\n");
           exit(-1);
       }
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
-      printf("attempting to connect to %s on port %d\n", server_address, port);
       if (connect(socket_, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
       {
-        printf("connection with the server failed...\n");
+        perror("connect");
         exit(-1);
       }
-      printf("connected to the server..\n");
     }
 
   private:

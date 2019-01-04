@@ -14,17 +14,16 @@ namespace skynet
   {
   public:
 
-    /** \brief Set this object to listen for new client Devices.
-     *
-     */
-    virtual void listen_for_clients() = 0;
-
     /** \brief Count number of client Devices requesting to connect
      *
      * \return number of clients
      */
     virtual int count_pending_clients() = 0;
 
+    /** \brief Connect a communicator in a pending Device
+     *
+     * \return a connect DeviceCommunicator
+     */
     virtual std::unique_ptr<DeviceCommunicator> connect_communicator_to_client() = 0;
 
   }; // class DeviceListener

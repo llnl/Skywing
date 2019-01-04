@@ -1,23 +1,7 @@
 #ifndef SKYNET_SOCKET_HPP__
 #define SKYNET_SOCKET_HPP__
 
-//#include <cstdint>
-//#include <stdio.h>
-//#include <stdlib.h>
 #include <unistd.h>
-//#include <string.h>
-//#include <sys/types.h>
-//#include <sys/socket.h>
-//#include <netinet/in.h>
-//#include <netdb.h>
-//#include <netinet/in.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <sys/socket.h>
-//#include <sys/types.h>
-//#include <arpa/inet.h>
-//#define MAX 80
-//#define SA struct sockaddr
 
 namespace skynet
 {
@@ -39,20 +23,19 @@ namespace skynet
     {
       type_ = type;
       confirm_supported_type();
-      socket_ = socket(type_, SOCK_STREAM, 0);
       // socket create and verification
-      if (socket_ == -1) {
-        printf("socket creation failed...\n");
-        exit(0);
+      if ((socket_ = socket(type_, SOCK_STREAM, 0)) == -1)
+      {
+        perror("socket");
+        exit(-1);
       }
-      else
-        printf("Socket successfully created..\n");
     }
 
     /** \brief Construct a new Socket.
      *
      * \param type Specifies the address type to be used.
-     * \param socket Specifies socket handle to existing socket
+     * \param socket Specifies socket handle to existing connected socket
+     * \param address Specifies the address that socket is connected to
      */
     Socket(int type, int socket, const char* address)
     {
@@ -63,7 +46,7 @@ namespace skynet
 
 
     ~Socket()
-    { close(socket_); }
+    { /*close(socket_);*/ } //TODO: figure out why this causes problems
 
     int socket_;
     int type_;
@@ -79,7 +62,7 @@ namespace skynet
     {
       if (type_ != IPv4)
       {
-        printf("Incorrect socket type in SocketCommunicator\n");
+        printf("Incorrect address type %d in Socket\n", type_);
         exit(-1);
       }
     }

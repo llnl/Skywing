@@ -35,7 +35,7 @@ namespace skynet
      * \return Vector of SocketCommunicatorFactory objects, one for each
      * connection request in the gatekeeper queue
      */
-    const std::vector<DeviceReference> collect_new_connections()
+    std::vector<DeviceReference> collect_new_connections()
     {
       int count;
       std::vector<DeviceReference> new_factories;
@@ -44,14 +44,12 @@ namespace skynet
       do
       {
         count = gatekeeper_->count_pending_clients();
-        std::cout << count << std::endl;
         if (count > 0)
         {
           // create a handshake SocketCommunicator to accept the next client
           handshake = gatekeeper_->connect_communicator_to_client();
           // create a new listening socket
           SocketDeviceListener gateway(type_, skynet_port_+1, true);
-          gateway.listen_for_clients();
           // create new server SocketCommunicatorFactory with bound gateway socket
           factory = std::make_unique<SocketCommunicatorFactory>(type_, std::move(gateway));
           // create DeviceReference using new server SocketCommunicatorFactory

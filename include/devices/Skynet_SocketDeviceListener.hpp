@@ -5,23 +5,6 @@
 #include "Skynet_Socket.hpp"
 #include "Skynet_SocketCommunicator.hpp"
 
-//#include <cstdint>
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <unistd.h>
-//#include <string.h>
-//#include <sys/types.h>
-//#include <sys/socket.h>
-//#include <netinet/in.h>
-//#include <netdb.h>
-//#include <netinet/in.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <sys/socket.h>
-//#include <sys/types.h>
-//#include <arpa/inet.h>
-//#define SA struct sockaddr
-
 namespace skynet
 {
   class SocketDeviceListener : public DeviceListener, public Socket
@@ -43,71 +26,61 @@ namespace skynet
 
       switch(type_)
       {
-        case AF_INET:
-          servaddr.sin_family = AF_INET;
+        case Socket::IPv4:
+          servaddr.sin_family = Socket::IPv4;
           if (client_address != NULL)
-            inet_pton(AF_INET, client_address, &(servaddr.sin_addr));
+            inet_pton(Socket::IPv4, client_address, &(servaddr.sin_addr));
           else
             servaddr.sin_addr.s_addr = INADDR_ANY;
           break;
         default:
-          // TODO: error handling
-          printf("Incorrect socket type in SocketCommunnicator::bind_communicator\n");
+          // this should never be reached because a check in Socket constructor
+          printf("Error in SocketDeviceListener:38\n");
           exit(-1);
       }
 
       bool bound = false;
       do
       {
-        printf("trying server port %d\n", port_);
         servaddr.sin_port = htons(port_);
         // Binding newly created socket to given IP and verification
         if (bind(socket_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0)
           bound = true;
         else
         {
-          printf("socket bind failed...\n");
           if (try_other_ports)
             port_++;
           else
+          {
+            perror("bind");
             exit(-1);
+          }
         }
       } while (!bound && port_ < UINT16_MAX);
-      printf("Server Socket successfully bound\n");
-    }
 
-    /** \brief Set socket that belongs to this communictor to listen for clients
-     *
-     */
-    void listen_for_clients()
-    {
-      //listening for a connection
       listen(socket_, QUEUE_LENGTH);
     }
 
-    /** \brief Wait for client to connect this communicator
+
+    /** \brief Connect a communicator in a pending Device
      *
-     * \param listener_socket Identifier that specifies listener socket.
-     * \param buf Optional buffer used to store client address.
-     *
-     * \return Address of client that has connected.
-     *
-     * Note that this function will block until a client connects.
+     * \return a connect DeviceCommunicator
      */
-    std::unique_ptr<DeviceCommunicator> connect_communicator_to_client() override
+    std::unique_ptr<DeviceCommunicator> connect_communicator_to_client()
     {
       struct sockaddr_in client_address_struct;
       const char * client_address;
       int new_socket = connect_new_socket();
       switch(type_)
       {
-        case AF_INET:
-          client_address = inet_ntop(AF_INET, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
+        case Socket::IPv4:
+          client_address = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
+          break;
         default:
-          printf("Incorrect socket type in SocketCommunicator::wait_for_client\n");
+          // this should never be reached because a check in Socket constructor
+          printf("Error in SocketDeviceListener.hpp:89\n");
           exit(-1);
       }
-      // TODO: figure out a way to make use of client address
 
       return std::make_unique<SocketCommunicator>(type_, new_socket, client_address);
     }
@@ -153,11 +126,9 @@ namespace skynet
       int new_socket = accept(socket_, (struct sockaddr *) &client_address_struct, &len);
       if (new_socket < 0)
       {
-        printf("server acccept failed...\n");
+        perror("accept");
         exit(-1);
       }
-      else
-        printf("server acccept the client...\n");
 
       return new_socket;
     }
