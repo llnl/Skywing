@@ -41,12 +41,12 @@ namespace skynet
     ~SocketGatekeeper()
     { gatekeeper_.close_communicator(); }
 
-    /** \brief Collect all connection requests that in the gatekeeper queue.
+    /** \brief Collect all connection requests that are in the gatekeeper queue.
      *
      * \return Vector of SocketCommunicatorFactory objects, one for each
      * connection request in the gatekeeper queue
      */
-    const std::vector<DeviceReference> collect_connections()
+    const std::vector<DeviceReference> collect_new_connections()
     {
       int count;
       uint16_t port;
