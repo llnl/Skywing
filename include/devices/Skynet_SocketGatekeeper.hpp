@@ -53,7 +53,7 @@ namespace skynet
           // create new server SocketCommunicatorFactory with bound gateway socket
           factory = std::make_unique<SocketCommunicatorFactory>(type_, std::move(gateway));
           // create DeviceReference using new server SocketCommunicatorFactory
-          new_factories.push_back(DeviceReference(std::move(factory)));
+          new_factories.push_back(std::move(DeviceReference(std::move(factory))));
           // inform client of port the server SocketCommunicatorFactory is using
           handshake->send_to<uint16_t>(gateway.get_port());
         }
