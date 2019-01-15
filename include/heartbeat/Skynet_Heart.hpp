@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <thread>
-#include <memory>
 #include <chrono> //For timing pulse
 
 #include "Skynet_BeatSender.hpp"
@@ -11,6 +10,7 @@
 #include "Skynet_PulseTimer.hpp"
 #include "Skynet_DeviceManager.hpp"
 #include "Skynet_PropertyChecker.hpp"
+#include "devices/Skynet_DeviceCommunicator.hpp"
 
 namespace skynet
 {
@@ -22,6 +22,11 @@ namespace skynet
      */
     class Heart
     {
+
+    public:
+      using comm_list_t = typename
+	DeviceManager::std::vector<unique_ptr<DeviceCommunicator>>;
+      
     public:
       /** \brief Construct a new Skynet Heart
        *
@@ -31,44 +36,22 @@ namespace skynet
        *  \param device_manager type of DeviceManager used by this device
        *  \param property_checker type of PropertyChecker used by this device
        */
-      Heart(std::unique_ptr<BeatSender> beat_sender, 
-	    std::unique_ptr<BeatInterpreter> beat_interpreter,
-	    std::unique_ptr<PulseTimer> pulse_timer, 
-	    std::unique_ptr<DeviceManager> device_manager,
-	    std::unique_ptr<PropertyChecker> property_checker)
+      Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
+	    PulseTimer pulse_timer, DeviceManager device_manager,
+	    PropertyChecker property_checker)
 	: beat_sender_(std::move(beat_sender_)),
 	  beat_interpreter_(std::move(beat_interpreter)),
 	  pulse_timer_(std::move(pulse_timer)),
 	  device_manager_(std::move(device_manager)),
-	  property_checker_(std::move(property_checker))
+	  property_checker_(std::move(property_checker)),
+	  is_device_alive_(true)
       {}
-
-      /** \brief Perform heartbeat initalization steps.
-       *
-       * These steps are the following:
-       * 1. Start a thread to listen for new devices.
-       * 2. Establish connections (DeviceCommunicators) with nearby devices.
-       * 3. Check that reference graph properties are satisfied.
-       * 4. While reference graph properties are not satisfied, modify
-       *    nearby devices and repeat steps 2 and 3 until satisfied.
-       */
-      void initalize_heartbeat()
-      {
-	// Step 1
-	std::thread t(&DeviceManager::listen_for_devices, std::ref(device_manager_));
-	new_device_listener_thread_ = std::move(t);
-
-	// Step 2
-	device_manager_.establish_device_connections();
-
-	// Step 3
-	
-      }
 
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
 	std::thread sending_thread(send_heartbeat);
+	std::thread listening_threat(listen_for_beats);
       }
 
       /** \brief Function to send regular heartbeats
@@ -76,7 +59,7 @@ namespace skynet
       void send_heartbeat() const
       {
 	//Run the heartbeat indefinitely
-	while (true)
+	while (is_device_alive_)
 	{
 
 	  //Get list of nearby devices
@@ -134,14 +117,37 @@ namespace skynet
 	}
       }
 
-    private:
-      std::unique_ptr<BeatSender> beat_sender_;
-      std::unique_ptr<BeatInterpreter> beat_interpreter_;
-      std::unique_ptr<PulseTimer> pulse_timer_;
-      std::unique_ptr<DeviceManager> device_manager_;
-      std::unique_ptr<PropertyChecker> property_checker_;
+      /** \brief Continuously loop through communicator list to check for incoming 
+       *   beats and send responses to those beats
+       */
+      //QUESTION: Do we need to add a delay between checks for beats?
+      void listen_for_beats() const
+      {
+	while(is_device_alive_)
+	{
+	  comm_list_t& comm_list = device_manager.get_comm_list();
+	  for (DeviceCommunicator& comm : comm_list)
+	  {
+	    //Check if a beat has been received
+	    auto message = comm_list->receive_from();
+	    
+	    //Respond to beat
+	  }
+	}
+      }
 
-      std::thread new_device_listener_thread_;
+      void kill_device()
+      {
+	is_device_alive_ = false;
+      }
+
+    private:
+      BeatSender beat_sender_;
+      BeatInterpreter beat_interpreter_;
+      PulseTimer pulse_timer_;
+      DeviceManager device_manager_;
+      PropertyChecker property_checker_;
+      bool is_device_alive_; //Indicates if this device is allive
     }; // class Heart
 
 } // namespace skynet
