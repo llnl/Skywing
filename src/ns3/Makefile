@@ -3,7 +3,8 @@ include $(SKYNET_DIR)/src/Makefile
 #-------------------- List of variables for all simulators ---------------------
 NS3_PREFIX = ns3-dev
 NS3_INCLUDE_DIR = $(SKYNET_DIR)/utils/ns3/include/$(NS3_PREFIX)
-NS3_LIB_DIR = $(SKYNET_DIR)/utils/ns3/lib64
+NS3_LIB_DIRS = $(SKYNET_DIR)/utils/ns3/lib64 $(SKYNET_DIR)/utils/ns3/lib
+SKYNS3_DIR = $(SKYNET_DIR)/src/ns3/skyns3
 #-------------------------------------------------------------------------------
 
 #--------------- List of variables specific to each simulator ------------------
@@ -22,7 +23,9 @@ UDP_ECHO_LIBS = \
 
 SKYNET_STARTUP_SRC = \
 	skynet_startup.cpp \
-	Ns3_Heart.cpp
+	$(SKYNS3_DIR)/Ns3_Heart.cpp \
+	$(SKYNS3_DIR)/Ns3_SocketCommunicator.cpp
+
 SKYNET_STARTUP_LIBS = \
 	core \
 	network \
@@ -61,7 +64,7 @@ SKYNET_STARTUP_OPTIMIZED_LIB_FLAGS = $(addsuffix -optimized,$(SKYNET_STARTUP_LIB
 CPP_FLAGS = $(SKYNET_CPP_FLAGS)
 CXX_FLAGS = $(SKYNET_CXX_FLAGS)
 INCLUDE_FLAGS = -I$(SKYNET_INCLUDE_DIR) -I$(NS3_INCLUDE_DIR)
-LIBPATH_FLAGS = -L$(NS3_LIB_DIR)
+LIBPATH_FLAGS = $(addprefix -L, $(NS3_LIB_DIRS))
 OBJECTS = $(UDP_ECHO_OBJECTS) $(SKYNET_STARTUP_OBJECTS)
 DFILES = $(UDP_ECHO_DFILES) $(SKYNET_STARTUP_DFILES)
 #-------------------------------------------------------------------------------
