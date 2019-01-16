@@ -1,6 +1,7 @@
 #ifndef SKYNET_GATEKEEPER_HPP__
 #define SKYNET_GATEKEEPER_HPP__
 
+#include "Skynet_CommunicatorFactory.hpp"
 #include "Skynet_DeviceListener.hpp"
 
 namespace skynet
@@ -16,10 +17,11 @@ namespace skynet
 
     /** \brief Collect new initial connections.
      *
-     * \return a vector of DeviceReference objects that correspond to Devices
-     * that have connected since the last time this method was called.
+     * \return a vector of CommunicatorFactory objects that are associated with
+     * Devices that have connected since the last time this method was called.
      */
-    virtual std::vector<DeviceReference> collect_new_connections() = 0;
+    virtual std::vector<std::unique_ptr<CommunicatorFactory>>
+      collect_new_connections() = 0;
 
   protected:
     std::unique_ptr<DeviceListener> gatekeeper_;
