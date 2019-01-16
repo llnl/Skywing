@@ -28,10 +28,11 @@ void *dev1(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<DeviceReference> connections = gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
+        gatekeeper.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back().create_new_communicator();
+        connections.back()->create_new_communicator(config);
         std::cout << "new connection to Device 1" << std::endl;
         connections.pop_back();
       }
@@ -46,7 +47,7 @@ void *dev2(void *vargp)
     const char * dev1_ip = "127.0.0.1";
 
     std::vector<std::string> config(0);
-      std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
+    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
     // Connect to dev1
     std::cout << "create factory on Device 2 to Device 1" << std::endl;
@@ -63,10 +64,11 @@ void *dev2(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<DeviceReference> connections = gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
+        gatekeeper.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back().create_new_communicator();
+        connections.back()->create_new_communicator(config);
         std::cout << "new connection to Device 2" << std::endl;
         connections.pop_back();
       }
@@ -106,10 +108,11 @@ void *dev3(void *vargp)
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<DeviceReference> connections = gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
+        gatekeeper.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back().create_new_communicator();
+        connections.back()->create_new_communicator(config);
         std::cout << "new connection to Device 3" << std::endl;
         connections.pop_back();
       }

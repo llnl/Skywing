@@ -2,7 +2,6 @@
 #define SKYNET_SOCKETGATEKEEPER_HPP__
 
 #include <arpa/inet.h>
-#include "Skynet_DeviceReference.hpp"
 #include "Skynet_Gatekeeper.hpp"
 #include "Skynet_SocketCommunicatorFactory.hpp"
 #include "Skynet_SocketDeviceListener.hpp"
@@ -35,11 +34,10 @@ namespace skynet
      * \return Vector of SocketCommunicatorFactory objects, one for each
      * connection request in the gatekeeper queue
      */
-    std::vector<DeviceReference> collect_new_connections()
+    std::vector<std::unique_ptr<CommunicatorFactory>> collect_new_connections()
     {
       int count;
-      std::vector<DeviceReference> new_factories;
-      std::unique_ptr<CommunicatorFactory> factory;
+      std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
       std::unique_ptr<DeviceCommunicator> handshake;
       do
       {
@@ -51,9 +49,9 @@ namespace skynet
           // create a new listening socket
           SocketDeviceListener gateway(type_, skynet_port_+1, true);
           // create new server SocketCommunicatorFactory with bound gateway socket
-          factory = std::make_unique<SocketCommunicatorFactory>(type_, std::move(gateway));
-          // create DeviceReference using new server SocketCommunicatorFactory
-          new_factories.push_back(std::move(DeviceReference(std::move(factory))));
+          // and add it to the new_factories list
+          new_factories.push_back(
+            std::make_unique<SocketCommunicatorFactory>(type_, std::move(gateway)));
           // inform client of port the server SocketCommunicatorFactory is using
           handshake->send_to<uint16_t>(gateway.get_port());
         }
