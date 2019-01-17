@@ -5,7 +5,7 @@
 #include <thread>
 #include <chrono> //For timing pulse
 
-#include "Skynet_BeatSender.hpp"
+#include "Skynet_TrivialBeatSender.hpp"
 #include "Skynet_BeatInterpreter.hpp"
 #include "Skynet_PulseTimer.hpp"
 #include "Skynet_DeviceManager.hpp"
@@ -24,7 +24,7 @@ namespace skynet
     {
 
     public:
-      using comm_list_t = typename
+      using comm_list_t = typename;
 	// DeviceManager:std::vector<std::unique_ptr<DeviceCommunicator>>;
 
     public:

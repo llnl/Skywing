@@ -1,7 +1,7 @@
 #ifndef SKYNET_BEATINTERPRETER_HPP__
 #define SKYNET_BEATINTERPRETER_HPP__
 
-#include "../devices/Skynet_DeviceReference.hpp"
+#include "devices/Skynet_DeviceReference.hpp"
 #include "Skynet_BeatSender.hpp"
 
 namespace skynet

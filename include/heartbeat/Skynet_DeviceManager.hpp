@@ -40,12 +40,12 @@ namespace skynet
      {
        //Add empty vector of responses as initial value for each
        // device to the response_history
-       for(DeviceReference device : nearby_devices)
-	 {
-	   id_t device_id = device.get_id();
-	   history_t init_history;
-	   response_history_[device_id] = init_history;
-	 }
+       for(auto device = begin(nearby_devices_); device!=end(nearby_devices_); ++device)
+    	 {
+    	   id_t device_id = device->get_id();
+    	   history_t init_history;
+    	   response_history_[device_id] = init_history;
+    	 }
      }
 
      /** \brief DeviceManager destructor
@@ -88,16 +88,16 @@ namespace skynet
 
      void establish_device_connections()
      {
-       for (DeviceReference& dr : nearby_devices_)
-       {
-	 if (not nearby_device_communicators_.count(dr.get_id()))
-	 {
-	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator>
-		     p(dr.get_id(), dr.create_new_communicator());
-	   nearby_device_communicators_.insert(std::move(p));
-	 }
-       }
-     }
+      /*AF: This function was not compling, commented out for now */
+      // for (auto device = begin(nearby_devices_); device!=end(nearby_devices_); ++device)
+      // {
+      //   if (not nearby_device_communicators_.count(device->get_id()))
+      //   {
+      //   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> p(device->get_id(), device.create_new_communicator());
+      //   nearby_device_communicators_.insert(std::move(p));
+      //   }
+      // }
+    }
 
      /** Add a device to the nearby devices list and initialize its history
       *
@@ -192,7 +192,7 @@ namespace skynet
      *    is added to the history.
      */
      virtual void do_add_response(const DeviceReference& device,
-                                  const BeatSender::BeatResponse& response) = 0;
+                                  const BeatResponse& response) = 0;
      //     {
      //       id_t device_id = device.get_id();
      //       response_history_[device_id].push_back(response);
@@ -200,7 +200,7 @@ namespace skynet
 
 
    private:
-     std::vector<std::unique_ptr<DeviceReference>> nearby_devices_;
+     std::vector<DeviceReference> nearby_devices_;
      std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
        nearby_device_communicators_;
 
