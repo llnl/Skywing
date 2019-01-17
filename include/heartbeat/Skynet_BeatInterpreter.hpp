@@ -28,13 +28,12 @@ namespace skynet
      bool should_device_remain(const DeviceReference& device,
 			       const std::vector<BeatResponse>& device_history)
      {
-       return do_should_device_remain(device, device_history);
+       return do_should_device_remain_(device, device_history);
      }
 
    private:
-     virtual bool do_should_device_remain(
-	     const DeviceReference& device,
-	     const std::vector<BeatResponse>& device_history) = 0;
+    virtual bool do_should_device_remain_(const DeviceReference& device,
+      const std::vector<BeatResponse>& device_history) const = 0;
 
 
    };// class BeatInterpreter
