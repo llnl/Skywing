@@ -33,12 +33,12 @@ namespace skynet
        */
       double  millisecs_to_next_beat(const DeviceReference& device)
       {
-	       return do_millisecs_to_next_beat(device);
+	       return do_millisecs_to_next_beat_(device);
       }
 
     private:
 
-      virtual double do_millisecs_to_next_beat(const DeviceReference& device) const = 0;
+      virtual double do_millisecs_to_next_beat_(const DeviceReference& device) const = 0;
 
     }; // class PulseTimer
 

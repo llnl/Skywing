@@ -6,8 +6,8 @@
 #include <chrono> //For timing pulse
 
 #include "Skynet_TrivialBeatSender.hpp"
-#include "Skynet_BeatInterpreter.hpp"
-#include "Skynet_PulseTimer.hpp"
+#include "Skynet_TrivialBeatInterpreter.hpp"
+#include "Skynet_TrivialPulseTimer.hpp"
 #include "Skynet_DeviceManager.hpp"
 #include "Skynet_PropertyChecker.hpp"
 #include "devices/Skynet_DeviceCommunicator.hpp"
@@ -24,8 +24,9 @@ namespace skynet
     {
 
     public:
-      using comm_list_t = typename;
-	// DeviceManager:std::vector<std::unique_ptr<DeviceCommunicator>>;
+      /*AF: Commented the two statements below for compling, not sure yeat what is needed*/
+      // using comm_list_t = typename;
+      // DeviceManager:std::vector<std::unique_ptr<DeviceCommunicator>>;
 
     public:
       /** \brief Construct a new Skynet Heart
@@ -50,17 +51,17 @@ namespace skynet
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
-	std::thread sending_thread(send_heartbeat());
-	std::thread listening_threat(listen_for_beats);
+        std::thread sending_thread(send_heartbeat());
+        std::thread listening_threat(listen_for_beats);
       }
 
       /** \brief Function to send regular heartbeats
        */
       void send_heartbeat() const
       {
-	//Run the heartbeat indefinitely
-	while (is_device_alive_)
-	{
+      	//Run the heartbeat indefinitely
+      	while (is_device_alive_)
+    	{
 
 	  //Get list of nearby devices
 	  //NOTE: The DeviceManager also has a function get_known_devices, which
@@ -142,9 +143,9 @@ namespace skynet
       }
 
     private:
-      BeatSender beat_sender_;
-      BeatInterpreter beat_interpreter_;
-      PulseTimer pulse_timer_;
+      TrivalBeatSender beat_sender_;
+      TrivialBeatInterpreter beat_interpreter_;
+      TrivalPulseTimer pulse_timer_;
       DeviceManager device_manager_;
       PropertyChecker property_checker_;
       bool is_device_alive_; //Indicates if this device is allive
