@@ -25,8 +25,8 @@ namespace skynet
 
     public:
       using comm_list_t = typename
-	DeviceManager::std::vector<unique_ptr<DeviceCommunicator>>;
-      
+	// DeviceManager:std::vector<std::unique_ptr<DeviceCommunicator>>;
+
     public:
       /** \brief Construct a new Skynet Heart
        *
@@ -50,7 +50,7 @@ namespace skynet
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
       {
-	std::thread sending_thread(send_heartbeat);
+	std::thread sending_thread(send_heartbeat());
 	std::thread listening_threat(listen_for_beats);
       }
 
@@ -100,7 +100,7 @@ namespace skynet
 	  // NOTE 2: The wait time will actually be longer for some devices because we
 	  //         will wait this long to start sending beats to devices again, but
 	  //	     beats are sent sequentially some devices will have to wait longer.
-	  double wait_time = 0; //Default time to wait until next heartbeart 
+	  double wait_time = 0; //Default time to wait until next heartbeart
 	  for (DeviceReference& device : device_list)
 	  {
 	    double temp_time = pulse_timer_.millisecs_to_next_beat(device);
@@ -113,11 +113,11 @@ namespace skynet
 	  }
 
 	  //Wait to send the next heartbeat
-	  std::this_thread::sleep_for(std::chrono::milliseconds(pulse)); 
+	  std::this_thread::sleep_for(std::chrono::milliseconds(pulse));
 	}
       }
 
-      /** \brief Continuously loop through communicator list to check for incoming 
+      /** \brief Continuously loop through communicator list to check for incoming
        *   beats and send responses to those beats
        */
       //QUESTION: Do we need to add a delay between checks for beats?
@@ -130,7 +130,7 @@ namespace skynet
 	  {
 	    //Check if a beat has been received
 	    auto message = comm_list->receive_from();
-	    
+
 	    //Respond to beat
 	  }
 	}

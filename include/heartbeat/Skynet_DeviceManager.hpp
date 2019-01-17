@@ -12,7 +12,7 @@
 
 namespace skynet
 {
-  
+
   /** \class DeviceManager
    *  \brief Abstract class for keeping track of devices
    *
@@ -24,12 +24,12 @@ namespace skynet
    {
    public:
      // Some types that will be used by the DeviceManager
-     using history_t = std::vector<BeatSender::BeatResponse>; //Device history
+     using history_t = std::vector<BeatResponse>; //Device history
      using id_t = typename DeviceReference::id_t; //Device ID
 
-     
-   public:     
-     
+
+   public:
+
      /** \brief Construct a new DeviceManager
       *
       *	\param nearby_devices a vector of devices that DeviceManager
@@ -57,7 +57,7 @@ namespace skynet
      /** \brief Get devices that the DeviceManager is currently keeping
       *	track of
       *
-      * The complete set of known devices  may include dead devices if 
+      * The complete set of known devices  may include dead devices if
       *	the DeviceManager continues to track devices that have been
       * pronounced dead.
       *
@@ -92,7 +92,7 @@ namespace skynet
        {
 	 if (not nearby_device_communicators_.count(dr.get_id()))
 	 {
-	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> 
+	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator>
 		     p(dr.get_id(), dr.create_new_communicator());
 	   nearby_device_communicators_.insert(std::move(p));
 	 }
@@ -137,21 +137,21 @@ namespace skynet
 			                 nearby_devices_.end());
 
        //Remove device history
-       id_t device_id = old_device.get_id()
+       id_t device_id = old_device.get_id();
        response_history_.erase(device_id);
      }
-     
+
      /** \brief Add response to response_history for the given device
       *
       * \param device Device to add response for
       * \param response Response to add to history for the given device
       */
      void add_response(const DeviceReference& device,
-		       const BeatSender::BeatResponse& response)
+		       const BeatResponse& response)
      {
        do_add_response(device, response);
      }
-       
+
      /** \brief Get the response history for a device
      *
      * \param device Device to get history of
@@ -161,7 +161,7 @@ namespace skynet
      {
        return response_history_[device.get_id()];
      }
-     
+
      /** \brief Clear the response history for a device
      *
      * \param device Device to clear history of
@@ -182,7 +182,7 @@ namespace skynet
       * will be equivalent to get_live_devices.
       */
      virtual const std::vector<DeviceReference>& do_get_live_devices() const = 0;
-       
+
     /** Add response to response_history for the given device
      *
      * Some potential ways that a response might be added:
@@ -197,19 +197,19 @@ namespace skynet
      //       id_t device_id = device.get_id();
      //       response_history_[device_id].push_back(response);
      //     }
-     
+
 
    private:
      std::vector<std::unique_ptr<DeviceReference>> nearby_devices_;
-     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>> 
+     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
        nearby_device_communicators_;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known
      // devices? This might depend on the type of  DeviceManager.
      std::unordered_map<id_t, history_t> response_history_;
-     
-   };// class 
+
+   };// class
 
 
 }// namespace skynet

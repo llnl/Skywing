@@ -23,13 +23,13 @@ namespace skynet
        *  \param property_list List of properties to be checked
        *  \param device_manager Device manager for heart, which can be used
        *	to get list of nearby devices and update this list if properties
-       *	aren't satisfied. 
+       *	aren't satisfied.
        */
         PropertyChecker(std::vector<GraphProperty> property_list) :
-        poperty_list_(std::move(property_list))
+        property_list_(std::move(property_list))
       {
       }
-        
+
       /** \brief PropertyChecker destructor
        */
       virtual ~PropertyChecker() = default;
@@ -72,7 +72,7 @@ namespace skynet
 	*   as necessary if now.
 	*
 	* \param device_manager Device manager that will be used to get the nearby
-	*  devices to check the properties and update the nearby device list if the 
+	*  devices to check the properties and update the nearby device list if the
 	*  properties are not satisfied
        */
       void validate_graph(DeviceManager& device_manager)
@@ -82,10 +82,10 @@ namespace skynet
 
     private:
       virtual void do_validate_graph(DeviceManager& device_manager) const = 0;
-      
+
     private:
       std::vector<GraphProperty> property_list_;
-      
+
     }; // class PropertyChecker
 
 } // namespace skynet
