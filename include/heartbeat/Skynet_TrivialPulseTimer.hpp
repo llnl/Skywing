@@ -16,7 +16,7 @@ namespace skynet
      *	and depend, for example, on if a response was received from
      *	the neighboring device the last time a pulse was sent.
      */
-    class TrivialPulseTime : public PulseTimer
+    class TrivialPulseTimer : public PulseTimer
     {
     public:
 

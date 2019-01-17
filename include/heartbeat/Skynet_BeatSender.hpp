@@ -20,6 +20,7 @@ namespace skynet
    class BeatSender
    {
    public:
+     BeatSender(); 
 
      /** \brief Send a signal to a device from the nearby
      *   device list and receive response.

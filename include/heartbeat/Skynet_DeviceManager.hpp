@@ -63,19 +63,11 @@ namespace skynet
       *
       * \return a vector of DeviceReferences
       */
-     const std::vector<DeviceReference>& get_known_devices() const
+      const std::vector<DeviceReference>& get_known_devices() const
      {
        return nearby_devices_;
      }
 
-     /** \brief Get devices that DeviceManager currently believes to be live
-      *
-      * \return a vector of DeviceReferences
-      */
-     const std::vector<DeviceReference>& get_live_devices() const
-     {
-       return do_get_live_devices();
-     }
 
      /** \brief Listen for new devices to add to list of devices.
       *
@@ -103,15 +95,15 @@ namespace skynet
       *
       * \param new_device Device to add to the nearby devices list
       */
-     void add_device(DeviceReference&& new_device)
+     void add_device(DeviceReference new_device)
      {
        //Add new device to device list
-       nearby_devices_.push_back(new_device);
-
-       //Add empty history for new device
-       id_t device_id = new_device.get_id();
-       history_t init_history;
-       response_history_[device_id] = init_history;
+       // nearby_devices_.push_back(new_device);
+       //
+       // //Add empty history for new device
+       // id_t device_id = new_device.get_id();
+       // history_t init_history;
+       // response_history_[device_id] = init_history;
 
      }
 
@@ -129,16 +121,18 @@ namespace skynet
      // to do anything since the status would be updated within DeviceReference
      // and we would keep the dead device along with its  history in the
      // using the nearby_devices_ list in the DeviceManager.
-     void remove_device(const DeviceReference& old_device)
+     void remove_device(DeviceReference old_device)
      {
-       //Use erase on top of remove to shorten vector after removing device
+        /*AF: again commenting out, issue with types with the Device Reference
+       Use erase on top of remove to shorten vector after removing device
        nearby_devices_.erase(std::remove(nearby_devices_.begin(),
 					 nearby_devices_.end(), old_device),
 			                 nearby_devices_.end());
 
+
        //Remove device history
-       id_t device_id = old_device.get_id();
-       response_history_.erase(device_id);
+       id_t device_id = old_deviceget_id();
+       response_history_.erase(device_id);*/
      }
 
      /** \brief Add response to response_history for the given device
@@ -146,11 +140,11 @@ namespace skynet
       * \param device Device to add response for
       * \param response Response to add to history for the given device
       */
-     void add_response(const DeviceReference& device,
-		       const BeatResponse& response)
-     {
-       do_add_response(device, response);
-     }
+     // void add_response(const DeviceReference& device,
+		 //       const BeatResponse& response)
+     // {
+     //   do_add_response_(device, response);
+     // }
 
      /** \brief Get the response history for a device
      *
@@ -176,27 +170,6 @@ namespace skynet
 
 
    private:
-
-     /** Get devices that the device manager believes to be live
-      * If the DeviceManager only keeps track of live devices this function
-      * will be equivalent to get_live_devices.
-      */
-     virtual const std::vector<DeviceReference>& do_get_live_devices() const = 0;
-
-    /** Add response to response_history for the given device
-     *
-     * Some potential ways that a response might be added:
-     * 1. Add response to the response_history_ vector
-     * 2. Specify max length of response_history_vector. Once the response_history_
-     *    reaches this length, remove the oldest response whenever a new response
-     *    is added to the history.
-     */
-     virtual void do_add_response(const DeviceReference& device,
-                                  const BeatResponse& response) = 0;
-     //     {
-     //       id_t device_id = device.get_id();
-     //       response_history_[device_id].push_back(response);
-     //     }
 
 
    private:
