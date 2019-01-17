@@ -9,7 +9,7 @@ namespace skynet
   /** \class TrivalBeatSender
    *  \brief class for operting a trivial heartbeat.
    */
-   class TrivalBeatSender : public BeatSender
+   class TrivialBeatSender : public BeatSender
    {
    public:
 

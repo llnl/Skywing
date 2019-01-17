@@ -36,7 +36,7 @@ namespace skynet
 
       /** \brief Get list of properties required by this device
        */
-      virtual std::vector<GraphProperty> get_property_list() const
+      const std::vector<GraphProperty>& get_property_list()
       {
           return property_list_;
       }
