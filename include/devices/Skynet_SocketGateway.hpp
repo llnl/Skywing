@@ -1,5 +1,5 @@
-#ifndef SKYNET_SOCKETGATEKEEPER_HPP__
-#define SKYNET_SOCKETGATEKEEPER_HPP__
+#ifndef SKYNET_SOCKETGATEWAY_HPP__
+#define SKYNET_SOCKETGATEWAY_HPP__
 
 #include <arpa/inet.h>
 #include "Skynet_Gateway.hpp"
@@ -9,7 +9,7 @@
 namespace skynet
 {
   /** \class SocketGateway
-   * \brief Object responsible for creating and maintaining a SocketDeviceListener
+   * \brief Implementation of Gateway for SocketCommunicatorFactory
    *
    */
   class SocketGateway : public Gateway

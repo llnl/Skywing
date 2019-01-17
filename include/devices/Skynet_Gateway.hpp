@@ -14,7 +14,7 @@ namespace skynet
   {
   public:
 
-    /** \brief Collect new initial connections.
+    /** \brief Create CommunicatorFactory for each new connection.
      *
      * \return a vector of CommunicatorFactory objects that are associated with
      * Devices that have connected since the last time this method was called.
