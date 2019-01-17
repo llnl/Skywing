@@ -11,7 +11,7 @@ namespace skynet
   {
     double response_val;
   };
-  
+
   /** \class BeatSender
    *  \brief Abstract class for operting the heartbeat.
    *	Defines the sequence of events that occurs each
@@ -20,7 +20,7 @@ namespace skynet
    class BeatSender
    {
    public:
-     
+
      /** \brief Send a signal to a device from the nearby
      *   device list and receive response.
      *
@@ -29,6 +29,9 @@ namespace skynet
      BeatResponse send_heartbeat(const DeviceReference& device)
      {
        do_send_heartbeat(device);
+       BeatResponse response;
+       response.response_val = 0;
+       return response; 
      }
 
    private:
