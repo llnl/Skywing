@@ -1,23 +1,22 @@
-#ifndef SKYNET_SOCKETDEVICELISTENER_HPP__
-#define SKYNET_SOCKETDEVICELISTENER_HPP__
+#ifndef SKYNET_SOCKETLISTENER_HPP__
+#define SKYNET_SOCKETLISTENER_HPP__
 
-#include "Skynet_DeviceListener.hpp"
 #include "Skynet_Socket.hpp"
 #include "Skynet_SocketCommunicator.hpp"
 
 namespace skynet
 {
-  class SocketDeviceListener : public DeviceListener, public Socket
+  class SocketListener : public Socket
   {
   public:
 
     static const int QUEUE_LENGTH = 10;
 
-    /** \brief Construct a new SocketDeviceListener.
+    /** \brief Construct a new SocketListener.
      *
      * \param type Specifies the address type to be used.
      */
-    SocketDeviceListener(int type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
+    SocketListener(int type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
       Socket(type), port_(port)
     {
       //Socket stucture
@@ -66,7 +65,7 @@ namespace skynet
      *
      * \return a connect DeviceCommunicator
      */
-    std::unique_ptr<DeviceCommunicator> connect_communicator_to_client()
+    std::unique_ptr<SocketCommunicator> connect_communicator_to_client()
     {
       struct sockaddr_in client_address_struct;
       const char * client_address;
@@ -136,8 +135,8 @@ namespace skynet
     char ipv4Buf_[INET_ADDRSTRLEN];
     uint16_t port_;
 
-  }; // class SocketDeviceListener
+  }; // class SocketListener
 } // namespace skynet
 
 
-#endif /* SKYNET_DEVICELISTENER_HPP__ */
+#endif /* SKYNET_SOCKETLISTENER_HPP__ */
