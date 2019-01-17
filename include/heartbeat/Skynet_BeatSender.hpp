@@ -28,14 +28,16 @@ namespace skynet
      */
      BeatResponse send_heartbeat(const DeviceReference& device)
      {
-       do_send_heartbeat(device);
-       BeatResponse response;
-       response.response_val = 0;
-       return response; 
+       /*AF: Added a defalut response for compling issues for now */
+       // do_send_heartbeat(device);
+       // BeatResponse response;
+       // response.response_val = 0;
+       // return response;
+       return do_send_heartbeat_(device);
      }
 
    private:
-     virtual BeatResponse do_send_heartbeat(const DeviceReference& device) = 0;
+     virtual BeatResponse do_send_heartbeat_(const DeviceReference& device) const = 0;
 
    };// class BeatSender
 

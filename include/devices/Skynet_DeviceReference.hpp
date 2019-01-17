@@ -10,7 +10,7 @@
 #include "Skynet_CommunicatorFactory.hpp"
 
 namespace skynet
-{  
+{
   /** \class DeviceReference
 
       A DeviceReference object represents some other participating
@@ -27,9 +27,9 @@ namespace skynet
     // which comparison is defined.
     using id_t = unsigned int; //Device ID type
 
-    
+
   public:
-    using id_t = unsigned int;
+    // using id_t = unsigned int;
 
   public:
     /** \brief Construct a new \c DeviceReference.
@@ -42,7 +42,7 @@ namespace skynet
       : is_believed_live_(true), device_id_(std::move(device_id)),
 	comm_factory_(std::move(comm_factory))
     { }
-    
+
     /** \brief Get if we believe the referred device to be live. */
     bool get_is_believed_live() const
     { return is_believed_live_; }
@@ -53,7 +53,7 @@ namespace skynet
     void set_is_believed_live(bool status)
     {
       is_believed_live_ = status;
-    }    
+    }
 
     /** Get device ID */
     id_t get_id() const
@@ -63,7 +63,7 @@ namespace skynet
 
     bool operator ==(const DeviceReference& other_device) const
     { return device_id_ == other_device.get_id(); }
-    
+
     /** \brief Request a new DeviceCommunicator for this DeviceReference.
      * \return A new DeviceCommunicator. */
     std::unique_ptr<DeviceCommunicator> create_new_communicator()
