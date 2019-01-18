@@ -5,11 +5,11 @@
 #include <thread>
 #include <chrono> //For timing pulse
 
-#include "Skynet_TrivialBeatSender.hpp"
-#include "Skynet_TrivialBeatInterpreter.hpp"
-#include "Skynet_TrivialPulseTimer.hpp"
-#include "Skynet_TrivialDeviceManager.hpp"
-#include "Skynet_TrivialPropertyChecker.hpp"
+#include "Skynet_BeatSender.hpp"
+#include "Skynet_BeatInterpreter.hpp"
+#include "Skynet_PulseTimer.hpp"
+#include "Skynet_DeviceManager.hpp"
+#include "Skynet_PropertyChecker.hpp"
 #include "devices/Skynet_DeviceCommunicator.hpp"
 
 namespace skynet
@@ -38,16 +38,16 @@ namespace skynet
        *  \param property_checker type of PropertyChecker used by this device
        */
       /*AF: Commented out below statemnet, There are no constuctors for the below items */
-      // Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
-	    // PulseTimer pulse_timer, DeviceManager device_manager,
-	    // PropertyChecker property_checker)
-	     // : beat_sender_(std::move(beat_sender))
-	  // beat_interpreter_(std::move(beat_interpreter)),
-	  // pulse_timer_(std::move(pulse_timer)),
-	  // device_manager_(std::move(device_manager)),
-	  // property_checker_(std::move(property_checker)),
-	  // is_device_alive_(true)
-      // {}
+      Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
+	    PulseTimer pulse_timer, DeviceManager device_manager,
+	    PropertyChecker property_checker)
+	     : beat_sender_(&beat_sender),
+	  beat_interpreter_(&beat_interpreter),
+	  pulse_timer_(&pulse_timer),
+	  device_manager_(&device_manager),
+	  property_checker_(&property_checker),
+	  is_device_alive_(true)
+      {}
 
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
@@ -148,11 +148,11 @@ namespace skynet
     }
 
     private:
-      TrivialBeatSender beat_sender_;
-      TrivialBeatInterpreter beat_interpreter_;
-      TrivialPulseTimer pulse_timer_;
-      TrivialDeviceManager device_manager_;
-      TrivialPropertyChecker property_checker_;
+      std::unique_ptr<BeatSender> beat_sender_;
+      std::unique_ptr<BeatInterpreter> beat_interpreter_;
+      std::unique_ptr<PulseTimer> pulse_timer_;
+      std::unique_ptr<DeviceManager> device_manager_;
+      std::unique_ptr<PropertyChecker> property_checker_;
       bool is_device_alive_; //Indicates if this device is allive
     }; // class Heart
 
