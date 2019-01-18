@@ -25,7 +25,7 @@ namespace skynet
       // response from the rest of the devices, also because it seems more
       // intuitive to define beats in this way. Currently beats are sent in
       // sequence. If beats are sent in parallel in future implementations
-      // this could be changed.      
+      // this could be changed.
       /** \brief Get the time to wait until the next heartbeat is sent to
        *   the input device
        *
@@ -33,13 +33,13 @@ namespace skynet
        */
       double  millisecs_to_next_beat(const DeviceReference& device)
       {
-	return do_milliseconds_to_next_pulse(device);
+	       return do_millisecs_to_next_beat_(device);
       }
 
     private:
 
-      virtual double do_millisecs_to_next_beat(const DeviceReference& device) const = 0;
-      
+      virtual double do_millisecs_to_next_beat_(const DeviceReference& device) const = 0;
+
     }; // class PulseTimer
 
 } // namespace skynet

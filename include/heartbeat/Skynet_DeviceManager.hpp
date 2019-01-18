@@ -12,7 +12,7 @@
 
 namespace skynet
 {
-  
+
   /** \class DeviceManager
    *  \brief Abstract class for keeping track of devices
    *
@@ -24,12 +24,12 @@ namespace skynet
    {
    public:
      // Some types that will be used by the DeviceManager
-     using history_t = std::vector<BeatSender::BeatResponse>; //Device history
+     using history_t = std::vector<BeatResponse>; //Device history
      using id_t = typename DeviceReference::id_t; //Device ID
 
-     
-   public:     
-     
+
+   public:
+
      /** \brief Construct a new DeviceManager
       *
       *	\param nearby_devices a vector of devices that DeviceManager
@@ -40,12 +40,12 @@ namespace skynet
      {
        //Add empty vector of responses as initial value for each
        // device to the response_history
-       for(DeviceReference device : nearby_devices)
-	 {
-	   id_t device_id = device.get_id();
-	   history_t init_history;
-	   response_history_[device_id] = init_history;
-	 }
+       for(auto device = begin(nearby_devices_); device!=end(nearby_devices_); ++device)
+    	 {
+    	   id_t device_id = device->get_id();
+    	   history_t init_history;
+    	   response_history_[device_id] = init_history;
+    	 }
      }
 
      /** \brief DeviceManager destructor
@@ -57,25 +57,17 @@ namespace skynet
      /** \brief Get devices that the DeviceManager is currently keeping
       *	track of
       *
-      * The complete set of known devices  may include dead devices if 
+      * The complete set of known devices  may include dead devices if
       *	the DeviceManager continues to track devices that have been
       * pronounced dead.
       *
       * \return a vector of DeviceReferences
       */
-     const std::vector<DeviceReference>& get_known_devices() const
+      const std::vector<DeviceReference>& get_known_devices() const
      {
        return nearby_devices_;
      }
 
-     /** \brief Get devices that DeviceManager currently believes to be live
-      *
-      * \return a vector of DeviceReferences
-      */
-     const std::vector<DeviceReference>& get_live_devices() const
-     {
-       return do_get_live_devices();
-     }
 
      /** \brief Listen for new devices to add to list of devices.
       *
@@ -88,30 +80,30 @@ namespace skynet
 
      void establish_device_connections()
      {
-       for (DeviceReference& dr : nearby_devices_)
-       {
-	 if (not nearby_device_communicators_.count(dr.get_id()))
-	 {
-	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> 
-		     p(dr.get_id(), dr.create_new_communicator());
-	   nearby_device_communicators_.insert(std::move(p));
-	 }
-       }
-     }
+      /*AF: This function was not compling, commented out for now */
+      // for (auto device = begin(nearby_devices_); device!=end(nearby_devices_); ++device)
+      // {
+      //   if (not nearby_device_communicators_.count(device->get_id()))
+      //   {
+      //   std::pair<const id_t, std::unique_ptr<DeviceCommunicator> p(device->get_id(), device.create_new_communicator());
+      //   nearby_device_communicators_.insert(std::move(p));
+      //   }
+      // }
+    }
 
      /** Add a device to the nearby devices list and initialize its history
       *
       * \param new_device Device to add to the nearby devices list
       */
-     void add_device(DeviceReference&& new_device)
+     void add_device(DeviceReference new_device)
      {
        //Add new device to device list
-       nearby_devices_.push_back(new_device);
-
-       //Add empty history for new device
-       id_t device_id = new_device.get_id();
-       history_t init_history;
-       response_history_[device_id] = init_history;
+       // nearby_devices_.push_back(new_device);
+       //
+       // //Add empty history for new device
+       // id_t device_id = new_device.get_id();
+       // history_t init_history;
+       // response_history_[device_id] = init_history;
 
      }
 
@@ -129,29 +121,31 @@ namespace skynet
      // to do anything since the status would be updated within DeviceReference
      // and we would keep the dead device along with its  history in the
      // using the nearby_devices_ list in the DeviceManager.
-     void remove_device(const DeviceReference& old_device)
+     void remove_device(DeviceReference old_device)
      {
-       //Use erase on top of remove to shorten vector after removing device
+        /*AF: again commenting out, issue with types with the Device Reference
+       Use erase on top of remove to shorten vector after removing device
        nearby_devices_.erase(std::remove(nearby_devices_.begin(),
 					 nearby_devices_.end(), old_device),
 			                 nearby_devices_.end());
 
+
        //Remove device history
-       id_t device_id = old_device.get_id()
-       response_history_.erase(device_id);
+       id_t device_id = old_deviceget_id();
+       response_history_.erase(device_id);*/
      }
-     
+
      /** \brief Add response to response_history for the given device
       *
       * \param device Device to add response for
       * \param response Response to add to history for the given device
       */
-     void add_response(const DeviceReference& device,
-		       const BeatSender::BeatResponse& response)
-     {
-       do_add_response(device, response);
-     }
-       
+     // void add_response(const DeviceReference& device,
+		 //       const BeatResponse& response)
+     // {
+     //   do_add_response_(device, response);
+     // }
+
      /** \brief Get the response history for a device
      *
      * \param device Device to get history of
@@ -161,7 +155,7 @@ namespace skynet
      {
        return response_history_[device.get_id()];
      }
-     
+
      /** \brief Clear the response history for a device
      *
      * \param device Device to clear history of
@@ -177,39 +171,18 @@ namespace skynet
 
    private:
 
-     /** Get devices that the device manager believes to be live
-      * If the DeviceManager only keeps track of live devices this function
-      * will be equivalent to get_live_devices.
-      */
-     virtual const std::vector<DeviceReference>& do_get_live_devices() const = 0;
-       
-    /** Add response to response_history for the given device
-     *
-     * Some potential ways that a response might be added:
-     * 1. Add response to the response_history_ vector
-     * 2. Specify max length of response_history_vector. Once the response_history_
-     *    reaches this length, remove the oldest response whenever a new response
-     *    is added to the history.
-     */
-     virtual void do_add_response(const DeviceReference& device,
-                                  const BeatSender::BeatResponse& response) = 0;
-     //     {
-     //       id_t device_id = device.get_id();
-     //       response_history_[device_id].push_back(response);
-     //     }
-     
 
    private:
-     std::vector<std::unique_ptr<DeviceReference>> nearby_devices_;
-     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>> 
+     std::vector<DeviceReference> nearby_devices_;
+     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
        nearby_device_communicators_;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known
      // devices? This might depend on the type of  DeviceManager.
      std::unordered_map<id_t, history_t> response_history_;
-     
-   };// class 
+
+   };// class
 
 
 }// namespace skynet

@@ -1,11 +1,13 @@
 include $(SKYNET_DIR)/src/Makefile
 #--------------------- List of variables for each Module -----------------------
 
-# Devices variables
+# Devices classes
 DEVICES_TESTS = \
-	devices/Skynet_SocketGateway
-#	devices/Skynet_Serialization 
-#	devices/Skynet_SocketCommunicator
+  devices/Skynet_SocketGateway
+
+# Heartbeat classes
+HEARTBEAT_TESTS = \
+  heartbeat/Skynet_Heart
 
 # <Module> variables
 # <MODULE>_TESTS = \
@@ -33,13 +35,17 @@ LIB_FLAGS = -l$(SKYNET_LIBS)
 DEVICES_OBJECTS = $(addsuffix _test.cpp.o, $(DEVICES_TESTS))
 DEVICES_DFILES = $(addsuffix _test.cpp.d, $(DEVICES_TESTS))
 
+# Heartbeat lists
+HEARTBEAT_OBJECTS = $(addsuffix _test.cpp.o, $(HEARTBEAT_TESTS))
+HEARTBEAT_DFILES = $(addsuffix _test.cpp.d, $(HEARTBEAT_TESTS))
+
 # <Module> lists
 # <Module>_OBJECTS = $(addsuffix _test.cpp.o, $(<MODULE>_TESTS))
 # <Module>_DFILES = $(addsuffix _test.cpp.d, $(<MODULE>_TESTS))
 
 # Master lists ***add additional module lists here***
-OBJECTS = $(DEVICES_OBJECTS) catch_main.cpp.o
-DFILES = $(DEVICES_DFILES) catch_main.cpp.d
+OBJECTS = $(DEVICES_OBJECTS) $(HEARTBEAT_OBJECTS) catch_main.cpp.o
+DFILES = $(DEVICES_DFILES) $(HEARTBEAT_DFILES) catch_main.cpp.d
 
 #-------------------------------------------------------------------------------
 
@@ -51,11 +57,15 @@ all:
 	$(MAKE) run_catch_tests
 devices:
 	$(MAKE) run_catch_devices_tests
+heartbeat:
+	$(MAKE) run_catch_heartbeat_tests
 # <module>:
 #   $(MAKE) run_catch_<module>_tests
 # *** add additional module executables to clean below ***
 clean:
-	$(RM) run_catch_tests devices/run_catch_devices_tests
+	$(RM) run_catch_tests
+	$(RM) devices/run_catch_devices_tests
+	$(RM) heartbeat/run_catch_heartbeat_tests
 	$(RM) $(OBJECTS) $(DFILES)
 
 # Devices rules
@@ -64,6 +74,13 @@ devices/%_test.cpp.o: devices/%_test.cpp
 run_catch_devices_tests: $(DEVICES_OBJECTS) catch_main.cpp.o
 	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
 	$(DEVICES_OBJECTS) catch_main.cpp.o -o devices/run_catch_devices_tests
+
+# Devices rules
+heartbeat/%_test.cpp.o: heartbeat/%_test.cpp
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+run_catch_heartbeat_tests: $(HEARTBEAT_OBJECTS) catch_main.cpp.o
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
+	$(HEARTBEAT_OBJECTS) catch_main.cpp.o -o heartbeat/run_catch_heartbeat_tests
 
 # <Module> rules
 # %_<module>_test.cpp.o: %_test.cpp
