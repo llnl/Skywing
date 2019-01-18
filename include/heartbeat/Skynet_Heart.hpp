@@ -38,16 +38,16 @@ namespace skynet
        *  \param property_checker type of PropertyChecker used by this device
        */
       /*AF: Commented out below statemnet, There are no constuctors for the below items */
-      Heart(BeatSender beat_sender, BeatInterpreter beat_interpreter,
-	    PulseTimer pulse_timer, DeviceManager device_manager,
-	    PropertyChecker property_checker)
-	     : beat_sender_(&beat_sender),
-	  beat_interpreter_(&beat_interpreter),
-	  pulse_timer_(&pulse_timer),
-	  device_manager_(&device_manager),
-	  property_checker_(&property_checker),
-	  is_device_alive_(true)
-      {}
+      Heart(std::unique_ptr<BeatSender> beat_sender, std::unique_ptr<BeatInterpreter> beat_interpreter,
+            std::unique_ptr<PulseTimer> pulse_timer, std::unique_ptr<DeviceManager> device_manager,
+            std::unique_ptr<PropertyChecker> property_checker)
+       : beat_sender_(std::move(beat_sender)),
+         beat_interpreter_(std::move(beat_interpreter)),
+         pulse_timer_(std::move(pulse_timer)),
+         device_manager_(std::move(device_manager)),
+         property_checker_(std::move(property_checker)),
+         is_device_alive_(true)
+       { }
 
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat() const
