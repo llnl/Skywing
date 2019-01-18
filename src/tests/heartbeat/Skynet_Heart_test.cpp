@@ -8,7 +8,7 @@
 
 TEST_CASE( "Heart Instantiation", "[Skynet_Heart]" )
 {
-  skynet::Heart heart_T100(std::make_unique<skynet::TrivialBeatSender>(),
+  skynet::Heart heart_T1(std::make_unique<skynet::TrivialBeatSender>(),
                            std::make_unique<skynet::TrivialBeatInterpreter>(),
                            std::make_unique<skynet::TrivialPulseTimer>(),
                            std::make_unique<skynet::TrivialDeviceManager>(),
