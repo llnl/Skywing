@@ -16,13 +16,17 @@ namespace skynet
     class TrivialPropertyChecker : public PropertyChecker
     {
     public:
+
+      TrivialPropertyChecker()
+      { }
+
       // const std::vector<GraphProperty>& get_property_list() const
       // {
       //     return property_list_;
       // }
       /** \brief Get list of properties required by this device
        */
-      
+
 
     private:
       void do_validate_graph(DeviceManager& device_manager) const override

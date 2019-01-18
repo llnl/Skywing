@@ -13,6 +13,9 @@ namespace skynet
    {
    public:
 
+     TrivialBeatSender()
+     { }
+
    private:
      BeatResponse do_send_heartbeat_(const DeviceReference& device) const override
      {
