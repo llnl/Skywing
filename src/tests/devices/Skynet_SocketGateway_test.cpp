@@ -1,5 +1,5 @@
 #include "catch2/catch.hpp"
-#include "devices/Skynet_SocketGatekeeper.hpp"
+#include "devices/Skynet_SocketGateway.hpp"
 
 #include <thread>
 #include <iostream>
@@ -20,16 +20,16 @@ void *dev1(void *vargp)
     std::vector<std::string> config(0);
     std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
 
-    // Create SocketGatekeeper to listen for new clients
-    std::cout << "create gatekeeper on Device 1" << std::endl;
-    SocketGatekeeper gatekeeper(Socket::IPv4, SKYNET_PORT_DEV1);
+    // Create SocketGateway to listen for new clients
+    std::cout << "create gateway on Device 1" << std::endl;
+    SocketGateway gateway(Socket::IPv4, SKYNET_PORT_DEV1);
 
-    // Periodically have gatekeeper collect new connections
+    // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
-        gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
+        gateway.collect_new_connections();
       while (!connections.empty())
       {
         connections.back()->create_new_communicator(config);
@@ -56,16 +56,16 @@ void *dev2(void *vargp)
     comm_list.push_back(client_factory.create_new_communicator(config));
     std::cout << "Device 2 connected to Device 1" << std::endl;
 
-    // Create SocketGatekeeper to listen for new clients
-    std::cout << "create gatekeeper on Device 2" << std::endl;
-    SocketGatekeeper gatekeeper(Socket::IPv4, SKYNET_PORT_DEV2);
+    // Create SocketGateway to listen for new clients
+    std::cout << "create gateway on Device 2" << std::endl;
+    SocketGateway gateway(Socket::IPv4, SKYNET_PORT_DEV2);
 
-    // Periodically have gatekeeper collect new connections
+    // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
-        gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
+        gateway.collect_new_connections();
       while (!connections.empty())
       {
         connections.back()->create_new_communicator(config);
@@ -100,16 +100,16 @@ void *dev3(void *vargp)
     comm_list.push_back(client_factory2.create_new_communicator(config));
     std::cout << "Device 3 connect to Device 2" << std::endl;
 
-    // Create SocketGatekeeper to listen for new clients
-    std::cout << "create gatekeeper on Device 3" << std::endl;
-    SocketGatekeeper gatekeeper(SocketCommunicator::IPv4, SKYNET_PORT_DEV3);
+    // Create SocketGateway to listen for new clients
+    std::cout << "create gateway on Device 3" << std::endl;
+    SocketGateway gateway(SocketCommunicator::IPv4, SKYNET_PORT_DEV3);
 
-    // Periodically have gatekeeper collect new connections
+    // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections = 
-        gatekeeper.collect_new_connections();
+      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
+        gateway.collect_new_connections();
       while (!connections.empty())
       {
         connections.back()->create_new_communicator(config);

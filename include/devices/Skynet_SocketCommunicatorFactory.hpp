@@ -4,7 +4,7 @@
 #include <arpa/inet.h>
 #include "Skynet_CommunicatorFactory.hpp"
 #include "Skynet_SocketCommunicator.hpp"
-#include "Skynet_SocketDeviceListener.hpp"
+#include "Skynet_SocketListener.hpp"
 
 
 namespace skynet
@@ -17,12 +17,12 @@ namespace skynet
     /** \brief Create a new server SocketCommunicatorFactory.
      *
      * \param type Specifies the address type to be used (IPv4).
-     * \param gateway The SocketDeviceListener for incoming connections
+     * \param gateway The SocketListener for incoming connections
      */
-    SocketCommunicatorFactory(int type, SocketDeviceListener&& gateway) :
+    SocketCommunicatorFactory(int type, SocketListener&& listener) :
       type_(type)
     {
-      gateway_ = std::make_unique<SocketDeviceListener>(gateway);
+      listener_ = std::make_unique<SocketListener>(listener);
       is_server = true;
     }
 
@@ -50,7 +50,7 @@ namespace skynet
     create_new_communicator(std::vector<std::string> /* comm_config_info*/)
     {
       if (is_server) // accept client via gateway socket
-        return gateway_->connect_communicator_to_client();
+        return listener_->connect_communicator_to_client();
       else // connect via server gateway
       {
         std::unique_ptr<SocketCommunicator> new_communicator =
@@ -66,8 +66,8 @@ namespace skynet
     const char * server_address_;
     bool is_server;
     uint16_t server_port_;
-    std::unique_ptr<SocketDeviceListener> gateway_;
+    std::unique_ptr<SocketListener> listener_;
   }; // SocketCommunicatorFactory
 } // namespace skynet
 
-#endif /* SKYNET_SOCKETCOMMUNICATORSERVERFACTORY_HPP__ */
+#endif /* SKYNET_SOCKETCOMMUNICATORFACTORY_HPP__ */
