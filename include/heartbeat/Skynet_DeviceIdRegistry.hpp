@@ -26,9 +26,16 @@ namespace skynet
       return registered_id;
     }
 
-    void free_id(id_t id)
+    void free_id(id_t id_to_free)
     {
-      // HELLO!
+      for (id_t id : registered_ids_)
+      {
+        if (id == id_to_free)
+        {
+          freed_ids_.push_back(id);
+          registered_ids_.erase(id);
+        }
+      }
     }
 
   private:
