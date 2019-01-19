@@ -1,6 +1,7 @@
 #ifndef SKYNET_SOCKET_HPP__
 #define SKYNET_SOCKET_HPP__
 
+#include <arpa/inet.h>
 #include <unistd.h>
 
 namespace skynet

@@ -1,6 +1,7 @@
 #ifndef SKYNET_DEVICEMANANGER_HPP__
 #define SKYNET_DEVICEMANANGER_HPP__
 
+#include <cstdint>
 #include <vector>
 #include <memory>
 #include <algorithm> //For remove function used to remove devices from device used
@@ -8,7 +9,9 @@
 
 #include "devices/Skynet_DeviceCommunicator.hpp"
 #include "devices/Skynet_DeviceReference.hpp"
+#include "devices/Skynet_Gateway.hpp"
 #include "Skynet_BeatSender.hpp"
+#include "Skynet_DeviceIdRegistry.hpp"
 
 namespace skynet
 {
@@ -25,10 +28,15 @@ namespace skynet
    public:
      // Some types that will be used by the DeviceManager
      using history_t = std::vector<BeatResponse>; //Device history
-     using id_t = typename DeviceReference::id_t; //Device ID
+     using id_t = uint8_t; //Device ID
 
 
    public:
+
+      DeviceManager(std::unique_ptr<Gateway> gateway):
+        gateway_(std::move(gateway))
+      { }
+
 
      /** \brief Construct a new DeviceManager
       *
@@ -73,10 +81,18 @@ namespace skynet
       *
       *  We expect this to be called as part of a new thread.
       */
-     void listen_for_devices()
-     {
-       // TODO
-     }
+      void listen_for_devices()
+      {
+        // collect new communicator factories from gateway
+        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+          gateway_->collect_new_connections();
+        // create a new device references
+        for (unsigned i=0; i < comm_factories.size(); i++)
+        {
+          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          add_device(new_device);
+        }
+      }
 
      void establish_device_connections()
      {
@@ -95,16 +111,15 @@ namespace skynet
       *
       * \param new_device Device to add to the nearby devices list
       */
-     void add_device(DeviceReference new_device)
+     void add_device(DeviceReference& new_device)
      {
-       //Add new device to device list
-       // nearby_devices_.push_back(new_device);
-       //
-       // //Add empty history for new device
-       // id_t device_id = new_device.get_id();
-       // history_t init_history;
-       // response_history_[device_id] = init_history;
+        //Add new device to device list
+        nearby_devices_.push_back(std::move(new_device));
 
+        //Add empty history for new device
+        id_t device_id = new_device.get_id();
+        history_t init_history;
+        response_history_[device_id] = init_history;
      }
 
      /** Remove a device from the nearby devices list and remove the history
@@ -170,12 +185,11 @@ namespace skynet
 
 
    private:
-
-
-   private:
-     std::vector<DeviceReference> nearby_devices_;
-     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
-       nearby_device_communicators_;
+      std::vector<DeviceReference> nearby_devices_;
+      std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
+        nearby_device_communicators_;
+      std::unique_ptr<Gateway> gateway_;
+      DeviceIdRegistry<id_t> id_registry_;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known
