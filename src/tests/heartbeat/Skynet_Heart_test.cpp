@@ -18,7 +18,7 @@ TEST_CASE( "Heart Instantiation", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialBeatInterpreter>(),
                           std::make_unique<skynet::TrivialPulseTimer>(),
                           std::make_unique<skynet::TrivialDeviceManager>(
-                            std::make_unique<skynet::SocketGateway>(IPv4, SKYNET_PORT) //TODO: figure out why skynet::Socket::IPv4 doesnt work instead of AF_INET
+                            std::make_unique<skynet::SocketGateway>(IPv4, SKYNET_PORT)
                            ),
                            std::make_unique<skynet::TrivialPropertyChecker>());
   heart_T1.run_heartbeat();
