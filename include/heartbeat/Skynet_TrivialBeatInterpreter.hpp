@@ -6,13 +6,15 @@
 namespace skynet
 {
   /** \class TrivialBeatInterpreter
-   *  \brief Abstract class for deciding what to do with history
+   *  \brief Class for deciding what to do with history
    *	of heartbeats (e.g. if neighboring devices should be
    *	pronounced dead)
    */
    class TrivialBeatInterpreter : public BeatInterpreter
    {
    public:
+      TrivialBeatInterpreter()
+      { }
 
    private:
    bool do_should_device_remain_(const DeviceReference& device,

@@ -35,7 +35,7 @@ namespace skynet
       *	\param nearby_devices a vector of devices that DeviceManager
       *	       will keep track of.
       */
-     DeviceManager(std::vector<DeviceReference> nearby_devices)
+    /* DeviceManager(std::vector<DeviceReference> nearby_devices)
        : nearby_devices_(std::move(nearby_devices))
      {
        //Add empty vector of responses as initial value for each
@@ -46,7 +46,7 @@ namespace skynet
     	   history_t init_history;
     	   response_history_[device_id] = init_history;
     	 }
-     }
+     }*/
 
      /** \brief DeviceManager destructor
       */

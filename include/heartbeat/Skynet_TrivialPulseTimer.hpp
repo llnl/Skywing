@@ -8,7 +8,7 @@
 namespace skynet
 {
     /** \class TrivialPulseTimer
-     *  \brief Abstract class to define how pulses are sent
+     *  \brief Class to define how pulses are sent
      *
      *	The simplest version of the pulse is a fixed-length time
      *	interval at which queries will be sent to all devices. A
@@ -19,6 +19,8 @@ namespace skynet
     class TrivialPulseTimer : public PulseTimer
     {
     public:
+      TrivialPulseTimer()
+      { }
 
     private:
 

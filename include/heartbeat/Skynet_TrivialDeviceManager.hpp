@@ -13,9 +13,13 @@ namespace skynet
   class TrivialDeviceManager : public DeviceManager
   {
     public:
+
+      TrivialDeviceManager()
+      { }
+      
     private:
 
-    
+
    };// class
 
 
