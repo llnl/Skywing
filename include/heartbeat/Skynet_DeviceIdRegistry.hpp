@@ -31,6 +31,7 @@ namespace skynet
         {
           freed_ids_.push_back(*iter);
           registered_ids_.erase(iter);
+          break;
         }
       }
     }
@@ -56,34 +57,26 @@ namespace skynet
       // third, use next_value to advance id value until a free one is found
       else
       {
-        bool is_free;
-        bool found = false;
-        int reset_count = 0;
         next_free_id_ = registered_ids_.back();
-        while (!found && reset_count < 2)
+        bool found = false;
+        while (!found)
         {
           if (next_free_id_ == last_id_)
           {
-            next_free_id_ = first_id_;
-            reset_count++;
+            printf("No free ids in DeviceRegistry\n");
+            exit(-1);
           }
           else
             next_free_id_ = next_value(next_free_id_);
-          is_free = true;
+          found = true;
           for (id_t id : registered_ids_)
           {
             if (id == next_free_id_)
             {
-              is_free = false;
+              found = false;
               break;
             }
           }
-          found = is_free;
-        }
-        if (reset_count == 2)
-        {
-          printf("No free ids in DeviceRegistry\n");
-          exit(-1);
         }
       }
       return next_free_id_;
