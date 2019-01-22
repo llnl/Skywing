@@ -34,7 +34,7 @@ namespace skynet
    public:
 
       DeviceManager(std::unique_ptr<Gateway> gateway):
-        gateway_(std::move(gateway))
+        gateway_(std::move(gateway)), shutdown_(false)
       { }
 
 
@@ -73,7 +73,7 @@ namespace skynet
       */
       const std::vector<DeviceReference>& get_known_devices() const
      {
-       return nearby_devices_;
+       return known_devices_;
      }
 
 
@@ -83,14 +83,18 @@ namespace skynet
       */
       void listen_for_devices()
       {
-        // collect new communicator factories from gateway
-        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
-          gateway_->collect_new_connections();
-        // create a new device references
-        for (unsigned i=0; i < comm_factories.size(); i++)
+        while (!shutdown_)
         {
-          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
-          add_device(new_device);
+          // collect new communicator factories from gateway
+          std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+            gateway_->collect_new_connections();
+          // create a new device references
+          for (unsigned i=0; i < comm_factories.size(); i++)
+          {
+            DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+            add_device(new_device);
+          }
+          std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
         }
       }
 
@@ -114,7 +118,7 @@ namespace skynet
      void add_device(DeviceReference& new_device)
      {
         //Add new device to device list
-        nearby_devices_.push_back(std::move(new_device));
+        known_devices_.push_back(std::move(new_device));
 
         //Add empty history for new device
         id_t device_id = new_device.get_id();
@@ -183,13 +187,21 @@ namespace skynet
        response_history_[device_id] = empty_history;
      }
 
+     void shutdown()
+     {
+       shutdown_ = true;
+     }
 
    private:
-      std::vector<DeviceReference> nearby_devices_;
+      std::vector<DeviceReference> known_devices_;
       std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
         nearby_device_communicators_;
       std::unique_ptr<Gateway> gateway_;
       DeviceIdRegistry<id_t> id_registry_;
+      bool shutdown_;
+
+      // TODO: move this to implementation or have it passed in via constructor
+      int LISTEN_FOR_DEVICES_TIMEOUT = 1;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known

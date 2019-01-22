@@ -49,12 +49,6 @@ namespace skynet
          is_device_alive_(true)
        { }
 
-      ~Heart()
-      {
-        if (device_listener_thread_.joinable())
-          device_listener_thread_.join();
-      }
-
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat()
       {
@@ -147,9 +141,13 @@ namespace skynet
         }*/
       }
 
-    void kill_device()
+    void terminate_device()
     {
-    is_device_alive_ = false;
+      is_device_alive_ = false;
+      // shutdown DeviceManager and device_listener_thread_
+      device_manager_->shutdown();
+      if (device_listener_thread_.joinable())
+        device_listener_thread_.join();
     }
 
     private:
