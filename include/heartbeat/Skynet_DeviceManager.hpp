@@ -62,18 +62,13 @@ namespace skynet
      // to work? Also is it okay to have virtual here?
      virtual ~DeviceManager() = default;
 
-     /** \brief Get devices that the DeviceManager is currently keeping
-      *	track of
-      *
-      * The complete set of known devices  may include dead devices if
-      *	the DeviceManager continues to track devices that have been
-      * pronounced dead.
+     /** \brief Get devices that the DeviceManager currently believes are live
       *
       * \return a vector of DeviceReferences
       */
-      const std::vector<DeviceReference>& get_known_devices() const
+      const std::vector<DeviceReference>& get_live_devices() const
      {
-       return known_devices_;
+       return live_devices_;
      }
 
 
@@ -112,7 +107,7 @@ namespace skynet
      void add_device(DeviceReference& new_device)
      {
         //Add new device to device list
-        known_devices_.push_back(std::move(new_device));
+        live_devices_.push_back(std::move(new_device));
 
         //Add empty history for new device
         id_t device_id = new_device.get_id();
@@ -182,7 +177,7 @@ namespace skynet
      }
 
    private:
-      std::vector<DeviceReference> known_devices_;
+      std::vector<DeviceReference> live_devices_;
       std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
         nearby_device_communicators_;
       std::unique_ptr<Gateway> gateway_;
