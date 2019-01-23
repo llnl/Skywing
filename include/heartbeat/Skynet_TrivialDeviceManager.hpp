@@ -14,9 +14,10 @@ namespace skynet
   {
     public:
 
-      TrivialDeviceManager()
+      TrivialDeviceManager(std::unique_ptr<Gateway> gateway) :
+        DeviceManager(std::move(gateway))
       { }
-      
+
     private:
 
 

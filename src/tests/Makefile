@@ -7,6 +7,7 @@ DEVICES_TESTS = \
 
 # Heartbeat classes
 HEARTBEAT_TESTS = \
+	heartbeat/Skynet_DeviceIdRegistry \
   heartbeat/Skynet_Heart
 
 # <Module> variables

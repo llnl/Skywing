@@ -50,11 +50,10 @@ namespace skynet
        { }
 
       /** \brief Begin the heartbeat and run until device dies. */
-      void run_heartbeat() const
+      void run_heartbeat()
       {
-        /*AF:Commented out for Compling purposes
-        std::thread sending_thread(send_heartbeat());
-        std::thread listening_thread(listen_for_beats);*/
+        device_listener_thread_ =
+          std::thread(&skynet::Heart::listen_for_devices, this);
       }
 
       /** \brief Function to send regular heartbeats
@@ -142,18 +141,40 @@ namespace skynet
         }*/
       }
 
-    void kill_device()
+    void terminate_device()
     {
-    is_device_alive_ = false;
+      is_device_alive_ = false;
+      if (device_listener_thread_.joinable())
+        device_listener_thread_.join();
     }
 
     private:
+
+      /** \brief Listen for new devices to add to list of devices.
+       *
+       *  We expect this to be called as part of a new thread.
+       */
+       void listen_for_devices()
+       {
+         while (is_device_alive_)
+         {
+           device_manager_->collect_new_devices();
+           std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
+         }
+       }
+
+
       std::unique_ptr<BeatSender> beat_sender_;
       std::unique_ptr<BeatInterpreter> beat_interpreter_;
       std::unique_ptr<PulseTimer> pulse_timer_;
       std::unique_ptr<DeviceManager> device_manager_;
       std::unique_ptr<PropertyChecker> property_checker_;
       bool is_device_alive_; //Indicates if this device is allive
+      std::thread device_listener_thread_;
+
+      // QUESTION: should this be passed in via the constructor?
+      const int LISTEN_FOR_DEVICES_TIMEOUT = 1;
+
     }; // class Heart
 
 } // namespace skynet
