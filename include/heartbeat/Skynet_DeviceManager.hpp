@@ -34,7 +34,7 @@ namespace skynet
    public:
 
       DeviceManager(std::unique_ptr<Gateway> gateway):
-        gateway_(std::move(gateway)), shutdown_(false)
+        gateway_(std::move(gateway))
       { }
 
 
@@ -77,24 +77,18 @@ namespace skynet
      }
 
 
-     /** \brief Listen for new devices to add to list of devices.
-      *
-      *  We expect this to be called as part of a new thread.
+     /** \brief Collect new devices that have connected and add to list of devices.
       */
-      void listen_for_devices()
+      void collect_new_devices()
       {
-        while (!shutdown_)
+        // collect new communicator factories from gateway
+        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+          gateway_->collect_new_connections();
+        // create a new device references
+        for (unsigned i=0; i < comm_factories.size(); i++)
         {
-          // collect new communicator factories from gateway
-          std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
-            gateway_->collect_new_connections();
-          // create a new device references
-          for (unsigned i=0; i < comm_factories.size(); i++)
-          {
-            DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
-            add_device(new_device);
-          }
-          std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
+          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          add_device(new_device);
         }
       }
 
@@ -187,21 +181,12 @@ namespace skynet
        response_history_[device_id] = empty_history;
      }
 
-     void shutdown()
-     {
-       shutdown_ = true;
-     }
-
    private:
       std::vector<DeviceReference> known_devices_;
       std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
         nearby_device_communicators_;
       std::unique_ptr<Gateway> gateway_;
       DeviceIdRegistry<id_t> id_registry_;
-      bool shutdown_;
-
-      // TODO: move this to implementation or have it passed in via constructor
-      int LISTEN_FOR_DEVICES_TIMEOUT = 1;
 
      /** A map storing the response history for all live devices */
      //QUESTION: Should response history be stored for live devices or known
