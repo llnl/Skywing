@@ -66,7 +66,7 @@ namespace skynet
       *
       * \return a vector of DeviceReferences
       */
-      const std::vector<DeviceReference>& get_live_devices() const
+      std::vector<DeviceReference>& get_live_devices()
      {
        return live_devices_;
      }
