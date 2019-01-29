@@ -88,7 +88,8 @@ namespace skynet
        response_history_.erase(device_id);*/
      }
 
-      /** \brief Collect new devices that have connected and add to list of neighbors
+      /** \brief Collect new devices that have connected and add to list of 
+       *   neighbors
       */
       void collect_new_devices()
       {
@@ -98,7 +99,8 @@ namespace skynet
         // create a new device references
         for (unsigned i=0; i < comm_factories.size(); i++)
         {
-          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          DeviceReference new_device(id_registry_.next_id(),
+				     std::move(comm_factories[i]));
           add_device(new_device);
         }
       }
@@ -110,7 +112,7 @@ namespace skynet
          if (not neighbor_communicators_.count(device->get_id()))
          {
 	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator>>
-	     p(device->get_id(), device.create_new_communicator());
+	     p(device->get_id(), device->create_new_communicator());
 	   neighbor_communicators_.insert(std::move(p));
          }
        }
