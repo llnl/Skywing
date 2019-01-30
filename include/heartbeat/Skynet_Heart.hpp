@@ -56,20 +56,6 @@ namespace skynet
           std::thread(&skynet::Heart::listen_for_devices, this);
       }
 
-      // DEBUG: remove this
-      void create_device_communicator()
-      {
-        std::vector<DeviceReference>& list = device_manager_->get_live_devices();
-        comm_ = list[0].create_new_communicator();
-      }
-
-      // DEBUG: remove this
-      int receive_message()
-      {
-        return comm_->receive_from<int>();
-      }
-
-
       /** \brief Function to send regular heartbeats
        */
       void send_heartbeat() const
@@ -163,9 +149,6 @@ namespace skynet
     }
 
     private:
-
-      // DEBUG: remove this
-      std::unique_ptr<DeviceCommunicator> comm_;
 
       /** \brief Listen for new devices to add to list of devices.
        *

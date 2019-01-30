@@ -29,13 +29,7 @@ TEST_CASE( "Heart Instantiation", "[Skynet_Heart]" )
   std::cout << "Creating Device Communicator to T1" << std::endl;
   std::unique_ptr<skynet::DeviceCommunicator> communicator =
     comm_factory.create_new_communicator(std::vector<std::string>(0));
-  std::cout << "Creating Device Communicator on T1" << std::endl;
-  heart_T1.create_device_communicator();
-  std::cout << "Sending the number 10 to T1" << std::endl;
-  communicator->send_to<int>(10);
-  int received = heart_T1.receive_message();
-  std::cout << "T1 received " << received << std::endl;
-  REQUIRE(received == 10);
   std::cout << "Terminating T1" << std::endl;
   heart_T1.terminate_device();
+
 }
