@@ -17,6 +17,7 @@ namespace skynet
     /** \brief Construct a new Configuration.
      *
      * \param filename Specifies configuration filename to be read in
+     * \param delimiter Specifies what is to use to delimit keys from values
      */
     Configuration(std::string filename, std::string delimiter)
     {
