@@ -71,6 +71,21 @@ namespace skynet
        return live_devices_;
      }
 
+     /** \brief Connect to existing devices.
+      */
+      void connect_to_existing_devices()
+      {
+        // create new communicator factories to existing devices
+        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+          gateway_->create_initial_connections();
+        // create new device references
+        for (unsigned i=0; i < comm_factories.size(); i++)
+        {
+          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          add_device(new_device);
+        }
+      }
+      
 
      /** \brief Collect new devices that have connected and add to list of devices.
       */
