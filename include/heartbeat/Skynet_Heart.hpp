@@ -56,6 +56,12 @@ namespace skynet
           std::thread(&skynet::Heart::listen_for_devices, this);
       }
 
+      // DEBUG: Remove this once no longer needed for testing
+      int number_of_connections()
+      {
+        return device_manager_->get_live_devices().size();
+      }
+
       /** \brief Function to send regular heartbeats
        */
       void send_heartbeat() const
