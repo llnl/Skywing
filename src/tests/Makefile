@@ -76,7 +76,7 @@ heartbeat:
 clean:
 	$(RM) run_catch_tests
 	$(RM) data/run_catch_data_tests test_config.txt
-	$(RM) devices/run_catch_devices_tests
+	$(RM) devices/run_catch_devices_tests test_config_dev*.txt
 	$(RM) heartbeat/run_catch_heartbeat_tests
 	$(RM) $(OBJECTS) $(DFILES)
 

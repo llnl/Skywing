@@ -2,6 +2,7 @@
 #define SKYNET_GATEWAY_HPP__
 
 #include "Skynet_CommunicatorFactory.hpp"
+#include "data/Skynet_Configuration.hpp"
 
 namespace skynet
 {
@@ -31,6 +32,14 @@ namespace skynet
       return new_factories;
     }
 
+    /** \brief Create CommunicatorFactory for each device in configuration file.
+     *
+     * \param config Configuration object
+     * \return a vector of CommunicatorFactory objects that are associated with
+     * Devices listed in configuration file.
+     */
+    virtual std::vector<std::unique_ptr<CommunicatorFactory>>
+      create_initial_connections() = 0;
 
   private:
 
