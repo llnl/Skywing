@@ -21,6 +21,7 @@ void *dev1(void *vargp)
     outfile << "skynet_port\t" << SKYNET_PORT_DEV1 << std::endl;
     outfile << "number_of_devices\t0" << std::endl;
     outfile << "address_type\tIPv4" << std::endl;
+    outfile.close();
     std::vector<std::string> comm_config(0);
     std::vector<std::unique_ptr<CommunicatorFactory>> connections;
 
@@ -64,6 +65,7 @@ void *dev2(void *vargp)
     outfile << "address_type\tIPv4" << std::endl;
     outfile << "device1_ip_address\t127.0.0.1" << std::endl;
     outfile << "device1_port\t" << SKYNET_PORT_DEV1 << std::endl;
+    outfile.close();
     std::vector<std::string> comm_config(0);
     std::vector<std::unique_ptr<CommunicatorFactory>> connections;
 
@@ -108,6 +110,7 @@ void *dev3(void *vargp)
     outfile << "device1_port\t" << SKYNET_PORT_DEV1 << std::endl;
     outfile << "device2_ip_address\t127.0.0.1" << std::endl;
     outfile << "device2_port\t" << SKYNET_PORT_DEV2 << std::endl;
+    outfile.close();
     std::vector<std::string> comm_config(0);
     std::vector<std::unique_ptr<CommunicatorFactory>> connections;
 
