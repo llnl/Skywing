@@ -14,7 +14,6 @@ namespace skynet
   class Configuration
   {
   public:
-
     /** \brief Construct a new Configuration.
      *
      * \param filename Specifies configuration filename to be read in
@@ -39,9 +38,17 @@ namespace skynet
 
     std::string get_value(std::string key)
     {
-      return dictionary_[key];
+      if (dictionary_.count(key) > 0)
+        return dictionary_[key];
+      else
+      {
+        std::cout << "Configuration file does not contain key " << key << std::endl;
+        exit(-1);
+      }
     }
 
+    bool has_key(std::string key)
+    { return dictionary_.count(key) > 0; }
 
   private:
 

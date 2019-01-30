@@ -9,11 +9,17 @@ TEST_CASE( "Configuration tests", "[Skynet_Configuration]" )
   outfile << "C\t3" << std::endl;
   outfile.close();
 
-  SECTION( "create Configuration object and check values" )
+  skynet::Configuration config("test_config.txt", "\t");
+
+  SECTION( "test get_value when key exists" )
   {
-    skynet::Configuration config("test_config.txt", "\t");
     REQUIRE( config.get_value("A").compare("1") == 0 );
     REQUIRE( config.get_value("B").compare("2") == 0 );
     REQUIRE( config.get_value("C").compare("3") == 0 );
+  }
+
+  SECTION( "test has_key when key doesn't exist" )
+  {
+    REQUIRE( config.has_key("D") == false );
   }
 }
