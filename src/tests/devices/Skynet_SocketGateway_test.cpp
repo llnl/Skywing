@@ -28,7 +28,7 @@ void *dev1(void *vargp)
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 1" << std::endl;
-    Configuration skynet_config("test_config_dev1.txt", "\t");
+    KeyValueReader skynet_config("test_config_dev1.txt", "\t");
     SocketGateway gateway(skynet_config);
 
     // Have SocketGateway connect to existing devices (there are none)
@@ -71,7 +71,7 @@ void *dev2(void *vargp)
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 2" << std::endl;
-    Configuration skynet_config("test_config_dev2.txt", "\t");
+    KeyValueReader skynet_config("test_config_dev2.txt", "\t");
     SocketGateway gateway(skynet_config);
 
     // Have SocketGateway connect to existing devices (dev1)
@@ -116,7 +116,7 @@ void *dev3(void *vargp)
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 3" << std::endl;
-    Configuration skynet_config("test_config_dev3.txt", "\t");
+    KeyValueReader skynet_config("test_config_dev3.txt", "\t");
     SocketGateway gateway(skynet_config);
 
     // Have SocketGateway connect to existing devices (dev1 and dev2)
