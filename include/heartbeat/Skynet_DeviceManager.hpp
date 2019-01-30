@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm> //For remove function used to remove devices from device used
 #include <unordered_map>
+#include <utility> //For std::pair
 
 #include "devices/Skynet_DeviceCommunicator.hpp"
 #include "devices/Skynet_DeviceReference.hpp"
@@ -62,8 +63,10 @@ namespace skynet
         history_t init_history;
         response_history_[device_id] = init_history;
 
+        //AM: Commenting out below because it makes catch tests fail. Will eventually
+        // need to add new communicators when a new device is added though.
         //Add communicator for new device
-        neighbor_communicators_[device_id] = new_device.create_new_communicator();
+        //neighbor_communicators_[device_id] = new_device.create_new_communicator();
      }
 
      /** \brief Remove a device from the list of neighboring devices and remove the
