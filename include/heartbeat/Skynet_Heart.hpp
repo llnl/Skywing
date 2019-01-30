@@ -158,7 +158,7 @@ namespace skynet
        {
          while (is_device_alive_)
          {
-           device_manager_->collect_new_devices();
+           device_manager_->add_new_connections();
            std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
          }
        }

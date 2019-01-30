@@ -58,12 +58,12 @@ namespace skynet
         //Get device ID to use in setting history and communicator
         id_t device_id = new_device.get_id();
 
-	//Add empty history for new device
+        //Add empty history for new device
         history_t init_history;
         response_history_[device_id] = init_history;
 
-	//Add communicator for new device
-	neighbor_communicators_[device_id] = new_device->create_new_communicator();
+        //Add communicator for new device
+        neighbor_communicators_[device_id] = new_device.create_new_communicator();
      }
 
      /** \brief Remove a device from the list of neighboring devices and remove the
@@ -108,7 +108,6 @@ namespace skynet
           DeviceReference new_device(id_registry_.next_id(),
 				     std::move(comm_factories[i]));
           add_device(new_device);
-	  
         }
       }
      
