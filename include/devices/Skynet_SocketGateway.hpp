@@ -5,6 +5,7 @@
 #include "Skynet_Gateway.hpp"
 #include "Skynet_SocketCommunicatorFactory.hpp"
 #include "Skynet_SocketListener.hpp"
+#include "data/Skynet_KeyValueReader.hpp"
 
 namespace skynet
 {
@@ -20,7 +21,7 @@ namespace skynet
      *
      * \param config The Configuration object for the Skynet instance
      */
-    SocketGateway(Configuration& config) : config_(config)
+    SocketGateway(KeyValueReader& config) : config_(config)
     {
       // first verify configuration
       verify_configuration();
@@ -60,7 +61,7 @@ namespace skynet
         ip_address = config_.get_value(key).c_str();
         // obtain port, if there is no port listed, use skynet_port
         key = "device" + std::to_string(i+1) + "_port";
-        if (config_.has_key(key))
+        if (config_.key_exists(key))
           port = stoi(config_.get_value(key));
         else
           port = skynet_port_;
@@ -123,7 +124,7 @@ namespace skynet
     int type_;
     uint16_t skynet_port_;
     std::unique_ptr<SocketListener> listener_;
-    Configuration& config_;
+    KeyValueReader& config_;
 
   }; // class SocketGateway
 } // namespace skynet

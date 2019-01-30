@@ -3,7 +3,7 @@ include $(SKYNET_DIR)/src/Makefile
 
 # Data classes
 DATA_TESTS = \
-  data/Skynet_Configuration
+  data/Skynet_KeyValueReader
 
 # Devices classes
 DEVICES_TESTS = \

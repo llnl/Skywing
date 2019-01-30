@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
-#include "data/Skynet_Configuration.hpp"
+#include "data/Skynet_KeyValueReader.hpp"
 
-TEST_CASE( "Configuration tests", "[Skynet_Configuration]" )
+TEST_CASE( "KeyValueReader tests", "[Skynet_KeyValueReader]" )
 {
   std::ofstream outfile("test_config.txt");
   outfile << "A\t1" << std::endl;
@@ -9,7 +9,7 @@ TEST_CASE( "Configuration tests", "[Skynet_Configuration]" )
   outfile << "C\t3" << std::endl;
   outfile.close();
 
-  skynet::Configuration config("test_config.txt", "\t");
+  skynet::KeyValueReader config("test_config.txt", "\t");
 
   SECTION( "test get_value when key exists" )
   {
@@ -20,6 +20,6 @@ TEST_CASE( "Configuration tests", "[Skynet_Configuration]" )
 
   SECTION( "test has_key when key doesn't exist" )
   {
-    REQUIRE( config.has_key("D") == false );
+    REQUIRE( config.key_exists("D") == false );
   }
 }
