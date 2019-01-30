@@ -64,11 +64,11 @@ DFILES = $(DATA_DFILES) $(DEVICES_DFILES) $(HEARTBEAT_DFILES) catch_main.cpp.d
 .PHONY: all devices clean
 all:
 	$(MAKE) run_catch_tests
-data:
+data_tests:
 	$(MAKE) run_catch_data_tests
-devices:
+devices_tests:
 	$(MAKE) run_catch_devices_tests
-heartbeat:
+heartbeat_tests:
 	$(MAKE) run_catch_heartbeat_tests
 # <module>:
 #   $(MAKE) run_catch_<module>_tests

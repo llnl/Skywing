@@ -8,7 +8,7 @@
 namespace skynet
 {
   /** \class Configuration
-   * \brief Configuration data for the Skynet Instance
+   * \brief Configuration data for the Skynet instance
    *
    */
   class Configuration
@@ -36,6 +36,11 @@ namespace skynet
       infile.close();
     }
 
+    /** \brief Get value of key from configuration
+     *
+     * \param key Specifies name of the key
+     * \return The value of the specified key
+     */
     std::string get_value(std::string key)
     {
       if (dictionary_.count(key) > 0)
@@ -47,8 +52,31 @@ namespace skynet
       }
     }
 
+    /** \brief Return whether a particular key exists in the configuration
+     *
+     * \param key Specifies name of the key
+     * \return Whether the key exists in the dictionary
+     */
     bool has_key(std::string key)
     { return dictionary_.count(key) > 0; }
+
+    /** \brief Verify that certain keys exist in the configuration and throw an
+     * error if they dont
+     *
+     * \param keys A list of keys to check for
+     */
+
+    void verify_keys(std::vector<std::string>& keys)
+    {
+      for (unsigned i = 0; i < keys.size(); i++)
+      {
+        if (!has_key(keys[i]))
+        {
+          std::cout << "Configuration file is missing key " << keys[i] << std::endl;
+          exit(-1);
+        }
+      }
+    }
 
   private:
 
