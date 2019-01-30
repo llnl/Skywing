@@ -17,10 +17,10 @@ namespace skynet
 {
 
   /** \class DeviceManager
-   *  \brief Abstract class for keeping track of devices
+   *  \brief Class for keeping track of devices
    *
-   * This abstract class provides an interface for keeping
-   * track of neighboring devices and the communication type
+   * This class provides an interface for keeping track
+   * of neighboring devices and the communication type
    * associated with these devices.
    */
    class DeviceManager
@@ -55,10 +55,15 @@ namespace skynet
         //Add new device to neighbors list
         neighbors_.push_back(std::move(new_device));
 
-        //Add empty history for new device
+        //Get device ID to use in setting history and communicator
         id_t device_id = new_device.get_id();
+
+	//Add empty history for new device
         history_t init_history;
         response_history_[device_id] = init_history;
+
+	//Add communicator for new device
+	neighbor_communicators_[device_id] = new_device->create_new_communicator();
      }
 
      /** \brief Remove a device from the list of neighboring devices and remove the
@@ -79,7 +84,7 @@ namespace skynet
      {
         /*AF: again commenting out, issue with types with the Device Reference
        //Use erase on top of remove to shorten vector after removing device
-       neighbors_.erase(std::remove(neighbors_.begin(),neighbors_devices_.end(), old_device),
+       neighbors_.erase(std::remove(neighbors_.begin(),neighbors_.end(), old_device),
 			                 neighbors_.end());
 
 
@@ -88,39 +93,28 @@ namespace skynet
        response_history_.erase(device_id);*/
      }
 
-      /** \brief Collect new devices that have connected and add to list of 
-       *   neighbors
+      /** \brief Get new devices that have connected from the gateway and
+       *   add connections to these devices 
       */
-      void collect_new_devices()
+      void add_new_connections()
       {
-        // collect new communicator factories from gateway
+        // Collect communicator factories for new neighbors from gateway
         std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
           gateway_->collect_new_connections();
-        // create a new device references
+	
+        // Create a device references for new neighbors
         for (unsigned i=0; i < comm_factories.size(); i++)
         {
           DeviceReference new_device(id_registry_.next_id(),
 				     std::move(comm_factories[i]));
           add_device(new_device);
+	  
         }
       }
-
-     void establish_device_connections()
-     {
-       for (auto device = begin(neighbors_); device!=end(neighbors_); ++device)
-       {
-         if (not neighbor_communicators_.count(device->get_id()))
-         {
-	   std::pair<const id_t, std::unique_ptr<DeviceCommunicator>>
-	     p(device->get_id(), device->create_new_communicator());
-	   neighbor_communicators_.insert(std::move(p));
-         }
-       }
-    }
      
-     /** \brief Get devices that the DeviceManager currently believes are live
+     /** \brief Get neighbors to this device
       *
-      * \return a vector of DeviceReferences
+      * \return a vector of DeviceReferences representing this device's neighbors
       */
      const std::vector<DeviceReference>& get_neighbors() const
      {
@@ -161,7 +155,9 @@ namespace skynet
      }
 
    private:
-      std::vector<DeviceReference> neighbors_;
+     //neighbors_ is the set of devices that this device can communicate
+     // with directly (i.e. is adjacent to in the reference graph)
+     std::vector<DeviceReference> neighbors_;
       std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
         neighbor_communicators_;
       std::unique_ptr<Gateway> gateway_;
