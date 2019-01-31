@@ -99,7 +99,7 @@ namespace skynet
       /** \brief Get new devices that have connected from the gateway and
        *   add connections to these devices 
       */
-      void add_new_connections()
+      void respond_to_connection_requests()
       {
         // Collect communicator factories for new neighbors from gateway
         std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
