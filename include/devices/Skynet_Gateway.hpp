@@ -19,7 +19,7 @@ namespace skynet
      * \return a vector of CommunicatorFactory objects that are associated with
      * Devices that have connected since the last time this method was called.
      */
-    std::vector<std::unique_ptr<CommunicatorFactory>> collect_new_connections()
+    std::vector<std::unique_ptr<CommunicatorFactory>> collect_new_connections() const
     {
       std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
       while (client_requesting_connection())
@@ -37,7 +37,7 @@ namespace skynet
      * Devices listed in configuration file.
      */
     virtual std::vector<std::unique_ptr<CommunicatorFactory>>
-      create_initial_connections() = 0;
+      create_initial_connections() const = 0;
 
   private:
 
@@ -45,13 +45,13 @@ namespace skynet
      *
      * \return whether there is a connection request
      */
-    virtual bool client_requesting_connection() = 0;
+    virtual bool client_requesting_connection() const = 0;
 
     /** \brief Create new CommunicatorFactory using a provided DeviceCommunicator
      *
      * \return a unique_ptr to a new CommunicatorFactory
      */
-    virtual std::unique_ptr<CommunicatorFactory> create_new_factory() = 0;
+    virtual std::unique_ptr<CommunicatorFactory> create_new_factory() const = 0;
 
   }; // class Gateway
 } // namespace skynet
