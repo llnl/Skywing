@@ -46,7 +46,7 @@ namespace skynet
      * \return a vector of CommunicatorFactory objects that are associated with
      * Devices listed in the configuration.
      */
-    std::vector<std::unique_ptr<CommunicatorFactory>> create_initial_connections()
+    std::vector<std::unique_ptr<CommunicatorFactory>> create_initial_connections() const
     {
       std::string key;
       const char * ip_address;
@@ -80,7 +80,7 @@ namespace skynet
      *
      * \return whether there is a connection request
      */
-    bool client_requesting_connection()
+    bool client_requesting_connection() const
     { return listener_->count_pending_clients() > 0; }
 
     /** \brief Create new SocketCommunicatorFactory using a provided
@@ -88,7 +88,7 @@ namespace skynet
      *
      * \return a unique_ptr to a new SocketCommunicatorFactory
      */
-    std::unique_ptr<CommunicatorFactory> create_new_factory()
+    std::unique_ptr<CommunicatorFactory> create_new_factory() const
     {
       // create a new SocketListener to be used by SocketCommunicatorFactory
       SocketListener new_listener(type_, skynet_port_+1, true);
