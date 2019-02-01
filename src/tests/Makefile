@@ -1,6 +1,10 @@
 include $(SKYNET_DIR)/src/Makefile
 #--------------------- List of variables for each Module -----------------------
 
+# Data classes
+DATA_TESTS = \
+  data/Skynet_KeyValueReader
+
 # Devices classes
 DEVICES_TESTS = \
   devices/Skynet_SocketGateway
@@ -32,6 +36,10 @@ LIB_FLAGS = -l$(SKYNET_LIBS)
 
 #------------------- List of files to be created for each Module ---------------
 
+# Data lists
+DATA_OBJECTS = $(addsuffix _test.cpp.o, $(DATA_TESTS))
+DATA_DFILES = $(addsuffix _test.cpp.d, $(DATA_TESTS))
+
 # Devices lists
 DEVICES_OBJECTS = $(addsuffix _test.cpp.o, $(DEVICES_TESTS))
 DEVICES_DFILES = $(addsuffix _test.cpp.d, $(DEVICES_TESTS))
@@ -45,8 +53,8 @@ HEARTBEAT_DFILES = $(addsuffix _test.cpp.d, $(HEARTBEAT_TESTS))
 # <Module>_DFILES = $(addsuffix _test.cpp.d, $(<MODULE>_TESTS))
 
 # Master lists ***add additional module lists here***
-OBJECTS = $(DEVICES_OBJECTS) $(HEARTBEAT_OBJECTS) catch_main.cpp.o
-DFILES = $(DEVICES_DFILES) $(HEARTBEAT_DFILES) catch_main.cpp.d
+OBJECTS = $(DATA_OBJECTS) $(DEVICES_OBJECTS) $(HEARTBEAT_OBJECTS) catch_main.cpp.o
+DFILES = $(DATA_DFILES) $(DEVICES_DFILES) $(HEARTBEAT_DFILES) catch_main.cpp.d
 
 #-------------------------------------------------------------------------------
 
@@ -56,18 +64,28 @@ DFILES = $(DEVICES_DFILES) $(HEARTBEAT_DFILES) catch_main.cpp.d
 .PHONY: all devices clean
 all:
 	$(MAKE) run_catch_tests
-devices:
+data_tests:
+	$(MAKE) run_catch_data_tests
+devices_tests:
 	$(MAKE) run_catch_devices_tests
-heartbeat:
+heartbeat_tests:
 	$(MAKE) run_catch_heartbeat_tests
 # <module>:
 #   $(MAKE) run_catch_<module>_tests
 # *** add additional module executables to clean below ***
 clean:
 	$(RM) run_catch_tests
-	$(RM) devices/run_catch_devices_tests
+	$(RM) data/run_catch_data_tests test_config.txt
+	$(RM) devices/run_catch_devices_tests test_config_dev*.txt
 	$(RM) heartbeat/run_catch_heartbeat_tests
 	$(RM) $(OBJECTS) $(DFILES)
+
+# Data rules
+data/%_test.cpp.o: data/%_test.cpp
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+run_catch_data_tests: $(DATA_OBJECTS) catch_main.cpp.o
+	$(CXX) $(CPP_FLAGS) $(CXX_FLAGS) $(LIB_FLAGS) \
+	$(DATA_OBJECTS) catch_main.cpp.o -o data/run_catch_data_tests
 
 # Devices rules
 devices/%_test.cpp.o: devices/%_test.cpp

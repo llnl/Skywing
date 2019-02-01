@@ -17,22 +17,37 @@ using namespace skynet;
 void *dev1(void *vargp)
 {
     // This device starts first and has nobody to connect to
-    std::vector<std::string> config(0);
-    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
+    std::ofstream outfile("test_config_dev1.txt");
+    outfile << "skynet_port\t" << SKYNET_PORT_DEV1 << std::endl;
+    outfile << "number_of_devices\t0" << std::endl;
+    outfile << "address_type\tIPv4" << std::endl;
+    outfile.close();
+    std::vector<std::string> comm_config(0);
+    std::vector<std::unique_ptr<CommunicatorFactory>> connections;
+
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 1" << std::endl;
-    SocketGateway gateway(Socket::IPv4, SKYNET_PORT_DEV1);
+    KeyValueReader skynet_config("test_config_dev1.txt", "\t");
+    SocketGateway gateway(skynet_config);
+
+    // Have SocketGateway connect to existing devices (there are none)
+    connections = gateway.create_initial_connections();
+    while (!connections.empty())
+    {
+      connections.back()->create_new_communicator(comm_config);
+      std::cout << "created initial connection on Device 1" << std::endl;
+      connections.pop_back();
+    }
 
     // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
-        gateway.collect_new_connections();
+      connections = gateway.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back()->create_new_communicator(config);
+        connections.back()->create_new_communicator(comm_config);
         std::cout << "new connection to Device 1" << std::endl;
         connections.pop_back();
       }
@@ -43,32 +58,39 @@ void *dev1(void *vargp)
 
 void *dev2(void *vargp)
 {
-    // This device starts seconds and knows it needs to connect to dev1
-    const char * dev1_ip = "127.0.0.1";
-
-    std::vector<std::string> config(0);
-    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
-
-    // Connect to dev1
-    std::cout << "create factory on Device 2 to Device 1" << std::endl;
-    SocketCommunicatorFactory client_factory(Socket::IPv4, dev1_ip, SKYNET_PORT_DEV1);
-    std::cout << "create communicator on Device 2 to Device 1" << std::endl;
-    comm_list.push_back(client_factory.create_new_communicator(config));
-    std::cout << "Device 2 connected to Device 1" << std::endl;
+    // This device starts second and knows it needs to connect to dev1
+    std::ofstream outfile("test_config_dev2.txt");
+    outfile << "skynet_port\t" << SKYNET_PORT_DEV2 << std::endl;
+    outfile << "number_of_devices\t1" << std::endl;
+    outfile << "address_type\tIPv4" << std::endl;
+    outfile << "device1_ip_address\t127.0.0.1" << std::endl;
+    outfile << "device1_port\t" << SKYNET_PORT_DEV1 << std::endl;
+    outfile.close();
+    std::vector<std::string> comm_config(0);
+    std::vector<std::unique_ptr<CommunicatorFactory>> connections;
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 2" << std::endl;
-    SocketGateway gateway(Socket::IPv4, SKYNET_PORT_DEV2);
+    KeyValueReader skynet_config("test_config_dev2.txt", "\t");
+    SocketGateway gateway(skynet_config);
+
+    // Have SocketGateway connect to existing devices (dev1)
+    connections = gateway.create_initial_connections();
+    while (!connections.empty())
+    {
+      connections.back()->create_new_communicator(comm_config);
+      std::cout << "created initial connection on Device 2" << std::endl;
+      connections.pop_back();
+    }
 
     // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
-        gateway.collect_new_connections();
+      connections = gateway.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back()->create_new_communicator(config);
+        connections.back()->create_new_communicator(comm_config);
         std::cout << "new connection to Device 2" << std::endl;
         connections.pop_back();
       }
@@ -79,40 +101,41 @@ void *dev2(void *vargp)
 
 void *dev3(void *vargp)
 {
-    // This device starts third and knows it needs to connect to dev1 & dev2
-    const char * dev1_ip = "127.0.0.1";
-    const char * dev2_ip = "127.0.0.1";
-
-    std::vector<std::string> config(0);
-    std::vector<std::unique_ptr<DeviceCommunicator>> comm_list;
-
-    // Create one client communicator for dev1
-    std::cout << "create factory on Device 3 to Device 1" << std::endl;
-    SocketCommunicatorFactory client_factory1(Socket::IPv4, dev1_ip, SKYNET_PORT_DEV1);
-    std::cout << "create communicator on Device 3 to Device 1" << std::endl;
-    comm_list.push_back(client_factory1.create_new_communicator(config));
-    std::cout << "Device 3 connected to Device 1" << std::endl;
-
-    // Create second client communicator for dev2
-    std::cout << "create factory on Device 3 to Device 2" << std::endl;
-    SocketCommunicatorFactory client_factory2(Socket::IPv4, dev2_ip, SKYNET_PORT_DEV2);
-    std::cout << "create communicator on Device 3 to Device 2" << std::endl;
-    comm_list.push_back(client_factory2.create_new_communicator(config));
-    std::cout << "Device 3 connect to Device 2" << std::endl;
+    // This device starts third and knows it needs to connect to dev1 and dev2
+    std::ofstream outfile("test_config_dev3.txt");
+    outfile << "skynet_port\t" << SKYNET_PORT_DEV3 << std::endl;
+    outfile << "number_of_devices\t2" << std::endl;
+    outfile << "address_type\tIPv4" << std::endl;
+    outfile << "device1_ip_address\t127.0.0.1" << std::endl;
+    outfile << "device1_port\t" << SKYNET_PORT_DEV1 << std::endl;
+    outfile << "device2_ip_address\t127.0.0.1" << std::endl;
+    outfile << "device2_port\t" << SKYNET_PORT_DEV2 << std::endl;
+    outfile.close();
+    std::vector<std::string> comm_config(0);
+    std::vector<std::unique_ptr<CommunicatorFactory>> connections;
 
     // Create SocketGateway to listen for new clients
     std::cout << "create gateway on Device 3" << std::endl;
-    SocketGateway gateway(SocketCommunicator::IPv4, SKYNET_PORT_DEV3);
+    KeyValueReader skynet_config("test_config_dev3.txt", "\t");
+    SocketGateway gateway(skynet_config);
+
+    // Have SocketGateway connect to existing devices (dev1 and dev2)
+    connections = gateway.create_initial_connections();
+    while (!connections.empty())
+    {
+      connections.back()->create_new_communicator(comm_config);
+      std::cout << "created initial connection on Device 3" << std::endl;
+      connections.pop_back();
+    }
 
     // Periodically have gateway collect new connections
     while (true)
     {
       std::this_thread::sleep_for (std::chrono::seconds(1));
-      std::vector<std::unique_ptr<CommunicatorFactory>> connections =
-        gateway.collect_new_connections();
+      connections = gateway.collect_new_connections();
       while (!connections.empty())
       {
-        connections.back()->create_new_communicator(config);
+        connections.back()->create_new_communicator(comm_config);
         std::cout << "new connection to Device 3" << std::endl;
         connections.pop_back();
       }

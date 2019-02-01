@@ -37,6 +37,7 @@ namespace skynet
     SocketCommunicatorFactory(int type, const char * server_address,
       uint16_t skynet_port) : type_(type), server_address_(server_address)
     {
+      // TODO: implement error catching if this process failes
       is_server = false;
       // connect to Gatekeeper on server device using handshake SocketCommunicator
       SocketCommunicator handshake(type_);
