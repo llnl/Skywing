@@ -29,6 +29,16 @@ namespace skynet
       }
     }
 
+    ~Socket()
+    { close(socket_handle_); }
+
+    /** \brief Delete copy & move constructors and copy & move assignment operators
+     */
+    Socket(const Socket& other) = delete;
+    Socket& operator=(const Socket& other) = delete;
+    Socket(Socket&& other) = delete;
+    Socket& operator=(Socket&& other) = delete;
+
     /** \brief Construct a new Socket.
      *
      * \param address_type Specifies the address type to be used.
@@ -84,23 +94,82 @@ namespace skynet
       listen(socket_handle_, queue_length);
     }
 
-    int get_handle() const
+    /** \brief Connect to a server socket.
+     *
+     * \param server_address The address of the server socket.
+     * \param port Which port number to connect to on the server.
+     */
+    void connect_to_server(const char * server_address, uint16_t port)
     {
-      return socket_handle_;
+      //Socket stucture
+      struct sockaddr_in servaddr;
+      bzero(&servaddr, sizeof(servaddr));
+
+      switch(address_type_)
+      {
+        case Socket::IPv4:
+          servaddr.sin_family = Socket::IPv4;
+          inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
+          break;
+      }
+      servaddr.sin_port = ntohs(port);
+
+      // connect the client socket to server socket
+      if (connect(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
+      {
+        perror("connect");
+        exit(-1);
+      }
     }
 
-    int get_address_type() const
+    std::unique_ptr<Socket> connect_new_socket_to_client()
     {
-      return address_type_;
+      const char * client_address;
+      struct sockaddr_in client_address_struct;
+      socklen_t len = sizeof(client_address_struct);
+
+      // Accept the data packet from client and verification
+      int new_socket_handle = accept(socket_handle_, (struct sockaddr *) &client_address_struct, &len);
+      if (new_socket_handle < 0)
+      {
+        perror("accept");
+        exit(-1);
+      }
+
+      // TODO: actually retrieve address of client
+      switch(address_type_)
+      {
+        case Socket::IPv4:
+          client_address = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
+          break;
+      }
+
+      return std::make_unique<Socket>(address_type_, new_socket_handle, client_address);
     }
 
+    int query_queue()
+    {
+      fd_set set;
+      struct timeval timeout;
+      FD_ZERO(&set);
+      FD_SET(socket_handle_, &set);
+      timeout.tv_sec = 0;
+      timeout.tv_usec = 0;
 
-    ~Socket()
-    { /*close(socket_handle_);*/ } //TODO: figure out why this causes problems
+      return select(socket_handle_+1, &set, NULL, NULL, &timeout);
+    }
 
-    const char * get_address() const
-    { return address_; }
+    void send_message(const void* message, std::size_t message_size) const
+    { write(socket_handle_, message, message_size); }
 
+    void read_message(void* buffer, std::size_t buffer_size) const
+    {
+      if (read(socket_handle_, buffer, buffer_size) == -1)
+      {
+        perror("read");
+        exit(-1);
+      }
+    }
 
   private:
 
@@ -120,6 +189,8 @@ namespace skynet
     int socket_handle_;
     int address_type_;
     const char * address_;
+    char ipv4Buf_[INET_ADDRSTRLEN];
+
   }; // class Socket
 } // namespace skynet
 

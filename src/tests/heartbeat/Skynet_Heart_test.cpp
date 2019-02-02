@@ -10,7 +10,7 @@
 
 TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
 {
-  const uint16_t SKYNET_PORT = 5000;
+  const uint16_t SKYNET_PORT = 6000;
   int IPv4 = skynet::Socket::IPv4;
   // This device starts first and has nobody to connect to
   std::ofstream outfile("test_config.txt");
@@ -43,9 +43,9 @@ TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
 
 TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
 {
-  const uint16_t SKYNET_PORT_T1 = 6000;
-  const uint16_t SKYNET_PORT_T2 = 7000;
-  const uint16_t SKYNET_PORT_T3 = 8000;
+  const uint16_t SKYNET_PORT_T1 = 6100;
+  const uint16_t SKYNET_PORT_T2 = 6200;
+  const uint16_t SKYNET_PORT_T3 = 6300;
   std::ofstream outfile;
   // This heart starts first and has nobody to connect to
   outfile.open("test_config_T1.txt");

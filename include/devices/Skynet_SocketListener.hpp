@@ -23,28 +23,14 @@ namespace skynet
       socket_.set_to_listen(QUEUE_LENGTH);
     }
 
-
     /** \brief Connect a communicator in a pending Device
      *
      * \return a connect DeviceCommunicator
      */
     std::unique_ptr<SocketCommunicator> connect_communicator_to_client()
     {
-      struct sockaddr_in client_address_struct;
-      const char * client_address;
-      int new_socket = connect_new_socket();
-      switch(socket_.get_address_type())
-      {
-        case Socket::IPv4:
-          client_address = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
-          break;
-        default:
-          // this should never be reached because a check in Socket constructor
-          printf("Error in SocketDeviceListener.hpp:89\n");
-          exit(-1);
-      }
-
-      return std::make_unique<SocketCommunicator>(socket_.get_address_type(), new_socket, client_address);
+      std::unique_ptr<Socket> new_socket = std::move(socket_.connect_new_socket_to_client());
+      return std::make_unique<SocketCommunicator>(std::move(new_socket));
     }
 
     /** \brief Count the number of connection requests that are pending.
@@ -52,16 +38,7 @@ namespace skynet
      * \return Number of connection requests that are pending.
      */
     int count_pending_clients()
-    {
-      fd_set set;
-      struct timeval timeout;
-      FD_ZERO(&set);
-      FD_SET(socket_.get_handle(), &set);
-      timeout.tv_sec = 0;
-      timeout.tv_usec = 0;
-
-      return select(socket_.get_handle() + 1, &set, NULL, NULL, &timeout);
-    }
+    { return socket_.query_queue(); }
 
     /** \brief Obtain the port this listener bound to
      *
@@ -70,33 +47,9 @@ namespace skynet
     uint16_t get_port() const
     { return port_; }
 
-    /** \brief Obtain the socket handle for this listener
-     *
-     * \return socket handle
-     */
-    int get_socket_handle() const
-    { return socket_.get_handle(); }
-
   private:
 
-    int connect_new_socket()
-    {
-      struct sockaddr_in client_address_struct;
-      socklen_t len = sizeof(client_address_struct);
-
-      // Accept the data packet from client and verification
-      int new_socket = accept(socket_.get_handle(), (struct sockaddr *) &client_address_struct, &len);
-      if (new_socket < 0)
-      {
-        perror("accept");
-        exit(-1);
-      }
-
-      return new_socket;
-    }
-
     Socket socket_;
-    char ipv4Buf_[INET_ADDRSTRLEN];
     uint16_t port_;
 
   }; // class SocketListener
