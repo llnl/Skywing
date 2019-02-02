@@ -6,7 +6,7 @@
 
 namespace skynet
 {
-  class SocketCommunicator : public DeviceCommunicator, public Socket
+  class SocketCommunicator : public DeviceCommunicator
   {
   public:
 
@@ -14,16 +14,17 @@ namespace skynet
      *
      * \param type Specifies the address type to be used.
      */
-    SocketCommunicator(int type) : Socket(type)
+    SocketCommunicator(int type) : socket_(type)
     {}
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * \param type Specifies the address type to be used.
-     * \param socket Specifies socket handle to existing connected socket
+     * \param address_type Specifies the address type to be used.
+     * \param socket_handle Specifies socket handle to existing connected socket
      * \param address Specifies the address that socket is connected to
      */
-    SocketCommunicator(int type, int socket, const char * address) : Socket(type, socket, address)
+    SocketCommunicator(int address_type, int socket_handle, const char * address) :
+      socket_(address_type, socket_handle, address)
     {}
 
     /** \brief Connect to a server SocketCommunicator.
@@ -37,7 +38,7 @@ namespace skynet
       struct sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
 
-      switch(type_)
+      switch(socket_.get_address_type())
       {
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
@@ -51,7 +52,7 @@ namespace skynet
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
-      if (connect(socket_, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
+      if (connect(socket_.get_handle(), (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
       {
         perror("connect");
         exit(-1);
@@ -63,8 +64,8 @@ namespace skynet
     void do_send_to_(const void* data, std::size_t data_size) const override
     {
       uint16_t networkLen = htons(data_size); // convert to network byte order
-      write(socket_, &networkLen, sizeof(networkLen)); //sends the size of the data first
-      write(socket_, data, data_size); //sends the seralized data
+      write(socket_.get_handle(), &networkLen, sizeof(networkLen)); //sends the size of the data first
+      write(socket_.get_handle(), data, data_size); //sends the seralized data
     }
 
 
@@ -76,13 +77,13 @@ namespace skynet
       // std::cout<<"in receiving "<<std::endl;
 
       uint16_t networkLen;
-      read(socket_, &networkLen, sizeof(networkLen));
+      read(socket_.get_handle(), &networkLen, sizeof(networkLen));
       // std::cout<<"networkLen "<<networkLen<<std::endl;
 
       uint16_t len = ntohs(networkLen); // convert back to host byte order
       char msg[len];
 
-      int a = read(socket_, msg, len);
+      int a = read(socket_.get_handle(), msg, len);
       if(a ==-1){
         std::cout<<"Error in reading data"<<std::endl;
       }
@@ -96,6 +97,8 @@ namespace skynet
       }
       return data;
     }
+
+    Socket socket_;
 
   }; // class SocketCommunicator
 } // namespace skynet

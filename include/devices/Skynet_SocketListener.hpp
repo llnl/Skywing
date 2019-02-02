@@ -6,7 +6,7 @@
 
 namespace skynet
 {
-  class SocketListener : public Socket
+  class SocketListener
   {
   public:
 
@@ -14,50 +14,13 @@ namespace skynet
 
     /** \brief Construct a new SocketListener.
      *
-     * \param type Specifies the address type to be used.
+     * \param address_type Specifies the address type to be used.
      */
-    SocketListener(int type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
-      Socket(type), port_(port)
+    SocketListener(int address_type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
+      socket_(address_type), port_(port)
     {
-      //Socket stucture
-      struct sockaddr_in servaddr;
-      bzero(&servaddr, sizeof(servaddr));
-
-      switch(type_)
-      {
-        case Socket::IPv4:
-          servaddr.sin_family = Socket::IPv4;
-          if (client_address != NULL)
-            inet_pton(Socket::IPv4, client_address, &(servaddr.sin_addr));
-          else
-            servaddr.sin_addr.s_addr = INADDR_ANY;
-          break;
-        default:
-          // this should never be reached because a check in Socket constructor
-          printf("Error in SocketDeviceListener:38\n");
-          exit(-1);
-      }
-
-      bool bound = false;
-      do
-      {
-        servaddr.sin_port = htons(port_);
-        // Binding newly created socket to given IP and verification
-        if (bind(socket_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0)
-          bound = true;
-        else
-        {
-          if (try_other_ports)
-            port_++;
-          else
-          {
-            perror("bind");
-            exit(-1);
-          }
-        }
-      } while (!bound && port_ < UINT16_MAX);
-
-      listen(socket_, QUEUE_LENGTH);
+      socket_.bind_to_port(port_, try_other_ports, client_address);
+      socket_.set_to_listen(QUEUE_LENGTH);
     }
 
 
@@ -70,7 +33,7 @@ namespace skynet
       struct sockaddr_in client_address_struct;
       const char * client_address;
       int new_socket = connect_new_socket();
-      switch(type_)
+      switch(socket_.get_address_type())
       {
         case Socket::IPv4:
           client_address = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
@@ -81,7 +44,7 @@ namespace skynet
           exit(-1);
       }
 
-      return std::make_unique<SocketCommunicator>(type_, new_socket, client_address);
+      return std::make_unique<SocketCommunicator>(socket_.get_address_type(), new_socket, client_address);
     }
 
     /** \brief Count the number of connection requests that are pending.
@@ -93,11 +56,11 @@ namespace skynet
       fd_set set;
       struct timeval timeout;
       FD_ZERO(&set);
-      FD_SET(socket_, &set);
+      FD_SET(socket_.get_handle(), &set);
       timeout.tv_sec = 0;
       timeout.tv_usec = 0;
 
-      return select(socket_ + 1, &set, NULL, NULL, &timeout);
+      return select(socket_.get_handle() + 1, &set, NULL, NULL, &timeout);
     }
 
     /** \brief Obtain the port this listener bound to
@@ -112,7 +75,7 @@ namespace skynet
      * \return socket handle
      */
     int get_socket_handle() const
-    { return socket_; }
+    { return socket_.get_handle(); }
 
   private:
 
@@ -122,7 +85,7 @@ namespace skynet
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      int new_socket = accept(socket_, (struct sockaddr *) &client_address_struct, &len);
+      int new_socket = accept(socket_.get_handle(), (struct sockaddr *) &client_address_struct, &len);
       if (new_socket < 0)
       {
         perror("accept");
@@ -132,6 +95,7 @@ namespace skynet
       return new_socket;
     }
 
+    Socket socket_;
     char ipv4Buf_[INET_ADDRSTRLEN];
     uint16_t port_;
 
