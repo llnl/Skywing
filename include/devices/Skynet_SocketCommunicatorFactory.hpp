@@ -19,10 +19,10 @@ namespace skynet
      * \param type Specifies the address type to be used (IPv4).
      * \param gateway The SocketListener for incoming connections
      */
-    SocketCommunicatorFactory(int type, SocketListener&& listener) :
+    SocketCommunicatorFactory(int type, std::unique_ptr<SocketListener> listener) :
       type_(type)
     {
-      listener_ = std::make_unique<SocketListener>(listener);
+      listener_ = std::move(listener);
       is_server = true;
     }
 

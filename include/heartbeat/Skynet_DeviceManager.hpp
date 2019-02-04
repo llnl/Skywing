@@ -46,6 +46,36 @@ namespace skynet
       */
      ~DeviceManager() = default;
 
+     /** \brief Connect to existing devices.
+      */
+      void connect_to_existing_devices()
+      {
+        // create new communicator factories to existing devices
+        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+          gateway_->create_initial_connections();
+        // create new device references
+        for (unsigned i=0; i < comm_factories.size(); i++)
+        {
+          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          add_device(new_device);
+        }
+      }
+
+
+     /** \brief Collect new devices that have connected and add to list of devices.
+      */
+      void collect_new_devices()
+      {
+        // collect new communicator factories from gateway
+        std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
+          gateway_->collect_new_connections();
+        // create a new device references
+        for (unsigned i=0; i < comm_factories.size(); i++)
+        {
+          DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
+          add_device(new_device);
+        }
+      }
 
      /** \brief Add a device to the list of neighboring devices and initialize its history
       *
@@ -97,14 +127,14 @@ namespace skynet
      }
 
       /** \brief Get new devices that have connected from the gateway and
-       *   add connections to these devices 
+       *   add connections to these devices
       */
       void respond_to_connection_requests()
       {
         // Collect communicator factories for new neighbors from gateway
         std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
           gateway_->collect_new_connections();
-	
+
         // Create a device references for new neighbors
         for (unsigned i=0; i < comm_factories.size(); i++)
         {
@@ -113,7 +143,7 @@ namespace skynet
           add_device(new_device);
         }
       }
-     
+
      /** \brief Get neighbors to this device
       *
       * \return a vector of DeviceReferences representing this device's neighbors

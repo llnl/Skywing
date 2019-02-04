@@ -8,8 +8,8 @@ using namespace skynet;
 
 
 #define SKYNET_PORT_DEV1 5000
-#define SKYNET_PORT_DEV2 6000
-#define SKYNET_PORT_DEV3 7000
+#define SKYNET_PORT_DEV2 5100
+#define SKYNET_PORT_DEV3 5200
 
 // A normal C function that is executed as a thread
 // when its name is specified in pthread_create()

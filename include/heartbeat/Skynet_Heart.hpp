@@ -37,7 +37,6 @@ namespace skynet
        *  \param device_manager type of DeviceManager used by this device
        *  \param property_checker type of PropertyChecker used by this device
        */
-      /*AF: Commented out below statemnet, There are no constuctors for the below items */
       Heart(std::unique_ptr<BeatSender> beat_sender, std::unique_ptr<BeatInterpreter> beat_interpreter,
             std::unique_ptr<PulseTimer> pulse_timer, std::unique_ptr<DeviceManager> device_manager,
             std::unique_ptr<PropertyChecker> property_checker)
@@ -52,8 +51,15 @@ namespace skynet
       /** \brief Begin the heartbeat and run until device dies. */
       void run_heartbeat()
       {
+        device_manager_->connect_to_existing_devices();
         device_listener_thread_ =
           std::thread(&skynet::Heart::listen_for_devices, this);
+      }
+
+      // DEBUG: Remove this once no longer needed for testing
+      int number_of_connections()
+      {
+        return device_manager_->get_neighbors().size();
       }
 
       /** \brief Function to send regular heartbeats

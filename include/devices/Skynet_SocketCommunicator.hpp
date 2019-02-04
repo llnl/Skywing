@@ -6,25 +6,28 @@
 
 namespace skynet
 {
-  class SocketCommunicator : public DeviceCommunicator, public Socket
+  class SocketCommunicator : public DeviceCommunicator
   {
   public:
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * \param type Specifies the address type to be used.
+     * creates a new Socket object
+     *
+     * \param address_type Specifies the address type to be used.
      */
-    SocketCommunicator(int type) : Socket(type)
-    {}
+    SocketCommunicator(int address_type)
+    { socket_ = std::make_unique<Socket>(address_type); }
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * \param type Specifies the address type to be used.
-     * \param socket Specifies socket handle to existing connected socket
+     * uses existing Socket object
+     *
+     * \param socket The existing Socket object
      * \param address Specifies the address that socket is connected to
      */
-    SocketCommunicator(int type, int socket, const char * address) : Socket(type, socket, address)
-    {}
+    SocketCommunicator(std::unique_ptr<Socket> socket)
+    { socket_ = std::move(socket); }
 
     /** \brief Connect to a server SocketCommunicator.
      *
@@ -32,39 +35,15 @@ namespace skynet
      * \param port Which port number to connect to on the server.
      */
     void connect_to_server(const char * server_address, uint16_t port)
-    {
-      //Socket stucture
-      struct sockaddr_in servaddr;
-      bzero(&servaddr, sizeof(servaddr));
-
-      switch(type_)
-      {
-        case Socket::IPv4:
-          servaddr.sin_family = Socket::IPv4;
-          inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
-          break;
-        default:
-          // This should not be reachable because of a check in Socket constructor
-          printf("Error in SocketCommunicator.hpp:41\n");
-          exit(-1);
-      }
-      servaddr.sin_port = ntohs(port);
-
-      // connect the client socket to server socket
-      if (connect(socket_, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
-      {
-        perror("connect");
-        exit(-1);
-      }
-    }
+    { socket_->connect_to_server(server_address, port); }
 
   private:
 
     void do_send_to_(const void* data, std::size_t data_size) const override
     {
       uint16_t networkLen = htons(data_size); // convert to network byte order
-      write(socket_, &networkLen, sizeof(networkLen)); //sends the size of the data first
-      write(socket_, data, data_size); //sends the seralized data
+      socket_->send_message(&networkLen, sizeof(networkLen)); //sends the size of the data first
+      socket_->send_message(data, data_size); //sends the seralized data
     }
 
 
@@ -76,16 +55,13 @@ namespace skynet
       // std::cout<<"in receiving "<<std::endl;
 
       uint16_t networkLen;
-      read(socket_, &networkLen, sizeof(networkLen));
+      socket_->read_message(&networkLen, sizeof(networkLen));
       // std::cout<<"networkLen "<<networkLen<<std::endl;
 
       uint16_t len = ntohs(networkLen); // convert back to host byte order
       char msg[len];
 
-      int a = read(socket_, msg, len);
-      if(a ==-1){
-        std::cout<<"Error in reading data"<<std::endl;
-      }
+      socket_->read_message(msg, len);
       msg[len] = '\0';
 
       //Hack way to get it into the correct format for the serialzier.
@@ -96,6 +72,8 @@ namespace skynet
       }
       return data;
     }
+
+    std::unique_ptr<Socket> socket_;
 
   }; // class SocketCommunicator
 } // namespace skynet
