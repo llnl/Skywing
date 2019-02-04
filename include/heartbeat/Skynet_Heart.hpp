@@ -59,7 +59,7 @@ namespace skynet
       // DEBUG: Remove this once no longer needed for testing
       int number_of_connections()
       {
-        return device_manager_->get_live_devices().size();
+        return device_manager_->get_neighbors().size();
       }
 
       /** \brief Function to send regular heartbeats
@@ -164,7 +164,7 @@ namespace skynet
        {
          while (is_device_alive_)
          {
-           device_manager_->collect_new_devices();
+           device_manager_->respond_to_connection_requests();
            std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
          }
        }
