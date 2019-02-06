@@ -20,20 +20,49 @@ namespace skynet
   */
   class DeviceReference
   {
+
+  public:
+    //Some types that will be used by DeviceReference
+    //NOTE: For the == operator to work below, id_t must be a type for
+    // which comparison is defined.
+    using id_t = unsigned int; //Device ID type
+
+
+  public:
+    // using id_t = unsigned int;
+
   public:
     /** \brief Construct a new \c DeviceReference.
      *
      * \param comm_factory A CommuncatorFactory representing this
      * DeviceReference's communications policy.
      */
-    DeviceReference(std::unique_ptr<CommunicatorFactory> comm_factory)
-      : is_believed_live_(true), comm_factory_(std::move(comm_factory))
+    DeviceReference(id_t device_id,
+		    std::unique_ptr<CommunicatorFactory> comm_factory)
+      : is_believed_live_(true), device_id_(std::move(device_id)),
+	comm_factory_(std::move(comm_factory))
     { }
 
     /** \brief Get if we believe the referred device to be live. */
-    bool get_is_belived_live() const
+    bool get_is_believed_live() const
     { return is_believed_live_; }
 
+    /** \brief Update is_believed_live when new information is gained
+     *   about the device status
+     */
+    void set_is_believed_live(bool status)
+    {
+      is_believed_live_ = status;
+    }
+
+    /** Get device ID */
+    id_t get_id() const
+    {
+      return device_id_;
+    }
+
+    bool operator ==(const DeviceReference& other_device) const
+    { return device_id_ == other_device.get_id(); }
 
     /** \brief Request a new DeviceCommunicator for this DeviceReference.
      * \return A new DeviceCommunicator. */
@@ -44,7 +73,7 @@ namespace skynet
 
   private:
     bool is_believed_live_;
-    id_t device_id_;
+    const id_t device_id_;
     std::unique_ptr<CommunicatorFactory> comm_factory_;
     std::vector<std::string> comm_config_info_;
 

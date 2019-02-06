@@ -4,7 +4,7 @@
 #include "ns3/application-container.h"
 #include "ns3/node-container.h"
 #include "ns3/object-factory.h"
-#include "Ns3_Heart.hpp"
+#include "skyns3/Ns3_Heart.hpp"
 
 namespace ns3
 {
@@ -20,9 +20,34 @@ namespace ns3
     /** \brief Construct a new HeartHelper.
      *
      */
-    HeartHelper()
+    HeartHelper(uint16_t port)
     {
       factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, Address server2, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("ServerAddress2", AddressValue(server2));
+      SetAttribute("Port", UintegerValue(port));
+    }
+
+    HeartHelper(Address server1, Address server2, Address server3, uint16_t port)
+    {
+      factory_.SetTypeId(Heart::GetTypeId());
+      SetAttribute("ServerAddress1", AddressValue(server1));
+      SetAttribute("ServerAddress2", AddressValue(server2));
+      SetAttribute("ServerAddress3", AddressValue(server3));
+      SetAttribute("Port", UintegerValue(port));
     }
 
     /** \brief Install an Ns3_Heart in each Node in a NodeContainer
@@ -43,6 +68,11 @@ namespace ns3
     }
 
   private:
+    void SetAttribute (std::string name, const AttributeValue &value)
+    {
+      factory_.Set (name, value);
+    }
+
     ObjectFactory factory_;
   }; // class HeartHelper
 } // namespace ns3

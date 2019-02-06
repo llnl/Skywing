@@ -2,6 +2,7 @@
 #define SKYNET_SERIALIZER_HPP__
 
 #include <cstddef>
+#include <cstdint>
 #include <type_traits>
 #include <iterator>
 #include <memory>
@@ -22,6 +23,10 @@ namespace skynet
     return static_cast<const void*>(&data);
   }
   inline const void* serialize(const unsigned& data)
+  {
+    return static_cast<const void*>(&data);
+  }
+  inline const void* serialize(const uint16_t& data)
   {
     return static_cast<const void*>(&data);
   }
@@ -76,6 +81,11 @@ namespace skynet
   inline std::size_t get_serialized_size(const unsigned&, const void*)
   {
     return sizeof(unsigned);
+  }
+
+  inline std::size_t get_serialized_size(const uint16_t&, const void*)
+  {
+    return sizeof(uint16_t);
   }
 
   inline std::size_t get_serialized_size(const bool&, const void*)
@@ -142,6 +152,17 @@ namespace skynet
 
     static unsigned deserializeImpl(const char* data)
     { return *(reinterpret_cast<const unsigned*>(data)); }
+  };
+
+
+  template<>
+  struct deserializeImplClass<uint16_t>
+  {
+    static uint16_t deserializeImpl(const std::vector<char>& data)
+    { return *(reinterpret_cast<const uint16_t*>(data.data())); }
+
+    static uint16_t deserializeImpl(const char* data)
+    { return *(reinterpret_cast<const uint16_t*>(data)); }
   };
 
   template<>

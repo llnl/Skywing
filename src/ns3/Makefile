@@ -4,6 +4,7 @@ include $(SKYNET_DIR)/src/Makefile
 NS3_PREFIX = ns3-dev
 NS3_INCLUDE_DIR = $(SKYNET_DIR)/utils/ns3/include/$(NS3_PREFIX)
 NS3_LIB_DIRS = $(SKYNET_DIR)/utils/ns3/lib64 $(SKYNET_DIR)/utils/ns3/lib
+SKYNS3_DIR = $(SKYNET_DIR)/src/ns3/skyns3
 #-------------------------------------------------------------------------------
 
 #--------------- List of variables specific to each simulator ------------------
@@ -22,7 +23,9 @@ UDP_ECHO_LIBS = \
 
 SKYNET_STARTUP_SRC = \
 	skynet_startup.cpp \
-	Ns3_Heart.cpp
+	$(SKYNS3_DIR)/Ns3_Heart.cpp \
+	$(SKYNS3_DIR)/Ns3_SocketCommunicator.cpp
+
 SKYNET_STARTUP_LIBS = \
 	core \
 	network \
@@ -71,8 +74,9 @@ DFILES = $(UDP_ECHO_DFILES) $(SKYNET_STARTUP_DFILES)
 # Phony rules
 .PHONY: all clean
 all:
-	$(MAKE) udp_echo_debug udp_echo_optimized
-	$(MAKE) skynet_startup_debug skynet_startup_optimized
+	$(MAKE) udp_echo_debug
+#	$(MAKE) udp_echo_debug udp_echo_optimized
+#	$(MAKE) skynet_startup_debug skynet_startup_optimized
 clean:
 	$(RM) udp_echo_debug udp_echo_optimized
 	$(RM) skynet_startup_debug skynet_startup_optimized

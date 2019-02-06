@@ -28,10 +28,10 @@ int main (int argc, char *argv[])
   // TODO: comment here
   ns3::CommandLine cmd;
   cmd.Parse (argc, argv);
-  
+
   // set the time resolution of the simulator to nanoseconds
   ns3::Time::SetResolution (ns3::Time::NS);
-  
+
   ns3::LogComponentEnable ("HeartApplication", ns3::LOG_LEVEL_INFO);
 
   // create an ns3 NodeContainer object and then create two ns3 Node objects
@@ -72,14 +72,20 @@ int main (int argc, char *argv[])
   // the association between NetDevice and IP address)
   ns3::Ipv4InterfaceContainer interfaces = address.Assign (devices);
 
-  ns3::HeartHelper heartFactory;
+  ns3::HeartHelper serverHeartFactory(5000);
+  ns3::ApplicationContainer serverHearts = serverHeartFactory.Install (nodes.Get(0));
+  serverHearts.Start(ns3::Seconds(1.0));
+  serverHearts.Stop(ns3::Seconds(10.0));
 
-  ns3::ApplicationContainer hearts = heartFactory.Install (nodes);
+  ns3::HeartHelper clientHeartFactory(interfaces.GetAddress(0), 5000);
+  ns3::ApplicationContainer clientHearts = clientHeartFactory.Install (nodes.Get(1));
+  clientHearts.Start(ns3::Seconds(5.0));
+  clientHearts.Stop(ns3::Seconds(10.0));
 
-  ns3::Simulator::Stop (ns3::Seconds(10.0));
+  //ns3::Simulator::Stop (ns3::Seconds(10.0));
 
   // start simulator and destroy/free the simulator when simulation is complete
-  ns3::Simulator::Run (); 
+  ns3::Simulator::Run ();
   ns3::Simulator::Destroy ();
   return 0;
 }

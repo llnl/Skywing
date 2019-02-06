@@ -12,4 +12,5 @@ if [ $# -lt 1 ]; then
   exit -1
 fi
 
+export DYLD_FALLBACK_LIBRARY_PATH=${SKYNET_DIR}/utils/ns3/lib
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${SKYNET_DIR}/utils/ns3/lib64; ./$1
