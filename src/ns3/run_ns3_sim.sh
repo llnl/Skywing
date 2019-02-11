@@ -4,6 +4,7 @@
 #    ./run_ns3_script.sh <ns3_executable>
 #
 #------------------------------------------------------------------------------
+export DYLD_FALLBACK_LIBRARY_PATH=${SKYNET_DIR}/utils/ns3/lib
 
 # check input
 if [ $# -lt 1 ]; then

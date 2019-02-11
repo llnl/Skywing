@@ -74,8 +74,9 @@ DFILES = $(UDP_ECHO_DFILES) $(SKYNET_STARTUP_DFILES)
 # Phony rules
 .PHONY: all clean
 all:
-	$(MAKE) udp_echo_debug udp_echo_optimized
-	$(MAKE) skynet_startup_debug skynet_startup_optimized
+	$(MAKE) udp_echo_debug
+#	$(MAKE) udp_echo_debug udp_echo_optimized
+#	$(MAKE) skynet_startup_debug skynet_startup_optimized
 clean:
 	$(RM) udp_echo_debug udp_echo_optimized
 	$(RM) skynet_startup_debug skynet_startup_optimized
