@@ -6,5 +6,11 @@ the Catch2 library:
 1) From the Skynet root directory, run 'git submodule init'.
 2) Run 'git submodule update'
 
-At this point, you should be able to compile all tests with 'make all' or 
-tests for a particular MODULE with 'make MODULE'.
+With the above steps complete, you can build and the run either:
+
+1) tests for all modules
+   a) make all
+   b) ./run_catch_tests
+2) tests only for a specific MODULE
+   a) make MODULE_tests
+   b) ./MODULE/run_catch_MODULE_tests
