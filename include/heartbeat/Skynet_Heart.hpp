@@ -14,6 +14,14 @@
 
 namespace skynet
 {
+
+
+    // Declare free functions that will be friend functions of the Heart class
+    class Heart;
+    void start_task_cycle(Heart* heart);
+    void task_cycle(Heart* heart);
+
+
     /** \class Heart
      *  \brief The center of a Skynet instance
      *
@@ -48,28 +56,13 @@ namespace skynet
          is_alive_(false)
        { }
 
-    // TODO: find a better way to do this b/c start_task_cycle needs to be 
-    // declared before activate but should not be public (called by user)
-    private:
-      void start_task_cycle(std::shared_ptr<DeviceManager> device_manager)
-      {
-        device_manager->connect_to_existing_devices();
-        task_cycle_thread_ =
-          std::thread(&skynet::Heart::task_cycle, this, device_manager,
-                      TASK_CYCLE_PAUSE_);
-      }
-
-    public:
-      /** \brief Activate the heart. 
-       *  1) connect to existing devices
-       *  2) start the task cycle thread
+      /** \brief Activate the heart.
       */
-      template<void (Heart::*start_task_cycle_function)(std::shared_ptr<DeviceManager>) 
-               = &Heart::start_task_cycle>
+      template<void (*start_task_cycle_function)(Heart*) = start_task_cycle>
       void activate()
       {
         is_alive_ = true;
-        (this->*start_task_cycle_function)(device_manager_);
+        start_task_cycle_function(this);
       }
 
       // DEBUG: Remove this once no longer needed for testing
@@ -171,35 +164,49 @@ namespace skynet
       }
 
     private:
-         
+
+      /* \brief Start the task cycle, which cycles through all Heart tasks
+       */
+      friend void start_task_cycle(Heart* heart);
+
       /** \brief Cycle through all the tasks for the heart:
        *  1) have Device Manager respond to new Device connection requests
        *  ?) respond to all incoming requests
        *  ?) send heartbeat
        */
-      void task_cycle(std::shared_ptr<DeviceManager> device_manager, int pause) const
-      {
-        while (is_alive_)
-        {
-          device_manager->respond_to_connection_requests();
-          std::this_thread::sleep_for(std::chrono::seconds(pause));
-        }
-      }
-
+      friend void task_cycle(Heart* heart);
 
       std::unique_ptr<BeatSender> beat_sender_;
       std::unique_ptr<BeatInterpreter> beat_interpreter_;
       std::unique_ptr<PulseTimer> pulse_timer_;
-      std::shared_ptr<DeviceManager> device_manager_;
+      std::unique_ptr<DeviceManager> device_manager_;
       std::unique_ptr<PropertyChecker> property_checker_;
       bool is_alive_;
       std::thread task_cycle_thread_;
 
-      // QUESTION: should this be passed in via the constructor?
-      const int TASK_CYCLE_PAUSE_ = 1;
 
     }; // class Heart
 
+    /** \brief Default implementation of start_task_cycle
+     */
+    void start_task_cycle(Heart* heart)
+    {
+      heart->device_manager_->connect_to_existing_devices();
+      heart->task_cycle_thread_ = std::thread(task_cycle, heart);
+    }
+
+    /** \brief Default implementation of task_cycle function
+     */
+    void task_cycle(Heart* heart)
+    {
+      // QUESTION: should this be specified in the configuration file?
+      const int PAUSE = 1;
+      while (heart->is_alive_)
+      {
+        heart->device_manager_->respond_to_connection_requests();
+        std::this_thread::sleep_for(std::chrono::seconds(PAUSE));
+      }
+    }
 } // namespace skynet
 
 #endif /* SKYNET_HEART_HPP__ */
