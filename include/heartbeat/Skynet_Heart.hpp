@@ -14,9 +14,6 @@
 
 namespace skynet
 {
-void     test()
-{ }
-
     /** \class Heart
      *  \brief The center of a Skynet instance
      *
