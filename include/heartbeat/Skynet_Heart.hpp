@@ -57,7 +57,8 @@ namespace skynet
         is_alive_ = true;
         device_manager_->connect_to_existing_devices();
         task_cycle_thread_ =
-          std::thread(&skynet::Heart::task_cycle, this);
+          std::thread(&skynet::Heart::task_cycle, this, device_manager_,
+                      TASK_CYCLE_TIMEOUT);
       }
 
       // DEBUG: Remove this once no longer needed for testing
@@ -165,12 +166,12 @@ namespace skynet
        *  ?) respond to all incoming requests
        *  ?) send heartbeat
        */
-       void task_cycle()
+       void task_cycle(std::shared_ptr<DeviceManager> device_manager, int timeout) const
        {
          while (is_alive_)
          {
-           device_manager_->respond_to_connection_requests();
-           std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
+           device_manager->respond_to_connection_requests();
+           std::this_thread::sleep_for(std::chrono::seconds(timeout));
          }
        }
 
@@ -178,13 +179,13 @@ namespace skynet
       std::unique_ptr<BeatSender> beat_sender_;
       std::unique_ptr<BeatInterpreter> beat_interpreter_;
       std::unique_ptr<PulseTimer> pulse_timer_;
-      std::unique_ptr<DeviceManager> device_manager_;
+      std::shared_ptr<DeviceManager> device_manager_;
       std::unique_ptr<PropertyChecker> property_checker_;
       bool is_alive_;
       std::thread task_cycle_thread_;
 
       // QUESTION: should this be passed in via the constructor?
-      const int LISTEN_FOR_DEVICES_TIMEOUT = 1;
+      const int TASK_CYCLE_TIMEOUT = 1;
 
     }; // class Heart
 
