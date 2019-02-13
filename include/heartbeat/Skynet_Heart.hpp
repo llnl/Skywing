@@ -45,15 +45,19 @@ namespace skynet
          pulse_timer_(std::move(pulse_timer)),
          device_manager_(std::move(device_manager)),
          property_checker_(std::move(property_checker)),
-         is_device_alive_(true)
+         is_alive_(false)
        { }
 
-      /** \brief Begin the heartbeat and run until device dies. */
-      void run_heartbeat()
+      /** \brief Activate the heart. 
+       *  1) connect to existing devices
+       *  2) start the task cycle thread
+      */
+      void activate()
       {
+        is_alive_ = true;
         device_manager_->connect_to_existing_devices();
-        device_listener_thread_ =
-          std::thread(&skynet::Heart::listen_for_devices, this);
+        task_cycle_thread_ =
+          std::thread(&skynet::Heart::task_cycle, this);
       }
 
       // DEBUG: Remove this once no longer needed for testing
@@ -147,22 +151,23 @@ namespace skynet
         }*/
       }
 
-    void terminate_device()
+    void terminate()
     {
-      is_device_alive_ = false;
-      if (device_listener_thread_.joinable())
-        device_listener_thread_.join();
+      is_alive_ = false;
+      if (task_cycle_thread_.joinable())
+        task_cycle_thread_.join();
     }
 
     private:
 
-      /** \brief Listen for new devices to add to list of devices.
-       *
-       *  We expect this to be called as part of a new thread.
+      /** \brief Cycle through all the tasks for the heart:
+       *  1) have Device Manager respond to new Device connection requests
+       *  ?) respond to all incoming requests
+       *  ?) send heartbeat
        */
-       void listen_for_devices()
+       void task_cycle()
        {
-         while (is_device_alive_)
+         while (is_alive_)
          {
            device_manager_->respond_to_connection_requests();
            std::this_thread::sleep_for(std::chrono::seconds(LISTEN_FOR_DEVICES_TIMEOUT));
@@ -175,8 +180,8 @@ namespace skynet
       std::unique_ptr<PulseTimer> pulse_timer_;
       std::unique_ptr<DeviceManager> device_manager_;
       std::unique_ptr<PropertyChecker> property_checker_;
-      bool is_device_alive_; //Indicates if this device is allive
-      std::thread device_listener_thread_;
+      bool is_alive_;
+      std::thread task_cycle_thread_;
 
       // QUESTION: should this be passed in via the constructor?
       const int LISTEN_FOR_DEVICES_TIMEOUT = 1;
