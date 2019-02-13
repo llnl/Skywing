@@ -64,12 +64,12 @@ namespace skynet
        *  1) connect to existing devices
        *  2) start the task cycle thread
       */
-      template<void (Heart::*start_function)(std::shared_ptr<DeviceManager>) 
+      template<void (Heart::*start_task_cycle_function)(std::shared_ptr<DeviceManager>) 
                = &Heart::start_task_cycle>
       void activate()
       {
         is_alive_ = true;
-        (this->*start_function)(device_manager_);
+        (this->*start_task_cycle_function)(device_manager_);
       }
 
       // DEBUG: Remove this once no longer needed for testing
