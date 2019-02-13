@@ -14,6 +14,9 @@
 
 namespace skynet
 {
+void     test()
+{ }
+
     /** \class Heart
      *  \brief The center of a Skynet instance
      *
@@ -48,17 +51,28 @@ namespace skynet
          is_alive_(false)
        { }
 
+    // TODO: find a better way to do this b/c start_task_cycle needs to be 
+    // declared before activate but should not be public (called by user)
+    private:
+      void start_task_cycle(std::shared_ptr<DeviceManager> device_manager)
+      {
+        device_manager->connect_to_existing_devices();
+        task_cycle_thread_ =
+          std::thread(&skynet::Heart::task_cycle, this, device_manager,
+                      TASK_CYCLE_PAUSE_);
+      }
+
+    public:
       /** \brief Activate the heart. 
        *  1) connect to existing devices
        *  2) start the task cycle thread
       */
+      template<void (Heart::*start_function)(std::shared_ptr<DeviceManager>) 
+               = &Heart::start_task_cycle>
       void activate()
       {
         is_alive_ = true;
-        device_manager_->connect_to_existing_devices();
-        task_cycle_thread_ =
-          std::thread(&skynet::Heart::task_cycle, this, device_manager_,
-                      TASK_CYCLE_TIMEOUT);
+        (this->*start_function)(device_manager_);
       }
 
       // DEBUG: Remove this once no longer needed for testing
@@ -152,28 +166,37 @@ namespace skynet
         }*/
       }
 
-    void terminate()
-    {
-      is_alive_ = false;
-      if (task_cycle_thread_.joinable())
-        task_cycle_thread_.join();
-    }
+      void terminate()
+      {
+        is_alive_ = false;
+        if (task_cycle_thread_.joinable())
+          task_cycle_thread_.join();
+      }
 
     private:
+         
+      //void start_task_cycle()
+      //{
+       // device_manager_->connect_to_existing_devices();
+        //task_cycle_thread_ =
+         // std::thread(&skynet::Heart::task_cycle, this, device_manager_,
+          //            TASK_CYCLE_PAUSE_);
+     // }
+
 
       /** \brief Cycle through all the tasks for the heart:
        *  1) have Device Manager respond to new Device connection requests
        *  ?) respond to all incoming requests
        *  ?) send heartbeat
        */
-       void task_cycle(std::shared_ptr<DeviceManager> device_manager, int timeout) const
-       {
-         while (is_alive_)
-         {
-           device_manager->respond_to_connection_requests();
-           std::this_thread::sleep_for(std::chrono::seconds(timeout));
-         }
-       }
+      void task_cycle(std::shared_ptr<DeviceManager> device_manager, int pause) const
+      {
+        while (is_alive_)
+        {
+          device_manager->respond_to_connection_requests();
+          std::this_thread::sleep_for(std::chrono::seconds(pause));
+        }
+      }
 
 
       std::unique_ptr<BeatSender> beat_sender_;
@@ -185,7 +208,7 @@ namespace skynet
       std::thread task_cycle_thread_;
 
       // QUESTION: should this be passed in via the constructor?
-      const int TASK_CYCLE_TIMEOUT = 1;
+      const int TASK_CYCLE_PAUSE_ = 1;
 
     }; // class Heart
 
