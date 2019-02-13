@@ -172,15 +172,6 @@ namespace skynet
 
     private:
          
-      //void start_task_cycle()
-      //{
-       // device_manager_->connect_to_existing_devices();
-        //task_cycle_thread_ =
-         // std::thread(&skynet::Heart::task_cycle, this, device_manager_,
-          //            TASK_CYCLE_PAUSE_);
-     // }
-
-
       /** \brief Cycle through all the tasks for the heart:
        *  1) have Device Manager respond to new Device connection requests
        *  ?) respond to all incoming requests
