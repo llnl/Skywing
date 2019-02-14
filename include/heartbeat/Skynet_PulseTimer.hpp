@@ -36,6 +36,8 @@ namespace skynet
 	       return do_millisecs_to_next_beat_(device);
       }
 
+      virtual ~PulseTimer() = default;
+
     private:
 
       virtual double do_millisecs_to_next_beat_(const DeviceReference& device) const = 0;

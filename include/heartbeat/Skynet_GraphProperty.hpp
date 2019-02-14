@@ -22,6 +22,8 @@ namespace skynet
       {
 	return do_is_property_satisfied(device_manager);
       }
+
+      virtual ~GraphProperty() = default;
 				      
     private:
       virtual bool do_is_property_satisfied(const DeviceManager&

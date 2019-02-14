@@ -31,6 +31,8 @@ namespace skynet
        return do_should_device_remain_(device, device_history);
      }
 
+     virtual ~BeatInterpreter() = default;
+
    private:
     virtual bool do_should_device_remain_(const DeviceReference& device,
       const std::vector<BeatResponse>& device_history) const = 0;
