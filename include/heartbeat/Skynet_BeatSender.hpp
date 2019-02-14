@@ -36,6 +36,8 @@ namespace skynet
        return do_send_heartbeat_(device);
      }
 
+     virtual ~BeatSender() = default;
+
    private:
      virtual BeatResponse do_send_heartbeat_(const DeviceReference& device) const = 0;
 

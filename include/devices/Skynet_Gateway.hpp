@@ -39,6 +39,8 @@ namespace skynet
     virtual std::vector<std::unique_ptr<CommunicatorFactory>>
       create_initial_connections() const = 0;
 
+    virtual ~Gateway() = default;
+
   private:
 
     /** \brief Determine if there is a connection request
