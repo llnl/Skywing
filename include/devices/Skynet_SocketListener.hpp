@@ -29,8 +29,7 @@ namespace skynet
      */
     std::unique_ptr<SocketCommunicator> connect_communicator_to_client()
     {
-      std::unique_ptr<Socket> new_socket = std::move(socket_.connect_new_socket_to_client());
-      return std::make_unique<SocketCommunicator>(std::move(new_socket));
+      return std::make_unique<SocketCommunicator>(socket_.connect_new_socket_to_client());
     }
 
     /** \brief Count the number of connection requests that are pending.

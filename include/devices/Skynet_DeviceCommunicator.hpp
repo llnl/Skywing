@@ -41,6 +41,8 @@ namespace skynet
       return deserialize<T>(pdata);
     }
 
+    virtual ~DeviceCommunicator() = default;
+
   private:
       
     /** \brief Send data to the associated Device. 
