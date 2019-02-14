@@ -17,6 +17,7 @@ TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
   outfile << "skynet_port\t" << SKYNET_PORT << std::endl;
   outfile << "number_of_devices\t0" << std::endl;
   outfile << "address_type\tIPv4" << std::endl;
+  outfile << "task_cycle_pause\t1" << std::endl;
   outfile.close();
   skynet::KeyValueReader skynet_config("test_config.txt", "\t");
 
@@ -27,7 +28,8 @@ TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialDeviceManager>(
                             std::make_unique<skynet::SocketGateway>(skynet_config)
                            ),
-                           std::make_unique<skynet::TrivialPropertyChecker>());
+                          std::make_unique<skynet::TrivialPropertyChecker>(),
+                          skynet_config);
   heart_T1.activate();
 
   std::cout << "Creating Communicator Factory to T1" << std::endl;
@@ -52,6 +54,7 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
   outfile << "skynet_port\t" << SKYNET_PORT_T1 << std::endl;
   outfile << "number_of_devices\t0" << std::endl;
   outfile << "address_type\tIPv4" << std::endl;
+  outfile << "task_cycle_pause\t1" << std::endl;
   outfile.close();
   skynet::KeyValueReader config_T1("test_config_T1.txt", "\t");
   std::cout << "Starting heartbeat on T1" << std::endl;
@@ -61,7 +64,8 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialDeviceManager>(
                             std::make_unique<skynet::SocketGateway>(config_T1)
                            ),
-                           std::make_unique<skynet::TrivialPropertyChecker>());
+                          std::make_unique<skynet::TrivialPropertyChecker>(),
+                          config_T1);
   heart_T1.activate();
 
   // This heart starts second and connects to T1
@@ -71,6 +75,7 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
   outfile << "address_type\tIPv4" << std::endl;
   outfile << "device1_ip_address\t127.0.0.1" << std::endl;
   outfile << "device1_port\t" << SKYNET_PORT_T1 << std::endl;
+  outfile << "task_cycle_pause\t1" << std::endl;
   outfile.close();
   skynet::KeyValueReader config_T2("test_config_T2.txt", "\t");
   std::cout << "Starting heartbeat on T2" << std::endl;
@@ -80,7 +85,8 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialDeviceManager>(
                             std::make_unique<skynet::SocketGateway>(config_T2)
                            ),
-                           std::make_unique<skynet::TrivialPropertyChecker>());
+                          std::make_unique<skynet::TrivialPropertyChecker>(),
+                          config_T2);
   heart_T2.activate();
   std::this_thread::sleep_for (std::chrono::seconds(1));
   REQUIRE( heart_T1.number_of_connections() == 1 );
@@ -95,6 +101,7 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
   outfile << "device1_port\t" << SKYNET_PORT_T1 << std::endl;
   outfile << "device2_ip_address\t127.0.0.1" << std::endl;
   outfile << "device2_port\t" << SKYNET_PORT_T2 << std::endl;
+  outfile << "task_cycle_pause\t1" << std::endl;
   outfile.close();
   skynet::KeyValueReader config_T3("test_config_T3.txt", "\t");
   std::cout << "Starting heartbeat on T3" << std::endl;
@@ -104,7 +111,8 @@ TEST_CASE( "Instantiate 3 hearts in sequence", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialDeviceManager>(
                             std::make_unique<skynet::SocketGateway>(config_T3)
                            ),
-                           std::make_unique<skynet::TrivialPropertyChecker>());
+                          std::make_unique<skynet::TrivialPropertyChecker>(),
+                          config_T3);
   heart_T3.activate();
   std::this_thread::sleep_for (std::chrono::seconds(1));
   REQUIRE( heart_T1.number_of_connections() == 2 );

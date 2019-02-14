@@ -44,17 +44,21 @@ namespace skynet
        *  \param pulse_timer type of PulseTimer used by this device
        *  \param device_manager type of DeviceManager used by this device
        *  \param property_checker type of PropertyChecker used by this device
+       *  \param config The Configuration object for the Skynet instance
        */
       Heart(std::unique_ptr<BeatSender> beat_sender, std::unique_ptr<BeatInterpreter> beat_interpreter,
             std::unique_ptr<PulseTimer> pulse_timer, std::unique_ptr<DeviceManager> device_manager,
-            std::unique_ptr<PropertyChecker> property_checker)
+            std::unique_ptr<PropertyChecker> property_checker, KeyValueReader& config)
        : beat_sender_(std::move(beat_sender)),
          beat_interpreter_(std::move(beat_interpreter)),
          pulse_timer_(std::move(pulse_timer)),
          device_manager_(std::move(device_manager)),
          property_checker_(std::move(property_checker)),
          is_alive_(false)
-       { }
+      {
+        // obtain task_cycle pause from configuration file
+        task_cycle_pause_ = stoi(config.get_value("task_cycle_pause"));
+      }
 
       /** \brief Activate the heart.
       */
@@ -183,6 +187,7 @@ namespace skynet
       std::unique_ptr<PropertyChecker> property_checker_;
       bool is_alive_;
       std::thread task_cycle_thread_;
+      int task_cycle_pause_;
 
 
     }; // class Heart
@@ -199,12 +204,10 @@ namespace skynet
      */
     void task_cycle(Heart* heart)
     {
-      // QUESTION: should this be specified in the configuration file?
-      const int PAUSE = 1;
       while (heart->is_alive_)
       {
         heart->device_manager_->respond_to_connection_requests();
-        std::this_thread::sleep_for(std::chrono::seconds(PAUSE));
+        std::this_thread::sleep_for(std::chrono::seconds(heart->task_cycle_pause_));
       }
     }
 } // namespace skynet
