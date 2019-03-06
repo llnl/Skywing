@@ -6,10 +6,6 @@
 #include "Skynet_SocketCommunicator.hpp"
 #include "Skynet_SocketListener.hpp"
 
-//TODO: remove
-#include <thread>
-
-
 namespace skynet
 {
   class SocketCommunicatorFactory : public CommunicatorFactory
@@ -35,7 +31,6 @@ namespace skynet
       std::unique_ptr<SocketCommunicator> handshake =
         gateway_listener.connect_communicator_to_client();
       handshake->send_to<uint16_t>(listener_->get_port());
-      std::cout << std::this_thread::get_id() << ": Sending port number " << listener_->get_port() << std::endl;
     }
 
     /** \brief Create a new client SocketCommunicatorFactory.
@@ -60,7 +55,6 @@ namespace skynet
       // obtain gateway port on server via server Gatekeeper, then close
       // handshake SocketCommunicator
       server_port_ = handshake.receive_from<uint16_t>();
-      std::cout << std::this_thread::get_id() << ": Received port number " << server_port_ << std::endl;
     }
 
     std::unique_ptr<DeviceCommunicator>

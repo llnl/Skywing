@@ -4,9 +4,6 @@
 #include "Skynet_Socket.hpp"
 #include "Skynet_SocketCommunicator.hpp"
 
-//TODO: remove this
-#include <thread>
-
 namespace skynet
 {
   class SocketListener
@@ -24,7 +21,6 @@ namespace skynet
     {
       port_ = socket_.bind_to_port(port, try_other_ports, client_address);
       socket_.set_to_listen(QUEUE_LENGTH);
-      std::cout << std::this_thread::get_id() << ": created SocketListener housing " << socket_.get_handle() << " on port " << port_ << std::endl;
     }
 
     /** \brief Connect a communicator in a pending Device
@@ -35,10 +31,6 @@ namespace skynet
     {
       return std::make_unique<SocketCommunicator>(socket_);
     }
-
-    // TODO: remove this
-    ~SocketListener()
-    { std::cout << std::this_thread::get_id() << ": destruct SocketListener housing " << socket_.get_handle() << std::endl; }
 
     /** \brief Count the number of connection requests that are pending.
      *

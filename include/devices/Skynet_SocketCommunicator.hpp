@@ -3,7 +3,6 @@
 
 #include "Skynet_DeviceCommunicator.hpp"
 #include "Skynet_Socket.hpp"
-#include <thread>
 
 namespace skynet
 {
@@ -19,7 +18,7 @@ namespace skynet
      * \param address_type Specifies the address type to be used.
      */
     SocketCommunicator(int address_type) : socket_(address_type)
-    { std::cout << std::this_thread::get_id() << ": created SocketCommunicator housing " << socket_.get_handle() << std::endl; }
+    {}
 
     /** \brief Construct a new SocketCommunicator.
      *
@@ -29,7 +28,7 @@ namespace skynet
      * \param listener The Socket that is listening for new connections
      */
     SocketCommunicator(Socket& listener) : socket_(listener)
-    { std::cout << std::this_thread::get_id() << ": created SocketCommunicator housing " << socket_.get_handle() << " from " << listener.get_handle() << std::endl; }
+    {}
 
     /** \brief Connect to a server SocketCommunicator.
      *

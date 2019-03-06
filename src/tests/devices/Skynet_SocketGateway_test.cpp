@@ -14,7 +14,6 @@ bool online;
 
 void dev1()
 {
-  std::cout << "Device 1 started " << std::this_thread::get_id() << std::endl;
   // This device starts first and has nobody to connect to
   std::ofstream outfile("test_config_dev1.txt");
   outfile << "skynet_port\t" << SKYNET_PORT_DEV1 << std::endl;
@@ -45,7 +44,6 @@ void dev1()
   {
     std::this_thread::sleep_for (std::chrono::seconds(1));
     new_factories = gateway.collect_new_connections();
-    if (!new_factories.empty()) std::cout << "***Device 1 found " << new_factories.size() << " new connections" << std::endl;
     for (uint i=0; i < new_factories.size(); i++)
     {
       communicators.push_back(new_factories[i]->create_new_communicator(comm_config));
@@ -60,7 +58,6 @@ void dev1()
 
 void dev2()
 {
-  std::cout << "Device 2 started " << std::this_thread::get_id() << std::endl;
   // This device starts second and knows it needs to connect to dev1
   std::ofstream outfile("test_config_dev2.txt");
   outfile << "skynet_port\t" << SKYNET_PORT_DEV2 << std::endl;
@@ -106,7 +103,6 @@ void dev2()
 
 void dev3()
 {
-  std::cout << "Device 3 started " << std::this_thread::get_id() << std::endl;  
   // This device starts third and knows it needs to connect to dev1 and dev2
   std::ofstream outfile("test_config_dev3.txt");
   outfile << "skynet_port\t" << SKYNET_PORT_DEV3 << std::endl;
@@ -129,10 +125,8 @@ void dev3()
 
   // Have SocketGateway connect to existing devices (dev1 and dev2)
   factories = gateway.create_initial_connections();
-  std::cout << "***Device 3 connecting to " << factories.size() << " devices" << std::endl;
   for (uint i=0; i < factories.size(); i++)
   {
-    std::cout << "***Device 3 creating communicator to factory number " << i << std::endl;
     communicators.push_back(factories[i]->create_new_communicator(comm_config));
     std::cout << "created initial connection on Device 3" << std::endl;
   }

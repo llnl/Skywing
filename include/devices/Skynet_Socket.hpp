@@ -5,8 +5,6 @@
 #include <strings.h>
 #include <unistd.h>
 
-#include <thread>
-
 namespace skynet
 {
   class Socket
@@ -29,8 +27,6 @@ namespace skynet
         perror("socket");
         exit(-1);
       }
-
-      std::cout << std::this_thread::get_id() << ": created client/listener socket " << socket_handle_ << std::endl;
     }
 
     /** \brief Construct a new Socket.
@@ -44,9 +40,7 @@ namespace skynet
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      std::cout << std::this_thread::get_id() << ": ---enter accept on listener " << listener.get_handle() << std::endl;
       socket_handle_ = accept(listener.socket_handle_, (struct sockaddr *) &client_address_struct, &len);
-      std::cout << std::this_thread::get_id() << ": ---exit accept" << std::endl;
       if (socket_handle_ < 0)
       {
         perror("accept");
@@ -59,14 +53,10 @@ namespace skynet
           address_ = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
           break;
       }
-      std::cout << std::this_thread::get_id() << ": created server socket " << socket_handle_ << " from " << listener.socket_handle_ << std::endl;
     }
 
     ~Socket()
-    {
-      std::cout << std::this_thread::get_id() << ": destroyed socket " << socket_handle_ << std::endl;
-      close(socket_handle_);
-    }
+    { close(socket_handle_); }
 
     /** \brief Delete copy & move constructors and copy & move assignment operators
      */
@@ -111,7 +101,7 @@ namespace skynet
           }
         }
       } while (!bound && port < UINT16_MAX);
-      
+
       return port;
     }
 
@@ -171,10 +161,6 @@ namespace skynet
         exit(-1);
       }
     }
-
-    // TODO: Delete this when done
-    int get_handle()
-    { return socket_handle_; }
 
   private:
 
