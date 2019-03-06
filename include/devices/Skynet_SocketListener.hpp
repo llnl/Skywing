@@ -4,6 +4,9 @@
 #include "Skynet_Socket.hpp"
 #include "Skynet_SocketCommunicator.hpp"
 
+//TODO: remove this
+#include <thread>
+
 namespace skynet
 {
   class SocketListener
@@ -17,20 +20,25 @@ namespace skynet
      * \param address_type Specifies the address type to be used.
      */
     SocketListener(int address_type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
-      socket_(address_type), port_(port)
+      socket_(address_type)
     {
-      socket_.bind_to_port(port_, try_other_ports, client_address);
+      port_ = socket_.bind_to_port(port, try_other_ports, client_address);
       socket_.set_to_listen(QUEUE_LENGTH);
+      std::cout << std::this_thread::get_id() << ": created SocketListener housing " << socket_.get_handle() << " on port " << port_ << std::endl;
     }
 
     /** \brief Connect a communicator in a pending Device
      *
-     * \return a connect DeviceCommunicator
+     * \return a connected DeviceCommunicator
      */
     std::unique_ptr<SocketCommunicator> connect_communicator_to_client()
     {
-      return std::make_unique<SocketCommunicator>(socket_.connect_new_socket_to_client());
+      return std::make_unique<SocketCommunicator>(socket_);
     }
+
+    // TODO: remove this
+    ~SocketListener()
+    { std::cout << std::this_thread::get_id() << ": destruct SocketListener housing " << socket_.get_handle() << std::endl; }
 
     /** \brief Count the number of connection requests that are pending.
      *

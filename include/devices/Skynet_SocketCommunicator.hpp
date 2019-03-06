@@ -3,6 +3,7 @@
 
 #include "Skynet_DeviceCommunicator.hpp"
 #include "Skynet_Socket.hpp"
+#include <thread>
 
 namespace skynet
 {
@@ -12,22 +13,23 @@ namespace skynet
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * creates a new Socket object
+     * creates an unconnected Socket object
+     * this communicator acts as a client
      *
      * \param address_type Specifies the address type to be used.
      */
-    SocketCommunicator(int address_type)
-    { socket_ = std::make_unique<Socket>(address_type); }
+    SocketCommunicator(int address_type) : socket_(address_type)
+    { std::cout << std::this_thread::get_id() << ": created SocketCommunicator housing " << socket_.get_handle() << std::endl; }
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * uses existing Socket object
+     * creates a connected Socket object
+     * this communicator acts as a server
      *
-     * \param socket The existing Socket object
-     * \param address Specifies the address that socket is connected to
+     * \param listener The Socket that is listening for new connections
      */
-    SocketCommunicator(std::unique_ptr<Socket> socket)
-    { socket_ = std::move(socket); }
+    SocketCommunicator(Socket& listener) : socket_(listener)
+    { std::cout << std::this_thread::get_id() << ": created SocketCommunicator housing " << socket_.get_handle() << " from " << listener.get_handle() << std::endl; }
 
     /** \brief Connect to a server SocketCommunicator.
      *
@@ -35,15 +37,15 @@ namespace skynet
      * \param port Which port number to connect to on the server.
      */
     void connect_to_server(const char * server_address, uint16_t port)
-    { socket_->connect_to_server(server_address, port); }
+    { socket_.connect_to_server(server_address, port); }
 
   private:
 
     void do_send_to_(const void* data, std::size_t data_size) const override
     {
       uint16_t networkLen = htons(data_size); // convert to network byte order
-      socket_->send_message(&networkLen, sizeof(networkLen)); //sends the size of the data first
-      socket_->send_message(data, data_size); //sends the seralized data
+      socket_.send_message(&networkLen, sizeof(networkLen)); //sends the size of the data first
+      socket_.send_message(data, data_size); //sends the seralized data
     }
 
 
@@ -55,13 +57,13 @@ namespace skynet
       // std::cout<<"in receiving "<<std::endl;
 
       uint16_t networkLen;
-      socket_->read_message(&networkLen, sizeof(networkLen));
+      socket_.read_message(&networkLen, sizeof(networkLen));
       // std::cout<<"networkLen "<<networkLen<<std::endl;
 
       uint16_t len = ntohs(networkLen); // convert back to host byte order
       char msg[len];
 
-      socket_->read_message(msg, len);
+      socket_.read_message(msg, len);
       msg[len] = '\0';
 
       //Hack way to get it into the correct format for the serialzier.
@@ -73,7 +75,7 @@ namespace skynet
       return data;
     }
 
-    std::unique_ptr<Socket> socket_;
+    Socket socket_;
 
   }; // class SocketCommunicator
 } // namespace skynet
