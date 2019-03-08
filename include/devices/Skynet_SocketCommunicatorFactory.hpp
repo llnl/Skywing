@@ -6,7 +6,6 @@
 #include "Skynet_SocketCommunicator.hpp"
 #include "Skynet_SocketListener.hpp"
 
-
 namespace skynet
 {
   class SocketCommunicatorFactory : public CommunicatorFactory
@@ -16,17 +15,28 @@ namespace skynet
   public:
     /** \brief Create a new server SocketCommunicatorFactory.
      *
+     * create a SocketListener for this factory and then use Gateway listener
+     * to create a handshake communicator to communicate factory listening port
+     * back to client
+     *
      * \param type Specifies the address type to be used (IPv4).
-     * \param gateway The SocketListener for incoming connections
+     * \param skynet_port Specifies the port used by the Gateway
      */
-    SocketCommunicatorFactory(int type, std::unique_ptr<SocketListener> listener) :
-      type_(type)
+    SocketCommunicatorFactory(int type, uint16_t skynet_port,
+      SocketListener& gateway_listener)
     {
-      listener_ = std::move(listener);
+      type_ = type;
       is_server = true;
+      listener_ = std::make_unique<SocketListener>(type_, skynet_port+1, true);
+      std::unique_ptr<SocketCommunicator> handshake =
+        gateway_listener.connect_communicator_to_client();
+      handshake->send_to<uint16_t>(listener_->get_port());
     }
 
     /** \brief Create a new client SocketCommunicatorFactory.
+     *
+     * communicate with server SocketCommunicatorFactory to determine what port
+     * the server SocketListener is listening on
      *
      * \param type Specifies the address type to be used (IPv4).
      * \param server_address The IP address of the server to connect to
