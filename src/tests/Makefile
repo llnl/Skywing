@@ -30,8 +30,8 @@ CATCH_CXX_FLAGS =
 #---------------------------- Makefile variables -------------------------------
 CPP_FLAGS = $(SKYNET_CPP_FLAGS)
 CXX_FLAGS = $(CATCH_CXX_FLAGS) $(SKYNET_CXX_FLAGS)
-INCLUDE_FLAGS = -I$(SKYNET_INCLUDE_DIR) -I$(CATCH_INCLUDE_DIR)
-LIB_FLAGS = -l$(SKYNET_LIBS)
+INCLUDE_FLAGS = $(addprefix -I, $(SKYNET_INCLUDE_DIR) $(CATCH_INCLUDE_DIR))
+LIB_FLAGS = $(addprefix -l, $(SKYNET_LIBS))
 #-------------------------------------------------------------------------------
 
 #------------------- List of files to be created for each Module ---------------

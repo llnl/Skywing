@@ -17,7 +17,7 @@ namespace skynet
      * \param address_type Specifies the address type to be used.
      */
     SocketListener(int address_type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
-      socket_(address_type), port_(port)
+      socket_(address_type)
     {
       socket_.bind_to_port(port_, try_other_ports, client_address);
       std::cout<<"Socket lister is binded too = "<< socket_.get_port()<<std::endl;
@@ -27,11 +27,11 @@ namespace skynet
 
     /** \brief Connect a communicator in a pending Device
      *
-     * \return a connect DeviceCommunicator
+     * \return a connected DeviceCommunicator
      */
     std::unique_ptr<SocketCommunicator> connect_communicator_to_client()
     {
-      return std::make_unique<SocketCommunicator>(socket_.connect_new_socket_to_client());
+      return std::make_unique<SocketCommunicator>(socket_);
     }
 
     /** \brief Count the number of connection requests that are pending.

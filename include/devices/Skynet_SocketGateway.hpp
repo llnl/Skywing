@@ -87,8 +87,7 @@ namespace skynet
     bool client_requesting_connection() const
     { return listener_->count_pending_clients() > 0; }
 
-    /** \brief Create new SocketCommunicatorFactory using a provided
-     *  SocketDeviceCommunicator
+    /** \brief Create new SocketCommunicatorFactory
      *
      * \return a unique_ptr to a new SocketCommunicatorFactory
      */
@@ -109,6 +108,7 @@ namespace skynet
       // handshake->close_connection();
       // create SocketCommunicatorFactory
       return std::make_unique<SocketCommunicatorFactory>(type_, std::move(new_listener), new_port, skynet_port_);
+
     }
 
     /** \brief Verify that all required keys are in the configuration
