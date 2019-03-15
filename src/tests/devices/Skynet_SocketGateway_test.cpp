@@ -23,7 +23,6 @@ void dev1()
   std::vector<std::string> comm_config(0);
   std::vector<std::unique_ptr<CommunicatorFactory>> factories;
   std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
-  std::vector<std::unique_ptr<DeviceCommunicator>> communicators;
 
 
   // Create SocketGateway to listen for new clients
@@ -33,11 +32,6 @@ void dev1()
 
   // Have SocketGateway connect to existing devices (there are none)
   factories = gateway.create_initial_connections();
-  for (uint i=0; i < factories.size(); i++)
-  {
-    communicators.push_back(factories[i]->create_new_communicator(comm_config));
-    std::cout << "created initial connection on Device 1" << std::endl;
-  }
 
   // Periodically have gateway collect new connections
   while (online)
@@ -46,13 +40,12 @@ void dev1()
     new_factories = gateway.collect_new_connections();
     for (uint i=0; i < new_factories.size(); i++)
     {
-      communicators.push_back(new_factories[i]->create_new_communicator(comm_config));
-      std::cout << "new connection to Device 1" << std::endl;
       factories.push_back(std::move(new_factories[i]));
+      std::cout << "new connection to Device 1" << std::endl;
     }
   }
 
-  REQUIRE( communicators.size() == 2 );
+  REQUIRE( factories.size() == 2 );
   std::cout << "Device 1 shutting down" << std::endl;
 }
 
@@ -69,7 +62,7 @@ void dev2()
   std::vector<std::string> comm_config(0);
   std::vector<std::unique_ptr<CommunicatorFactory>> factories;
   std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
-  std::vector<std::unique_ptr<DeviceCommunicator>> communicators;
+
 
   // Create SocketGateway to listen for new clients
   std::cout << "create gateway on Device 2" << std::endl;
@@ -78,11 +71,6 @@ void dev2()
 
   // Have SocketGateway connect to existing devices (dev1)
   factories = gateway.create_initial_connections();
-  for (uint i=0; i < factories.size(); i++)
-  {
-    communicators.push_back(factories[i]->create_new_communicator(comm_config));
-    std::cout << "created initial connection on Device 2" << std::endl;
-  }
 
   // Periodically have gateway collect new connections
   while (online)
@@ -91,13 +79,11 @@ void dev2()
     new_factories = gateway.collect_new_connections();
     for (uint i=0; i < new_factories.size(); i++)
     {
-      communicators.push_back(new_factories[i]->create_new_communicator(comm_config));
-      std::cout << "new connection to Device 2" << std::endl;
       factories.push_back(std::move(new_factories[i]));
-    }
+      std::cout << "new connection to Device 2" << std::endl;    }
   }
 
-  REQUIRE( communicators.size() == 2 );
+  REQUIRE( factories.size() == 2 );
   std::cout << "Device 2 shutting down" << std::endl;
 }
 
@@ -116,7 +102,6 @@ void dev3()
   std::vector<std::string> comm_config(0);
   std::vector<std::unique_ptr<CommunicatorFactory>> factories;
   std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
-  std::vector<std::unique_ptr<DeviceCommunicator>> communicators;
 
   // Create SocketGateway to listen for new clients
   std::cout << "create gateway on Device 3" << std::endl;
@@ -125,11 +110,6 @@ void dev3()
 
   // Have SocketGateway connect to existing devices (dev1 and dev2)
   factories = gateway.create_initial_connections();
-  for (uint i=0; i < factories.size(); i++)
-  {
-    communicators.push_back(factories[i]->create_new_communicator(comm_config));
-    std::cout << "created initial connection on Device 3" << std::endl;
-  }
 
   // Periodically have gateway collect new connections
   while (online)
@@ -138,23 +118,22 @@ void dev3()
     new_factories = gateway.collect_new_connections();
     for (uint i=0; i < new_factories.size(); i++)
     {
-      communicators.push_back(new_factories[i]->create_new_communicator(comm_config));
-      std::cout << "new connection to Device 3" << std::endl;
       factories.push_back(std::move(new_factories[i]));
+      std::cout << "new connection to Device 3" << std::endl;
     }
   }
 
-  REQUIRE( communicators.size() == 2 );
+  REQUIRE( factories.size() == 2 );
   std::cout << "Device 3 shutting down" << std::endl;
 }
 
-TEST_CASE( "Communication methods work", "[Skynet_SocketGateway]" )
+TEST_CASE( "Gateway connection methods work", "[Skynet_SocketGateway]" )
 {
   online = true;
 
   std::cout << "Starting Device 1" << std::endl;
   std::thread dev1_thread = std::thread(&dev1);
-  std::this_thread::sleep_for (std::chrono::seconds(5));
+  std::this_thread::sleep_for (std::chrono::seconds(15));
 
   std::cout << "Starting Device 2" << std::endl;
   std::thread dev2_thread = std::thread(&dev2);

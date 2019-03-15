@@ -17,7 +17,7 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    SocketCommunicator(int address_type) : socket_(address_type)
+    SocketCommunicator(int address_type, uint16_t port = 1) : socket_(address_type, port)
     {}
 
     /** \brief Construct a new SocketCommunicator.
@@ -39,24 +39,35 @@ namespace skynet
     void connect_to_server(const char * server_address, uint16_t port)
     { socket_.connect_to_server(server_address, port); }
 
+    /** \brief Close connection and destroy socket.
+     *
+     */
     void close_connection( )
-    { socket_->close_socket(); }
+    { socket_.close_socket(); }
 
+    /** \brief Bind Communicator to a unique port.
+     *
+     * \param port Which port number to ty to connect to on the server.
+     * \param client_address The address of the client SocketCommunicator.
+     */
     void bind_to_port(uint16_t port, const char* client_address = NULL){
-      socket_->bind_to_port(port, true,client_address);
+      socket_.bind_to_port(port, true, client_address);
     }
 
+    /** \brief Set the Communicator to listen for new connectiosn .
+     *
+     * \param queue_length number of messages it will hold.
+     */
     void set_to_listen(int queue_length)
     {
-      socket_->set_to_listen(queue_length);
+      socket_.set_to_listen(queue_length);
     }
 
-    void connect_new_socket_to_client(){
-      socket_->connect_new_socket_to_client(); 
-    }
-
+    /** \brief Get port number.
+     *
+     */
     uint16_t get_port(){
-      return socket_->get_port();
+      return socket_.get_port();
     }
   private:
 

@@ -71,7 +71,7 @@ namespace skynet
 
       // DEBUG: Remove this once no longer needed for testing
       int number_of_connections()
-      {
+      { 
         return device_manager_->get_neighbors().size();
       }
 

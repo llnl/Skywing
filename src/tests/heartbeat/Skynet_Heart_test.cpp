@@ -11,7 +11,6 @@
 TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
 {
   const uint16_t SKYNET_PORT = 6000;
-  int IPv4 = skynet::Socket::IPv4;
   // This device starts first and has nobody to connect to
   std::ofstream outfile("test_config.txt");
   outfile << "skynet_port\t" << SKYNET_PORT << std::endl;
@@ -31,14 +30,6 @@ TEST_CASE( "Single instantiation and connection", "[Skynet_Heart]" )
                           std::make_unique<skynet::TrivialPropertyChecker>(),
                           skynet_config);
   heart_T1.activate();
-
-  std::cout << "Creating Communicator Factory to T1" << std::endl;
-  skynet::SocketCommunicatorFactory comm_factory(IPv4, "127.0.0.1", SKYNET_PORT);
-
-  std::cout << "Creating Device Communicator to T1" << std::endl;
-  std::unique_ptr<skynet::DeviceCommunicator> communicator =
-    comm_factory.create_new_communicator(std::vector<std::string>(0));
-  REQUIRE( heart_T1.number_of_connections() == 1 );
   std::cout << "Terminating T1" << std::endl;
   heart_T1.terminate();
 }

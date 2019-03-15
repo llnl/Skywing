@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <unistd.h>
+#include <iostream>
+
 
 namespace skynet
 {
@@ -17,9 +19,8 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    Socket(int address_type)
+    Socket(int address_type, uint16_t port) : address_type_(address_type), port_(port)
     {
-      address_type_ = address_type;
       confirm_supported_address_type();
       // socket create and verification
       if ((socket_handle_ = socket(address_type_, SOCK_STREAM, 0)) == -1)
@@ -73,14 +74,16 @@ namespace skynet
      */
     Socket(int address_type, int socket_handle, const char* address)
     {
+      std::cout<<" port = "<<port_<<std::endl;
+
       address_type_ = address_type;
       socket_handle_ = socket_handle;
-      port_=0;
       address_ = address;
     }
 
     uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
     {
+      port_ = port;
       //Socket stucture
       struct sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
@@ -139,14 +142,8 @@ namespace skynet
       {
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
-          std::cout<<"server_address"<<server_address<<std::endl;
 
           inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
-          // std::cout<<"In socket connect to server with socket"<<socket_handle_<<std::endl;
-          // std::cout<<"In socket connect to server with socket"<<port<<std::endl;
-          // std::cout<<"In socket connect to server with socket"<<server_address<<std::endl;
-
-
           break;
       }
 
@@ -160,7 +157,6 @@ namespace skynet
       }
     }
 
-<<<<<<< HEAD
     std::unique_ptr<Socket> connect_new_socket_to_client()
     {
       const char * client_address;
@@ -168,8 +164,6 @@ namespace skynet
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      std::cout<<"In socket::connect_new_socket_to_client for port "<<socket_handle_ <<std::endl;
-
       int new_socket_handle = accept(socket_handle_, (struct sockaddr *) &client_address_struct, &len);
       if (new_socket_handle < 0)
       {
@@ -188,8 +182,6 @@ namespace skynet
       return std::make_unique<Socket>(address_type_, new_socket_handle, client_address);
     }
 
-=======
->>>>>>> 1c1db4c73a3f08814c51cba40de904b4fc1a4de6
     int query_queue()
     {
       fd_set set;
@@ -214,11 +206,18 @@ namespace skynet
       }
     }
 
+    /** \brief Closes socket and sets handle to -1.
+     *
+     */
     void close_socket(){
       close(socket_handle_);
       socket_handle_ = -1;
     }
-    int get_port()
+
+    /** \brief Returns port number of socket.
+     *
+     */
+    uint16_t get_port() const
     {
       return port_;
     }

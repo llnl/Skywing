@@ -17,11 +17,9 @@ namespace skynet
      * \param address_type Specifies the address type to be used.
      */
     SocketListener(int address_type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
-      socket_(address_type)
+      socket_(address_type, port)
     {
-      socket_.bind_to_port(port_, try_other_ports, client_address);
-      std::cout<<"Socket lister is binded too = "<< socket_.get_port()<<std::endl;
-      port_ = socket_.get_port();
+      socket_.bind_to_port(socket_.get_port(), try_other_ports, client_address);
       socket_.set_to_listen(QUEUE_LENGTH);
     }
 
@@ -45,13 +43,12 @@ namespace skynet
      *
      * \return port number
      */
-    uint16_t get_port() const
-    { return port_; }
+    uint16_t get_socket_port() const
+    { return socket_.get_port(); }
 
   private:
 
     Socket socket_;
-    uint16_t port_;
 
   }; // class SocketListener
 } // namespace skynet

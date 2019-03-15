@@ -67,9 +67,7 @@ namespace skynet
           port = skynet_port_;
         // create corresponding SocketCommunicatorFactory
 
-        std::cout<<"Device "<< skynet_port_<<" is creating factory for device  "<< port <<std::endl;
-
-
+        // std::cout<<"Device "<< skynet_port_<<" is creating factory for device  "<< port <<std::endl;
         factories.push_back(std::make_unique<SocketCommunicatorFactory>(
           type_, ip_address,port,skynet_port_));
       }
@@ -93,21 +91,28 @@ namespace skynet
      */
     std::unique_ptr<CommunicatorFactory> create_new_factory() const
     {
+      // std::cout<<"Device " <<skynet_port_<< "wants to create new factory"<<std::endl;
+
       // create a new SocketListener to be used by SocketCommunicatorFactory
-      std::cout<<"Device " <<skynet_port_<< "wants to create new factory"<<std::endl;
       std::unique_ptr<SocketListener> new_listener =
         std::make_unique<SocketListener>(type_, skynet_port_+1, true);
       // create a new SocketCommunicator connected to client and send
-      // SocketListener port number back to the client
+      // SocketListener port number back to the client (buffer communication)
       std::unique_ptr<SocketCommunicator> handshake =
         listener_->connect_communicator_to_client();
-      std::cout<< "new port number = "<<new_listener->get_port()<<std::endl;
-      handshake->send_to<uint16_t>(new_listener->get_port());
-      uint16_t new_port = handshake->receive_from<uint16_t>();
-      std::cout<< "new port number = "<<new_port<<std::endl;
-      // handshake->close_connection();
+
+      // Sendthe port_number of socket listener in this decives factory to
+      //the gatway listener of the other devices
+      handshake->send_to<uint16_t>(new_listener->get_socket_port());
+      //get the port number for the socket listener in other devices factory
+      uint16_t listener_on_factory_port = handshake->receive_from<uint16_t>();
+
+      //Close socket that was used as a buffer
+      handshake->close_connection();
+
       // create SocketCommunicatorFactory
-      return std::make_unique<SocketCommunicatorFactory>(type_, std::move(new_listener), new_port, skynet_port_);
+      return std::make_unique<SocketCommunicatorFactory>(type_,
+        std::move(new_listener), listener_on_factory_port, skynet_port_);
 
     }
 
