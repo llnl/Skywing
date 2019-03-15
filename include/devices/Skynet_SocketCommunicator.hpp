@@ -34,9 +34,29 @@ namespace skynet
      * \param server_address The address of the server SocketCommunicator.
      * \param port Which port number to connect to on the server.
      */
+
     void connect_to_server(const char * server_address, uint16_t port)
     { socket_->connect_to_server(server_address, port); }
 
+    void close_connection( )
+    { socket_->close_socket(); }
+
+    void bind_to_port(uint16_t port, const char* client_address = NULL){
+      socket_->bind_to_port(port, true,client_address);
+    }
+
+    void set_to_listen(int queue_length)
+    {
+      socket_->set_to_listen(queue_length);
+    }
+
+    void connect_new_socket_to_client(){
+      socket_->connect_new_socket_to_client(); 
+    }
+
+    uint16_t get_port(){
+      return socket_->get_port();
+    }
   private:
 
     void do_send_to_(const void* data, std::size_t data_size) const override

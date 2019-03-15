@@ -35,6 +35,10 @@ namespace skynet
     virtual std::unique_ptr<DeviceCommunicator>
     create_new_communicator(std::vector<std::string> comm_config_info) = 0;
 
+    virtual std::unique_ptr<DeviceCommunicator>
+    listen_for_new_request() = 0;
+
+
     virtual ~CommunicatorFactory() = default;
 
   }; // class CommunicatorFactory

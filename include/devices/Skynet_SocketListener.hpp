@@ -20,6 +20,8 @@ namespace skynet
       socket_(address_type), port_(port)
     {
       socket_.bind_to_port(port_, try_other_ports, client_address);
+      std::cout<<"Socket lister is binded too = "<< socket_.get_port()<<std::endl;
+      port_ = socket_.get_port();
       socket_.set_to_listen(QUEUE_LENGTH);
     }
 

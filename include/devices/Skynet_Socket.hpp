@@ -30,7 +30,7 @@ namespace skynet
     }
 
     ~Socket()
-    { close(socket_handle_); }
+    { close(socket_handle_);socket_handle_ = -1; }
 
     /** \brief Delete copy & move constructors and copy & move assignment operators
      */
@@ -49,6 +49,7 @@ namespace skynet
     {
       address_type_ = address_type;
       socket_handle_ = socket_handle;
+      port_=0;
       address_ = address;
     }
 
@@ -73,6 +74,7 @@ namespace skynet
       do
       {
         servaddr.sin_port = htons(port);
+        port_ = port;
         // Binding newly created socket to given IP and verification
         if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0)
           bound = true;
@@ -109,9 +111,17 @@ namespace skynet
       {
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
+          std::cout<<"server_address"<<server_address<<std::endl;
+
           inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
+          // std::cout<<"In socket connect to server with socket"<<socket_handle_<<std::endl;
+          // std::cout<<"In socket connect to server with socket"<<port<<std::endl;
+          // std::cout<<"In socket connect to server with socket"<<server_address<<std::endl;
+
+
           break;
       }
+
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
@@ -129,6 +139,8 @@ namespace skynet
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
+      std::cout<<"In socket::connect_new_socket_to_client for port "<<socket_handle_ <<std::endl;
+
       int new_socket_handle = accept(socket_handle_, (struct sockaddr *) &client_address_struct, &len);
       if (new_socket_handle < 0)
       {
@@ -171,6 +183,14 @@ namespace skynet
       }
     }
 
+    void close_socket(){
+      close(socket_handle_);
+      socket_handle_ = -1;
+    }
+    int get_port()
+    {
+      return port_;
+    }
   private:
 
     /** \brief Confirm that this object's address type is supported.
@@ -188,6 +208,7 @@ namespace skynet
 
     int socket_handle_;
     int address_type_;
+    uint16_t port_;
     const char * address_;
     char ipv4Buf_[INET_ADDRSTRLEN];
 
