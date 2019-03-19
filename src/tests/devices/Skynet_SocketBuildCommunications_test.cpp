@@ -7,8 +7,8 @@
 using namespace skynet;
 
 
-#define SKYNET_PORT_DEV1 4000
-#define SKYNET_PORT_DEV2 4100
+#define SKYNET_PORT_DEV1 5000
+#define SKYNET_PORT_DEV2 5100
 
 // A normal C function that is executed as a thread
 // when its name is specified in pthread_create()
@@ -52,13 +52,24 @@ void device1()
 
     /* Create new Socket Communicators from the constucted factories */
     std::cout<<"Device 1 is creating communicators...... "<<std::endl;
-    for(int i = 0; i<factories.size(); i++){
+    for(uint16_t i = 0; i<factories.size(); i++){
       commincators.push_back(factories[i]->create_new_communicator(comm_config));
     }
 
-    /*Check that one Socket Communicatior was created */
+    std::cout << "Device 1 is checking if factories have requests...." << std::endl;
+
+    /* Create new Socket Communicators from the constucted factories */
+    for(uint16_t i = 0; i<factories.size(); i++){
+      std::vector<std::unique_ptr<DeviceCommunicator>> new_commincators
+        = factories[i]->create_requested_communicators();
+      for(uint16_t j = 0; j<new_commincators.size(); j++){
+        commincators.push_back(std::move(new_commincators[j]));
+      }
+    }
+
+    /*Check that two Socket Communicatiors were created */
     std::cout<<"Device 1 has "<<commincators.size()<< " Socket Communicators"<<std::endl;
-    REQUIRE( commincators.size() == 1 );
+    REQUIRE( commincators.size() == 2 );
 
 
 }
@@ -91,14 +102,22 @@ void device2()
     std::cout << "Device 2 is checking if factories have requests...." << std::endl;
 
     /* Create new Socket Communicators from the constucted factories */
-    for(int i = 0; i<factories.size(); i++){
-      commincators.push_back(factories[i]->listen_for_new_request());
+    for(uint16_t i = 0; i<factories.size(); i++){
+      std::vector<std::unique_ptr<DeviceCommunicator>> new_commincators
+        = factories[i]->create_requested_communicators();
+      for(uint j = 0; j<new_commincators.size(); j++){
+        commincators.push_back(std::move(new_commincators[j]));
+      }
     }
 
-    /*Check that one Socket Communicatior was created */
 
+    std::cout<<"Device 2 is creating communicators...... "<<std::endl;
+    for(uint16_t i = 0; i<factories.size(); i++){
+      commincators.push_back(factories[i]->create_new_communicator(comm_config));
+    }
     std::cout<<"Device 2 has "<<commincators.size()<< " Socket Communicators"<<std::endl;
-    REQUIRE( commincators.size() == 1 );
+    /*Check that two Socket Communicatiors were created */
+    REQUIRE( commincators.size() == 2 );
 
 }
 

@@ -6,9 +6,9 @@
 using namespace skynet;
 
 
-#define SKYNET_PORT_DEV1 5000
-#define SKYNET_PORT_DEV2 5100
-#define SKYNET_PORT_DEV3 5200
+#define SKYNET_PORT_DEV1 4000
+#define SKYNET_PORT_DEV2 4100
+#define SKYNET_PORT_DEV3 4200
 
 bool online;
 
@@ -133,7 +133,7 @@ TEST_CASE( "Gateway connection methods work", "[Skynet_SocketGateway]" )
 
   std::cout << "Starting Device 1" << std::endl;
   std::thread dev1_thread = std::thread(&dev1);
-  std::this_thread::sleep_for (std::chrono::seconds(15));
+  std::this_thread::sleep_for (std::chrono::seconds(5));
 
   std::cout << "Starting Device 2" << std::endl;
   std::thread dev2_thread = std::thread(&dev2);

@@ -39,36 +39,8 @@ namespace skynet
     void connect_to_server(const char * server_address, uint16_t port)
     { socket_.connect_to_server(server_address, port); }
 
-    /** \brief Close connection and destroy socket.
-     *
-     */
-    void close_connection( )
-    { socket_.close_socket(); }
 
-    /** \brief Bind Communicator to a unique port.
-     *
-     * \param port Which port number to ty to connect to on the server.
-     * \param client_address The address of the client SocketCommunicator.
-     */
-    void bind_to_port(uint16_t port, const char* client_address = NULL){
-      socket_.bind_to_port(port, true, client_address);
-    }
 
-    /** \brief Set the Communicator to listen for new connectiosn .
-     *
-     * \param queue_length number of messages it will hold.
-     */
-    void set_to_listen(int queue_length)
-    {
-      socket_.set_to_listen(queue_length);
-    }
-
-    /** \brief Get port number.
-     *
-     */
-    uint16_t get_port(){
-      return socket_.get_port();
-    }
   private:
 
     void do_send_to_(const void* data, std::size_t data_size) const override

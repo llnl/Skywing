@@ -91,28 +91,21 @@ namespace skynet
      */
     std::unique_ptr<CommunicatorFactory> create_new_factory() const
     {
-      // std::cout<<"Device " <<skynet_port_<< "wants to create new factory"<<std::endl;
-
-      // create a new SocketListener to be used by SocketCommunicatorFactory
-      std::unique_ptr<SocketListener> new_listener =
-        std::make_unique<SocketListener>(type_, skynet_port_+1, true);
+      // create SocketCommunicatorFactory
+      std::unique_ptr<SocketCommunicatorFactory> new_commfactory = std::make_unique<SocketCommunicatorFactory>(type_, 1, skynet_port_);
       // create a new SocketCommunicator connected to client and send
       // SocketListener port number back to the client (buffer communication)
       std::unique_ptr<SocketCommunicator> handshake =
         listener_->connect_communicator_to_client();
 
       // Sendthe port_number of socket listener in this decives factory to
-      //the gatway listener of the other devices
-      handshake->send_to<uint16_t>(new_listener->get_socket_port());
-      //get the port number for the socket listener in other devices factory
-      uint16_t listener_on_factory_port = handshake->receive_from<uint16_t>();
+      // the gatway listener of the other devices
+      handshake->send_to<uint16_t>(new_commfactory->get_port_listener_remote_factory());
+      // Get the port number for the socket listener in other devices factory
+      // and update comummication factory information
+      new_commfactory->update_port_listener_remote_factory(handshake->receive_from<uint16_t>());
 
-      //Close socket that was used as a buffer
-      handshake->close_connection();
-
-      // create SocketCommunicatorFactory
-      return std::make_unique<SocketCommunicatorFactory>(type_,
-        std::move(new_listener), listener_on_factory_port, skynet_port_);
+      return new_commfactory;
 
     }
 

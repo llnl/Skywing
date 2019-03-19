@@ -36,6 +36,7 @@ namespace skynet
     */
     Socket(Socket& listener)
     {
+      port_ = 7000;
       address_type_ = listener.address_type_;
       struct sockaddr_in client_address_struct;
       socklen_t len = sizeof(client_address_struct);
@@ -72,18 +73,19 @@ namespace skynet
      * \param socket_handle Specifies socket handle to existing connected socket
      * \param address Specifies the address that socket is connected to
      */
-    Socket(int address_type, int socket_handle, const char* address)
-    {
-      std::cout<<" port = "<<port_<<std::endl;
-
-      address_type_ = address_type;
-      socket_handle_ = socket_handle;
-      address_ = address;
-    }
+    // Socket(int address_type, int socket_handle, const char* address)
+    // {
+    //   std::cout<<" port = "<<port_<<std::endl;
+    //
+    //   address_type_ = address_type;
+    //   socket_handle_ = socket_handle;
+    //   address_ = address;
+    // }
 
     uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
     {
       port_ = port;
+
       //Socket stucture
       struct sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
@@ -103,10 +105,10 @@ namespace skynet
       do
       {
         servaddr.sin_port = htons(port);
-        port_ = port;
         // Binding newly created socket to given IP and verification
-        if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0)
+        if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0){
           bound = true;
+        }
         else
         {
           if (try_other_ports)
@@ -119,6 +121,7 @@ namespace skynet
         }
       } while (!bound && port < UINT16_MAX);
 
+      port_ = port;
       return port;
     }
 
@@ -155,31 +158,6 @@ namespace skynet
         perror("connect");
         exit(-1);
       }
-    }
-
-    std::unique_ptr<Socket> connect_new_socket_to_client()
-    {
-      const char * client_address;
-      struct sockaddr_in client_address_struct;
-      socklen_t len = sizeof(client_address_struct);
-
-      // Accept the data packet from client and verification
-      int new_socket_handle = accept(socket_handle_, (struct sockaddr *) &client_address_struct, &len);
-      if (new_socket_handle < 0)
-      {
-        perror("accept");
-        exit(-1);
-      }
-
-      // TODO: actually retrieve address of client
-      switch(address_type_)
-      {
-        case Socket::IPv4:
-          client_address = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
-          break;
-      }
-
-      return std::make_unique<Socket>(address_type_, new_socket_handle, client_address);
     }
 
     int query_queue()

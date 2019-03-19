@@ -21,14 +21,18 @@ namespace skynet
      *
      * \param type Specifies the address type to be used (IPv4).
      * \param skynet_port Specifies the port used by the Gateway
+     * \param listener_on_factory_port_  Specifies the port for the other
+     *    device's SocketListener that is held in the respective SocketCommunicatorFactory
      */
-     SocketCommunicatorFactory(int type, std::unique_ptr<SocketListener> listener, uint16_t listener_on_factory_port, uint16_t skynet_port) :
-      type_(type),skynet_port_(skynet_port), listener_on_factory_port_(listener_on_factory_port)
+     SocketCommunicatorFactory(int type, uint16_t port_listener_remote_factory, uint16_t skynet_port) :
+      type_(type), port_listener_remote_factory_(port_listener_remote_factory)
 
     {
+      local_port_ = skynet_port;
       type_ = type;
-      is_server = true;
-      listener_ = std::make_unique<SocketListener>(type_, skynet_port+1, true);
+      // create a new SocketListener to be used by SocketCommunicatorFactory
+      listener_= std::make_unique<SocketListener>(type_, skynet_port+1, true);
+
     }
 
     /** \brief Create a new client SocketCommunicatorFactory.
@@ -43,22 +47,27 @@ namespace skynet
      *
      */
     SocketCommunicatorFactory(int type, const char * server_address,
-      uint16_t skynet_port_of_connecting_device,  uint16_t skynet_port) : type_(type), server_address_(server_address), skynet_port_(skynet_port)
+      uint16_t skynet_port_of_connecting_device,  uint16_t skynet_port) : type_(type), server_address_(server_address)
     {
       // TODO: implement error catching if this process failes
-      is_server = false;
       // connect to Gatekeeper on server device using handshake SocketCommunicator
+      local_port_ = skynet_port;
       SocketCommunicator handshake(type_);
       handshake.connect_to_server(server_address_, skynet_port_of_connecting_device);
-      listener_on_factory_port_ = handshake.receive_from<uint16_t>();
+      port_listener_remote_factory_ = handshake.receive_from<uint16_t>();
 
-      listener_ = std::make_unique<SocketListener>(type_, skynet_port_+1, true);
+      listener_ = std::make_unique<SocketListener>(type_, skynet_port+1, true);
 
       // obtain gateway port on server via server Gatekeeper, then close
       // handshake SocketCommunicator
       handshake.send_to<uint16_t>(listener_->get_socket_port());
-      handshake.close_connection();
 
+    }
+
+
+
+    void update_port_listener_remote_factory(uint16_t port_listener_remote_factory){
+      port_listener_remote_factory_= port_listener_remote_factory;
     }
 
 
@@ -71,7 +80,7 @@ namespace skynet
       // connect to new Socket Communicator with Socket Factores using
       // handshake SocketCommunicator
       SocketCommunicator handshake(type_);
-      handshake.connect_to_server(server_address_, listener_on_factory_port_);
+      handshake.connect_to_server(server_address_, port_listener_remote_factory_);
 
       // Wait till you have a response from other device factory listener
       // to get port number of new Socket Communicator
@@ -91,8 +100,6 @@ namespace skynet
 
       // Send response back that connection occured and close connection
        handshake.send_to<int>(-1);
-       handshake.close_connection();
-
 
         return new_communicator;
     }
@@ -101,9 +108,11 @@ namespace skynet
      * Factory and then create Communicator.
      *
      */
-    std::unique_ptr<DeviceCommunicator>
-    listen_for_new_request()
+    std::vector<std::unique_ptr<DeviceCommunicator>>
+    create_requested_communicators()
     {
+
+      std::vector<std::unique_ptr<DeviceCommunicator>> new_communicator;
       // connect to other Socket Factory using this factories listener and
       // see if there are any connection requests
       // handshake SocketCommunicator
@@ -112,7 +121,7 @@ namespace skynet
 
         // Create new listener to be the bridge and listen to new connections
         std::unique_ptr<SocketListener> new_listener =
-          std::make_unique<SocketListener>(type_, skynet_port_+1, true);
+          std::make_unique<SocketListener>(type_, 1, true);
 
           //send listener port
           handshake->send_to<uint16_t>(new_listener->get_socket_port());
@@ -128,22 +137,26 @@ namespace skynet
         }
 
         // Conect to the client with a new communicator
-        std::unique_ptr<SocketCommunicator> new_communicator =
-            new_listener->connect_communicator_to_client();
+        new_communicator.push_back(new_listener->connect_communicator_to_client());
 
         //close handshake
-        handshake->close_connection();
         return new_communicator;
       // }
+    }
+
+    uint16_t get_port_listener_remote_factory() const
+    {
+      // std::cout<<"local_port "<< local_port_<<" port = "<<listener_->get_socket_port()<<std::endl;
+      return listener_->get_socket_port();
     }
 
   private:
 
     int type_;
     const char * server_address_ = "127.0.0.1";
-    bool is_server;
-    uint16_t skynet_port_;
-    uint16_t listener_on_factory_port_;
+    uint16_t local_port_;
+    //The port number of the SocketListener in the corresponding device's SocketCommunicatorFactory
+    uint16_t port_listener_remote_factory_;
     std::unique_ptr<SocketListener> listener_;
   }; // SocketCommunicatorFactory
 } // namespace skynet
