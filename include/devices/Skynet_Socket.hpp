@@ -36,7 +36,6 @@ namespace skynet
     */
     Socket(Socket& listener)
     {
-      port_ = 7000;
       address_type_ = listener.address_type_;
       struct sockaddr_in client_address_struct;
       socklen_t len = sizeof(client_address_struct);
@@ -84,7 +83,6 @@ namespace skynet
 
     uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
     {
-      port_ = port;
 
       //Socket stucture
       struct sockaddr_in servaddr;
@@ -108,11 +106,13 @@ namespace skynet
         // Binding newly created socket to given IP and verification
         if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0){
           bound = true;
+          port_ = port;
         }
         else
         {
-          if (try_other_ports)
+          if (try_other_ports){
             port++;
+          }
           else
           {
             perror("bind");
@@ -121,7 +121,6 @@ namespace skynet
         }
       } while (!bound && port < UINT16_MAX);
 
-      port_ = port;
       return port;
     }
 
