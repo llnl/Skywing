@@ -183,13 +183,6 @@ namespace skynet
       }
     }
 
-    /** \brief Closes socket and sets handle to -1.
-     *
-     */
-    void close_socket(){
-      close(socket_handle_);
-      socket_handle_ = -1;
-    }
 
     /** \brief Returns port number of socket.
      *

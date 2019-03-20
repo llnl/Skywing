@@ -153,7 +153,7 @@ namespace skynet
   private:
 
     int type_;
-    const char * server_address_ = "127.0.0.1";
+    const char * server_address_ = " ";
     uint16_t local_port_;
     //The port number of the SocketListener in the corresponding device's SocketCommunicatorFactory
     uint16_t port_listener_remote_factory_;
