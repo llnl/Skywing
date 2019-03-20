@@ -66,20 +66,6 @@ namespace skynet
     Socket(Socket&& other) = delete;
     Socket& operator=(Socket&& other) = delete;
 
-    /** \brief Construct a new Socket.
-     *
-     * \param address_type Specifies the address type to be used.
-     * \param socket_handle Specifies socket handle to existing connected socket
-     * \param address Specifies the address that socket is connected to
-     */
-    // Socket(int address_type, int socket_handle, const char* address)
-    // {
-    //   std::cout<<" port = "<<port_<<std::endl;
-    //
-    //   address_type_ = address_type;
-    //   socket_handle_ = socket_handle;
-    //   address_ = address;
-    // }
 
     uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
     {
