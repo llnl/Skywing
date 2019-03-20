@@ -17,7 +17,7 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    SocketCommunicator(int address_type) : socket_(address_type)
+    SocketCommunicator(int address_type, uint16_t port = 1) : socket_(address_type, port)
     {}
 
     /** \brief Construct a new SocketCommunicator.
@@ -35,8 +35,11 @@ namespace skynet
      * \param server_address The address of the server SocketCommunicator.
      * \param port Which port number to connect to on the server.
      */
+
     void connect_to_server(const char * server_address, uint16_t port)
     { socket_.connect_to_server(server_address, port); }
+
+
 
   private:
 

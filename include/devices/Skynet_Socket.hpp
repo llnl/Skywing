@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <unistd.h>
+#include <iostream>
+
 
 namespace skynet
 {
@@ -17,9 +19,8 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    Socket(int address_type)
+    Socket(int address_type, uint16_t port) : address_type_(address_type), port_(port)
     {
-      address_type_ = address_type;
       confirm_supported_address_type();
       // socket create and verification
       if ((socket_handle_ = socket(address_type_, SOCK_STREAM, 0)) == -1)
@@ -56,7 +57,7 @@ namespace skynet
     }
 
     ~Socket()
-    { close(socket_handle_); }
+    { close(socket_handle_);socket_handle_ = -1; }
 
     /** \brief Delete copy & move constructors and copy & move assignment operators
      */
@@ -68,6 +69,7 @@ namespace skynet
 
     uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
     {
+
       //Socket stucture
       struct sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
@@ -88,12 +90,15 @@ namespace skynet
       {
         servaddr.sin_port = htons(port);
         // Binding newly created socket to given IP and verification
-        if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0)
+        if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0){
           bound = true;
+          port_ = port;
+        }
         else
         {
-          if (try_other_ports)
+          if (try_other_ports){
             port++;
+          }
           else
           {
             perror("bind");
@@ -125,9 +130,11 @@ namespace skynet
       {
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
+
           inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
           break;
       }
+
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
@@ -162,6 +169,14 @@ namespace skynet
       }
     }
 
+
+    /** \brief Returns port number of socket.
+     *
+     */
+    uint16_t get_port() const
+    {
+      return port_;
+    }
   private:
 
     /** \brief Confirm that this object's address type is supported.
@@ -179,6 +194,7 @@ namespace skynet
 
     int socket_handle_;
     int address_type_;
+    uint16_t port_;
     const char * address_;
     char ipv4Buf_[INET_ADDRSTRLEN];
 

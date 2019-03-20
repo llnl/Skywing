@@ -7,7 +7,8 @@ DATA_TESTS = \
 
 # Devices classes
 DEVICES_TESTS = \
-  devices/Skynet_SocketGateway
+  devices/Skynet_SocketGateway \
+	devices/Skynet_SocketBuildCommunications
 
 # Heartbeat classes
 HEARTBEAT_TESTS = \
