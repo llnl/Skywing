@@ -1,6 +1,10 @@
 project('skynet', 'cpp',
   version: '0.0.1',
-  default_options : ['cpp_std=c++14'])
+  default_options : [
+    'cpp_std=c++14',
+    'warning_level=3',
+    'werror=true'
+  ])
 
 catch2_dep = subproject('catch2').get_variable('catch2_dep')
 thread_dep = dependency('threads')
