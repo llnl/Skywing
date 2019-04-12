@@ -4,6 +4,8 @@
 #include "Skynet_DeviceCommunicator.hpp"
 #include "Skynet_Socket.hpp"
 
+#include <memory>
+
 namespace skynet
 {
   class SocketCommunicator : public DeviceCommunicator
@@ -63,9 +65,9 @@ namespace skynet
       // std::cout<<"networkLen "<<networkLen<<std::endl;
 
       uint16_t len = ntohs(networkLen); // convert back to host byte order
-      char msg[len];
+      std::unique_ptr<char[]> msg = std::make_unique<char[]>(len + 1);
 
-      socket_.read_message(msg, len);
+      socket_.read_message(msg.get(), len);
       msg[len] = '\0';
 
       //Hack way to get it into the correct format for the serialzier.
