@@ -1,6 +1,3 @@
-[submodule "utils/catch2"]
-	path = utils/catch2
-	url = https://github.com/catchorg/Catch2.git
 [submodule "subprojects/ns3/ns-3-dev"]
 	path = subprojects/ns3/ns-3-dev
 	url = https://gitlab.com/nsnam/ns-3-dev.git
