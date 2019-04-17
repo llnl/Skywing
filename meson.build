@@ -8,7 +8,7 @@ project('skynet', 'cpp',
 
 catch2_dep = subproject('catch2').get_variable('catch2_dep')
 thread_dep = dependency('threads')
-# ns3_dep = dependency('ns3')
+ns3_dep = subproject('ns3').get_variable('ns3_dep')
 
 skynet_inc = include_directories('include')
 skynet_internal_dep = declare_dependency(
@@ -21,4 +21,5 @@ skynet_dep = declare_dependency(
   dependencies : skynet_internal_dep,
   link_with : skynet_lib)
 
+subdir('src/ns3')
 subdir('src/tests')
