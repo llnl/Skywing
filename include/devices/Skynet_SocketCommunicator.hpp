@@ -43,7 +43,7 @@ namespace skynet
 
   private:
 
-    void do_send_to_(const void* data, std::size_t data_size) const override
+    void do_send_to_(const void* data, std::size_t data_size) override
     {
       uint16_t networkLen = htons(data_size); // convert to network byte order
       socket_.send_message(&networkLen, sizeof(networkLen)); //sends the size of the data first
@@ -51,7 +51,7 @@ namespace skynet
     }
 
 
-    std::vector<char> do_receive_from_() const override
+    std::vector<char> do_receive_from_() override
     {
 
     //[TODO] AF: this could be more efficent, the read() fucntion seems to only take a array of char and not a vector....

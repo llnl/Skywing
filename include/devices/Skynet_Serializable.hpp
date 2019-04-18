@@ -11,8 +11,9 @@ namespace skynet
   public:
     // You must also implement the following static function:
     // static Derived deserialize(const std::vector<char>& data);
-
     virtual std::vector<char> serialize() const = 0;
+
+    virtual ~Serializable() = default;
   }; // class Serializable
 } // namespace skynet
 

@@ -4,3 +4,6 @@
 [submodule "subprojects/ns3/waf"]
 	path = subprojects/ns3/waf
 	url = https://gitlab.com/ita1024/waf.git
+[submodule "subprojects/cppzmq/cppzmq"]
+	path = subprojects/cppzmq/cppzmq
+	url = https://github.com/zeromq/cppzmq
