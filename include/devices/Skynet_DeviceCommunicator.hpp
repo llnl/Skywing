@@ -2,7 +2,7 @@
 #define SKYNET_DEVICECOMMUNICATOR_HPP__
 
 #include <cstddef>
-#include "Skynet_Serializer.hpp"
+#include "Skynet_Serialize.hpp"
 
 namespace skynet
 {
@@ -15,17 +15,15 @@ namespace skynet
   class DeviceCommunicator
   {
   public:
-    
+
     /** \brief Send a data through this communication channel.
      */
-    template<typename T> 
+    template<typename T>
     void send_to(const T& data) const
     {
-      // std::cout<<"in send to data = "<<data<<std::endl;
-      auto pData = serialize(data); // returns either a void* or a std::vector<char>
-      // std::cout<<"Seralized data = "<<pData<<std::endl;
+      auto buf = serialize(data);
 
-      do_send_to_(convert_if_vec(pData), get_serialized_size(data, pData));
+      do_send_to_(buf.data(), buf.size());
     }
 
     /** \brief Receive data through this communication channel.
@@ -35,17 +33,16 @@ namespace skynet
     template<typename T>
     T receive_from() const
     {
-      auto pdata  = do_receive_from_();
-    // std::cout<<"in receive from data = "<<pdata[0]<<std::endl;
+      auto buf  = do_receive_from_();
 
-      return deserialize<T>(pdata);
+      return deserialize<T>(buf);
     }
 
     virtual ~DeviceCommunicator() = default;
 
   private:
-      
-    /** \brief Send data to the associated Device. 
+
+    /** \brief Send data to the associated Device.
      *
      * \param data Data to send.
      * \param data_size Number of bytes of data to send.

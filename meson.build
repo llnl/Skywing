@@ -9,11 +9,12 @@ project('skynet', 'cpp',
 catch2_dep = subproject('catch2').get_variable('catch2_dep')
 thread_dep = dependency('threads')
 ns3_dep = subproject('ns3').get_variable('ns3_dep')
+cereal_dep = subproject('cereal').get_variable('cereal_dep')
 
 skynet_inc = include_directories('include')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
-  dependencies : [thread_dep])#, ns3_dep])
+  dependencies : [thread_dep, cereal_dep])
 
 subdir('src/skynet')
 

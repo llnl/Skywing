@@ -7,3 +7,6 @@
 [submodule "subprojects/catch2/Catch2"]
 	path = subprojects/catch2/Catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "subprojects/cereal/cereal"]
+	path = subprojects/cereal/cereal
+	url = https://github.com/USCiLab/cereal
