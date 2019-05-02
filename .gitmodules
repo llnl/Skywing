@@ -4,3 +4,6 @@
 [submodule "subprojects/ns3/waf"]
 	path = subprojects/ns3/waf
 	url = https://gitlab.com/ita1024/waf.git
+[submodule "subprojects/catch2/Catch2"]
+	path = subprojects/catch2/Catch2
+	url = https://github.com/catchorg/Catch2.git
