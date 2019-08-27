@@ -1,3 +1,9 @@
-[submodule "utils/catch2"]
-	path = utils/catch2
+[submodule "subprojects/ns3/ns-3-dev"]
+	path = subprojects/ns3/ns-3-dev
+	url = https://gitlab.com/nsnam/ns-3-dev.git
+[submodule "subprojects/ns3/waf"]
+	path = subprojects/ns3/waf
+	url = https://gitlab.com/ita1024/waf.git
+[submodule "subprojects/catch2/Catch2"]
+	path = subprojects/catch2/Catch2
 	url = https://github.com/catchorg/Catch2.git
