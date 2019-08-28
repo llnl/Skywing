@@ -5,31 +5,30 @@
 
 namespace skynet
 {
-    /** \class GraphProperty
-     *  \brief Abstract class to define properties required of 
-     *	the reference graph
+  /** \class GraphProperty
+    *  \brief Abstract class to define properties required of
+    *  the reference graph
+    */
+  class GraphProperty
+  {
+  public:
+
+    /** \brief Check if the reference graph satisfies this
+     *   property using information from the device manager
+     *
+     *  \return 1 if graph property is satisfied 0 otherwise
      */
-    class GraphProperty
+    bool is_property_satisfied(const DeviceManager& device_manager)
     {
-    public:
+      return do_is_property_satisfied(device_manager);
+    }
 
-      /** \brief Check if the reference graph satisfies this
-       *   property using information from the device manager
-       *
-       *  \return 1 if graph property is satisfied 0 otherwise
-       */
-      bool is_property_satisfied(const DeviceManager& device_manager)
-      {
-	return do_is_property_satisfied(device_manager);
-      }
+    virtual ~GraphProperty() = default;
 
-      virtual ~GraphProperty() = default;
-				      
-    private:
-      virtual bool do_is_property_satisfied(const DeviceManager&
-					    device_manager) const = 0;
-      
-    }; // class GraphProperty
+  private:
+    virtual bool do_is_property_satisfied(const DeviceManager& device_manager) const = 0;
+
+  }; // class GraphProperty
 
 } // namespace skynet
 

@@ -23,7 +23,7 @@ namespace skynet
     /** \brief Obtain the next free ID in the registry
      *  \return The value of the next free ID
      */
-    const id_t next_id()
+    id_t next_id()
     {
       const id_t next_free_id_ = next_free_id();
       registered_ids_.push_back(next_free_id_);
@@ -33,7 +33,7 @@ namespace skynet
     /** \brief Free a registered ID so that it can be reused
      *  \param id_to_free The value of the ID to be freed
      */
-    void free_id(id_t id_to_free)
+    void free_id(const id_t id_to_free)
     {
       bool found = false;
       for (typename std::vector<id_t>::iterator iter = registered_ids_.begin();
@@ -119,7 +119,7 @@ namespace skynet
   // Implementation for uint8_t IDs
   template<> inline void DeviceIdRegistry<uint8_t>::set_bounds()
   { first_id_ = 0; last_id_ = UINT8_MAX; }
-  template<> inline uint8_t DeviceIdRegistry<uint8_t>::next_value(uint8_t id)
+  template<> inline uint8_t DeviceIdRegistry<uint8_t>::next_value(const uint8_t id)
   { return id+1; }
 
 } // namespace skynet

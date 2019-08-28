@@ -12,17 +12,13 @@ namespace skynet
 {
   class TrivialDeviceManager : public DeviceManager
   {
-    public:
+  public:
 
-      TrivialDeviceManager(std::unique_ptr<Gateway> gateway) :
-        DeviceManager(std::move(gateway))
-      { }
+    TrivialDeviceManager(std::unique_ptr<Gateway> gateway) :
+      DeviceManager(std::move(gateway))
+    { }
 
-    private:
-
-
-   };// class
-
+  };// class
 
 }// namespace skynet
 

@@ -9,22 +9,21 @@ namespace skynet
   /** \class TrivalBeatSender
    *  \brief class for operting a trivial heartbeat.
    */
-   class TrivialBeatSender : public BeatSender
-   {
-   public:
+  class TrivialBeatSender : public BeatSender
+  {
+  public:
 
-     TrivialBeatSender()
-     { }
+    TrivialBeatSender()
+    { }
 
-   private:
-     BeatResponse do_send_heartbeat_(const DeviceReference& /* device */) const override
-     {
-       BeatResponse response;
-       response.response_val = 0;
-       return response;
-     }
-   };// class BeatSender
-
+  private:
+    BeatResponse do_send_heartbeat_(const DeviceReference& /* device */) const override
+    {
+      BeatResponse response;
+      response.response_val = 0;
+      return response;
+    }
+  };// class BeatSender
 
 }// namespace skynet
 

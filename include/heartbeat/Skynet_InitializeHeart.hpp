@@ -7,24 +7,21 @@
 
 namespace skynet
 {
-    /** \class InitializeHeart
-     *  \brief Abract class to define the heart settings and
-     *	begin the hearbeat when a new device comes online.
-     */
-    class InitializeHeart
-    {
-    public:
-      
-       /** \brief Read configuration file and use it to create a Heart object
-       *
-       *  \param config configuration file used to create heart object
-       */
-      template<typename T>
-      const Heart& void create_heart(const T& config);
-      
-    private:
+  /** \class InitializeHeart
+   *  \brief Abract class to define the heart settings and
+   *  begin the hearbeat when a new device comes online.
+   */
+  class InitializeHeart
+  {
+  public:
 
-    }; // class InitializeHeart
+    /** \brief Read configuration file and use it to create a Heart object
+     *
+     *  \param config configuration file used to create heart object
+     */
+    template<typename T>
+    const Heart& void create_heart(const T& config);
+  }; // class InitializeHeart
 
 } // namespace skynet
 

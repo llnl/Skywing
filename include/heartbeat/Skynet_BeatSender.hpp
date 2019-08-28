@@ -14,8 +14,8 @@ namespace skynet
 
   /** \class BeatSender
    *  \brief Abstract class for operting the heartbeat.
-   *	Defines the sequence of events that occurs each
-   *	time the heart "beats."
+   *  Defines the sequence of events that occurs each
+   *  time the heart "beats."
    */
    class BeatSender
    {
