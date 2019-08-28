@@ -29,7 +29,7 @@ namespace skynet
 
 
     private:
-      void do_validate_graph(DeviceManager& device_manager) const override
+      void do_validate_graph(DeviceManager& /* device_manager */) const override
       {
 
       }
