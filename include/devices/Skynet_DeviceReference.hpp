@@ -37,10 +37,12 @@ namespace skynet
      * \param comm_factory A CommuncatorFactory representing this
      * DeviceReference's communications policy.
      */
+    // Is id_t expect to change to a heavier weight type?  It's an
+    // integer, but it's currently being moved from.
     DeviceReference(id_t device_id,
 		    std::unique_ptr<CommunicatorFactory> comm_factory)
       : is_believed_live_(true), device_id_(std::move(device_id)),
-	comm_factory_(std::move(comm_factory))
+        comm_factory_(std::move(comm_factory))
     { }
 
     /** \brief Get if we believe the referred device to be live. */
@@ -50,7 +52,7 @@ namespace skynet
     /** \brief Update is_believed_live when new information is gained
      *   about the device status
      */
-    void set_is_believed_live(bool status)
+    void set_is_believed_live(const bool status)
     {
       is_believed_live_ = status;
     }

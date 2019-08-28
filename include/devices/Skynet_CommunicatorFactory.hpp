@@ -33,7 +33,7 @@ namespace skynet
      * with group.
      */
     virtual std::unique_ptr<DeviceCommunicator>
-    create_new_communicator(std::vector<std::string> comm_config_info) = 0;
+    create_new_communicator(const std::vector<std::string>& comm_config_info) = 0;
 
     virtual std::vector<std::unique_ptr<DeviceCommunicator>>
     create_requested_communicators() = 0;

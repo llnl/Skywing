@@ -19,7 +19,7 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    Socket(int address_type, uint16_t port) : address_type_(address_type), port_(port)
+    Socket(const int address_type, const uint16_t port) : address_type_(address_type), port_(port)
     {
       confirm_supported_address_type();
       // socket create and verification
@@ -34,14 +34,14 @@ namespace skynet
     *
     * \param listener The Socket object that is listening for new connections
     */
-    Socket(Socket& listener)
+    Socket(Socket& listener) :
+      address_type_(listener.address_type_)
     {
-      address_type_ = listener.address_type_;
-      struct sockaddr_in client_address_struct;
+      sockaddr_in client_address_struct;
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      socket_handle_ = accept(listener.socket_handle_, (struct sockaddr *) &client_address_struct, &len);
+      socket_handle_ = accept(listener.socket_handle_, (sockaddr*) &client_address_struct, &len);
       if (socket_handle_ < 0)
       {
         perror("accept");
@@ -67,11 +67,11 @@ namespace skynet
     Socket& operator=(Socket&& other) = delete;
 
 
-    uint16_t bind_to_port(uint16_t port, bool try_other_ports, const char* client_address)
+    uint16_t bind_to_port(uint16_t port, const bool try_other_ports, const char* const client_address)
     {
 
       //Socket stucture
-      struct sockaddr_in servaddr;
+      sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
 
       switch(address_type_)
@@ -90,7 +90,7 @@ namespace skynet
       {
         servaddr.sin_port = htons(port);
         // Binding newly created socket to given IP and verification
-        if (bind(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) == 0){
+        if (bind(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) == 0){
           bound = true;
           port_ = port;
         }
@@ -110,7 +110,7 @@ namespace skynet
       return port;
     }
 
-    void set_to_listen(int queue_length)
+    void set_to_listen(const int queue_length)
     {
       listen(socket_handle_, queue_length);
     }
@@ -120,10 +120,10 @@ namespace skynet
      * \param server_address The address of the server socket.
      * \param port Which port number to connect to on the server.
      */
-    void connect_to_server(const char * server_address, uint16_t port)
+    void connect_to_server(const char* const server_address, const uint16_t port)
     {
       //Socket stucture
-      struct sockaddr_in servaddr;
+      sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
 
       switch(address_type_)
@@ -138,7 +138,7 @@ namespace skynet
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
-      if (connect(socket_handle_, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
+      if (connect(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) != 0)
       {
         perror("connect");
         exit(-1);
@@ -148,7 +148,7 @@ namespace skynet
     int query_queue()
     {
       fd_set set;
-      struct timeval timeout;
+      timeval timeout;
       FD_ZERO(&set);
       FD_SET(socket_handle_, &set);
       timeout.tv_sec = 0;
@@ -157,10 +157,10 @@ namespace skynet
       return select(socket_handle_+1, &set, NULL, NULL, &timeout);
     }
 
-    void send_message(const void* message, std::size_t message_size) const
+    void send_message(const void* const message, const std::size_t message_size) const
     { write(socket_handle_, message, message_size); }
 
-    void read_message(void* buffer, std::size_t buffer_size) const
+    void read_message(void* const buffer, const std::size_t buffer_size) const
     {
       if (read(socket_handle_, buffer, buffer_size) == -1)
       {
@@ -195,7 +195,7 @@ namespace skynet
     int socket_handle_;
     int address_type_;
     uint16_t port_;
-    const char * address_;
+    const char* address_;
     char ipv4Buf_[INET_ADDRSTRLEN];
 
   }; // class Socket

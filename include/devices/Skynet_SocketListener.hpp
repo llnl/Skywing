@@ -16,7 +16,7 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    SocketListener(int address_type, uint16_t port, bool try_other_ports, const char* client_address = NULL) :
+    SocketListener(const int address_type, const uint16_t port, const bool try_other_ports, const char* const client_address = nullptr) :
       socket_(address_type, port)
     {
       socket_.bind_to_port(socket_.get_port(), try_other_ports, client_address);

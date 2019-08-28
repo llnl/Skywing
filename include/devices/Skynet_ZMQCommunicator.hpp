@@ -9,20 +9,20 @@ namespace skynet
   class ZMQCommunicator : public DeviceCommunicator
   {
   public:
-    ZMQCommunicator(char const* address) :
+    ZMQCommunicator(char const* const address) :
       zmq_ctx_(1),
       zmq_sock_(zmq_ctx_, ZMQ_PAIR)
     {
       zmq_sock_.bind(address);
     }
 
-    void connect_to_server(char const* address)
+    void connect_to_server(char const* const address)
     {
       zmq_sock_.connect(address);
     }
 
   private:
-    void do_send_to_(void const* data, std::size_t data_size) override
+    void do_send_to_(void const* const data, const std::size_t data_size) override
     {
       auto data_buf = std::make_unique<char[]>(data_size);
       std::memcpy(data_buf.get(), data, data_size);
