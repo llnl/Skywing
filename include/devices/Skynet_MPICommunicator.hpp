@@ -27,7 +27,7 @@ namespace skynet
     {}
 
   private:
-    /** \brief Send data to the associated Device. 
+    /** \brief Send data to the associated Device.
      *
      * From the DeviceCommunicator interface.
      *
@@ -35,7 +35,7 @@ namespace skynet
      * \param data_size Number of bytes of data to send.
      * \param tag A tag associated with the data.
      */
-    void do_send_to_(void* data, std::size_t data_size) const
+    void do_send_to_(void* data, std::size_t data_size)
     {
       MPI_Send(data, data_size, MPI_BYTE, other_rank_, tag_, comm_);
     }
@@ -49,13 +49,13 @@ namespace skynet
      * \return A pair providing the data received and the size of
      * the data received.
      */
-    std::vector<char> do_receive_from_() const
+    std::vector<char> do_receive_from_()
     {
       MPI_Status status;
       MPI_Probe(other_rank_, tag_, comm_, &status);
       int data_size;
       MPI_Get_count(&status, MPI_BYTE, &data_size);
-      
+
       std::vector<char> data(data_size);
       MPI_Status status;
       MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_,

@@ -19,7 +19,7 @@ namespace skynet
     /** \brief Send a data through this communication channel.
      */
     template<typename T>
-    void send_to(const T& data) const
+    void send_to(const T& data)
     {
       auto buf = serialize(data);
 
@@ -31,7 +31,7 @@ namespace skynet
      * \return An object of type T.
      */
     template<typename T>
-    T receive_from() const
+    T receive_from()
     {
       auto buf  = do_receive_from_();
 
@@ -48,7 +48,7 @@ namespace skynet
      * \param data_size Number of bytes of data to send.
      * \param tag A tag associated with the data.
      */
-    virtual void do_send_to_(const void* data, std::size_t data_size) const = 0;
+    virtual void do_send_to_(const void* data, std::size_t data_size) = 0;
 
     /** \brief Receive data from the associated Device.
      *
@@ -57,7 +57,7 @@ namespace skynet
      * \return A pair providing the data received and the size of
      * the data received.
      */
-    virtual std::vector<char> do_receive_from_() const = 0;
+    virtual std::vector<char> do_receive_from_() = 0;
   }; // class DeviceCommunicator
 
 } // namespace skynet

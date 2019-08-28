@@ -6,9 +6,18 @@ project('skynet', 'cpp',
     'werror=true'
   ])
 
+use_ns3 = get_option('use_ns3')
+message('using ns3: ' + use_ns3.to_string())
+
 catch2_dep = subproject('catch2').get_variable('catch2_dep')
+
+if use_ns3
+  ns3_dep = subproject('ns3').get_variable('ns3_dep')
+endif
+
+zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
+cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
-ns3_dep = subproject('ns3').get_variable('ns3_dep')
 cereal_dep = subproject('cereal').get_variable('cereal_dep')
 
 skynet_inc = include_directories('include')
@@ -22,5 +31,8 @@ skynet_dep = declare_dependency(
   dependencies : skynet_internal_dep,
   link_with : skynet_lib)
 
-subdir('src/ns3')
+if use_ns3
+  subdir('src/ns3')
+endif
+
 subdir('src/tests')

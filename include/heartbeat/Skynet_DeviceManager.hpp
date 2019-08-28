@@ -113,7 +113,7 @@ namespace skynet
      // to do anything since the status would be updated within DeviceReference
      // and we would keep the dead device along with its  history in the
      // using the neighbors list in the DeviceManager.
-     void remove_device(DeviceReference old_device)
+     void remove_device(DeviceReference /* old_device */)
      {
         /*AF: again commenting out, issue with types with the Device Reference
        //Use erase on top of remove to shorten vector after removing device

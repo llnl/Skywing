@@ -24,7 +24,7 @@ namespace skynet
 
     private:
 
-      double do_millisecs_to_next_beat_(const DeviceReference& device) const override
+      double do_millisecs_to_next_beat_(const DeviceReference& /* device */) const override
       {
         double time;
         time = 0;
