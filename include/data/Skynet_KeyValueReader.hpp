@@ -52,7 +52,7 @@ namespace skynet
      * \param key Specifies name of the key
      * \return The value of the specified key
      */
-    std::string get_value(const std::string& key)
+    const std::string& get_value(const std::string& key)
     {
       if (dictionary_.count(key) > 0)
         return dictionary_[key];

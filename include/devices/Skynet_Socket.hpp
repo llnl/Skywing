@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <iostream>
 
-
 namespace skynet
 {
   class Socket
@@ -19,7 +18,9 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    Socket(const int address_type, const uint16_t port) : address_type_(address_type), port_(port)
+    Socket(const int address_type, const uint16_t port)
+      : address_type_(address_type),
+        port_(port)
     {
       confirm_supported_address_type();
       // socket create and verification
@@ -31,13 +32,16 @@ namespace skynet
     }
 
     /** \brief Construct a new Socket.
-    *
-    * \param listener The Socket object that is listening for new connections
-    */
-    Socket(Socket& listener) :
+     *
+     * \param listener The Socket object that is listening for new connections
+     */
+    // TODO: This originally took a non-const reference and the normal copy constructor
+    //       was deleted below; this is very strange, was it an oversight?
+    Socket(const Socket& listener) :
       address_type_(listener.address_type_)
     {
       sockaddr_in client_address_struct;
+      // len can't be const as accept takes a non-const pointer
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
@@ -51,26 +55,25 @@ namespace skynet
       switch(address_type_)
       {
         case Socket::IPv4:
-          address_ = inet_ntop(Socket::IPv4, &(client_address_struct.sin_addr), ipv4Buf_, INET_ADDRSTRLEN);
+          address_ = inet_ntop(Socket::IPv4, &client_address_struct.sin_addr, ipv4Buf_, INET_ADDRSTRLEN);
           break;
       }
     }
 
     ~Socket()
-    { close(socket_handle_);socket_handle_ = -1; }
+    { close(socket_handle_); socket_handle_ = -1; }
 
     /** \brief Delete copy & move constructors and copy & move assignment operators
      */
-    Socket(const Socket& other) = delete;
+    // See TODO above about why this is commented out
+    //Socket(const Socket& other) = delete;
     Socket& operator=(const Socket& other) = delete;
     Socket(Socket&& other) = delete;
     Socket& operator=(Socket&& other) = delete;
 
-
     uint16_t bind_to_port(uint16_t port, const bool try_other_ports, const char* const client_address)
     {
-
-      //Socket stucture
+      // Socket stucture
       sockaddr_in servaddr;
       bzero(&servaddr, sizeof(servaddr));
 
@@ -154,7 +157,7 @@ namespace skynet
       timeout.tv_sec = 0;
       timeout.tv_usec = 0;
 
-      return select(socket_handle_+1, &set, NULL, NULL, &timeout);
+      return select(socket_handle_ + 1, &set, NULL, NULL, &timeout);
     }
 
     void send_message(const void* const message, const std::size_t message_size) const
@@ -168,7 +171,6 @@ namespace skynet
         exit(-1);
       }
     }
-
 
     /** \brief Returns port number of socket.
      *
@@ -187,7 +189,7 @@ namespace skynet
     {
       if (address_type_ != IPv4)
       {
-        printf("Incorrect address type %d in Socket\n", address_type_);
+        std::cout << "Incorrect address type " << address_type_ << " in Socket\n";
         exit(-1);
       }
     }

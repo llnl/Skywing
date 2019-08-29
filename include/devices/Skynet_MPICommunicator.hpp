@@ -23,7 +23,9 @@ namespace skynet
      * \param other_rank The rank of the device with which we'll communicate.
      */
     MPICommunicator(const MPI_Comm comm, const int tag, const int other_rank)
-      : comm_(comm), tag_(tag), other_rank_(other_rank)
+      : comm_(comm),
+        tag_(tag),
+        other_rank_(other_rank)
     {}
 
   private:

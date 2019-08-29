@@ -25,7 +25,9 @@ namespace skynet
      * be communicating.
      */
     MPICommunicatorFactory(const int other_rank)
-      : comm_(MPI_COMM_WORLD), tag_(0), other_rank_(other_rank)
+      : comm_(MPI_COMM_WORLD),
+        tag_(0),
+        other_rank_(other_rank)
     { }
 
     /** \brief Create a new MPICommunicatorFactory.
@@ -36,7 +38,9 @@ namespace skynet
      *  with which we'll be communicating.
      */
     MPICommunicatorFactory(const MPI_Comm comm, const int other_rank)
-      : comm_(comm), tag_(0), other_rank_(other_rank)
+      : comm_(comm),
+        tag_(0),
+        other_rank_(other_rank)
     { }
 
     /** \brief Create a new DeviceCommunicator.

@@ -19,7 +19,8 @@ namespace skynet
      *
      * \param address_type Specifies the address type to be used.
      */
-    SocketCommunicator(const int address_type, const uint16_t port = 1) : socket_(address_type, port)
+    SocketCommunicator(const int address_type, const uint16_t port = 1)
+      : socket_(address_type, port)
     {}
 
     /** \brief Construct a new SocketCommunicator.
@@ -29,7 +30,8 @@ namespace skynet
      *
      * \param listener The Socket that is listening for new connections
      */
-    SocketCommunicator(Socket& listener) : socket_(listener)
+    SocketCommunicator(const Socket& listener)
+      : socket_(listener)
     {}
 
     /** \brief Connect to a server SocketCommunicator.
@@ -55,7 +57,6 @@ namespace skynet
 
     std::vector<char> do_receive_from_() override
     {
-
       //[TODO] AF: this could be more efficent, the read() fucntion seems to only take a array of char and not a vector....
       // char msg[1024];
       // std::cout<<"in receiving "<<std::endl;
