@@ -34,7 +34,7 @@ namespace skynet
         type_ = Socket::IPv4;
       else
       {
-        std::cout << "Invalid address type in configuration value" << std::endl;
+        std::cout << "Invalid address type in configuration value\n";
         exit(-1);
       }
       // create the SocketListener for this SocketGateway
@@ -87,7 +87,8 @@ namespace skynet
     std::unique_ptr<CommunicatorFactory> create_new_factory() const
     {
       // create SocketCommunicatorFactory
-      std::unique_ptr<SocketCommunicatorFactory> new_commfactory = std::make_unique<SocketCommunicatorFactory>(type_, 1, skynet_port_);
+      std::unique_ptr<SocketCommunicatorFactory> new_commfactory =
+        std::make_unique<SocketCommunicatorFactory>(type_, 1, skynet_port_);
       // create a new SocketCommunicator connected to client and send
       // SocketListener port number back to the client (buffer communication)
       std::unique_ptr<SocketCommunicator> handshake =
@@ -101,7 +102,6 @@ namespace skynet
       new_commfactory->update_port_listener_remote_factory(handshake->receive_from<uint16_t>());
 
       return new_commfactory;
-
     }
 
     /** \brief Verify that all required keys are in the configuration

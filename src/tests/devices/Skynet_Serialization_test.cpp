@@ -5,49 +5,22 @@
 
 using namespace skynet;
 
-template < class T >
-inline std::ostream& operator << (std::ostream& os, const std::vector<T>& v)
-{
-    os << "[ ";
-    for (auto&& el : v)
-    {
-        os << el << " ";
-    }
-    os << "]";
-    return os;
-}
-
 // Roundtrip a value through serialize/deserialize
 template<typename T>
-T test_serialization(T t)
+T test_serialization(const T& t)
 {
-  const auto p = serialize(t);
-
-  std::vector<char> charvec(p.size());
-
-  std::memcpy(charvec.data(), p.data(), p.size());
-
-  T recovered_val = deserialize<T>(charvec);
-
-  return recovered_val;
+  return deserialize<T>(serialize(t));
 }
 
-// Roundtrip a std::vector<S> through serialize/deserialize
-template<typename S>
-std::vector<S> test_serialization(std::vector<S> t)
+// Roundtrip a std::vector<T> through serialize/deserialize
+template<typename T>
+std::vector<T> test_serialization(const std::vector<T>& t)
 {
-  const auto p = serialize(t);
-
-  std::vector<char> charvec(p.size());
-
-  std::memcpy(charvec.data(), p.data(), p.size());
-
-  std::vector<S> recovered_val = deserialize<std::vector<S>>(charvec);
-  return recovered_val;
+  return deserialize<std::vector<T>>(serialize(t));
 }
 
 
-TEST_CASE( "POD Serialization/Deserialization works", "[Skynet_Serializer]" )
+TEST_CASE("POD Serialization/Deserialization works", "[Skynet_Serializer]")
 {
   int test_int = -2;
   double test_double = 2.5;
@@ -67,7 +40,7 @@ TEST_CASE( "POD Serialization/Deserialization works", "[Skynet_Serializer]" )
   REQUIRE(test_bool == recovered_bool);
 }
 
-TEST_CASE( "Vector of POD Serialization/Deserialization works", "[Skynet_Serializer]" )
+TEST_CASE("Vector of POD Serialization/Deserialization works", "[Skynet_Serializer]")
 {
   std::vector<int> intvec { 3, -2, 9 };
   std::vector<double> doublevec { 3.2, 2.6, -9.3 };

@@ -93,14 +93,16 @@ namespace skynet
       {
         servaddr.sin_port = htons(port);
         // Binding newly created socket to given IP and verification
-        if (bind(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) == 0){
+        if (bind(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) == 0)
+        {
           bound = true;
           port_ = port;
         }
         else
         {
-          if (try_other_ports){
-            port++;
+          if (try_other_ports)
+          {
+            ++port;
           }
           else
           {

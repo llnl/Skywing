@@ -9,9 +9,9 @@ namespace skynet
   class ZMQCommunicator : public DeviceCommunicator
   {
   public:
-    ZMQCommunicator(char const* const address) :
-      zmq_ctx_(1),
-      zmq_sock_(zmq_ctx_, ZMQ_PAIR)
+    ZMQCommunicator(char const* const address)
+      : zmq_ctx_(1),
+        zmq_sock_(zmq_ctx_, ZMQ_PAIR)
     {
       zmq_sock_.bind(address);
     }

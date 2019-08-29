@@ -28,8 +28,7 @@ namespace skynet
       std::ifstream infile(filename);
       if (!infile.is_open())
       {
-        std::cout << "Key-value file " << filename << " could not be opened."
-          << std::endl;
+        std::cout << "Key-value file " << filename << " could not be opened.\n";
         exit(-1);
       }
       std::string line;
@@ -40,7 +39,7 @@ namespace skynet
           dictionary_[key] = line.substr(line.find(delimiter)+1, line.length());
         else
         {
-          std::cout << "Key collision on key " << key << " in " << filename << std::endl;
+          std::cout << "Key collision on key " << key << " in " << filename << '\n';
           exit(-1);
         }
       }
@@ -58,7 +57,7 @@ namespace skynet
         return dictionary_.find(key)->second;
       else
       {
-        std::cout << "Key-value dictionary does not contain key " << key << std::endl;
+        std::cout << "Key-value dictionary does not contain key " << key << '\n';
         exit(-1);
       }
     }
@@ -82,7 +81,7 @@ namespace skynet
       {
         if (!key_exists(key))
         {
-          std::cout << "Key-value file is missing key " << key << std::endl;
+          std::cout << "Key-value file is missing key " << key << '\n';
           exit(-1);
         }
       }
