@@ -37,20 +37,17 @@ namespace skynet
      */
     void free_id(const id_t id_to_free)
     {
-      // TODO: Look at this more; can be rewritten
-      for (typename std::vector<id_t>::iterator iter = registered_ids_.begin();
-        iter != registered_ids_.end(); iter++)
+      const auto erase_loc = std::find(registered_ids_.begin(), registered_ids_.end(), id_to_free);
+      if (erase_loc == registered_ids_.end())
       {
-        if (*iter == id_to_free)
-        {
-          freed_ids_.push_back(*iter);
-          registered_ids_.erase(iter);
-          return;
-        }
+        std::cout << "Tried to free ID that was not registered in DeviceIdRegistry\n";
+        exit(-1);
       }
-      // The id was not found if the loop is exited
-      std::cout << "Tried to free ID that was not registered in DeviceIdRegistry\n";
-      exit(-1);
+      freed_ids_.push_back(*erase_loc);
+      // Order doesn't matter; swap to the back to save some copies
+      using std::swap;
+      swap(*erase_loc, registered_ids_.back());
+      registered_ids_.pop_back();
     }
 
   private:

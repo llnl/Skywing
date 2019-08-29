@@ -23,14 +23,14 @@ namespace skynet
      */
     SocketGateway(const KeyValueReader& config)
       : config_(config)
+      // Wait to set the rest of the values so that the configuration can be verified
     {
       // first verify configuration
       verify_configuration();
       // extract the skynet_port and address type from the configuration
-      skynet_port_ = stoi(config.get_value("skynet_port"));
+      skynet_port_ = std::stoi(config.get_value("skynet_port"));
       // TODO: maybe improve this
-      const std::string type = config.get_value("address_type");
-      if (type == "IPv4")
+      if (config.get_value("address_type") == "IPv4")
         type_ = Socket::IPv4;
       else
       {
@@ -65,8 +65,14 @@ namespace skynet
         // create corresponding SocketCommunicatorFactory
 
         // std::cout<<"Device "<< skynet_port_<<" is creating factory for device  "<< port <<std::endl;
-        factories.push_back(std::make_unique<SocketCommunicatorFactory>(
-          type_, ip_address, port, skynet_port_));
+        factories.push_back(
+          std::make_unique<SocketCommunicatorFactory>(
+            type_,
+            ip_address,
+            port,
+            skynet_port_
+          )
+        );
       }
       return factories;
     }

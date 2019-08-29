@@ -32,11 +32,11 @@ namespace skynet
         exit(-1);
       }
       std::string line;
-      while (getline(infile,line))
+      while (getline(infile, line))
       {
         const std::string key = line.substr(0, line.find(delimiter));
         if (!key_exists(key))
-          dictionary_[key] = line.substr(line.find(delimiter)+1, line.length());
+          dictionary_[key] = line.substr(line.find(delimiter) + 1, line.length());
         else
         {
           std::cout << "Key collision on key " << key << " in " << filename << '\n';

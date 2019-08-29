@@ -7,6 +7,7 @@
 #include <algorithm> //For remove function used to remove devices from device used
 #include <unordered_map>
 #include <utility> //For std::pair
+#include <iterator>
 
 #include "devices/Skynet_DeviceCommunicator.hpp"
 #include "devices/Skynet_DeviceReference.hpp"
@@ -52,9 +53,9 @@ namespace skynet
       std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
         gateway_->create_initial_connections();
       // create new device references
-      for (unsigned i=0; i < comm_factories.size(); i++)
+      for (auto&& factory : comm_factories)
       {
-        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
+        add_device(DeviceReference(id_registry_.next_id(), std::move(factory)));
       }
     }
 
@@ -67,9 +68,9 @@ namespace skynet
       std::vector<std::unique_ptr<CommunicatorFactory>> comm_factories =
         gateway_->collect_new_connections();
       // create a new device references
-      for (unsigned i=0; i < comm_factories.size(); i++)
+      for (auto&& factory : comm_factories)
       {
-        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
+        add_device(DeviceReference(id_registry_.next_id(), std::move(factory)));
       }
     }
 
@@ -131,9 +132,9 @@ namespace skynet
         gateway_->collect_new_connections();
 
       // Create a device references for new neighbors
-      for (unsigned i=0; i < comm_factories.size(); i++)
+      for (auto&& factory : comm_factories)
       {
-        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
+        add_device(DeviceReference(id_registry_.next_id(), std::move(factory)));
       }
     }
 
@@ -173,12 +174,16 @@ namespace skynet
      */
     void clear_history(const DeviceReference& device)
     {
-      //Replace history with empty history
-      response_history_[device.get_id()] = history_t{};
+      // Replace history with empty history
+      const auto erase_loc = response_history_.find(device.get_id());
+      if (erase_loc != response_history_.end())
+      {
+        response_history_.erase(erase_loc);
+      }
     }
 
   private:
-    //neighbors_ is the set of devices that this device can communicate
+    // neighbors_ is the set of devices that this device can communicate
     // with directly (i.e. is adjacent to in the reference graph)
     std::vector<DeviceReference> neighbors_;
     std::unordered_map<id_t, std::unique_ptr<DeviceCommunicator>>
@@ -186,7 +191,7 @@ namespace skynet
     std::unique_ptr<Gateway> gateway_;
     DeviceIdRegistry<id_t> id_registry_;
 
-    //A map storing the response history for all neighboring devices
+    // A map storing the response history for all neighboring devices
     std::unordered_map<id_t, history_t> response_history_;
 
   };// class

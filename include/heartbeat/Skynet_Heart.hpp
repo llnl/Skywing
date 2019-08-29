@@ -58,7 +58,7 @@ namespace skynet
         device_manager_(std::move(device_manager)),
         property_checker_(std::move(property_checker)),
         is_alive_(false),
-        task_cycle_pause_(stoi(config.get_value("task_cycle_pause")))
+        task_cycle_pause_(std::stoi(config.get_value("task_cycle_pause")))
     {
       ;
     }

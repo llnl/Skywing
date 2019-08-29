@@ -27,11 +27,6 @@ namespace skynet
     // which comparison is defined.
     using id_t = unsigned int; //Device ID type
 
-
-  public:
-    // using id_t = unsigned int;
-
-  public:
     /** \brief Construct a new \c DeviceReference.
      *
      * \param comm_factory A CommuncatorFactory representing this
