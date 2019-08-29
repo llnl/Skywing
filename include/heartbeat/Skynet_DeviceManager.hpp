@@ -56,8 +56,7 @@ namespace skynet
       // create new device references
       for (unsigned i=0; i < comm_factories.size(); i++)
       {
-        DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
-        add_device(new_device);
+        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
       }
     }
 
@@ -72,8 +71,7 @@ namespace skynet
       // create a new device references
       for (unsigned i=0; i < comm_factories.size(); i++)
       {
-        DeviceReference new_device(id_registry_.next_id(), std::move(comm_factories[i]));
-        add_device(new_device);
+        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
       }
     }
 
@@ -81,17 +79,16 @@ namespace skynet
      *
      * \param new_device Device to add to the neighbors list
      */
-    void add_device(DeviceReference& new_device)
+    void add_device(DeviceReference&& new_device)
     {
       //Add new device to neighbors list
       neighbors_.push_back(std::move(new_device));
 
       //Get device ID to use in setting history and communicator
-      id_t device_id = new_device.get_id();
+      const id_t device_id = new_device.get_id();
 
       //Add empty history for new device
-      history_t init_history;
-      response_history_[device_id] = init_history;
+      response_history_[device_id] = history_t{};
 
       //AM: Commenting out below because it makes catch tests fail. Will eventually
       // need to add new communicators when a new device is added though.
@@ -138,9 +135,7 @@ namespace skynet
       // Create a device references for new neighbors
       for (unsigned i=0; i < comm_factories.size(); i++)
       {
-        DeviceReference new_device(id_registry_.next_id(),
-          std::move(comm_factories[i]));
-        add_device(new_device);
+        add_device(DeviceReference(id_registry_.next_id(), std::move(comm_factories[i])));
       }
     }
 
@@ -181,9 +176,7 @@ namespace skynet
     void clear_history(const DeviceReference& device)
     {
       //Replace history with empty history
-      id_t device_id = device.get_id();
-      history_t empty_history;
-      response_history_[device_id] = empty_history;
+      response_history_[device.get_id()] = history_t{};
     }
 
   private:

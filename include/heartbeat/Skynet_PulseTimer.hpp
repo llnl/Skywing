@@ -31,7 +31,7 @@ namespace skynet
       *
       * \param device Nearby device to get the pulse (time to wait) for
       */
-    double  millisecs_to_next_beat(const DeviceReference& device)
+    double millisecs_to_next_beat(const DeviceReference& device)
     {
       return do_millisecs_to_next_beat_(device);
     }

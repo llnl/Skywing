@@ -52,10 +52,10 @@ namespace skynet
         pulse_timer_(std::move(pulse_timer)),
         device_manager_(std::move(device_manager)),
         property_checker_(std::move(property_checker)),
-        is_alive_(false)
+        is_alive_(false),
+        task_cycle_pause_(stoi(config.get_value("task_cycle_pause")))
     {
-      // obtain task_cycle pause from configuration file
-      task_cycle_pause_ = stoi(config.get_value("task_cycle_pause"));
+      ;
     }
 
     /** \brief Activate the heart.
@@ -68,7 +68,7 @@ namespace skynet
     }
 
     // DEBUG: Remove this once no longer needed for testing
-    int number_of_connections()
+    int number_of_connections() const
     {
       return device_manager_->get_neighbors().size();
     }
@@ -181,7 +181,7 @@ namespace skynet
     friend void task_cycle(Heart* heart);
 
     std::unique_ptr<BeatSender> beat_sender_;
-  std::unique_ptr<BeatInterpreter> beat_interpreter_;
+    std::unique_ptr<BeatInterpreter> beat_interpreter_;
     std::unique_ptr<PulseTimer> pulse_timer_;
     std::unique_ptr<DeviceManager> device_manager_;
     std::unique_ptr<PropertyChecker> property_checker_;
