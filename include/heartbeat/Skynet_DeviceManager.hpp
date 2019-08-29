@@ -31,8 +31,6 @@ namespace skynet
     using history_t = std::vector<BeatResponse>; //Device history
     using id_t = uint8_t; //Device ID
 
-
-  public:
     /** \brief Construct a new DeviceManager
      *
      * \param gateway the devices gateway used for creating communications to
@@ -191,7 +189,7 @@ namespace skynet
     //A map storing the response history for all neighboring devices
     std::unordered_map<id_t, history_t> response_history_;
 
-   };// class
+  };// class
 
 
 }// namespace skynet

@@ -17,8 +17,10 @@ namespace skynet
     { }
 
   private:
-    bool do_should_device_remain_(const DeviceReference& /* device */,
-      const std::vector<BeatResponse>& /* device_history */) const override
+    bool do_should_device_remain_(
+      const DeviceReference& /* device */,
+      const std::vector<BeatResponse>& /* device_history */
+    ) const override
     {
       return true;
     }

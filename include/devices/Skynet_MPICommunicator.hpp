@@ -60,8 +60,7 @@ namespace skynet
 
       std::vector<char> data(data_size);
       MPI_Status status;
-      MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_,
-	      tag_, comm_, &status);
+      MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_, tag_, comm_, &status);
       return data;
     }
 

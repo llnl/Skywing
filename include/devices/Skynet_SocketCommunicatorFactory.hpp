@@ -12,7 +12,7 @@ namespace skynet
   {
   public:
     using data_type = std::vector<std::unique_ptr<DeviceCommunicator>>;
-  public:
+
     /** \brief Create a new server SocketCommunicatorFactory.
      *
      * create a SocketListener for this factory and then use Gateway listener
@@ -42,8 +42,12 @@ namespace skynet
      * listening on
      *
      */
-    SocketCommunicatorFactory(const int type, const std::string& server_address,
-      const uint16_t skynet_port_of_connecting_device,  const uint16_t skynet_port)
+    SocketCommunicatorFactory(
+      const int type,
+      const std::string& server_address,
+      const uint16_t skynet_port_of_connecting_device,
+      const uint16_t skynet_port
+    )
       : type_(type),
         server_address_(server_address),
         local_port_(skynet_port),
@@ -72,7 +76,7 @@ namespace skynet
      *
      */
     std::unique_ptr<DeviceCommunicator>
-    create_new_communicator(const std::vector<std::string>& /* comm_config_info*/) override
+      create_new_communicator(const std::vector<std::string>& /* comm_config_info */) override
     {
       // connect to new Socket Communicator with Socket Factores using
       // handshake SocketCommunicator
@@ -102,7 +106,7 @@ namespace skynet
      *
      */
     std::vector<std::unique_ptr<DeviceCommunicator>>
-    create_requested_communicators()
+      create_requested_communicators()
     {
       std::vector<std::unique_ptr<DeviceCommunicator>> new_communicator;
       // connect to other Socket Factory using this factories listener and

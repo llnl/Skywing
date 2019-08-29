@@ -39,8 +39,10 @@ namespace skynet
      */
     // Is id_t expect to change to a heavier weight type?  It's an
     // integer, but it's currently being moved from.
-    DeviceReference(id_t device_id,
-		    std::unique_ptr<CommunicatorFactory>&& comm_factory)
+    DeviceReference(
+      id_t device_id,
+		  std::unique_ptr<CommunicatorFactory>&& comm_factory
+    )
       : is_believed_live_(true),
         device_id_(std::move(device_id)),
         comm_factory_(std::move(comm_factory))
@@ -64,7 +66,7 @@ namespace skynet
       return device_id_;
     }
 
-    bool operator ==(const DeviceReference& other_device) const
+    bool operator==(const DeviceReference& other_device) const
     { return device_id_ == other_device.get_id(); }
 
     /** \brief Request a new DeviceCommunicator for this DeviceReference.
