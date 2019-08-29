@@ -59,7 +59,7 @@ namespace skynet
      *  \param id Current value of ID
      *  \return The value of the next ID, regardless of whether it is registered
      */
-    id_t next_value(id_t id);
+    id_t next_value(id_t id) const;
 
     /** \brief Set bounds of ID type (first_id_) and (last_id_)
      */
@@ -94,7 +94,7 @@ namespace skynet
 
           next_id = next_value(next_id);
 
-          if (std::find(registered_ids_.begin(), registered_ids_.end(), next_id) != registered_ids_.end())
+          if (std::find(registered_ids_.begin(), registered_ids_.end(), next_id) == registered_ids_.end())
           {
             break;
           }
@@ -113,7 +113,7 @@ namespace skynet
   // Implementation for uint8_t IDs
   template<> inline void DeviceIdRegistry<uint8_t>::set_bounds()
   { first_id_ = 0; last_id_ = UINT8_MAX; }
-  template<> inline uint8_t DeviceIdRegistry<uint8_t>::next_value(const uint8_t id)
+  template<> inline uint8_t DeviceIdRegistry<uint8_t>::next_value(const uint8_t id) const
   { return id+1; }
 
 } // namespace skynet

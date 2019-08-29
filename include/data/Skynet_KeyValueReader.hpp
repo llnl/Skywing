@@ -52,10 +52,10 @@ namespace skynet
      * \param key Specifies name of the key
      * \return The value of the specified key
      */
-    const std::string& get_value(const std::string& key)
+    const std::string& get_value(const std::string& key) const
     {
       if (dictionary_.count(key) > 0)
-        return dictionary_[key];
+        return dictionary_.find(key)->second;
       else
       {
         std::cout << "Key-value dictionary does not contain key " << key << std::endl;
@@ -68,7 +68,7 @@ namespace skynet
      * \param key Specifies name of the key
      * \return Whether the key exists in the dictionary
      */
-    bool key_exists(const std::string& key)
+    bool key_exists(const std::string& key) const
     { return dictionary_.count(key) > 0; }
 
     /** \brief Verify that certain keys exist in the dictionary and throw an
@@ -76,7 +76,7 @@ namespace skynet
      *
      * \param keys A list of keys to check for
      */
-    void verify_keys(const std::vector<std::string>& keys)
+    void verify_keys(const std::vector<std::string>& keys) const
     {
       for (const auto& key : keys)
       {
@@ -90,7 +90,7 @@ namespace skynet
 
   private:
 
-    std::unordered_map<std::string,std::string> dictionary_;
+    std::unordered_map<std::string, std::string> dictionary_;
 
   }; // class KeyValueReader
 } // namespace skynet

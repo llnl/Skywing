@@ -21,7 +21,7 @@ namespace skynet
      *
      * \param config The Configuration object for the Skynet instance
      */
-    SocketGateway(KeyValueReader& config)
+    SocketGateway(const KeyValueReader& config)
       : config_(config)
     {
       // first verify configuration
@@ -70,8 +70,6 @@ namespace skynet
       }
       return factories;
     }
-
-
 
   private:
 
@@ -128,7 +126,7 @@ namespace skynet
     int type_;
     uint16_t skynet_port_;
     std::unique_ptr<SocketListener> listener_;
-    KeyValueReader& config_;
+    const KeyValueReader& config_;
 
   }; // class SocketGateway
 } // namespace skynet

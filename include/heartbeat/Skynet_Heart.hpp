@@ -44,9 +44,9 @@ namespace skynet
      *  \param property_checker type of PropertyChecker used by this device
      *  \param config The Configuration object for the Skynet instance
      */
-    Heart(std::unique_ptr<BeatSender> beat_sender, std::unique_ptr<BeatInterpreter> beat_interpreter,
-          std::unique_ptr<PulseTimer> pulse_timer, std::unique_ptr<DeviceManager> device_manager,
-          std::unique_ptr<PropertyChecker> property_checker, KeyValueReader& config)
+    Heart(std::unique_ptr<BeatSender>&& beat_sender, std::unique_ptr<BeatInterpreter>&& beat_interpreter,
+          std::unique_ptr<PulseTimer>&& pulse_timer, std::unique_ptr<DeviceManager>&& device_manager,
+          std::unique_ptr<PropertyChecker>&& property_checker, const KeyValueReader& config)
       : beat_sender_(std::move(beat_sender)),
         beat_interpreter_(std::move(beat_interpreter)),
         pulse_timer_(std::move(pulse_timer)),

@@ -38,7 +38,7 @@ namespace skynet
      * \param gateway the devices gateway used for creating communications to
      *  new devices
      */
-    DeviceManager(std::unique_ptr<Gateway> gateway):
+    DeviceManager(std::unique_ptr<Gateway>&& gateway):
       gateway_(std::move(gateway))
     { }
 
