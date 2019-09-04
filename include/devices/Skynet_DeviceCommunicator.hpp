@@ -33,7 +33,7 @@ namespace skynet
     template<typename T>
     T receive_from()
     {
-      auto buf  = do_receive_from_();
+      auto buf = do_receive_from_();
 
       return deserialize<T>(buf);
     }

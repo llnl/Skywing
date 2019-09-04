@@ -22,8 +22,10 @@ namespace skynet
      * \param tag The tag used for this Skynet Communicator.
      * \param other_rank The rank of the device with which we'll communicate.
      */
-    MPICommunicator(MPI_Comm comm, int tag, int other_rank)
-      : comm_(comm), tag_(tag), other_rank_(other_rank)
+    MPICommunicator(const MPI_Comm comm, const int tag, const int other_rank)
+      : comm_(comm),
+        tag_(tag),
+        other_rank_(other_rank)
     {}
 
   private:
@@ -35,7 +37,7 @@ namespace skynet
      * \param data_size Number of bytes of data to send.
      * \param tag A tag associated with the data.
      */
-    void do_send_to_(void* data, std::size_t data_size)
+    void do_send_to_(const void* const data, const std::size_t data_size)
     {
       MPI_Send(data, data_size, MPI_BYTE, other_rank_, tag_, comm_);
     }
@@ -57,13 +59,10 @@ namespace skynet
       MPI_Get_count(&status, MPI_BYTE, &data_size);
 
       std::vector<char> data(data_size);
-      MPI_Status status;
-      MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_,
-	       tag_, comm_, &status);
+      MPI_Recv(static_cast<void*>(&data[0]), data_size, MPI_BYTE, other_rank_, tag_, comm_, &status);
       return data;
     }
 
-    private:
     MPI_Comm comm_;
     int tag_;
     int other_rank_;

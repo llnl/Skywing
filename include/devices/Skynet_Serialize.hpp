@@ -17,7 +17,7 @@ namespace skynet
 {
   /** \brief Turn a value into a std::vector<char> */
   template<typename T>
-  std::vector<char> serialize(T t)
+  std::vector<char> serialize(const T& t)
   {
     std::stringstream ss;
     cereal::PortableBinaryOutputArchive ar(ss);

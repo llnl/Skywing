@@ -23,25 +23,23 @@ namespace skynet
      * \param filename Specifies configuration filename to be read in
      * \param delimiter Specifies what is to use to delimit keys from values
      */
-    KeyValueReader(std::string filename, std::string delimiter)
+    KeyValueReader(const std::string& filename, const std::string& delimiter)
     {
-      std::string key;
       std::ifstream infile(filename);
       if (!infile.is_open())
       {
-        std::cout << "Key-value file " << filename << " could not be opened."
-          << std::endl;
+        std::cout << "Key-value file " << filename << " could not be opened.\n";
         exit(-1);
       }
       std::string line;
-      while (getline(infile,line))
+      while (getline(infile, line))
       {
-        key = line.substr(0, line.find(delimiter));
+        const std::string key = line.substr(0, line.find(delimiter));
         if (!key_exists(key))
-          dictionary_[key] = line.substr(line.find(delimiter)+1, line.length());
+          dictionary_[key] = line.substr(line.find(delimiter) + 1, line.length());
         else
         {
-          std::cout << "Key collision on key " << key << " in " << filename << std::endl;
+          std::cout << "Key collision on key " << key << " in " << filename << '\n';
           exit(-1);
         }
       }
@@ -53,13 +51,14 @@ namespace skynet
      * \param key Specifies name of the key
      * \return The value of the specified key
      */
-    std::string get_value(std::string key)
+    const std::string& get_value(const std::string& key) const
     {
-      if (dictionary_.count(key) > 0)
-        return dictionary_[key];
+      const auto loc = dictionary_.find(key);
+      if (loc != dictionary_.end())
+        return loc->second;
       else
       {
-        std::cout << "Key-value dictionary does not contain key " << key << std::endl;
+        std::cout << "Key-value dictionary does not contain key " << key << '\n';
         exit(-1);
       }
     }
@@ -69,7 +68,7 @@ namespace skynet
      * \param key Specifies name of the key
      * \return Whether the key exists in the dictionary
      */
-    bool key_exists(std::string key)
+    bool key_exists(const std::string& key) const
     { return dictionary_.count(key) > 0; }
 
     /** \brief Verify that certain keys exist in the dictionary and throw an
@@ -77,13 +76,13 @@ namespace skynet
      *
      * \param keys A list of keys to check for
      */
-    void verify_keys(std::vector<std::string>& keys)
+    void verify_keys(const std::vector<std::string>& keys) const
     {
-      for (unsigned i = 0; i < keys.size(); i++)
+      for (const auto& key : keys)
       {
-        if (!key_exists(keys[i]))
+        if (!key_exists(key))
         {
-          std::cout << "Key-value file is missing key " << keys[i] << std::endl;
+          std::cout << "Key-value file is missing key " << key << '\n';
           exit(-1);
         }
       }
@@ -91,7 +90,7 @@ namespace skynet
 
   private:
 
-    std::unordered_map<std::string,std::string> dictionary_;
+    std::unordered_map<std::string, std::string> dictionary_;
 
   }; // class KeyValueReader
 } // namespace skynet
