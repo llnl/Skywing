@@ -36,7 +36,7 @@ namespace skynet
     // integer, but it's currently being moved from.
     DeviceReference(
       id_t device_id,
-		  std::unique_ptr<CommunicatorFactory>&& comm_factory
+		  std::unique_ptr<CommunicatorFactory> comm_factory
     )
       : is_believed_live_(true),
         device_id_(std::move(device_id)),

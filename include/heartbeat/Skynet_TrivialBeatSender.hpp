@@ -19,7 +19,7 @@ namespace skynet
   private:
     BeatResponse do_send_heartbeat_(const DeviceReference& /* device */) const override
     {
-      return BeatResponse{0};
+      return BeatResponse{};
     }
   };// class BeatSender
 

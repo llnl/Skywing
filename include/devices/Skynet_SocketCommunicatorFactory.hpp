@@ -106,7 +106,7 @@ namespace skynet
      *
      */
     std::vector<std::unique_ptr<DeviceCommunicator>>
-      create_requested_communicators()
+      create_requested_communicators() override
     {
       std::vector<std::unique_ptr<DeviceCommunicator>> new_communicator;
       // connect to other Socket Factory using this factories listener and

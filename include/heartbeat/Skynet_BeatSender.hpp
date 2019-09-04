@@ -9,7 +9,7 @@ namespace skynet
   /** \brief Defines what a response from another device looks like */
   struct BeatResponse
   {
-    double response_val;
+    double response_val = 0;
   };
 
   /** \class BeatSender

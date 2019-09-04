@@ -37,8 +37,8 @@ namespace skynet
      */
     // TODO: This originally took a non-const reference and the normal copy constructor
     //       was deleted below; this is very strange, was it an oversight?
-    Socket(const Socket& listener) :
-      address_type_(listener.address_type_)
+    Socket(const Socket& listener)
+      : address_type_(listener.address_type_)
     {
       sockaddr_in client_address_struct;
       // len can't be const as accept takes a non-const pointer
@@ -82,7 +82,7 @@ namespace skynet
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
           if (client_address != NULL)
-            inet_pton(Socket::IPv4, client_address, &(servaddr.sin_addr));
+            inet_pton(Socket::IPv4, client_address, &servaddr.sin_addr);
           else
             servaddr.sin_addr.s_addr = INADDR_ANY;
           break;
@@ -93,7 +93,7 @@ namespace skynet
       {
         servaddr.sin_port = htons(port);
         // Binding newly created socket to given IP and verification
-        if (bind(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) == 0)
+        if (bind(socket_handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) == 0)
         {
           bound = true;
           port_ = port;
@@ -136,14 +136,14 @@ namespace skynet
         case Socket::IPv4:
           servaddr.sin_family = Socket::IPv4;
 
-          inet_pton(Socket::IPv4, server_address, &(servaddr.sin_addr));
+          inet_pton(Socket::IPv4, server_address, &servaddr.sin_addr);
           break;
       }
 
       servaddr.sin_port = ntohs(port);
 
       // connect the client socket to server socket
-      if (connect(socket_handle_, (sockaddr*)&servaddr, sizeof(servaddr)) != 0)
+      if (connect(socket_handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) != 0)
       {
         perror("connect");
         exit(-1);

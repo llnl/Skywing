@@ -53,8 +53,9 @@ namespace skynet
      */
     const std::string& get_value(const std::string& key) const
     {
-      if (dictionary_.count(key) > 0)
-        return dictionary_.find(key)->second;
+      const auto loc = dictionary_.find(key);
+      if (loc != dictionary_.end())
+        return loc->second;
       else
       {
         std::cout << "Key-value dictionary does not contain key " << key << '\n';

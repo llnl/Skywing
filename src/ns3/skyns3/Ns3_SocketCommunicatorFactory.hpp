@@ -24,7 +24,7 @@ namespace ns3
 
     // TODO: try to find a way that this does not need to be reproduced here
     std::unique_ptr<skynet::DeviceCommunicator>
-    create_new_communicator(std::vector<std::string> /* comm_config_info*/)
+    create_new_communicator(std::vector<std::string> /* comm_config_info*/) override
     {
       std::unique_ptr<SocketCommunicator> sc;
       // if factory is server side
