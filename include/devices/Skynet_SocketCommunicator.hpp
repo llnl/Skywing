@@ -14,39 +14,33 @@ namespace skynet
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * creates an unconnected Socket object
-     * this communicator acts as a client
+     * Creates a connected socket based on the supplied address and port
      *
      * \param address_type Specifies the address type to be used.
+     * \param server_address The address to connect to
+     * \param port The port to connect to
      */
-    SocketCommunicator(const int address_type, const uint16_t port = 1)
-      : socket_(address_type, port)
-    {}
+    SocketCommunicator(
+      const int address_type,
+      const char* const server_address,
+      const std::uint16_t port
+    )
+      : socket_(address_type)
+    {
+      socket_.connect_to_server(server_address, port);
+    }
 
     /** \brief Construct a new SocketCommunicator.
      *
-     * creates a connected Socket object
-     * this communicator acts as a server
+     * Creates a communicator based off an already existing connection, taking ownership
      *
-     * \param listener The Socket that is listening for new connections
+     * \param conn An already existing connection to handle
      */
-    SocketCommunicator(const Socket& listener)
-      : socket_(listener)
+    SocketCommunicator(Socket conn)
+      : socket_(std::move(conn))
     {}
 
-    /** \brief Connect to a server SocketCommunicator.
-     *
-     * \param server_address The address of the server SocketCommunicator.
-     * \param port Which port number to connect to on the server.
-     */
-
-    void connect_to_server(const char* const server_address, const uint16_t port)
-    { socket_.connect_to_server(server_address, port); }
-
-
-
   private:
-
     void do_send_to_(const void* data, const std::size_t data_size) override
     {
       const uint16_t networkLen = htons(data_size); // convert to network byte order
@@ -67,7 +61,6 @@ namespace skynet
     }
 
     Socket socket_;
-
   }; // class SocketCommunicator
 } // namespace skynet
 

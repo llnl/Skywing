@@ -5,22 +5,23 @@
 #include <strings.h>
 #include <unistd.h>
 #include <iostream>
+#include <string>
 
 namespace skynet
 {
+  /** \brief Simple wrapper for low-level sockets
+   */
   class Socket
   {
   public:
-
-    static const int IPv4 = AF_INET; // redefinition of AF_INET const
+    static constexpr int ipv4 = AF_INET; // redefinition of AF_INET const
 
     /** \brief Construct a new Socket.
      *
      * \param address_type Specifies the address type to be used.
      */
-    Socket(const int address_type, const uint16_t port)
-      : address_type_(address_type),
-        port_(port)
+    Socket(const int address_type) :
+      address_type_(address_type)
     {
       confirm_supported_address_type();
       // socket create and verification
@@ -31,47 +32,78 @@ namespace skynet
       }
     }
 
-    /** \brief Construct a new Socket.
-     *
-     * \param listener The Socket object that is listening for new connections
+    /** \brief Delete copy constructor and copy assignment operators
      */
-    // TODO: This originally took a non-const reference and the normal copy constructor
-    //       was deleted below; this is very strange, was it an oversight?
-    Socket(const Socket& listener)
-      : address_type_(listener.address_type_)
+    Socket(const Socket& other) = delete;
+    Socket& operator=(const Socket& other) = delete;
+
+    // Move constructor
+    Socket(Socket&& other) noexcept :
+      socket_handle_(other.socket_handle_)
+    {
+      other.socket_handle_ = -1;
+    }
+
+    // Move assignment operator
+    Socket& operator=(Socket&& other) noexcept
+    {
+      // Do this in a round-about way to handle self-assignment
+      const int handle = other.socket_handle_;
+      other.socket_handle_ = -1;
+      socket_handle_ = handle;
+      return *this;
+    }
+
+    // Destructor
+    ~Socket()
+    {
+      if (socket_handle_ != -1)
+      {
+        close(socket_handle_);
+      }
+    }
+
+    /** \brief Accepts an incoming connection
+     *
+     * \return A Socket with the new connection
+     */
+    Socket accept() const
     {
       sockaddr_in client_address_struct;
       // len can't be const as accept takes a non-const pointer
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      socket_handle_ = accept(listener.socket_handle_, (sockaddr*) &client_address_struct, &len);
-      if (socket_handle_ < 0)
+      int raw_handle = ::accept(socket_handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
+      if (raw_handle < 0)
       {
         perror("accept");
         exit(-1);
       }
 
-      switch(address_type_)
-      {
-        case Socket::IPv4:
-          address_ = inet_ntop(Socket::IPv4, &client_address_struct.sin_addr, ipv4Buf_, INET_ADDRSTRLEN);
-          break;
-      }
+      // TODO: Is this address needed for any reason?
+      // Can maybe move this into the switch somehow
+      // char buffer[INET_ADDRSTRLEN];
+      // std::string address;
+      // switch(address_type_)
+      // {
+      //   case ipv4:
+      //     address = inet_ntop(ipv4, &client_address_struct.sin_addr, buffer, INET_ADDRSTRLEN);
+      //     break;
+      // }
+      // return std::make_pair(Socket(raw_handle), address);
+
+      return Socket(with_raw_handle{}, raw_handle);
     }
 
-    ~Socket()
-    { close(socket_handle_); socket_handle_ = -1; }
-
-    /** \brief Delete copy & move constructors and copy & move assignment operators
+    /** \brief Binds the socket to a port/address
+     *
+     * \param port The port to bind to
+     * \param try_other_ports If other ports should be tried if the initial one fails
+     * \param client_address The address to bind to, if any
+     * \return The port that was bound to
      */
-    // See TODO above about why this is commented out
-    //Socket(const Socket& other) = delete;
-    Socket& operator=(const Socket& other) = delete;
-    Socket(Socket&& other) = delete;
-    Socket& operator=(Socket&& other) = delete;
-
-    uint16_t bind_to_port(uint16_t port, const bool try_other_ports, const char* const client_address)
+    uint16_t bind_to_port(const uint16_t port, const bool try_other_ports, const char* const client_address)
     {
       // Socket stucture
       sockaddr_in servaddr;
@@ -79,42 +111,35 @@ namespace skynet
 
       switch(address_type_)
       {
-        case Socket::IPv4:
-          servaddr.sin_family = Socket::IPv4;
-          if (client_address != NULL)
-            inet_pton(Socket::IPv4, client_address, &servaddr.sin_addr);
+        case ipv4:
+          servaddr.sin_family = ipv4;
+          if (client_address != nullptr)
+            inet_pton(ipv4, client_address, &servaddr.sin_addr);
           else
             servaddr.sin_addr.s_addr = INADDR_ANY;
           break;
       }
 
-      bool bound = false;
-      do
+      for (auto test_port = port; test_port < UINT16_MAX; ++test_port)
       {
-        servaddr.sin_port = htons(port);
-        // Binding newly created socket to given IP and verification
+        servaddr.sin_port = htons(test_port);
         if (bind(socket_handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) == 0)
         {
-          bound = true;
-          port_ = port;
+          return test_port;
         }
-        else
+        else if (!try_other_ports)
         {
-          if (try_other_ports)
-          {
-            ++port;
-          }
-          else
-          {
-            perror("bind");
-            exit(-1);
-          }
+          perror("bind");
+          exit(-1);
         }
-      } while (!bound && port < UINT16_MAX);
-
-      return port;
+      }
+      // TODO: What to do here?
+      std::cout << "Ports exhausted\n";
+      exit(-1);
     }
 
+    /** \brief Set the socket to listen for incoming connections
+     */
     void set_to_listen(const int queue_length)
     {
       listen(socket_handle_, queue_length);
@@ -133,10 +158,10 @@ namespace skynet
 
       switch(address_type_)
       {
-        case Socket::IPv4:
-          servaddr.sin_family = Socket::IPv4;
+        case ipv4:
+          servaddr.sin_family = ipv4;
 
-          inet_pton(Socket::IPv4, server_address, &servaddr.sin_addr);
+          inet_pton(ipv4, server_address, &servaddr.sin_addr);
           break;
       }
 
@@ -150,7 +175,9 @@ namespace skynet
       }
     }
 
-    int query_queue()
+    /** \brief Returns the number of connections in the queue
+     */
+    int query_queue() const
     {
       fd_set set;
       timeval timeout;
@@ -159,12 +186,22 @@ namespace skynet
       timeout.tv_sec = 0;
       timeout.tv_usec = 0;
 
-      return select(socket_handle_ + 1, &set, NULL, NULL, &timeout);
+      return select(socket_handle_ + 1, &set, nullptr, nullptr, &timeout);
     }
 
+    /** \brief Sends a message using the socket
+     *
+     * \param message The message to send
+     * \param message_size The size of the message
+     */
     void send_message(const void* const message, const std::size_t message_size) const
     { write(socket_handle_, message, message_size); }
 
+    /** \brief Reads a message from the socket
+     *
+     * \param buffer The buffer to read into
+     * \param buffer_size The size of the buffer
+     */
     void read_message(void* const buffer, const std::size_t buffer_size) const
     {
       if (read(socket_handle_, buffer, buffer_size) == -1)
@@ -174,14 +211,17 @@ namespace skynet
       }
     }
 
-    /** \brief Returns port number of socket.
-     *
-     */
-    uint16_t get_port() const
-    {
-      return port_;
-    }
   private:
+    // Tag for using the raw handle constructor
+    struct with_raw_handle{};
+
+    /** \brief Create a socket from a raw handle
+     *
+     * \param handle The raw handle
+     */
+    Socket(with_raw_handle, const int handle) :
+      socket_handle_(handle)
+    {}
 
     /** \brief Confirm that this object's address type is supported.
      *
@@ -189,19 +229,16 @@ namespace skynet
      */
     void confirm_supported_address_type()
     {
-      if (address_type_ != IPv4)
+      if (address_type_ != ipv4)
       {
         std::cout << "Incorrect address type " << address_type_ << " in Socket\n";
         exit(-1);
       }
     }
 
-    int socket_handle_;
+    // Raw socket handle
+    int socket_handle_ = -1;
     int address_type_;
-    uint16_t port_;
-    const char* address_;
-    char ipv4Buf_[INET_ADDRSTRLEN];
-
   }; // class Socket
 } // namespace skynet
 

@@ -22,24 +22,11 @@ namespace skynet
      * \param config The Configuration object for the Skynet instance
      */
     SocketGateway(const KeyValueReader& config)
-      : config_(config)
-      // Wait to set the rest of the values so that the configuration can be verified
-    {
-      // first verify configuration
-      verify_configuration();
-      // extract the skynet_port and address type from the configuration
-      skynet_port_ = std::stoi(config.get_value("skynet_port"));
-      // TODO: maybe improve this
-      if (config.get_value("address_type") == "IPv4")
-        type_ = Socket::IPv4;
-      else
-      {
-        std::cout << "Invalid address type in configuration value\n";
-        exit(-1);
-      }
-      // create the SocketListener for this SocketGateway
-      listener_ = std::make_unique<SocketListener>(type_, skynet_port_, false);
-    }
+      : config_(verify_configuration(config)),
+        type_(get_type(config)),
+        skynet_port_(std::stoi(config.get_value("skynet_port"))),
+        listener_(type_, skynet_port_, false)
+    {}
 
     /** \brief Create ScoketCommunicatorFactory for each device listed in the
      * configuration
@@ -47,7 +34,7 @@ namespace skynet
      * \return a vector of CommunicatorFactory objects that are associated with
      * Devices listed in the configuration.
      */
-    std::vector<std::unique_ptr<CommunicatorFactory>> create_initial_connections() const
+    std::vector<std::unique_ptr<CommunicatorFactory>> create_initial_connections() const override
     {
       std::vector<std::unique_ptr<CommunicatorFactory>> factories;
       // obtain number of devices in configuration and iterate through them
@@ -62,9 +49,8 @@ namespace skynet
         const uint16_t port = config_.key_exists(port_key)
           ? std::stoi(config_.get_value(port_key))
           : skynet_port_;
-        // create corresponding SocketCommunicatorFactory
 
-        // std::cout<<"Device "<< skynet_port_<<" is creating factory for device  "<< port <<std::endl;
+        // create corresponding SocketCommunicatorFactory
         factories.push_back(
           std::make_unique<SocketCommunicatorFactory>(
             type_,
@@ -83,57 +69,73 @@ namespace skynet
      *
      * \return whether there is a connection request
      */
-    bool client_requesting_connection() const
-    { return listener_->count_pending_clients() > 0; }
+    bool client_requesting_connection() const override
+    { return listener_.count_pending_clients() > 0; }
 
     /** \brief Create new SocketCommunicatorFactory
      *
      * \return a unique_ptr to a new SocketCommunicatorFactory
      */
-    std::unique_ptr<CommunicatorFactory> create_new_factory() const
+    std::unique_ptr<CommunicatorFactory> create_new_factory() const override
     {
       // create SocketCommunicatorFactory
-      std::unique_ptr<SocketCommunicatorFactory> new_commfactory =
-        std::make_unique<SocketCommunicatorFactory>(type_, 1, skynet_port_);
+      auto new_commfactory = std::make_unique<SocketCommunicatorFactory>(type_, 1, skynet_port_);
       // create a new SocketCommunicator connected to client and send
       // SocketListener port number back to the client (buffer communication)
-      std::unique_ptr<SocketCommunicator> handshake =
-        listener_->connect_communicator_to_client();
+      auto handshake = listener_.connect_communicator_to_client();
 
       // Sendthe port_number of socket listener in this decives factory to
       // the gatway listener of the other devices
-      handshake->send_to<uint16_t>(new_commfactory->get_port_listener_remote_factory());
+      handshake.send_to<uint16_t>(new_commfactory->get_port_listener_remote_factory());
       // Get the port number for the socket listener in other devices factory
       // and update comummication factory information
-      new_commfactory->update_port_listener_remote_factory(handshake->receive_from<uint16_t>());
+      new_commfactory->update_port_listener_remote_factory(handshake.receive_from<uint16_t>());
 
       return new_commfactory;
     }
 
     /** \brief Verify that all required keys are in the configuration
      *
-     * \param key Specifies name of the key
-     * \return Whether the key exists in the dictionary
+     * \param to_check The configuration to check
+     * \return The parameter to_check
      */
-    void verify_configuration()
+    static const KeyValueReader& verify_configuration(const KeyValueReader& to_check)
     {
+      // Ensure that number_of_devices exists before accessing it
+      to_check.verify_keys({"number_of_devices"});
+
+      // Otherwise check everything else
       std::vector<std::string> keys{
         "skynet_port",
-        "address_type",
-        "number_of_devices"
+        "address_type"
       };
-
-      const int num_of_devices = std::stoi(config_.get_value("number_of_devices"));
+      const int num_of_devices = std::stoi(to_check.get_value("number_of_devices"));
       for (int i = 0; i < num_of_devices; ++i)
         keys.push_back("device" + std::to_string(i + 1) + "_ip_address");
-      config_.verify_keys(keys);
+      to_check.verify_keys(keys);
+
+      return to_check;
     }
 
+    /** \brief Returns the type of connection from the specified configuration
+     *
+     * \param config The configuration to read from
+     */
+    static int get_type(const KeyValueReader& config)
+    {
+      if (config.get_value("address_type") == "IPv4")
+        return Socket::ipv4;
+      else
+      {
+        std::cout << "Invalid address type in configuration value\n";
+        exit(-1);
+      }
+    }
+
+    const KeyValueReader& config_;
     int type_;
     uint16_t skynet_port_;
-    std::unique_ptr<SocketListener> listener_;
-    const KeyValueReader& config_;
-
+    SocketListener listener_;
   }; // class SocketGateway
 } // namespace skynet
 
