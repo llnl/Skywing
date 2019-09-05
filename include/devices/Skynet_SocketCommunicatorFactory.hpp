@@ -115,10 +115,7 @@ namespace skynet
       handshake.send_to<uint16_t>(new_listener.get_socket_port());
 
       // Make sure they connect to the listern first
-      uint16_t new_port = 0;
-      while (new_port == 0) {
-        new_port = handshake.receive_from<uint16_t>();
-      }
+      handshake.receive_from<uint16_t>();
 
       // Conect to the client with a new communicator
       new_communicator.push_back(std::make_unique<SocketCommunicator>(new_listener.connect_communicator_to_client()));

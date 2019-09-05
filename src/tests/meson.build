@@ -1,5 +1,8 @@
 # ['test_name', 'path/to/test/source']
 tests = [
+  # comm/
+  ['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
+
   # data/
   ['keyvaluereader_test', 'data/Skynet_KeyValueReader_test.cpp'],
 
