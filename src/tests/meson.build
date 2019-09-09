@@ -2,6 +2,7 @@
 tests = [
   # comm/
   ['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
+  ['broadcast_test_sockets', 'comm/Skynet_Broadcast_sockets_test.cpp'],
 
   # data/
   ['keyvaluereader_test', 'data/Skynet_KeyValueReader_test.cpp'],

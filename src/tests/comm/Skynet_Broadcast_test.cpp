@@ -71,8 +71,6 @@ constexpr std::array<const char*, 5> machine_configs{
   "device3_port 5400"
 };
 
-#include <sstream>
-
 struct BroadcastMessage
 {
   template <class Archive>
@@ -159,7 +157,6 @@ void machine_task(const std::size_t index)
         comm->send_to(to_broadcast);
       }
       heard_id = to_broadcast.id;
-      std::cout << "the word is out from " << send_index + 1 << '\n';
     }
     // Even the sending machine will hear the broadcast again, so it can just accept it
     // Note that this too is incredibly fragile since everything has to be broadcast and
