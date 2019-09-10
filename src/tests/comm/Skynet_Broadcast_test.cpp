@@ -29,9 +29,6 @@ constexpr std::array<std::size_t, 5> machine_counts{1, 2, 3, 3, 3};
 // The number of requests that need to be made
 constexpr std::array<int, 5> requests_needed{1, 2, 2, 1, 0};
 
-// The number of accepts that need to be made
-//constexpr std::array<int, 5> accepts_needed{0, 0, 1, 2, 3};
-
 constexpr std::array<const char*, 5> machine_configs{
   // Machine 1
   "skynet_port 5100\n"
@@ -117,10 +114,6 @@ void machine_task(const std::size_t index)
     // Have to do it from the back to the front since the later machines
     // are accepting first
     const auto adj_i = factories.size() - 1 - i;
-    // TODO: This appears to always bind the port to 1024, which somehow hasn't errored?
-    //       I think this may be the cause of the problems
-    // TODO: The above seems to be fine?  Even when everything has different ports it still
-    //       isn't working... I really have no idea why...
     comms.push_back(factories[adj_i]->create_new_communicator({}));
   }
   while (comms.size() != factories.size())

@@ -77,7 +77,7 @@ namespace skynet
       socklen_t len = sizeof(client_address_struct);
 
       // Accept the data packet from client and verification
-      int raw_handle = ::accept(socket_handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
+      int raw_handle = ::accept4(socket_handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len, SOCK_NONBLOCK);
       if (raw_handle < 0)
       {
         perror("accept");

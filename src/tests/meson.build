@@ -1,7 +1,7 @@
 # ['test_name', 'path/to/test/source']
 tests = [
   # comm/
-  #['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
+  ['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
   ['broadcast_test_sockets', 'comm/Skynet_Broadcast_sockets_test.cpp'],
 
   # data/
