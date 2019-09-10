@@ -20,13 +20,13 @@ void my_server(thread_client_msg& write_to)
   SocketCommunicator socketCom(5086);
   std::this_thread::sleep_for(std::chrono::seconds(10));
 
-  write_to.test_int  = socketCom.receive_from<int>();
-  write_to.test_double = socketCom.receive_from<double>();
-  write_to.test_unsigned = socketCom.receive_from<unsigned>();
-  write_to.test_bool = socketCom.receive_from<bool>();
-  write_to.intvec = socketCom.receive_from<std::vector<int>>();
-  write_to.doublevec = socketCom.receive_from<std::vector<double>>();
-  write_to.unsignedvec = socketCom.receive_from<std::vector<unsigned>>();
+  write_to.test_int  = socketCom.receive<int>();
+  write_to.test_double = socketCom.receive<double>();
+  write_to.test_unsigned = socketCom.receive<unsigned>();
+  write_to.test_bool = socketCom.receive<bool>();
+  write_to.intvec = socketCom.receive<std::vector<int>>();
+  write_to.doublevec = socketCom.receive<std::vector<double>>();
+  write_to.unsignedvec = socketCom.receive<std::vector<unsigned>>();
 }
 
 void my_client(const thread_client_msg& send_message)
@@ -37,13 +37,13 @@ void my_client(const thread_client_msg& send_message)
 
   std::this_thread::sleep_for(std::chrono::seconds(11));
 
-  socketCom.send_to<int>(send_message.test_int);
-  socketCom.send_to<double>(send_message.test_double);
-  socketCom.send_to<unsigned>(send_message.test_unsigned);
-  socketCom.send_to<bool>(send_message.test_bool);
-  socketCom.send_to<std::vector<int>>(send_message.intvec);
-  socketCom.send_to<std::vector<double>>(send_message.doublevec);
-  socketCom.send_to<std::vector<unsigned>>(send_message.unsignedvec);
+  socketCom.blocking_send<int>(send_message.test_int);
+  socketCom.blocking_send<double>(send_message.test_double);
+  socketCom.blocking_send<unsigned>(send_message.test_unsigned);
+  socketCom.blocking_send<bool>(send_message.test_bool);
+  socketCom.blocking_send<std::vector<int>>(send_message.intvec);
+  socketCom.blocking_send<std::vector<double>>(send_message.doublevec);
+  socketCom.blocking_send<std::vector<unsigned>>(send_message.unsignedvec);
 }
 
 TEST_CASE("Communication methods work", "[Skynet_SocketCommunicator]")

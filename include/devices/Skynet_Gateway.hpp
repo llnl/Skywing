@@ -14,21 +14,17 @@ namespace skynet
   {
   public:
 
-    /** \brief Create CommunicatorFactory for each new connection.
+    /** \brief Create a Communicator Factory if one is pending.
      *
-     * \return a vector of CommunicatorFactory objects that are associated with
-     * Devices that have connected since the last time this method was called.
+     * \return A Communicator Factory if one was requested, nullptr otherwise
      */
-    std::vector<std::unique_ptr<CommunicatorFactory>> collect_new_connections() const
+    std::unique_ptr<CommunicatorFactory> collect_new_connection() const
     {
-      std::vector<std::unique_ptr<CommunicatorFactory>> new_factories;
-      while (client_requesting_connection())
+      if (client_requesting_connection())
       {
-        // create new CommunicatorFactory connected to client and add it to the
-        // new_factories list
-        new_factories.push_back(create_new_factory());
+        return create_new_factory();
       }
-      return new_factories;
+      return nullptr;
     }
 
     /** \brief Create CommunicatorFactory for each device in configuration file.

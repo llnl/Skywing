@@ -37,9 +37,9 @@ void device1()
   while (true)
   {
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    factories = gateway.collect_new_connections();
-    if (factories.size() == 1)
+    if (auto factory = gateway.collect_new_connection())
     {
+      factories.push_back(std::move(factory));
       break;
     }
   }
@@ -48,24 +48,30 @@ void device1()
   // Create new Socket Communicators from the constucted factories
   std::cout << "Device 1 is creating communicators......\n";
   std::vector<std::unique_ptr<DeviceCommunicator>> communicators;
-  for (auto&& factory : factories)
+  while (communicators.size() != 1)
   {
-    const std::vector<std::string> comm_config;
-    communicators.push_back(factory->create_new_communicator(comm_config));
+    for (auto&& factory : factories)
+    {
+      const std::vector<std::string> comm_config;
+      if (auto comm = factory->create_new_communicator(comm_config))
+      {
+        communicators.push_back(std::move(comm));
+      }
+    }
   }
 
   std::cout << "Device 1 is checking if factories have requests....\n";
 
   // Create new Socket Communicators from the constucted factories
-  for (auto&& factory : factories)
+  while (communicators.size() != 2)
   {
-    std::vector<std::unique_ptr<DeviceCommunicator>> new_communicators =
-      factory->create_requested_communicators();
-    std::move(
-      new_communicators.begin(),
-      new_communicators.end(),
-      std::back_inserter(communicators)
-    );
+    for (auto&& factory : factories)
+    {
+      if (auto comm = factory->create_requested_communicator())
+      {
+        communicators.push_back(std::move(comm));
+      }
+    }
   }
 
   /*Check that two Socket Communicatiors were created */
@@ -101,22 +107,28 @@ void device2()
 
     std::vector<std::unique_ptr<DeviceCommunicator>> communicators;
     // Create new Socket Communicators from the constucted factories
-    for (auto&& factory : factories)
+    while (communicators.size() != 1)
     {
-      std::vector<std::unique_ptr<DeviceCommunicator>> new_communicators =
-        factory->create_requested_communicators();
-      std::move(
-        new_communicators.begin(),
-        new_communicators.end(),
-        std::back_inserter(communicators)
-      );
+      for (auto&& factory : factories)
+      {
+        if (auto comm = factory->create_requested_communicator())
+        {
+          communicators.push_back(std::move(comm));
+        }
+      }
     }
 
     std::cout << "Device 2 is creating communicators......\n";
-    for (auto&& factory : factories)
+    while (communicators.size() != 2)
     {
-      const std::vector<std::string> comm_config;
-      communicators.push_back(factory->create_new_communicator(comm_config));
+      for (auto&& factory : factories)
+      {
+        const std::vector<std::string> comm_config;
+        if (auto comm = factory->create_new_communicator(comm_config))
+        {
+          communicators.push_back(std::move(comm));
+        }
+      }
     }
     std::cout << "Device 2 has " << communicators.size() << " Socket Communicators\n";
     // Check that two Socket Communicatiors were created

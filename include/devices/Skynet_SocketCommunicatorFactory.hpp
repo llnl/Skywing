@@ -54,11 +54,11 @@ namespace skynet
       // TODO: implement error catching if this process failes
       // connect to Gatekeeper on server device using handshake SocketCommunicator
       SocketCommunicator handshake(type_, server_address_.c_str(), skynet_port_of_connecting_device);
-      port_listener_remote_factory_ = handshake.receive_from<uint16_t>();
+      port_listener_remote_factory_ = handshake.blocking_receive<uint16_t>();
 
       // obtain gateway port on server via server Gatekeeper, then close
       // handshake SocketCommunicator
-      handshake.send_to<uint16_t>(listener_.get_socket_port());
+      handshake.send<uint16_t>(listener_.get_socket_port());
     }
 
 
@@ -75,22 +75,20 @@ namespace skynet
     std::unique_ptr<DeviceCommunicator>
       create_new_communicator(const std::vector<std::string>& /* comm_config_info */) override
     {
+      std::cerr << "create_new_communicator " << server_address_ << '\n';
       // connect to new Socket Communicator with Socket Factores using
       // handshake SocketCommunicator
       SocketCommunicator handshake(type_, server_address_.c_str(), port_listener_remote_factory_);
 
       // Wait till you have a response from other device factory listener
       // to get port number of new Socket Communicator
-      uint16_t new_port = 0;
-      while (new_port == 0) {
-        new_port = handshake.receive_from<uint16_t>();
-      }
+      const uint16_t new_port = handshake.blocking_receive<uint16_t>();
 
       // Create new communicator to the over devices Socket Communicator
       SocketCommunicator new_communicator(type_, server_address_.c_str(), new_port);
 
       // Send response back that connection occured and close connection
-      handshake.send_to<int>(-1);
+      handshake.send<int>(-1);
 
       return std::make_unique<SocketCommunicator>(std::move(new_communicator));
     }
@@ -99,10 +97,12 @@ namespace skynet
      * Factory and then create Communicator.
      *
      */
-    std::vector<std::unique_ptr<DeviceCommunicator>>
-      create_requested_communicators() override
+    std::unique_ptr<DeviceCommunicator> create_requested_communicator() override
     {
-      std::vector<std::unique_ptr<DeviceCommunicator>> new_communicator;
+      if (listener_.count_pending_clients() == 0)
+      {
+        return nullptr;
+      }
       // connect to other Socket Factory using this factories listener and
       // see if there are any connection requests
       // handshake SocketCommunicator
@@ -112,16 +112,13 @@ namespace skynet
       SocketListener new_listener(type_, 1, true);
 
       //send listener port
-      handshake.send_to<uint16_t>(new_listener.get_socket_port());
+      handshake.send<uint16_t>(new_listener.get_socket_port());
 
       // Make sure they connect to the listern first
-      handshake.receive_from<uint16_t>();
+      handshake.blocking_receive<uint16_t>();
 
       // Conect to the client with a new communicator
-      new_communicator.push_back(std::make_unique<SocketCommunicator>(new_listener.connect_communicator_to_client()));
-
-      //close handshake
-      return new_communicator;
+      return std::make_unique<SocketCommunicator>(new_listener.connect_communicator_to_client());
     }
 
     uint16_t get_port_listener_remote_factory() const

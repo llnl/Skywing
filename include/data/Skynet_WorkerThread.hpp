@@ -1,3 +1,6 @@
+#ifndef SKYNET_WORKERTHREAD_HPP__
+#define SKYNET_WORKERTHREAD_HPP__
+
 #include <function>
 #include <chrono>
 #include <vector>
@@ -8,30 +11,34 @@
 #include <atomic>
 #include <iterator>
 #include <climits>
+#include <tuple>
+#include <type_traits>
+
+#include "Skynet_Future.hpp"
 
 namespace skynet
 {
   /** \brief Class to use for a working thread for doing work with skynet::Future
    *
    */
-  class FutureThread
+  class WorkerThread
   {
   public:
     /// The type of tasks to submit; returns true on completion, false to be resubmitted
     using task_type = std::function<bool()>;
 
     // Non-copyable, but movable
-    FutureThread(const FutureThread&) = delete;
-    FutureThread(FutureThread&&) = default;
-    FutureThread& operator=(const FutureThread&) = delete;
-    FutureThread& operator=(FutureThread&&) = default;
+    WorkerThread(const WorkerThread&) = delete;
+    WorkerThread(WorkerThread&&) = default;
+    WorkerThread& operator=(const WorkerThread&) = delete;
+    WorkerThread& operator=(WorkerThread&&) = default;
 
-    /** \brief Cleanly exits the FutureThread
+    /** \brief Cleanly exits the WorkerThread
      *
      * Although the thread cleanly exits, there may still be work in the queue that
      * has yet to finish.
      */
-    ~FutureThread()
+    ~WorkerThread()
     {
       kill_thread_ = true;
       // Will force the thread to stop waiting
@@ -44,13 +51,53 @@ namespace skynet
      * \param func The function to run; should return false if it needs to be
      *             run again, and true if the work is complete
      */
-    void submit_work(task_type&& func)
+    Future<void> submit_work(task_type&& func)
     {
+      // make a wrapper so that a future can be returned
+      std::promise<void> promise;
+      std::future<void> to_ret = promise.get_future();
+      auto wrapper = [func = std::move(func), promise = std::move(promise)]() mutable {
+        if (func())
+        {
+          promise.set_value();
+          return true;
+        }
+        return false;
+      };
       {
         std::unique_lock<std::mutex> lock(task_mut_);
-        pending_tasks.push_back(std::move(func));
+        pending_tasks.push_back(std::move(wrapper));
       }
       work_to_be_done_.notify_all();
+      return Future<void>(std::move(to_ret));
+    }
+
+    /** \brief Wraps a value returning callable to be used
+     *
+     * \param func The callable to run, should return a pair-like object of
+     *             a bool and a value where the bool signals if the value is ready
+     */
+    template<typename Callable>
+    auto wrap_and_submit_work(Callable&& func) -> Future<std::tuple_element_t<0, std::result_of_t<func()>>>
+    {
+      using value_type = std::tuple_element_t<0, std::result_of_t<func()>>;
+      std::promise<value_type> promise;
+      std::future<value_type> to_ret = promise.get_future();
+      auto wrapper = [func = std::forward<Callable>(func), promise = std::move(promise)]() mutable {
+        const auto value_pair = func();
+        if (std::get<0>(value_pair))
+        {
+          promise.set_value(std::get<1>(value_pair));
+          return true;
+        }
+        return false;
+      };
+      {
+        std::unique_lock<std::mutex> lock(task_mut_);
+        pending_tasks.push_back(std::move(wrapper));
+      }
+      work_to_be_done_.notify_all();
+      return Future<value_type>(std::move(to_ret));
     }
 
   private:
@@ -64,7 +111,7 @@ namespace skynet
           std::unique_lock<std::mutex> lock(task_mut_);
           // wait "forever" if there isn't already work in the queue
           const auto time_to_wait = current_tasks_.empty()
-            ? std::chrono::milliseconds(LLONG_MAX)
+            ? decltype(work_interval)(LLONG_MAX)
             : work_interval;
           work_to_be_done_.wait_for(lock, [this]() {
             return !pending_tasks.empty();
@@ -122,6 +169,8 @@ namespace skynet
     std::atomic<bool> kill_thread_{false};
 
     // The amount of time to wait between running through threads if work remains
-    static constexpr std::chrono::milliseconds work_interval(1);
-  }; // class FutureThread
+    static constexpr std::chrono::microseconds work_interval(10);
+  }; // class WorkerThread
 } // namespace skynet
+
+#endif // SKYNET_WORKERTHREAD_HPP__

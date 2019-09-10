@@ -1,22 +1,23 @@
 # ['test_name', 'path/to/test/source']
 tests = [
   # comm/
-  ['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
+  #['broadcast_test', 'comm/Skynet_Broadcast_test.cpp'],
   ['broadcast_test_sockets', 'comm/Skynet_Broadcast_sockets_test.cpp'],
 
   # data/
   ['keyvaluereader_test', 'data/Skynet_KeyValueReader_test.cpp'],
+  #['future_test', 'data/Skynet_Future_test.cpp'],
 
   # devices/
   ['serialization_test', 'devices/Skynet_Serialization_test.cpp'],
   ['socketbuildcommunications_test', 'devices/Skynet_SocketBuildCommunications_test.cpp'],
   # ['socketcommunicator_test', 'devices/Skynet_SocketCommunicator_test.cpp'],
-  ['zmqcommunicator_test', 'devices/Skynet_ZMQCommunicator_test.cpp'],
-  ['socketgateway_test', 'devices/Skynet_SocketGateway_test.cpp'],
+  # ['zmqcommunicator_test', 'devices/Skynet_ZMQCommunicator_test.cpp'],
+  # ['socketgateway_test', 'devices/Skynet_SocketGateway_test.cpp'],
 
   # heartbeat/
-  ['deviceidregistry_test', 'heartbeat/Skynet_DeviceIdRegistry_test.cpp'],
-  ['heart_test', 'heartbeat/Skynet_Heart_test.cpp']
+  #['deviceidregistry_test', 'heartbeat/Skynet_DeviceIdRegistry_test.cpp'],
+  #['heart_test', 'heartbeat/Skynet_Heart_test.cpp']
 ]
 
 foreach t : tests

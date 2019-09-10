@@ -30,7 +30,7 @@ constexpr std::array<std::size_t, 5> machine_counts{1, 2, 3, 3, 3};
 constexpr std::array<int, 5> requests_needed{1, 2, 2, 1, 0};
 
 // The number of accepts that need to be made
-constexpr std::array<int, 5> accepts_needed{0, 0, 1, 2, 3};
+//constexpr std::array<int, 5> accepts_needed{0, 0, 1, 2, 3};
 
 constexpr std::array<const char*, 5> machine_configs{
   // Machine 1
@@ -105,17 +105,11 @@ void machine_task(const std::size_t index)
   while (factories.size() != machine_counts[index])
   {
     std::this_thread::sleep_for(10ms);
-    auto new_factories = gateway.collect_new_connections();
-    for (auto&& factory : new_factories)
+    if (auto factory = gateway.collect_new_connection())
     {
       factories.push_back(std::move(factory));
     }
   }
-  // I really don't like how this is, but I can't think of a better way to do it...
-  // Note that this is very brittle (deadlocks if anything goes wrong too) and took
-  // a long time to get right.  Might need to redo some of the communications stuff
-  // to make this easier?  Querying / non-blocking when there are no communicators
-  // to create would make this a lot easier I feel
   std::vector<std::unique_ptr<DeviceCommunicator>> comms;
   // Set up communications between all machines
   for (int i = 0; i < requests_needed[index]; ++i)
@@ -123,57 +117,91 @@ void machine_task(const std::size_t index)
     // Have to do it from the back to the front since the later machines
     // are accepting first
     const auto adj_i = factories.size() - 1 - i;
+    // TODO: This appears to always bind the port to 1024, which somehow hasn't errored?
+    //       I think this may be the cause of the problems
+    // TODO: The above seems to be fine?  Even when everything has different ports it still
+    //       isn't working... I really have no idea why...
     comms.push_back(factories[adj_i]->create_new_communicator({}));
   }
-  for (int i = 0; i < accepts_needed[index]; ++i)
+  while (comms.size() != factories.size())
   {
-    // These have to be inserted in the front so that they're in the
-    // same order on all machines (yes, super fragile code here)
-    auto new_communicators = factories[i]->create_requested_communicators();
-    for (auto&& comm : new_communicators)
+    for (auto&& factory : factories)
     {
-      comms.insert(comms.begin(), std::move(comm));
+      if (auto new_comm = factory->create_requested_communicator())
+      {
+        comms.push_back(std::move(new_comm));
+      }
     }
   }
-  REQUIRE(comms.size() == factories.size());
+  std::stringstream s;
+  s << index << " : [" ;
+  for (auto&& comm : comms)
+  {
+    const auto* a = static_cast<SocketCommunicator*>(comm.get());
+    s << ' ';
+    a->do_debug(s);
+  }
+  s << " ]\n";
+  std::cout << s.str();
+  // Future: Can tag data and then have a buffer for if stuff arrives out of order
+  int last_heard = 0;
   for (std::size_t send_index = 0; send_index < machine_configs.size(); ++send_index)
   {
-    // These indexes don't work; I don't know if anything can be done about it
-    if (send_index == 1 || send_index == 3 || send_index == 4)
-    {
-      continue;
-    }
     const BroadcastMessage to_broadcast{
       static_cast<int>(5 + send_index),
       static_cast<int>(50 + 20 * send_index)
     };
-    // Can make this a tag or something?
-    int heard_id = 0;
     // The first machine initiates the broadcast
     if (index == send_index)
     {
+      std::cerr << "woah it's " << send_index << '\n';
       for (auto&& comm : comms)
       {
-        comm->send_to(to_broadcast);
+        comm->send(to_broadcast);
       }
-      heard_id = to_broadcast.id;
+      last_heard = to_broadcast.id;
     }
-    // Even the sending machine will hear the broadcast again, so it can just accept it
-    // Note that this too is incredibly fragile since everything has to be broadcast and
-    // received in the proper order
-    for (auto&& comm : comms)
+    else
     {
-      const auto message = comm->receive_from<BroadcastMessage>();
-      if (message.id != heard_id)
+      bool done = false;
+      while (!done)
       {
-        REQUIRE(message == to_broadcast);
-        heard_id = message.id;
         for (auto&& comm : comms)
         {
-          comm->send_to(message);
+          // listen for messages from all neighbors
+          const auto message_pair = comm->receive<BroadcastMessage>();
+          // Make sure an actual message was heard
+          if (!message_pair.first)
+          {
+            continue;
+          }
+          const auto& message = message_pair.second;
+          std::cerr << "BrrrrrrRRRRzztTTttz " << index << '\n';
+          // got a message, ignore it if it's old
+          if (message.id <= last_heard)
+          {
+            std::cerr << "ignore " << message.id << '\n';
+            continue;
+          }
+          // Otherwise make sure it's the same and broadcast it to all neighbors aside from the sender
+          REQUIRE(message == to_broadcast);
+          last_heard = message.id;
+          std::cerr << "kawkwakawkajoFJIWOFJIOWJFIO\n";
+          for (auto&& neighbor : comms)
+          {
+            if (std::addressof(neighbor) != std::addressof(comm))
+            {
+              neighbor->send(message);
+            }
+          }
+          done = true;
+          break;
         }
+        // Make it not a busy loop
+        std::this_thread::sleep_for(10us);
       }
     }
+    std::cerr << "eggs dee " << index << '\n';
   }
 }
 

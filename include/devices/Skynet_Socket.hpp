@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <unistd.h>
+#include <poll.h>
+#include <sys/ioctl.h>
 #include <iostream>
 #include <string>
 
@@ -25,7 +27,7 @@ namespace skynet
     {
       confirm_supported_address_type();
       // socket create and verification
-      if ((socket_handle_ = socket(address_type_, SOCK_STREAM, 0)) == -1)
+      if ((socket_handle_ = socket(address_type_, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
       {
         perror("socket");
         exit(-1);
@@ -38,8 +40,9 @@ namespace skynet
     Socket& operator=(const Socket& other) = delete;
 
     // Move constructor
-    Socket(Socket&& other) noexcept :
-      socket_handle_(other.socket_handle_)
+    Socket(Socket&& other) noexcept
+      : socket_handle_(other.socket_handle_),
+        address_type_(other.address_type_)
     {
       other.socket_handle_ = -1;
     }
@@ -170,6 +173,10 @@ namespace skynet
       // connect the client socket to server socket
       if (connect(socket_handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) != 0)
       {
+        if (errno == EINPROGRESS)
+        {
+          return;
+        }
         perror("connect");
         exit(-1);
       }
@@ -193,20 +200,52 @@ namespace skynet
      *
      * \param message The message to send
      * \param message_size The size of the message
+     * \return true if the message was sent, false if it would block
      */
-    void send_message(const void* const message, const std::size_t message_size) const
-    { write(socket_handle_, message, message_size); }
+    bool send_message(const void* const message, const std::size_t message_size) const
+    {
+      if (write(socket_handle_, message, message_size) == -1)
+      {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+          return false;
+        }
+        perror("write");
+        exit(-1);
+      }
+      return true;
+    }
 
     /** \brief Reads a message from the socket
      *
      * \param buffer The buffer to read into
      * \param buffer_size The size of the buffer
+     * \return true if a message was read, false if it would have blocked
      */
-    void read_message(void* const buffer, const std::size_t buffer_size) const
+    bool read_message(void* const buffer, const std::size_t buffer_size) const
     {
       if (read(socket_handle_, buffer, buffer_size) == -1)
       {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+          return false;
+        }
         perror("read");
+        exit(-1);
+      }
+      return true;
+    }
+
+    /** \brief Waits until a connection is complete and ready to write to
+     */
+    void wait_to_connect()
+    {
+      pollfd to_poll;
+      to_poll.fd = socket_handle_;
+      to_poll.events = POLLOUT;
+      if (poll(&to_poll, 1, -1) == -1)
+      {
+        perror("poll");
         exit(-1);
       }
     }

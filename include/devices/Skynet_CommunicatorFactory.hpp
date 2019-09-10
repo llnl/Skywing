@@ -26,18 +26,18 @@ namespace skynet
   {
   public:
 
-    /** \brief Create a new DeviceCommunicator.
+    /** \brief Create a new DeviceCommunicator, blocks until this can be done.
      *
      * \param comm_config_info Configuration info for this new communicator.
-     * AF: Had to remove this in order to get a vector of devices working. Disscus
-     * with group.
      */
     virtual std::unique_ptr<DeviceCommunicator>
-    create_new_communicator(const std::vector<std::string>& comm_config_info) = 0;
+      create_new_communicator(const std::vector<std::string>& comm_config_info) = 0;
 
-    virtual std::vector<std::unique_ptr<DeviceCommunicator>>
-    create_requested_communicators() = 0;
-
+    /** \brief Creates a communicator if one is requested
+     *
+     * \return A DeviceCommunicator if one was requested, nullptr otherwise
+     */
+    virtual std::unique_ptr<DeviceCommunicator> create_requested_communicator() = 0;
 
     virtual ~CommunicatorFactory() = default;
 

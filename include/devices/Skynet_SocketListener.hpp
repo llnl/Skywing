@@ -36,7 +36,9 @@ namespace skynet
      */
     SocketCommunicator connect_communicator_to_client() const
     {
-      return SocketCommunicator(socket_.accept());
+      auto sock = socket_.accept();
+      sock.wait_to_connect();
+      return SocketCommunicator(std::move(sock));
     }
 
     /** \brief Count the number of connection requests that are pending.

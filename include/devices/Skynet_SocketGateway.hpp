@@ -86,10 +86,10 @@ namespace skynet
 
       // Sendthe port_number of socket listener in this decives factory to
       // the gatway listener of the other devices
-      handshake.send_to<uint16_t>(new_commfactory->get_port_listener_remote_factory());
+      handshake.send<uint16_t>(new_commfactory->get_port_listener_remote_factory());
       // Get the port number for the socket listener in other devices factory
       // and update comummication factory information
-      new_commfactory->update_port_listener_remote_factory(handshake.receive_from<uint16_t>());
+      new_commfactory->update_port_listener_remote_factory(handshake.blocking_receive<uint16_t>());
 
       return new_commfactory;
     }

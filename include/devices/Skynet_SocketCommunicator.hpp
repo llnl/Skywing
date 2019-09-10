@@ -5,6 +5,8 @@
 #include "Skynet_Socket.hpp"
 
 #include <memory>
+#include <thread>
+#include <iostream>
 
 namespace skynet
 {
@@ -28,6 +30,7 @@ namespace skynet
       : socket_(address_type)
     {
       socket_.connect_to_server(server_address, port);
+      socket_.wait_to_connect();
     }
 
     /** \brief Construct a new SocketCommunicator.
@@ -41,22 +44,36 @@ namespace skynet
     {}
 
   private:
-    void do_send_to_(const void* data, const std::size_t data_size) override
+    bool do_send(const void* data, const std::size_t data_size) override
     {
-      const uint16_t networkLen = htons(data_size); // convert to network byte order
-      socket_.send_message(&networkLen, sizeof(networkLen)); // sends the size of the data first
-      socket_.send_message(data, data_size); // sends the seralized data
+      // convert to network byte order
+      const uint16_t networkLen = htons(data_size);
+      // sends the size of the data first
+      if (!socket_.send_message(&networkLen, sizeof(networkLen)))
+      {
+        return false;
+      }
+      // sends the seralized data
+      return socket_.send_message(data, data_size);
     }
 
 
-    std::vector<char> do_receive_from_() override
+    std::vector<char> do_receive() override
     {
       uint16_t networkLen;
-      socket_.read_message(&networkLen, sizeof(networkLen));
+      if (!socket_.read_message(&networkLen, sizeof(networkLen)))
+      {
+        return {};
+      }
 
-      const uint16_t len = ntohs(networkLen); // convert back to host byte order
+      // convert back to host byte order
+      const uint16_t len = ntohs(networkLen);
       std::vector<char> data(len);
-      socket_.read_message(data.data(), len);
+      // Need to block until a message is recieved
+      while (!socket_.read_message(data.data(), len))
+      {
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+      }
       return data;
     }
 
