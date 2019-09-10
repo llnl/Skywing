@@ -6,7 +6,7 @@ tests = [
 
   # data/
   ['keyvaluereader_test', 'data/Skynet_KeyValueReader_test.cpp'],
-  #['future_test', 'data/Skynet_Future_test.cpp'],
+  ['future_test', 'data/Skynet_Future_test.cpp'],
 
   # devices/
   ['serialization_test', 'devices/Skynet_Serialization_test.cpp'],

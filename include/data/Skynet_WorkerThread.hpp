@@ -1,7 +1,7 @@
 #ifndef SKYNET_WORKERTHREAD_HPP__
 #define SKYNET_WORKERTHREAD_HPP__
 
-#include <function>
+#include <functional>
 #include <chrono>
 #include <vector>
 
@@ -13,6 +13,7 @@
 #include <climits>
 #include <tuple>
 #include <type_traits>
+#include <memory>
 
 #include "Skynet_Future.hpp"
 
@@ -27,11 +28,17 @@ namespace skynet
     /// The type of tasks to submit; returns true on completion, false to be resubmitted
     using task_type = std::function<bool()>;
 
-    // Non-copyable, but movable
+    WorkerThread()
+    {
+      // can't set up the thread handle until the object has finished constructing
+      thread_handle_ = std::thread(&WorkerThread::thread_func, this);
+    }
+
+    // Non-copyable, non-movable
     WorkerThread(const WorkerThread&) = delete;
-    WorkerThread(WorkerThread&&) = default;
+    WorkerThread(WorkerThread&&) = delete;
     WorkerThread& operator=(const WorkerThread&) = delete;
-    WorkerThread& operator=(WorkerThread&&) = default;
+    WorkerThread& operator=(WorkerThread&&) = delete;
 
     /** \brief Cleanly exits the WorkerThread
      *
@@ -40,8 +47,8 @@ namespace skynet
      */
     ~WorkerThread()
     {
+      // Force the thread to stop waiting
       kill_thread_ = true;
-      // Will force the thread to stop waiting
       work_to_be_done_.notify_all();
       thread_handle_.join();
     }
@@ -51,22 +58,22 @@ namespace skynet
      * \param func The function to run; should return false if it needs to be
      *             run again, and true if the work is complete
      */
-    Future<void> submit_work(task_type&& func)
+    Future<void> submit_work(task_type func)
     {
       // make a wrapper so that a future can be returned
-      std::promise<void> promise;
-      std::future<void> to_ret = promise.get_future();
-      auto wrapper = [func = std::move(func), promise = std::move(promise)]() mutable {
-        if (func())
-        {
-          promise.set_value();
-          return true;
-        }
-        return false;
-      };
+      // std::function doesn't allow move-only types so do this dumb work around
+      auto promise = std::make_shared<std::promise<void>>();
+      std::future<void> to_ret = promise->get_future();
       {
         std::unique_lock<std::mutex> lock(task_mut_);
-        pending_tasks.push_back(std::move(wrapper));
+        pending_tasks_.emplace_back([func, promise]() mutable {
+          if (func())
+          {
+            promise->set_value();
+            return true;
+          }
+          return false;
+        });
       }
       work_to_be_done_.notify_all();
       return Future<void>(std::move(to_ret));
@@ -78,23 +85,23 @@ namespace skynet
      *             a bool and a value where the bool signals if the value is ready
      */
     template<typename Callable>
-    auto wrap_and_submit_work(Callable&& func) -> Future<std::tuple_element_t<0, std::result_of_t<func()>>>
+    auto wrap_and_submit_work(Callable&& func) -> Future<std::tuple_element_t<0, decltype(func())>>
     {
-      using value_type = std::tuple_element_t<0, std::result_of_t<func()>>;
-      std::promise<value_type> promise;
-      std::future<value_type> to_ret = promise.get_future();
-      auto wrapper = [func = std::forward<Callable>(func), promise = std::move(promise)]() mutable {
-        const auto value_pair = func();
-        if (std::get<0>(value_pair))
-        {
-          promise.set_value(std::get<1>(value_pair));
-          return true;
-        }
-        return false;
-      };
+      using value_type = std::tuple_element_t<0, decltype(func())>;
+      // shared_ptr for same reason as above
+      auto promise = std::make_shared<std::promise<value_type>>();
+      std::future<value_type> to_ret = promise->get_future();
       {
         std::unique_lock<std::mutex> lock(task_mut_);
-        pending_tasks.push_back(std::move(wrapper));
+        pending_tasks_.emplace_back([func = std::forward<Callable>(func), promise]() mutable {
+          const auto value_pair = func();
+          if (std::get<0>(value_pair))
+          {
+            promise->set_value(std::get<1>(value_pair));
+            return true;
+          }
+          return false;
+        });
       }
       work_to_be_done_.notify_all();
       return Future<value_type>(std::move(to_ret));
@@ -102,8 +109,10 @@ namespace skynet
 
   private:
     // The function run on the thread
-    static void thread_func()
+    void thread_func()
     {
+      // The amount of time to wait between running through threads if work remains
+      static constexpr std::chrono::microseconds work_interval(10);
       while (true)
       {
         // Wait for work to be available / wait a small bit if work is pending
@@ -111,10 +120,10 @@ namespace skynet
           std::unique_lock<std::mutex> lock(task_mut_);
           // wait "forever" if there isn't already work in the queue
           const auto time_to_wait = current_tasks_.empty()
-            ? decltype(work_interval)(LLONG_MAX)
+            ? static_cast<decltype(work_interval)>(LLONG_MAX)
             : work_interval;
-          work_to_be_done_.wait_for(lock, [this]() {
-            return !pending_tasks.empty();
+          work_to_be_done_.wait_for(lock, time_to_wait, [this]() {
+            return !pending_tasks_.empty() || kill_thread_;
           });
           // Kill the thread if requested
           if (kill_thread_)
@@ -123,29 +132,25 @@ namespace skynet
           }
           // Take the new tasks and put them at the end of the tasks to perform
           std::move(
-            pending_tasks.begin(),
-            pending_tasks.end(),
+            pending_tasks_.begin(),
+            pending_tasks_.end(),
             std::back_inserter(current_tasks_)
           );
-          pending_tasks.clear();
+          pending_tasks_.clear();
         }
         // Start processing the work now
-        std::vector<current_tasks_::iterator> to_remove;
-        // Run each function and if it's done mark it for removal
         for (auto it = current_tasks_.begin(); it != current_tasks_.end(); ++it)
         {
           auto& task = *it;
           if (task())
           {
-            to_remove.push_back(it);
+            // remove it by swapping it to the back and popping it
+            using std::swap;
+            swap(task, current_tasks_.back());
+            current_tasks_.pop_back();
+            // The iterator then needs to be adjusted as well
+            --it;
           }
-        }
-        // Remove the finished tasks
-        for (const auto& to_ret : to_remove)
-        {
-          using std::swap;
-          swap(*to_ret, current_tasks.back());
-          current_tasks.pop_back();
         }
       }
     }
@@ -167,9 +172,6 @@ namespace skynet
 
     // For notifying the thread to finish processing
     std::atomic<bool> kill_thread_{false};
-
-    // The amount of time to wait between running through threads if work remains
-    static constexpr std::chrono::microseconds work_interval(10);
   }; // class WorkerThread
 } // namespace skynet
 

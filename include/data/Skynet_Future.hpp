@@ -26,14 +26,14 @@ namespace skynet
 
   /** Exception thrown if a future errors
    */
-  class FutureError : std::exception
+  class FutureError : public std::exception
   {
   public:
     FutureError(std::string message)
       : message_(std::move(message))
     {}
 
-    const char* what() const override
+    const char* what() const noexcept override
     {
       return message_.c_str();
     }
@@ -73,9 +73,9 @@ namespace skynet
 
     /** Wait until the future is ready
      */
-    void wait(ErrorPlan plan) const
+    void wait(ErrorPlan plan = ErrorPlan::terminate_on_error) const
     {
-      error_if_invalid();
+      error_if_invalid(plan);
       value_.wait();
     }
 
@@ -84,9 +84,12 @@ namespace skynet
      * \returns True if the value is ready
      */
     template<typename Rep, typename Period>
-    bool wait_for(ErrorPlan plan, const std::chrono::duration<Rep, Period>& timeout_duration) const
+    bool wait_for(
+      const std::chrono::duration<Rep, Period>& timeout_duration,
+      ErrorPlan plan = ErrorPlan::terminate_on_error
+    ) const
     {
-      error_if_invalid();
+      error_if_invalid(plan);
       return value_.wait_for(timeout_duration) == std::future_status::ready;
     }
 
@@ -95,9 +98,12 @@ namespace skynet
      * \return True if the value is ready
      */
     template<typename Rep, typename Period>
-    bool wait_until(ErrorPlan plan, const std::chrono::time_point<Rep, Period>& timeout_time) const
+    bool wait_until(
+      const std::chrono::time_point<Rep, Period>& timeout_time,
+      ErrorPlan plan = ErrorPlan::terminate_on_error
+    ) const
     {
-      error_if_invalid();
+      error_if_invalid(plan);
       return value_.wait_until(timeout_time) == std::future_status::ready;
     }
 
@@ -105,18 +111,18 @@ namespace skynet
      *
      * \return True if the value is ready, false otherwise
      */
-    bool poll() const
+    bool poll(ErrorPlan plan = ErrorPlan::terminate_on_error) const
     {
-      error_if_invalid();
+      error_if_invalid(plan);
       return value_.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     }
 
     /** Returns the value if ready, errors otherwise
      */
-    T get()
+    T get(ErrorPlan plan = ErrorPlan::terminate_on_error)
     {
-      error_if_invalid();
-      if (!poll())
+      error_if_invalid(plan);
+      if (!poll(plan))
       {
         handle_error(plan, FutureError("skynet::Future::get called when value was not ready."));
       }
@@ -125,7 +131,7 @@ namespace skynet
 
   private:
     // Error if the future is not valid
-    void error_if_invalid() const
+    void error_if_invalid(ErrorPlan plan) const
     {
       if (!value_.valid())
       {
