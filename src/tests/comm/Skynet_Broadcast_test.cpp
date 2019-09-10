@@ -133,16 +133,6 @@ void machine_task(const std::size_t index)
       }
     }
   }
-  std::stringstream s;
-  s << index << " : [" ;
-  for (auto&& comm : comms)
-  {
-    const auto* a = static_cast<SocketCommunicator*>(comm.get());
-    s << ' ';
-    a->do_debug(s);
-  }
-  s << " ]\n";
-  std::cout << s.str();
   // Future: Can tag data and then have a buffer for if stuff arrives out of order
   int last_heard = 0;
   for (std::size_t send_index = 0; send_index < machine_configs.size(); ++send_index)
@@ -154,7 +144,6 @@ void machine_task(const std::size_t index)
     // The first machine initiates the broadcast
     if (index == send_index)
     {
-      std::cerr << "woah it's " << send_index << '\n';
       for (auto&& comm : comms)
       {
         comm->send(to_broadcast);
@@ -176,17 +165,14 @@ void machine_task(const std::size_t index)
             continue;
           }
           const auto& message = message_pair.second;
-          std::cerr << "BrrrrrrRRRRzztTTttz " << index << '\n';
           // got a message, ignore it if it's old
           if (message.id <= last_heard)
           {
-            std::cerr << "ignore " << message.id << '\n';
             continue;
           }
           // Otherwise make sure it's the same and broadcast it to all neighbors aside from the sender
           REQUIRE(message == to_broadcast);
           last_heard = message.id;
-          std::cerr << "kawkwakawkajoFJIWOFJIOWJFIO\n";
           for (auto&& neighbor : comms)
           {
             if (std::addressof(neighbor) != std::addressof(comm))
@@ -201,7 +187,6 @@ void machine_task(const std::size_t index)
         std::this_thread::sleep_for(10us);
       }
     }
-    std::cerr << "eggs dee " << index << '\n';
   }
 }
 
