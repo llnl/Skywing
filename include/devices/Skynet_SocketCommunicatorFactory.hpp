@@ -75,7 +75,6 @@ namespace skynet
     std::unique_ptr<DeviceCommunicator>
       create_new_communicator(const std::vector<std::string>& /* comm_config_info */) override
     {
-      std::cerr << "create_new_communicator " << server_address_ << '\n';
       // connect to new Socket Communicator with Socket Factores using
       // handshake SocketCommunicator
       SocketCommunicator handshake(type_, server_address_.c_str(), port_listener_remote_factory_);
