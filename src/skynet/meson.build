@@ -1,5 +1,5 @@
 skynet_lib = library('skynet',
   [
-    # TODO: put future .cpp files here
+    'devices/socket_communicator.cpp'
   ],
   dependencies : [skynet_internal_dep])
