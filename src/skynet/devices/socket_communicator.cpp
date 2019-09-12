@@ -103,9 +103,8 @@ namespace skynet
         to_poll.events = POLLOUT;
         if (poll(&to_poll, 1, -1) < 0)
         {
-          // perror("SocketCommunicator::connect_to_server - poll");
-          // exit(-1);
-          return false;
+          perror("SocketCommunicator::connect_to_server - poll");
+          exit(-1);
         }
       }
       else

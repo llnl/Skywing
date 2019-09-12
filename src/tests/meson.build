@@ -1,7 +1,13 @@
 # ['test_name', 'path/to/test/source']
 tests = [
-  ['optional_test', 'utility/optional_test.cpp'],
-  ['socket_communicator_test', 'devices/socket_communicator_test.cpp']
+  # ./
+  ['tag_test', 'tags_test.cpp'],
+
+  # devices/
+  ['socket_communicator_test', 'devices/socket_communicator_test.cpp'],
+
+  # utility/
+  ['optional_test', 'utility/optional_test.cpp']
 ]
 
 foreach t : tests
