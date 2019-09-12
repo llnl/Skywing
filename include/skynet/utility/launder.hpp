@@ -1,6 +1,10 @@
 #ifndef SKYNET_UTILITY_LAUNDER_HPP
 #define SKYNET_UTILITY_LAUNDER_HPP
 
+#if __cplusplus >= 201703L
+  #include <new>
+#endif
+
 namespace skynet
 {
   // This is a simple wrapper for defining std::launder if it exists,

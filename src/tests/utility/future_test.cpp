@@ -6,7 +6,7 @@
 
 using namespace skynet;
 
-TEST_CASE("Submitting tasks works", "[Skynet_Future_Submit]")
+TEST_CASE("Submitting tasks works", "[Skynet_FutureSubmit]")
 {
   WorkerThread worker;
   auto fut_one = worker.submit_work([]() { return true; });
@@ -16,7 +16,7 @@ TEST_CASE("Submitting tasks works", "[Skynet_Future_Submit]")
   REQUIRE(fut_two.get() == 1);
 }
 
-TEST_CASE("Tasks needing multiple calls work", "[Skynet_Future_Multiple_Calls]")
+TEST_CASE("Tasks needing multiple calls work", "[Skynet_FutureMultipleCalls]")
 {
   WorkerThread worker;
   auto fut_one = worker.submit_work([calls = 0]() mutable {

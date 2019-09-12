@@ -4,7 +4,8 @@ project('skynet', 'cpp',
     'cpp_std=c++14',
     'warning_level=3',
     'werror=true'
-  ])
+  ]
+)
 
 use_ns3 = get_option('use_ns3')
 message('using ns3: ' + use_ns3.to_string())
@@ -20,16 +21,39 @@ cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
 cereal_dep = subproject('cereal').get_variable('cereal_dep')
 
+make_network_message_size = executable(
+  'make_network_message_size',
+  'scripts/generate_message_network_size.cpp',
+  dependencies : [
+    declare_dependency(
+      include_directories : include_directories('include'),
+      dependencies : [cereal_dep]
+    )
+  ]
+)
+
+# Having an output to a sub-directory errors; not sure how / if it's
+# worth writing to a sub-directory
+gen_network_message_size = custom_target(
+  'get_network_message_size',
+  input : [],
+  output : ['message_network_size.hpp'],
+  command : [make_network_message_size]
+)
+
 skynet_inc = include_directories('include')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
-  dependencies : [thread_dep, cereal_dep])
+  dependencies : [thread_dep, cereal_dep],
+  sources : gen_network_message_size
+)
 
 subdir('src/skynet')
 
 skynet_dep = declare_dependency(
   dependencies : skynet_internal_dep,
-  link_with : skynet_lib)
+  link_with : skynet_lib
+)
 
 if use_ns3
   subdir('src/ns3')

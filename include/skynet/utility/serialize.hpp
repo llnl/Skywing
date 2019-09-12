@@ -25,8 +25,8 @@ namespace skynet
 
   /** \brief Turn a std::vector<char> into a value
    */
-  template<typename T>
-  T deserialize(const std::vector<char>& data)
+  template<typename T, typename ContiguousContainer>
+  T deserialize(const ContiguousContainer& data)
   {
     std::stringstream ss;
     ss.write(data.data(), data.size());

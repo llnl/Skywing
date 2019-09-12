@@ -3,38 +3,14 @@
 
 #include "tag.hpp"
 #include "utility/on_error.hpp"
+#include "master.hpp"
+#include "job_base.hpp"
 
 #include <vector>
 #include <tuple>
 
 namespace skynet
 {
-  /** \brief Job that Skynet instances are working on
-   *
-   * Handles wrapping communications and buffering information from tags
-   */
-  class JobBase
-  {
-  public:
-    /** \brief Processes the raw information sent from a job on another instance
-     *
-     * \param tag The tag the data was sent with
-     * \param data The raw data sent over
-     * \return True if processing went find, false if there was an error
-     */
-    bool process_data(const std::size_t tag, const std::vector<char>& data)
-    {
-      return do_process_data(tag, data);
-    }
-
-    virtual ~JobBase() = default;
-
-  private:
-    /** \brief Implementation of process_data
-     */
-    virtual bool do_process_data(std::size_t tag, const std::vector<char>& data) = 0;
-  }; // Class JobBase
-
   /** \brief Wrapper for tags so that tags with the same underlying type can be used
    */
   template<typename Tag>
@@ -117,6 +93,11 @@ namespace skynet
 
     // The buffer of data for each tag
     std::tuple<TagWrapper<Tags>...> buffers_;
+
+    // The id for the message to send
+    // Could keep a seperate id for each tag, but running out of message id's
+    // isn't very realistic
+    std::uint32_t message_id_{1};
   }; // Class Job
 } // namespace skynet
 

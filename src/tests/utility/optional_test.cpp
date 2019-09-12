@@ -3,6 +3,7 @@
 #include "skynet/utility/optional.hpp"
 
 #include <utility>
+#include <vector>
 
 using namespace skynet;
 
@@ -31,4 +32,15 @@ TEST_CASE("Optional self-assignment works", "[Skynet_OptionalSelfAssign]")
   assign(b, b);
   REQUIRE(b);
   REQUIRE(*b == 'b');
+}
+
+TEST_CASE("Non-trivial objects work", "[Skynet_OptionalNonTrivial]")
+{
+  using op_vec = Optional<std::vector<int>>;
+  op_vec a;
+  REQUIRE_FALSE(a);
+  const std::vector<int> vec{1, 2, 3};
+  op_vec b{vec};
+  REQUIRE(b);
+  REQUIRE(*b == vec);
 }

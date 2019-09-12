@@ -1,6 +1,8 @@
 # ['test_name', 'path/to/test/source']
 tests = [
   # ./
+  ['broadcast_test', 'broadcast_test.cpp'],
+  ['master_conn_test', 'master_conn_test.cpp'],
   ['tag_test', 'tags_test.cpp'],
 
   # devices/
