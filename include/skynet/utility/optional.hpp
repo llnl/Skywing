@@ -19,6 +19,10 @@ namespace skynet
   class Optional
   {
   public:
+    /** \brief The type the optional hold
+     */
+    using value_type = T;
+
     /** \brief Construct an optional that holds no value
      */
     constexpr Optional() noexcept

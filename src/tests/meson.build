@@ -7,6 +7,7 @@ tests = [
   ['socket_communicator_test', 'devices/socket_communicator_test.cpp'],
 
   # utility/
+  ['future_test', 'utility/future_test.cpp'],
   ['optional_test', 'utility/optional_test.cpp']
 ]
 

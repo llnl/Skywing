@@ -54,12 +54,20 @@ namespace skynet
      * \pre The specified tag has data in its buffer.
      */
     template<typename GetTag>
-    typename GetTag::value_type get_value()
+    typename GetTag::value_type get_value() noexcept
     {
-      auto& buffer = std::get<TagWrapper<GetTag>>(buffers_).buffer;
+      auto& buffer = get_buffer<GetTag>();
       auto value = std::move(buffer.back());
       buffer.pop_back();
       return value;
+    }
+
+    /** \brief Checks if a tag buffer has data or not
+     */
+    template<typename GetTag>
+    bool has_data() const noexcept
+    {
+      return !get_buffer<GetTag>().empty();
     }
 
   private:
@@ -81,8 +89,20 @@ namespace skynet
       return true;
     }
 
+    // Retrieve a buffer as a reference based on a tag
+    template<typename GetTag>
+    auto& get_buffer() noexcept
+    {
+      return std::get<TagWrapper<GetTag>>(buffers_).buffer;
+    }
+    template<typename GetTag>
+    const auto& get_buffer() const noexcept
+    {
+      return std::get<TagWrapper<GetTag>>(buffers_).buffer;
+    }
+
     // Retrieve a buffer as a void* based on an index
-    void* get_buffer(const std::size_t index)
+    void* get_buffer(const std::size_t index) noexcept
     {
       // Make an array of void* to all of the buffers
       // It seems like there should be a way to just save these as offsets, but
