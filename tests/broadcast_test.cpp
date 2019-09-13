@@ -45,10 +45,11 @@ struct SizeTTag : Tag<std::size_t> {};
 
 using JobType = Job<SizeTTag>;
 
-void machine_task(const std::size_t index)
+// Reference wasn't working
+void machine_task(Master* const master_ptr, const std::size_t index)
 {
   using namespace std::chrono_literals;
-  Master master{ports[index], static_cast<std::uint32_t>(index)};
+  auto& master = *master_ptr;
   // Connect to the corresponding machines (if any)
   for (const auto& machine : to_connect[index])
   {
@@ -83,16 +84,24 @@ void machine_task(const std::size_t index)
         }
       }
     }
+    // Give some time for the broadcast to finish
+    std::this_thread::sleep_for(10ms);
   }
 }
 
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")
 {
   using namespace std::chrono_literals;
+  // Ensure that the masters live until all threads exit
+  std::vector<Master> masters;
+  for (std::size_t i = 0; i < machine_counts.size(); ++i)
+  {
+    masters.emplace_back(ports[i], static_cast<std::uint32_t>(i));
+  }
   std::vector<std::thread> threads;
   for (std::size_t i = 0; i < machine_counts.size(); ++i)
   {
-    threads.emplace_back(machine_task, i);
+    threads.emplace_back(machine_task, &masters[i], i);
     std::this_thread::sleep_for(10ms);
   }
   for (auto&& thread : threads)

@@ -2,6 +2,7 @@
 tests = [
   # ./
   ['broadcast_test', 'broadcast_test.cpp'],
+  ['broadcast_complex_test', 'broadcast_complex_test.cpp'],
   ['master_conn_test', 'master_conn_test.cpp'],
   ['tag_test', 'tags_test.cpp'],
 

@@ -257,13 +257,15 @@ namespace skynet
     void process_message(const Message& msg, const MessageAndDataBuffer& buffer)
     {
       // If the message is old just ignore it
-      auto& last_id = last_message_id_[msg.origin];
-      if (msg.message_id <= last_id)
       {
-        return;
+        auto& last_id = last_message_id_[msg.origin][msg.job_id];
+        if (msg.message_id <= last_id)
+        {
+          return;
+        }
+        last_id = msg.message_id;
       }
 
-      last_id = msg.message_id;
       switch(msg.type)
       {
       // Greeting messages should never been seen here, only when the
@@ -307,8 +309,11 @@ namespace skynet
     // List of neighboring connections
     std::vector<ExternalMaster> neighbors_;
 
-    // The message id of each last heard message from each machine in the network
-    std::unordered_map<std::uint32_t, std::uint32_t> last_message_id_;
+    // The message id of each last heard message from each machine for each job in the network
+    std::unordered_map<
+      std::uint32_t,
+      std::unordered_map<std::uint32_t, std::uint32_t>
+    > last_message_id_;
 
     // The id of this machine
     std::uint32_t id_;
