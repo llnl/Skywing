@@ -1,17 +1,17 @@
 # ['test_name', 'path/to/test/source']
 tests = [
   # ./
-  ['broadcast_test', 'broadcast_test.cpp'],
-  ['broadcast_complex_test', 'broadcast_complex_test.cpp'],
-  ['master_conn_test', 'master_conn_test.cpp'],
-  ['tag_test', 'tags_test.cpp'],
+  ['broadcast', 'broadcast.cpp'],
+  ['broadcast_complex', 'broadcast_complex.cpp'],
+  ['master_conn', 'master_conn.cpp'],
+  ['tags', 'tags.cpp'],
 
   # devices/
-  ['socket_communicator_test', 'devices/socket_communicator_test.cpp'],
+  ['socket_communicator', 'devices/socket_communicator.cpp'],
 
   # utility/
-  ['future_test', 'utility/future_test.cpp'],
-  ['optional_test', 'utility/optional_test.cpp']
+  ['future', 'utility/future.cpp'],
+  ['optional', 'utility/optional.cpp']
 ]
 
 foreach t : tests
