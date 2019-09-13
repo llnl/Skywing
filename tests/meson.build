@@ -17,7 +17,7 @@ tests = [
 foreach t : tests
   exe = executable(
     t[0], # test name
-    [t[1], 'catch_main.cpp'], # test executable
+    ['skynet/' + t[1], 'catch_main.cpp'], # test executable
     dependencies : [catch2_dep, skynet_dep, cppzmq_dep, zmq_dep])
   test(t[0], exe)
 endforeach
