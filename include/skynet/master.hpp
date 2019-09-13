@@ -42,10 +42,10 @@ namespace skynet
      * send/recieve greetings, but need to do so in the opposite order so
      * have seperate constructors for both.
      */
-    ExternalMaster(ByAccept, SocketCommunicator conn)
+    ExternalMaster(ByAccept, SocketCommunicator conn, const std::uint32_t local_id)
       : conn_{std::move(conn)}
     {
-      send_greeting();
+      send_greeting(local_id);
       wait_for_greeting();
     }
 
@@ -53,37 +53,37 @@ namespace skynet
      *
      * This is for when a client connects to a server.
      */
-    ExternalMaster(ByRequest, SocketCommunicator conn)
+    ExternalMaster(ByRequest, SocketCommunicator conn, const std::uint32_t local_id)
       : conn_{std::move(conn)}
     {
       wait_for_greeting();
-      send_greeting();
+      send_greeting(local_id);
     }
 
     /** \brief Recieve a skynet::Message from an external connection if one exists
      *
-     * Also returns the actually message that
+     * Returns the message as well as the buffer containing the serialized message
+     * and data
      */
-    Optional<MessageAndData> get_message() noexcept
+    Optional<std::pair<Message, MessageAndDataBuffer>> get_message() noexcept
     {
-      std::array<char, Message::network_size> buffer;
-      if (!conn_.read_message(buffer.data(), buffer.size()))
+      MessageAndDataBuffer buffer{id_};
+      if (!conn_.read_message(buffer.buffer(), Message::network_size))
       {
         // No message yet
         return {};
       }
-      MessageAndData to_ret{deserialize<Message>(buffer), id_};
-      // Just return if there's nothing more to read
-      if (to_ret.message().message_size == 0)
+      // Get the message and adjust the buffer
+      const Message msg = buffer.message();
+      // Read the rest (if there's anything)
+      if (msg.message_size != 0)
       {
-        return to_ret;
+        if (!conn_.read_message(buffer.data(), msg.message_size))
+        {
+          on_error("ExternalMaster::get_message failed to read the data part of the message!");
+        }
       }
-
-      if (!conn_.read_message(to_ret.data(), to_ret.message().message_size))
-      {
-        on_error("ExternalMaster::get_message failed to read the data part of the message!");
-      }
-      return to_ret;
+      return std::make_pair(msg, std::move(buffer));
     }
 
     /** \brief Sends a raw message to the other master
@@ -108,7 +108,7 @@ namespace skynet
         if (const auto opt_msg_data = get_message())
         {
           const auto& msg_data = *opt_msg_data;
-          const auto& msg = msg_data.message();
+          const auto& msg = msg_data.first;
           if (msg.type != MessageType::greeting)
           {
             on_error("ExternalMaster::ExternalMaster got non-greeting on connection!");
@@ -118,7 +118,7 @@ namespace skynet
             on_error("ExternalMaster::ExternalMaster has a non-zero message size!");
           }
           // Otherwise just set the id
-          id_ = msg_data.from();
+          id_ = msg.origin;
           return;
         }
         std::this_thread::sleep_for(std::chrono::microseconds(10));
@@ -126,12 +126,13 @@ namespace skynet
     }
 
     // Send the greeting
-    void send_greeting()
+    void send_greeting(const std::uint32_t local_id)
     {
       Message to_send;
       to_send.type = MessageType::greeting;
       to_send.message_size = 0;
-      send_message(serialize(to_send));
+      to_send.origin = local_id;
+      send_message(to_bytes(to_send));
     }
 
     // For talking with the external master
@@ -171,7 +172,17 @@ namespace skynet
       {
         on_error("Master::connect_to_server failed!");
       }
-      neighbors_.emplace_back(ByRequest{}, std::move(to_connect));
+      neighbors_.emplace_back(ByRequest{}, std::move(to_connect), id_);
+    }
+
+    /** \brief See if there are any pending connections and accept them if so
+     */
+    void accept_pending_connections()
+    {
+      while(auto conn = server_socket_.accept())
+      {
+        neighbors_.emplace_back(ByAccept{}, std::move(*conn), id_);
+      }
     }
 
     /** \brief Creates a job for the master
@@ -179,20 +190,10 @@ namespace skynet
      * \return A reference to the job
      */
     template<typename JobType>
-    JobType& create_job()
+    JobType& create_job(const std::uint32_t id)
     {
-      jobs_.push_back(std::make_unique<JobType>());
-      return jobs_.back();
-    }
-
-    /** \brief See if there are any pending connections and accept them if so
-     */
-    void make_pending_connections()
-    {
-      while(auto conn = server_socket_.accept())
-      {
-        neighbors_.emplace_back(ByAccept{}, std::move(*conn));
-      }
+      jobs_.push_back(std::make_unique<JobType>(id, *this));
+      return static_cast<JobType&>(*jobs_.back());
     }
 
     /** \brief Listens for messages from neighbors and handles them if there
@@ -202,9 +203,10 @@ namespace skynet
     {
       for (auto&& neighbor : neighbors_)
       {
-        if (auto msg = neighbor.get_message())
+        if (auto msg_opt = neighbor.get_message())
         {
-          process_message(*msg);
+          const auto& msg = *msg_opt;
+          process_message(msg.first, msg.second);
         }
       }
     }
@@ -214,7 +216,7 @@ namespace skynet
      * \param job_id The id of the job the message is for
      * \param tag_id The id of the tag the message is fo
      * \param msg_id The message's id
-     * \param data The data to broadcast
+     * \param data The data to broadcast (no serialization is done)
      */
     void broadcast_message(
       const std::uint32_t job_id,
@@ -232,7 +234,7 @@ namespace skynet
       header.origin = id_;
       header.message_id = msg_id;
       header.message_size = data.size();
-      const auto header_buffer = serialize(header);
+      const auto header_buffer = to_bytes(header);
       // copy the whole buffer over now
       std::memcpy(to_send.data(), header_buffer.data(), header_buffer.size());
       std::memcpy(to_send.data() + header_buffer.size(), data.data(), data.size());
@@ -242,17 +244,25 @@ namespace skynet
       }
     }
 
+    // TODO: Is this something useful or just good for testing?
+    /** \brief Returns the number of machines connected
+     */
+    int number_of_neighbors() const noexcept
+    {
+      return static_cast<int>(neighbors_.size());
+    }
+
   private:
     // Does all processing that needs to be done when a message is recieved
-    void process_message(const MessageAndData& message_and_data)
+    void process_message(const Message& msg, const MessageAndDataBuffer& buffer)
     {
-      const auto& msg = message_and_data.message();
       // If the message is old just ignore it
       auto& last_id = last_message_id_[msg.origin];
       if (msg.message_id <= last_id)
       {
         return;
       }
+
       last_id = msg.message_id;
       switch(msg.type)
       {
@@ -263,17 +273,29 @@ namespace skynet
         break;
 
       case MessageType::broadcast:
-        // Just propagate the message to all neighbors but the one it was
-        // recieved from
+        // Add the data to the appropriate queue
+        add_data_to_queue(msg, buffer);
+        // Propagate the message to all neighbors but the one it was
+        // recieved from and the origin
         for (auto&& neighbor : neighbors_)
         {
-          if (neighbor.id() != message_and_data.from())
+          if (neighbor.id() != buffer.from() && neighbor.id() != msg.origin)
           {
-            neighbor.send_message(message_and_data.vector());
+            neighbor.send_message(buffer.vector());
           }
         }
         break;
       }
+    }
+
+    // Adds data to the tag queue for a job from a message
+    void add_data_to_queue(const Message& msg, const MessageAndDataBuffer& buffer)
+    {
+      if (msg.job_id >= jobs_.size())
+      {
+        on_error("Job ID larger than number of jobs!");
+      }
+      jobs_[msg.job_id]->process_data(msg.tag_id, buffer.data(), msg.message_size);
     }
 
     // For listening to connection requests

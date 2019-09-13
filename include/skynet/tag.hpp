@@ -23,10 +23,14 @@ namespace skynet
      * \param data The data to parse to add the the vector
      * \param append_to The vector to append to, must be of type std::vector<T>
      */
-    static void append_to_queue(const std::vector<char>& data, void* const append_to)
+    static void append_to_queue(
+      const char* const data,
+      const std::size_t size,
+      void* const append_to
+    )
     {
       auto* const true_append_to = static_cast<std::vector<T>*>(append_to);
-      true_append_to->push_back(deserialize<T>(data));
+      true_append_to->push_back(from_bytes<T>(data, size));
     }
 
     /** \brief The type being sent over this tag

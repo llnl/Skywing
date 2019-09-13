@@ -11,6 +11,28 @@
 
 namespace skynet
 {
+  namespace detail
+  {
+    // Calculates the index in a list of tags
+    template<typename SearchFor, typename... Tags>
+    struct tag_id_impl;
+
+    // Match
+    template<typename SearchFor, typename... Rest>
+    struct tag_id_impl<SearchFor, SearchFor, Rest...>
+    {
+      static constexpr std::uint32_t value = 0;
+    };
+
+    // No match
+    template<typename SearchFor, typename Next, typename... Rest>
+    struct tag_id_impl<SearchFor, Next, Rest...>
+    {
+      static constexpr std::uint32_t value = 1 + tag_id_impl<SearchFor, Rest...>::value;
+    };
+
+  } // namespace detail
+
   /** \brief Wrapper for tags so that tags with the same underlying type can be used
    */
   template<typename Tag>
@@ -25,12 +47,19 @@ namespace skynet
   class Job : public JobBase
   {
   public:
+    /** \brief Creates a job with the specified id and master
+     */
+    explicit Job(const std::uint32_t id, Master& master)
+      : JobBase{master}
+      , id_{id}
+    {}
+
     /** \brief Pops data from a tag buffer
      *
      * \pre The specified tag has data in its buffer.
      */
     template<typename GetTag>
-    typename GetTag::value_type get_value() noexcept
+    typename GetTag::value_type get() noexcept
     {
       auto& buffer = get_buffer<GetTag>();
       auto value = std::move(buffer.back());
@@ -46,9 +75,27 @@ namespace skynet
       return !get_buffer<GetTag>().empty();
     }
 
+    /** \brief Broadcasts a value on a tag to all nodes in the network
+     */
+    template<typename SendTag>
+    void broadcast(const typename SendTag::value_type& value)
+    {
+      get_master().broadcast_message(
+        id_,
+        tag_id<SendTag>(),
+        message_id_,
+        to_bytes(value)
+      );
+      ++message_id_;
+    }
+
   private:
     // Override processing of data
-    bool do_process_data(const std::size_t tag, const std::vector<char>& data) override
+    bool do_process_data(
+      const std::size_t tag,
+      const char* const data,
+      const std::size_t size
+    ) override
     {
       // Ensure that the tag number isn't too large
       if (tag >= sizeof...(Tags))
@@ -57,11 +104,11 @@ namespace skynet
         return false;
       }
       // Otherwise add the data to the queue
-      using func_ptr = void (*)(const std::vector<char>&, void*);
+      using func_ptr = void (*)(const char*, std::size_t, void*);
       static constexpr std::array<func_ptr, sizeof...(Tags)> func_ptrs{
         &Tags::append_to_queue...
       };
-      func_ptrs[tag](data, get_buffer(tag));
+      func_ptrs[tag](data, size, get_buffer(tag));
       return true;
     }
 
@@ -91,6 +138,13 @@ namespace skynet
       return pointers[index];
     }
 
+    // Returns the id of a specified tag
+    template<typename Tag>
+    static std::uint32_t tag_id() noexcept
+    {
+      return detail::tag_id_impl<Tag, Tags...>::value;
+    }
+
     // The buffer of data for each tag
     std::tuple<TagWrapper<Tags>...> buffers_;
 
@@ -98,6 +152,9 @@ namespace skynet
     // Could keep a seperate id for each tag, but running out of message id's
     // isn't very realistic
     std::uint32_t message_id_{1};
+
+    // The id for this job; must be the same across all instances
+    std::uint32_t id_;
   }; // Class Job
 } // namespace skynet
 

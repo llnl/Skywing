@@ -7,12 +7,16 @@
 #include <cereal/archives/portable_binary.hpp>
 #include <cereal/types/vector.hpp>
 
+// The names to_bytes/from_bytes are used instead of serialize and deserialize
+// as Cereal uses ADL on those names to find how to process data and that can
+// cause ambiguity
+
 namespace skynet
 {
   /** \brief Turn a value into a std::vector<char>
    */
   template<typename T>
-  std::vector<char> serialize(const T& t)
+  std::vector<char> to_bytes(const T& t)
   {
     std::stringstream ss;
     cereal::PortableBinaryOutputArchive ar(ss);
@@ -23,19 +27,43 @@ namespace skynet
     return {s.begin(), s.end()};
   }
 
-  /** \brief Turn a std::vector<char> into a value
+  /** \brief Serializes a value to an already existing buffer
+   *
+   * \pre The buffer is large enough to hold the serialized value
    */
-  template<typename T, typename ContiguousContainer>
-  T deserialize(const ContiguousContainer& data)
+  template<typename T, typename OutputIterator>
+  void to_bytes(const T& t, const OutputIterator it)
   {
     std::stringstream ss;
-    ss.write(data.data(), data.size());
+    cereal::PortableBinaryOutputArchive ar(ss);
+
+    ar(t);
+
+    auto s = ss.str();
+    std::copy(s.begin(), s.end(), it);
+  }
+
+  /** \brief Turn raw data into a value
+   */
+  template<typename T>
+  T from_bytes(const char* const data, const std::size_t size)
+  {
+    std::stringstream ss;
+    ss.write(data, size);
     cereal::PortableBinaryInputArchive ar(ss);
 
     T t;
     ar(t);
 
     return t;
+  }
+
+  /** \brief Turn a ContiguousContainer into a value
+   */
+  template<typename T, typename ContiguousContainer>
+  T from_bytes(const ContiguousContainer& data)
+  {
+    return from_bytes<T>(data.data(), data.size());
   }
 
 } // namespace skynet

@@ -16,22 +16,32 @@ constexpr int int_value = 10;
 constexpr int int_value2 = 20;
 constexpr double double_value = 14.64;
 
+constexpr std::uint16_t dummy_port = 55555;
+
+template<typename Job, typename Container>
+void process_wrapper(Job& job, const std::uint32_t id, const Container& c)
+{
+  job.process_data(id, c.data(), c.size());
+}
+
 TEST_CASE("Tag buffers work", "[Skynet_TagBuffers]")
 {
-  Job<IntTag, DoubleTag> job;
+  Master dummy{dummy_port, 0};
+  Job<IntTag, DoubleTag> job{0, dummy};
   // Add an integer and a double (this is not what user code would look like)
-  job.process_data(0, serialize(int_value));
-  job.process_data(1, serialize(double_value));
+  process_wrapper(job, 0, to_bytes(int_value));
+  process_wrapper(job, 1, to_bytes(double_value));
   // Get back the values and ensure that they haven't changed
-  REQUIRE(job.get_value<IntTag>() == int_value);
-  REQUIRE(job.get_value<DoubleTag>() == double_value);
+  REQUIRE(job.get<IntTag>() == int_value);
+  REQUIRE(job.get<DoubleTag>() == double_value);
 }
 
 TEST_CASE("Tags can use repeated types", "[Skynet_TagRepeatedTypes]")
 {
-  Job<IntTag, IntTag2> job;
-  job.process_data(0, serialize(int_value));
-  job.process_data(1, serialize(int_value2));
-  REQUIRE(job.get_value<IntTag>() == int_value);
-  REQUIRE(job.get_value<IntTag2>() == int_value2);
+  Master dummy{dummy_port, 0};
+  Job<IntTag, IntTag2> job{0, dummy};
+  process_wrapper(job, 0, to_bytes(int_value));
+  process_wrapper(job, 1, to_bytes(int_value2));
+  REQUIRE(job.get<IntTag>() == int_value);
+  REQUIRE(job.get<IntTag2>() == int_value2);
 }

@@ -9,7 +9,7 @@
 
 int main()
 {
-  const auto size = serialize(skynet::Message{}).size();
+  const auto size = to_bytes(skynet::Message{}).size();
   std::ofstream fout("message_network_size.hpp");
   if (!fout)
   {

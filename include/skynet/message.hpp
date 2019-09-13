@@ -68,66 +68,55 @@ namespace skynet
     ar(m.type, m.job_id, m.tag_id, m.origin, m.message_id, m.message_size);
   }
 
-  /** \brief Grouping of a message and its data together for easier propigation
+  /** \brief Simple class for holding a processing the raw bytes of a recieved
+   * message and its data
    */
-  class MessageAndData
+  class MessageAndDataBuffer
   {
   public:
-    /** \brief Initialize the structure with enough memory to hold the message
-     * passed and the data
+    /** \brief Construct a buffer, marking which connection it came from.
+     */
+    explicit MessageAndDataBuffer(const std::uint32_t from)
+      : from_{from}
+      , buffer_(Message::network_size)
+    {}
+
+    /** \brief Return a pointer to the start of the buffer, for putting the
+     * serialized Message into
+     */
+    char* buffer() noexcept { return buffer_.data(); }
+
+    /** \brief Return a deserialized message and adjust the buffer for reading
+     * based on the content of the message
      *
-     * Also includes a field for which connection this was recieved from,
-     * since that doesn't need to be transmitted across the network
+     * \pre A serialized message has been written into the buffer
      */
-    explicit MessageAndData(const Message& m, const std::uint32_t from)
-      : data_(m.message_size + Message::network_size)
-      , from_{from}
+    Message message()
     {
-      new (data_.data()) Message{m};
+      const auto msg = from_bytes<Message>(buffer_);
+      buffer_.resize(Message::network_size + msg.message_size);
+      return msg;
     }
 
-    // Disable copying (probably would be fine though?)
-    MessageAndData(const MessageAndData&) = delete;
-    MessageAndData& operator=(const MessageAndData&) = delete;
-    // Moving is fine
-    MessageAndData(MessageAndData&&) = default;
-    MessageAndData& operator=(MessageAndData&&) = default;
-
-    /** \brief Returns a reference to the contained message
+    /** \brief Return a pointer to the data part of the buffer
      */
-    const Message& message() const noexcept
-    {
-      return *launder(reinterpret_cast<const Message*>(data_.data()));
-    }
+    char* data() noexcept { return buffer_.data() + Message::network_size; }
+    const char* data() const noexcept { return buffer_.data() + Message::network_size; }
 
-    /** \brief Returns a pointer to the start of the data
+    /** \brief Return a reference to the entire buffer
      */
-    char* data() noexcept
-    {
-      return data_.data() + Message::network_size;
-    }
-    const char* data() const noexcept
-    {
-      return data_.data() + Message::network_size;
-    }
+    const std::vector<char>& vector() const noexcept { return buffer_; }
 
-    /** \brief Returns the id of the machine that this is from
+    /** \brief Return the id of the connection this message was sent from
      */
     std::uint32_t from() const noexcept { return from_; }
 
-    /** \brief Returns a reference to the internal vector
-     */
-    const std::vector<char>& vector() const noexcept { return data_; }
-
   private:
-    // Holding data (make sure it's aligned correctly)
-    static constexpr std::size_t data_align = std::max(alignof(Message), alignof(std::vector<char>));
-    alignas(data_align) std::vector<char> data_;
-
-    // The id of the machine that this is from
+    // Who sent the data
     std::uint32_t from_;
+    // Buffer to hold who the data is from
+    std::vector<char> buffer_;
   };
-
 } // namespace skynet
 
 // Don't allow the macro to leak

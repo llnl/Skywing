@@ -14,11 +14,10 @@ using namespace skynet;
 void server()
 {
   Master server{server_port, server_id};
-  // There's no way to see if new connections have been made
-  // (Which I think normally is fine)
-  // So just wait long enough to ensure that the client is trying to connect
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-  server.make_pending_connections();
+  while (server.number_of_neighbors() == 0)
+  {
+    server.accept_pending_connections();
+  }
 }
 
 void client()
