@@ -59,4 +59,4 @@ if use_ns3
   subdir('src/ns3')
 endif
 
-subdir('src/tests')
+subdir('tests')
