@@ -48,12 +48,20 @@ namespace skynet
    *
    * Tags certain values to be sent; all values sent for a specific tag must
    * be of the same type.  This type should not be constructed by user code
-   * (just inherited) so the constructor is protected.
+   * (just inherited) so the constructor is private.
    */
   template <typename T>
   class Tag
   {
   public:
+    /** \brief The type being sent over this tag
+     */
+    using value_type = T;
+
+  private:
+    template<typename...>
+    friend class Job;
+
     /** \brief Parses raw data and appends it to a vector
      *
      * This shouldn't be publicly exposed.
@@ -70,11 +78,6 @@ namespace skynet
       true_append_to->push_back(detail::from_bytes<T>(data, size));
     }
 
-    /** \brief The type being sent over this tag
-     */
-    using value_type = T;
-
-  protected:
     Tag() = default;
   }; // class Tag
 

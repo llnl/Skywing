@@ -50,7 +50,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       REQUIRE(my_job.get_when_ready<IntTag>() == to_remove);
     }
     // Wait a bit to synchronize the machines
-    std::this_thread::sleep_for(10ms);
+    std::this_thread::sleep_for(100ms);
   }
 }
 

@@ -17,7 +17,6 @@
 // TODO: Support other types of communicators; will probably make
 //       it a template and have it as a parameter, so not making a seperate
 //       .cpp file even though there currently could be one.
-// TODO: Support disconnecting of machines
 
 namespace skynet
 {
