@@ -2,7 +2,6 @@
 
 #include "skynet/master.hpp"
 #include "skynet/job.hpp"
-#include "skynet/tag.hpp"
 
 #include "utils.hpp"
 
@@ -48,8 +47,8 @@ bool test_tags(Job& job) noexcept
 {
   if (job.template has_data<T1>() && job.template has_data<T2>())
   {
-    REQUIRE(job.template get<T1>() == ExpectedTagValue<T1>::value);
-    REQUIRE(job.template get<T2>() == ExpectedTagValue<T2>::value);
+    REQUIRE(*job.template get<T1>() == ExpectedTagValue<T1>::value);
+    REQUIRE(*job.template get<T2>() == ExpectedTagValue<T2>::value);
     return true;
   }
   return false;
@@ -59,9 +58,9 @@ bool test_tags(Job& job) noexcept
 {
   if (job.template has_data<T1>() && job.template has_data<T2>() && job.template has_data<T3>())
   {
-    REQUIRE(job.template get<T1>() == ExpectedTagValue<T1>::value);
-    REQUIRE(job.template get<T2>() == ExpectedTagValue<T2>::value);
-    REQUIRE(job.template get<T3>() == ExpectedTagValue<T3>::value);
+    REQUIRE(*job.template get<T1>() == ExpectedTagValue<T1>::value);
+    REQUIRE(*job.template get<T2>() == ExpectedTagValue<T2>::value);
+    REQUIRE(*job.template get<T3>() == ExpectedTagValue<T3>::value);
     return true;
   }
   return false;

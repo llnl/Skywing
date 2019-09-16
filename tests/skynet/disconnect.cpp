@@ -2,7 +2,6 @@
 
 #include "skynet/master.hpp"
 #include "skynet/job.hpp"
-#include "skynet/tag.hpp"
 
 #include "utils.hpp"
 
@@ -53,7 +52,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
         master.handle_neighbor_messages();
         if (my_job.has_data<IntTag>())
         {
-          REQUIRE(my_job.get<IntTag>() == to_remove);
+          REQUIRE(*my_job.get<IntTag>() == to_remove);
           break;
         }
         std::this_thread::sleep_for(1ms);

@@ -1,8 +1,8 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
-#include "tag.hpp"
 #include "utility/on_error.hpp"
+#include "utility/optional.hpp"
 #include "master.hpp"
 #include "job_base.hpp"
 
@@ -31,15 +31,48 @@ namespace skynet
       static constexpr std::uint32_t value = 1 + tag_id_impl<SearchFor, Rest...>::value;
     };
 
+    /** \brief Wrapper for tags so that tags with the same underlying type can be used
+     */
+    template<typename Tag>
+    struct TagWrapper
+    {
+      std::vector<typename Tag::value_type> buffer;
+    }; // struct TagWrapper
   } // namespace detail
 
-  /** \brief Wrapper for tags so that tags with the same underlying type can be used
+  /** \brief A tag for sending values
+   *
+   * Tags certain values to be sent; all values sent for a specific tag must
+   * be of the same type.  This type should not be constructed by user code
+   * (just inherited) so the constructor is protected.
    */
-  template<typename Tag>
-  struct TagWrapper
+  template <typename T>
+  class Tag
   {
-    std::vector<typename Tag::value_type> buffer;
-  };
+  public:
+    /** \brief Parses raw data and appends it to a vector
+     *
+     * This shouldn't be publicly exposed.
+     * \param data The data to parse to add the the vector
+     * \param append_to The vector to append to, must be of type std::vector<T>
+     */
+    static void append_to_queue(
+      const char* const data,
+      const std::size_t size,
+      void* const append_to
+    )
+    {
+      auto* const true_append_to = static_cast<std::vector<T>*>(append_to);
+      true_append_to->push_back(from_bytes<T>(data, size));
+    }
+
+    /** \brief The type being sent over this tag
+     */
+    using value_type = T;
+
+  protected:
+    Tag() = default;
+  }; // class Tag
 
   /** \brief Job with known tags
    */
@@ -54,13 +87,17 @@ namespace skynet
       , id_{id}
     {}
 
-    /** \brief Pops data from a tag buffer
+    /** \brief Pops data from a tag buffer if it is available
      *
      * \pre The specified tag has data in its buffer.
      */
     template<typename GetTag>
-    typename GetTag::value_type get() noexcept
+    Optional<typename GetTag::value_type> get() noexcept
     {
+      if (!has_data<GetTag>())
+      {
+        return {};
+      }
       auto& buffer = get_buffer<GetTag>();
       auto value = std::move(buffer.back());
       buffer.pop_back();
@@ -116,12 +153,12 @@ namespace skynet
     template<typename GetTag>
     auto& get_buffer() noexcept
     {
-      return std::get<TagWrapper<GetTag>>(buffers_).buffer;
+      return std::get<detail::TagWrapper<GetTag>>(buffers_).buffer;
     }
     template<typename GetTag>
     const auto& get_buffer() const noexcept
     {
-      return std::get<TagWrapper<GetTag>>(buffers_).buffer;
+      return std::get<detail::TagWrapper<GetTag>>(buffers_).buffer;
     }
 
     // Retrieve a buffer as a void* based on an index
@@ -133,7 +170,7 @@ namespace skynet
       // arithmetic?  Can't use offsetof since this is a non-standard layout
       // type due to the virtual functions)
       const std::array<void*, sizeof...(Tags)> pointers{
-        static_cast<void*>(&std::get<TagWrapper<Tags>>(buffers_).buffer)...
+        static_cast<void*>(&std::get<detail::TagWrapper<Tags>>(buffers_).buffer)...
       };
       return pointers[index];
     }
@@ -146,7 +183,7 @@ namespace skynet
     }
 
     // The buffer of data for each tag
-    std::tuple<TagWrapper<Tags>...> buffers_;
+    std::tuple<detail::TagWrapper<Tags>...> buffers_;
 
     // The id for the message to send
     // Could keep a seperate id for each tag, but running out of message id's

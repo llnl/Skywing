@@ -105,6 +105,24 @@ namespace skynet
       return std::move(this->operator*());
     }
 
+    /** \brief Returns the contained value if the optional hold a value,
+     * otherwise returns the passed value
+     */
+    template<typename U>
+    T value_or(U&& default_value) const&
+    {
+      return static_cast<bool>(*this)
+        ? this->operator*()
+        : static_cast<T>(std::forward<U>(default_value));
+    }
+    template<typename U>
+    T value_or(T&& default_value) &&
+    {
+      return static_cast<bool>(*this)
+        ? std::move(this->operator*())
+        : static_cast<T>(std::forward<U>(default_value));
+    }
+
     /** \brief Returns true if the optional holds a value, false otherwise
      */
     constexpr explicit operator bool() const noexcept

@@ -32,8 +32,8 @@ TEST_CASE("Tag buffers work", "[Skynet_TagBuffers]")
   process_wrapper(job, 0, to_bytes(int_value));
   process_wrapper(job, 1, to_bytes(double_value));
   // Get back the values and ensure that they haven't changed
-  REQUIRE(job.get<IntTag>() == int_value);
-  REQUIRE(job.get<DoubleTag>() == double_value);
+  REQUIRE(*job.get<IntTag>() == int_value);
+  REQUIRE(*job.get<DoubleTag>() == double_value);
 }
 
 TEST_CASE("Tags can use repeated types", "[Skynet_TagRepeatedTypes]")
@@ -42,6 +42,6 @@ TEST_CASE("Tags can use repeated types", "[Skynet_TagRepeatedTypes]")
   Job<IntTag, IntTag2> job{0, dummy};
   process_wrapper(job, 0, to_bytes(int_value));
   process_wrapper(job, 1, to_bytes(int_value2));
-  REQUIRE(job.get<IntTag>() == int_value);
-  REQUIRE(job.get<IntTag2>() == int_value2);
+  REQUIRE(*job.get<IntTag>() == int_value);
+  REQUIRE(*job.get<IntTag2>() == int_value2);
 }

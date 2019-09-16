@@ -2,7 +2,6 @@
 
 #include "skynet/master.hpp"
 #include "skynet/job.hpp"
-#include "skynet/tag.hpp"
 
 #include <array>
 #include <cstdint>
@@ -79,7 +78,7 @@ void machine_task(Master* const master_ptr, const std::size_t index)
         master.handle_neighbor_messages();
         if (my_job.has_data<SizeTTag>())
         {
-          REQUIRE(my_job.get<SizeTTag>() == send_index);
+          REQUIRE(*my_job.get<SizeTTag>() == send_index);
           break;
         }
       }
