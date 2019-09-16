@@ -24,18 +24,28 @@
 
 namespace skynet { namespace detail
 {
+  static constexpr std::uint8_t start_system_messages = 0x80;
   /** \brief The kinds of messages that can be sent
    */
-  enum class MessageType
+  enum class MessageType : std::uint8_t
   {
-    // Set-up messages
-    goodbye,
-    greeting,
-
+    // Job-sentric messages
     // Broadcast messages
     global_broadcast,
-    local_broadcast
+    local_broadcast,
+
+    // System messages
+    // Set-up messages
+    goodbye = start_system_messages,
+    greeting,
   }; // enum class MessageType
+
+  /** \brief Returns true if the MessageType isn't correlated with a job
+   */
+  constexpr bool is_system_message(MessageType t)
+  {
+    return static_cast<std::uint8_t>(t) >= start_system_messages;
+  }
 
   /** \brief The message that is sent between two Skynet instances
    *

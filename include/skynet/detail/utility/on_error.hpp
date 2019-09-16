@@ -3,11 +3,13 @@
 
 #include <stdexcept>
 #include <string>
+#include <iostream>
 
 namespace skynet { namespace detail
 {
   /** Skynet exception (temporary?)
    */
+  /*
   class Exception : public std::exception
   {
   public:
@@ -24,13 +26,16 @@ namespace skynet { namespace detail
     // on memory exhaustion, which we're not going to handle anyways
     std::string err_;
   }; // class Exception
+  */
 
   /** \brief Function that should always be used when reporting that an error
    * occured, should make transitioning to a different error handling scheme easier
    */
   void on_error(const char* const desc)
   {
-    throw Exception(desc);
+    std::cerr << desc << '\n';
+    std::terminate();
+    // throw Exception(desc);
   }
 } } // namespace skynet::detail
 

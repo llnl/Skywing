@@ -189,7 +189,7 @@ namespace skynet
       // Ensure that the tag number isn't too large
       if (tag >= sizeof...(Tags))
       {
-        detail::on_error("do_process_data - tag number is too large");
+        // detail::on_error("do_process_data - tag number is too large");
         return false;
       }
       // Otherwise add the data to the queue

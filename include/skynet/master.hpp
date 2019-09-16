@@ -14,6 +14,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <thread>
+#include <cassert>
 
 // TODO: Support other types of communicators; will probably make
 //       it a template and have it as a parameter, so not making a seperate
@@ -105,11 +106,6 @@ namespace skynet
             on_error("ExternalMaster::get_message failed to read the data part of the message!");
           }
         }
-        // If it's a goodbye message mark this connection as dead
-        if (msg.type == MessageType::goodbye)
-        {
-          dead_ = true;
-        }
         return std::make_pair(msg, std::move(buffer));
       }
 
@@ -137,6 +133,10 @@ namespace skynet
       /** \brief Returns if the connection is dead or not
        */
       bool is_dead() const noexcept { return dead_; }
+
+      /** \brief Marks the connection as dead
+       */
+      void mark_as_dead() noexcept { dead_ = true; }
 
     private:
       // Only allow private construction
@@ -258,14 +258,10 @@ namespace skynet
       to_send.type = detail::MessageType::goodbye;
       to_send.message_size = 0;
       to_send.origin = id_;
-      // ensure that the message isn't ignored
-      to_send.message_id = UINT32_MAX;
-      // Job ID doesn't matter, but needs to be set, so just set it to 0
-      to_send.job_id = 0;
       const auto buffer = to_bytes(to_send);
       for (auto& neighbor : neighbors_)
       {
-        neighbor.send_message(buffer);
+        neighbor.second.send_message(buffer);
       }
     }
 
@@ -291,7 +287,7 @@ namespace skynet
       }
       if (auto new_neighbor = detail::ExternalMaster::create(detail::ByRequest{}, std::move(to_connect), id_))
       {
-        neighbors_.emplace_back(std::move(*new_neighbor));
+        neighbors_.emplace(new_neighbor->id(), std::move(*new_neighbor));
       }
     }
 
@@ -303,7 +299,7 @@ namespace skynet
       {
         if (auto new_neighbor = detail::ExternalMaster::create(detail::ByAccept{}, std::move(*conn), id_))
         {
-          neighbors_.emplace_back(std::move(*new_neighbor));
+          neighbors_.emplace(new_neighbor->id(), std::move(*new_neighbor));
         }
       }
     }
@@ -315,11 +311,15 @@ namespace skynet
     template<typename JobType>
     JobType& create_job(const JobID id)
     {
-      jobs_.push_back(std::make_unique<JobType>(id, *this));
-      return static_cast<JobType&>(*jobs_.back());
+      if (jobs_.find(id) != jobs_.end())
+      {
+        detail::on_error("Job with duplicate ID created!");
+      }
+      // std::pair<iterator, bool>
+      const auto res = jobs_.emplace(id, std::make_unique<JobType>(id, *this));
+      return static_cast<JobType&>(*res.first->second);
     }
 
-    // TODO: Is this something useful or just good for testing?
     /** \brief Returns the number of machines connected
      */
     int number_of_neighbors() const noexcept
@@ -333,15 +333,15 @@ namespace skynet
      */
     void handle_neighbor_messages()
     {
-      remove_dead_neighbors();
       for (auto&& neighbor : neighbors_)
       {
-        while (auto msg_opt = neighbor.get_message())
+        while (auto msg_opt = neighbor.second.get_message())
         {
           const auto& msg = *msg_opt;
           process_message(msg.first, msg.second);
         }
       }
+      remove_dead_neighbors();
     }
 
     /** \brief Broadcast a message to the entire network
@@ -374,22 +374,26 @@ namespace skynet
       std::memcpy(to_send.data(), header_buffer.data(), header_buffer.size());
       std::memcpy(to_send.data() + header_buffer.size(), data.data(), data.size());
       for (auto&& neighbor : neighbors_)
-      {
-        neighbor.send_message(to_send);
+      {\
+        neighbor.second.send_message(to_send);
       }
     }
 
     // Does all processing that needs to be done when a message is recieved
     void process_message(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
     {
-      // TODO: Probably a systematic way to say that a message isn't related to
-      //       a job since only those should be broadcast?
+      // If the message is bad ignore it and mark the connection as dead
+      if (message_is_bad(msg, buffer))
+      {
+        mark_as_dead(buffer);
+        return;
+      }
       // If the message is old just ignore it, unless it's a parting
       // message
-      if (msg.type != detail::MessageType::goodbye) {
+      if (!detail::is_system_message(msg.type)) {
         auto& last_id = last_message_id_[msg.origin][msg.job_id];
         if (msg.message_id <= last_id)
-        {
+        {\
           return;
         }
         last_id = msg.message_id;
@@ -397,15 +401,15 @@ namespace skynet
 
       switch(msg.type)
       {
-      // Greeting messages should never been seen here, only when the
-      // connection type is first made
       case detail::MessageType::greeting:
-        detail::on_error("Unexpected greeting in Master::process_message");
-        break;
-
+        // Greeting messages should never been seen here, only when the
+        // connection type is first made; this connection is malfunctioning
+        // so consider it dead
+        // detail::on_error("Unexpected greeting in Master::process_message");
+        // break;
+        // [[fallthrough]];
       case detail::MessageType::goodbye:
-        // Just exit for now; can't remove the dead neighbors as this is called
-        // during iteration
+        mark_as_dead(buffer);
         break;
 
       case detail::MessageType::local_broadcast:
@@ -419,9 +423,9 @@ namespace skynet
         // recieved from and the origin
         for (auto&& neighbor : neighbors_)
         {
-          if (neighbor.id() != buffer.from() && neighbor.id() != msg.origin)
+          if (neighbor.second.id() != buffer.from() && neighbor.second.id() != msg.origin)
           {
-            neighbor.send_message(buffer.vector());
+            neighbor.second.send_message(buffer.vector());
           }
         }
         break;
@@ -431,43 +435,72 @@ namespace skynet
     // Adds data to the tag queue for a job from a message
     void add_data_to_queue(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
     {
-      if (msg.job_id >= jobs_.size())
-      {
-        detail::on_error("Job ID larger than number of jobs!");
-      }
-      detail::JobBase::Accessor::process_data(
-        *jobs_[msg.job_id],
+      assert(jobs_.find(msg.job_id) != jobs_.end());
+      const auto okay = detail::JobBase::Accessor::process_data(
+        *jobs_.find(msg.job_id)->second,
         msg.tag_id,
         buffer.data(),
         msg.message_size
       );
+      if (!okay)
+      {
+        mark_as_dead(buffer);
+      }
     }
 
     /** \brief Removes all dead neighbors
      */
     void remove_dead_neighbors() noexcept
     {
-      // TODO: Maybe want to free some of last_message_id_ since it's not required
-      //       anymore, but there's always the chance that an old broadcast message
-      //       comes along, so a list of dead ID's would be needed
-      neighbors_.erase(
-        std::remove_if(
-          neighbors_.begin(),
-          neighbors_.end(),
-          [](const detail::ExternalMaster& m) { return m.is_dead(); }
-        ),
-        neighbors_.end()
-      );
+      for (auto it = neighbors_.begin(); it != neighbors_.end(); /* nothing */)
+      {
+        if (it->second.is_dead())
+        {
+          it = neighbors_.erase(it);
+        }
+        else
+        {
+          ++it;
+        }
+      }
+    }
+
+    /** \brief Checks if a message is bad or not
+     */
+    bool message_is_bad(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer) const
+    {
+      // If the message is from a machine that isn't known
+      if (neighbors_.find(buffer.from()) == neighbors_.end())
+      {
+        return true;
+      }
+      if (!detail::is_system_message(msg.type))
+      {
+        // If the job id isn't found
+        if (jobs_.find(msg.job_id) == jobs_.end())
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /** \brief Marks the message a buffer was recieved from as dead
+     */
+    void mark_as_dead(const detail::MessageAndDataBuffer& buffer) noexcept
+    {
+      assert(neighbors_.find(buffer.from()) != neighbors_.end());
+      neighbors_.find(buffer.from())->second.mark_as_dead();
     }
 
     // For listening to connection requests
     detail::SocketCommunicator server_socket_;
 
     // List of the jobs that are present
-    std::vector<std::unique_ptr<detail::JobBase>> jobs_;
+    std::unordered_map<JobID, std::unique_ptr<detail::JobBase>> jobs_;
 
     // List of neighboring connections
-    std::vector<detail::ExternalMaster> neighbors_;
+    std::unordered_map<MachineID, detail::ExternalMaster> neighbors_;
 
     // The message id of each last heard message from each machine for each job in the network
     std::unordered_map<

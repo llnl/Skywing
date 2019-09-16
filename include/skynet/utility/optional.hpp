@@ -105,6 +105,17 @@ namespace skynet
       return std::move(this->operator*());
     }
 
+    /** \brief Returns a pointer to the contained value
+     */
+    T* operator->() noexcept
+    {
+      return std::addressof(this->operator*());
+    }
+    const T* operator->() const noexcept
+    {
+      return std::addressof(this->operator*());
+    }
+
     /** \brief Returns the contained value if the optional hold a value,
      * otherwise returns the passed value
      */
