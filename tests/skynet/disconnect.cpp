@@ -21,7 +21,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
 {
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), static_cast<std::uint32_t>(index)};
+  Master master{static_cast<std::uint16_t>(base_port + index), static_cast<MachineID>(index)};
   // Fully connect the network to ensure that at any point all machines can have a
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i)

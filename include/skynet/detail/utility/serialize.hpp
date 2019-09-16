@@ -1,5 +1,5 @@
-#ifndef SKYNET_UTILITY_SERIALIZE_HPP
-#define SKYNET_UTILITY_SERIALIZE_HPP
+#ifndef SKYNET_DETAIL_UTILITY_SERIALIZE_HPP
+#define SKYNET_DETAIL_UTILITY_SERIALIZE_HPP
 
 #include <vector>
 #include <sstream>
@@ -67,4 +67,4 @@ namespace skynet { namespace detail
   }
 } } // namespace skynet::detail
 
-#endif // SKYNET_UTILITY_SERIALIZE_HPP
+#endif // SKYNET_DETAIL_UTILITY_SERIALIZE_HPP

@@ -1,14 +1,16 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
-#include "detail/job_base.hpp"
-#include "detail/utility/on_error.hpp"
-#include "utility/optional.hpp"
-#include "master.hpp"
+#include "skynet/types.hpp"
+#include "skynet/detail/job_base.hpp"
+#include "skynet/detail/utility/on_error.hpp"
+#include "skynet/utility/optional.hpp"
+#include "skynet/master.hpp"
 
 #include <vector>
 #include <tuple>
 #include <chrono>
+#include <limits>
 
 namespace skynet
 {
@@ -22,14 +24,14 @@ namespace skynet
     template<typename SearchFor, typename... Rest>
     struct tag_id_impl<SearchFor, SearchFor, Rest...>
     {
-      static constexpr std::uint32_t value = 0;
+      static constexpr TagID value = 0;
     };
 
     // No match
     template<typename SearchFor, typename Next, typename... Rest>
     struct tag_id_impl<SearchFor, Next, Rest...>
     {
-      static constexpr std::uint32_t value = 1 + tag_id_impl<SearchFor, Rest...>::value;
+      static constexpr TagID value = 1 + tag_id_impl<SearchFor, Rest...>::value;
     };
 
     /** \brief Wrapper for tags so that tags with the same underlying type can be used
@@ -86,10 +88,16 @@ namespace skynet
   template<typename... Tags>
   class Job : public detail::JobBase
   {
+    // Make sure there aren't too many tags
+    static_assert(
+      sizeof...(Tags) <= std::numeric_limits<TagID>::max(),
+      "Too many tags!"
+    );
+
   public:
     /** \brief Creates a job with the specified id and master
      */
-    explicit Job(const std::uint32_t id, Master& master)
+    explicit Job(const JobID id, Master& master)
       : JobBase{master}
       , id_{id}
     {}
@@ -173,7 +181,7 @@ namespace skynet
   private:
     // Override processing of data
     bool process_data(
-      const std::size_t tag,
+      const TagID tag,
       const char* const data,
       const std::size_t size
     ) override
@@ -221,7 +229,7 @@ namespace skynet
 
     // Returns the id of a specified tag
     template<typename Tag>
-    static std::uint32_t tag_id() noexcept
+    static TagID tag_id() noexcept
     {
       return detail::tag_id_impl<Tag, Tags...>::value;
     }
@@ -232,10 +240,10 @@ namespace skynet
     // The id for the message to send
     // Could keep a seperate id for each tag, but running out of message id's
     // isn't very realistic
-    std::uint32_t message_id_{1};
+    MessageID message_id_{1};
 
     // The id for this job; must be the same across all instances
-    std::uint32_t id_;
+    JobID id_;
   }; // Class Job
 } // namespace skynet
 

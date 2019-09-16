@@ -1,5 +1,5 @@
-#ifndef SKYNET_DEVICES_SOCKET_COMMUNICATOR_HPP
-#define SKYNET_DEVICES_SOCKET_COMMUNICATOR_HPP
+#ifndef SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#define SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
 #include "skynet/utility/optional.hpp"
 
@@ -93,4 +93,4 @@ namespace skynet { namespace detail
   }; // class SocketCommunicator
 } } // namespace skynet::detail
 
-#endif // SKYNET_DEVICES_SOCKET_COMMUNICATOR_HPP
+#endif // SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP

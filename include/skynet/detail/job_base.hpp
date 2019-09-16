@@ -1,6 +1,7 @@
-#ifndef SKYNET_JOB_BASE_HPP
-#define SKYNET_JOB_BASE_HPP
+#ifndef SKYNET_DETAIL_JOB_BASE_HPP
+#define SKYNET_DETAIL_JOB_BASE_HPP
 
+#include "skynet/types.hpp"
 #include <vector>
 
 namespace skynet
@@ -52,7 +53,7 @@ namespace skynet
        * \param data The raw data sent over
        * \return True if processing went fine, false if there was an error
        */
-      virtual bool process_data(std::size_t tag, const char* data, std::size_t size) = 0;
+      virtual bool process_data(TagID tag, const char* data, std::size_t size) = 0;
 
       // The handle to the associated master
       Master& master_;
@@ -60,4 +61,4 @@ namespace skynet
   } // namespace detail
 } // namespace skynet
 
-#endif // SKYNET_JOB_BASE_HPP
+#endif // SKYNET_DETAIL_JOB_BASE_HPP

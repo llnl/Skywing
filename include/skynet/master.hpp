@@ -1,10 +1,11 @@
 #ifndef SKYNET_MASTER_HPP
 #define SKYNET_MASTER_HPP
 
-#include "detail/job_base.hpp"
-#include "detail/message.hpp"
-#include "detail/devices/socket_communicator.hpp"
-#include "detail/utility/on_error.hpp"
+#include "skynet/types.hpp"
+#include "skynet/detail/job_base.hpp"
+#include "skynet/detail/message.hpp"
+#include "skynet/detail/devices/socket_communicator.hpp"
+#include "skynet/detail/utility/on_error.hpp"
 
 #include <vector>
 #include <memory>
@@ -44,7 +45,7 @@ namespace skynet
       static Optional<ExternalMaster> create(
         ByAccept,
         SocketCommunicator conn,
-        const std::uint32_t local_id
+        const MachineID local_id
       ) noexcept
       {
         ExternalMaster to_ret(std::move(conn));
@@ -60,7 +61,7 @@ namespace skynet
       static Optional<ExternalMaster> create(
         ByRequest,
         SocketCommunicator conn,
-        const std::uint32_t local_id
+        const MachineID local_id
       ) noexcept
       {
         ExternalMaster to_ret(std::move(conn));
@@ -131,7 +132,7 @@ namespace skynet
 
       /** \brief Returns the id of the computer this is connected to
        */
-      std::uint32_t id() const noexcept { return id_; }
+      MachineID id() const noexcept { return id_; }
 
       /** \brief Returns if the connection is dead or not
        */
@@ -176,7 +177,7 @@ namespace skynet
       }
 
       // Send the greeting
-      bool send_greeting(const std::uint32_t local_id)
+      bool send_greeting(const MachineID local_id)
       {
         Message to_send;
         to_send.type = MessageType::greeting;
@@ -190,7 +191,7 @@ namespace skynet
       SocketCommunicator conn_;
 
       // The id of the external master
-      std::uint32_t id_;
+      MachineID id_;
 
       // If the connection is dead or not
       bool dead_{false};
@@ -216,9 +217,9 @@ namespace skynet
 
       static void local_broadcast(
         Master& m,
-        const std::uint32_t job_id,
-        const std::uint32_t tag_id,
-        const std::uint32_t msg_id,
+        const JobID job_id,
+        const TagID tag_id,
+        const MessageID msg_id,
         const std::vector<char>& data
       )
       {
@@ -227,9 +228,9 @@ namespace skynet
 
       static void global_broadcast(
         Master& m,
-        const std::uint32_t job_id,
-        const std::uint32_t tag_id,
-        const std::uint32_t msg_id,
+        const JobID job_id,
+        const TagID tag_id,
+        const MessageID msg_id,
         const std::vector<char>& data
       )
       {
@@ -243,7 +244,7 @@ namespace skynet
      * \param port The port to listen on
      * \param id The ID to assign to this machine
      */
-    explicit Master(const std::uint16_t port, const std::uint32_t id)
+    explicit Master(const std::uint16_t port, const MachineID id)
       : id_{id}
     {
       server_socket_.set_to_listen(port);
@@ -312,7 +313,7 @@ namespace skynet
      * \return A reference to the job
      */
     template<typename JobType>
-    JobType& create_job(const std::uint32_t id)
+    JobType& create_job(const JobID id)
     {
       jobs_.push_back(std::make_unique<JobType>(id, *this));
       return static_cast<JobType&>(*jobs_.back());
@@ -352,9 +353,9 @@ namespace skynet
      * \param type The type of broadcast
      */
     void do_broadcast(
-      const std::uint32_t job_id,
-      const std::uint32_t tag_id,
-      const std::uint32_t msg_id,
+      const JobID job_id,
+      const TagID tag_id,
+      const MessageID msg_id,
       const std::vector<char>& data,
       const detail::MessageType type
     ) noexcept
@@ -470,8 +471,8 @@ namespace skynet
 
     // The message id of each last heard message from each machine for each job in the network
     std::unordered_map<
-      std::uint32_t,
-      std::unordered_map<std::uint32_t, std::uint32_t>
+      MachineID,
+      std::unordered_map<JobID, MessageID>
     > last_message_id_;
 
     // The id of this machine

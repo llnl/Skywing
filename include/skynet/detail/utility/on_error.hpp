@@ -1,5 +1,5 @@
-#ifndef SKYNET_UTILITY_ON_ERROR_HPP
-#define SKYNET_UTILITY_ON_ERROR_HPP
+#ifndef SKYNET_DETAIL_UTILITY_ON_ERROR_HPP
+#define SKYNET_DETAIL_UTILITY_ON_ERROR_HPP
 
 #include <stdexcept>
 #include <string>
@@ -34,4 +34,4 @@ namespace skynet { namespace detail
   }
 } } // namespace skynet::detail
 
-#endif // SKYNET_UTILITY_ON_ERROR_HPP
+#endif // SKYNET_DETAIL_UTILITY_ON_ERROR_HPP

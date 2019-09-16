@@ -1,6 +1,7 @@
-#ifndef SKYNET_MESSAGE_HPP
-#define SKYNET_MESSAGE_HPP
+#ifndef SKYNET_DETAIL_MESSAGE_HPP
+#define SKYNET_DETAIL_MESSAGE_HPP
 
+#include "skynet/types.hpp"
 #include "skynet/detail/utility/serialize.hpp"
 #include "skynet/detail/utility/launder.hpp"
 
@@ -48,20 +49,32 @@ namespace skynet { namespace detail
     /// The type of message that this is
     MessageType type;
     /// The job that this message is for
-    std::uint32_t job_id;
+    JobID job_id;
     /// The tag that the message was sent with
-    std::uint32_t tag_id;
+    TagID tag_id;
     /// The id of the computer that the message is originally from
-    std::uint32_t origin;
+    MachineID origin;
     /// The id of the message
-    std::uint32_t message_id;
+    MessageID message_id;
     /// The size of the message that follows
     std::uint32_t message_size;
   }; // struct Message
 
+  #if SKYNET_GENERATED_MESSAGE_NETWORK_SIZE > 0
+    // TODO: This is desirable, but due to padding this static_assert can
+    //       produce false positives
+    // Shouldn't be possible to have a serialized size smaller than the object
+    // size; don't want any fields that aren't serialized
+    // static_assert(
+    //   Message::network_size >= sizeof(Message),
+    //   "All data in skynet::detail::Message is not being serialized!"
+    // );
+  #endif // SKYNET_GENERATED_MESSAGE_NETWORK_SIZE
+
   // Message should always be trivially copyable
-  static_assert(std::is_trivially_copyable<Message>::value,
-    "skynet::Message is not trivally copyable!\n"
+  static_assert(
+    std::is_trivially_copyable<Message>::value,
+    "skynet::detail::Message is not trivally copyable!\n"
     "Remove any complex types from the structure."
   );
 
@@ -81,7 +94,7 @@ namespace skynet { namespace detail
   public:
     /** \brief Construct a buffer, marking which connection it came from.
      */
-    explicit MessageAndDataBuffer(const std::uint32_t from)
+    explicit MessageAndDataBuffer(const MachineID from)
       : from_{from}
       , buffer_(Message::network_size)
     {}
@@ -114,11 +127,11 @@ namespace skynet { namespace detail
 
     /** \brief Return the id of the connection this message was sent from
      */
-    std::uint32_t from() const noexcept { return from_; }
+    MachineID from() const noexcept { return from_; }
 
   private:
     // Who sent the data
-    std::uint32_t from_;
+    MachineID from_;
     // Buffer to hold who the data is from
     std::vector<char> buffer_;
   };
@@ -127,4 +140,4 @@ namespace skynet { namespace detail
 // Don't allow the macro to leak
 #undef SKYNET_GENERATED_MESSAGE_NETWORK_SIZE
 
-#endif // SKYNET_MESSAGE_HPP
+#endif // SKYNET_DETAIL_MESSAGE_HPP

@@ -1,5 +1,5 @@
-#ifndef SKYNET_UTILITY_LAUNDER_HPP
-#define SKYNET_UTILITY_LAUNDER_HPP
+#ifndef SKYNET_DETAIL_UTILITY_LAUNDER_HPP
+#define SKYNET_DETAIL_UTILITY_LAUNDER_HPP
 
 #if __cplusplus >= 201703L
   #include <new>
@@ -25,4 +25,4 @@ namespace skynet { namespace detail
   #endif
 } } // namespace skynet::detail
 
-#endif // SKYNET_UTILITY_LAUNDER_HPP
+#endif // SKYNET_DETAIL_UTILITY_LAUNDER_HPP
