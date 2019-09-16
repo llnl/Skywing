@@ -36,41 +36,55 @@ namespace skynet
   class ExternalMaster
   {
   public:
-    /** \brief Construct an ExternalMaster using an existing connection
+    /** \brief Attempt to construct an ExternalMaster using an existing connection
      *
      * This is for when a server accepts a new connection.  Both have to
      * send/recieve greetings, but need to do so in the opposite order so
      * have seperate constructors for both.
      */
-    ExternalMaster(ByAccept, SocketCommunicator conn, const std::uint32_t local_id)
-      : conn_{std::move(conn)}
+    static Optional<ExternalMaster> create(ByAccept, SocketCommunicator conn, const std::uint32_t local_id) noexcept
     {
-      send_greeting(local_id);
-      wait_for_greeting();
+      ExternalMaster to_ret(std::move(conn));
+      if (!to_ret.send_greeting(local_id)) { return {}; }
+      if (!to_ret.wait_for_greeting()) { return {}; }
+      return to_ret;
     }
 
-    /** \brief Construct an ExternalMaster using an existing connection
+    /** \brief Attempt to construct an ExternalMaster using an existing connection
      *
      * This is for when a client connects to a server.
      */
-    ExternalMaster(ByRequest, SocketCommunicator conn, const std::uint32_t local_id)
-      : conn_{std::move(conn)}
+    static Optional<ExternalMaster> create(ByRequest, SocketCommunicator conn, const std::uint32_t local_id) noexcept
     {
-      wait_for_greeting();
-      send_greeting(local_id);
+      ExternalMaster to_ret(std::move(conn));
+      if (!to_ret.wait_for_greeting()) { return {}; }
+      if (!to_ret.send_greeting(local_id)) { return {}; }
+      return to_ret;
     }
 
     /** \brief Recieve a skynet::Message from an external connection if one exists
      *
      * Returns the message as well as the buffer containing the serialized message
-     * and data
+     * and data.  Also marks the connection as dead if any errors occur.  Does
+     * nothing if the connection is marked as dead.
      */
     Optional<std::pair<Message, MessageAndDataBuffer>> get_message() noexcept
     {
-      MessageAndDataBuffer buffer{id_};
-      if (!conn_.read_message(buffer.buffer(), Message::network_size))
+      if (dead_)
       {
-        // No message yet
+        return {};
+      }
+      MessageAndDataBuffer buffer{id_};
+      const auto err = conn_.read_message(buffer.buffer(), Message::network_size);
+      switch (err)
+      {
+      case ConnectionError::no_error: break;
+      case ConnectionError::would_block: return {};
+
+      case ConnectionError::closed:
+        // [[fallthrough]];
+      case ConnectionError::unrecoverable:
+        dead_ = true;
         return {};
       }
       // Get the message and adjust the buffer
@@ -78,28 +92,52 @@ namespace skynet
       // Read the rest (if there's anything)
       if (msg.message_size != 0)
       {
-        if (!conn_.read_message(buffer.data(), msg.message_size))
+        if (conn_.read_message(buffer.data(), msg.message_size) != ConnectionError::no_error)
         {
           on_error("ExternalMaster::get_message failed to read the data part of the message!");
         }
+      }
+      // If it's a goodbye message mark this connection as dead
+      if (msg.type == MessageType::goodbye)
+      {
+        dead_ = true;
       }
       return std::make_pair(msg, std::move(buffer));
     }
 
     /** \brief Sends a raw message to the other master
+     *
+     * Also marks the connection as dead if any errors occur.  Does nothing
+     * if the connection is marked as dead.
      */
     void send_message(const std::vector<char>& c)
     {
-      conn_.send_message(c.data(), c.size());
+      if (dead_)
+      {
+        return;
+      }
+      if (conn_.send_message(c.data(), c.size()) != ConnectionError::no_error)
+      {
+        dead_ = true;
+      }
     }
 
     /** \brief Returns the id of the computer this is connected to
      */
     std::uint32_t id() const noexcept { return id_; }
 
+    /** \brief Returns if the connection is dead or not
+     */
+    bool is_dead() const noexcept { return dead_; }
+
   private:
+    // Only allow private construction
+    explicit ExternalMaster(SocketCommunicator conn)
+      : conn_{std::move(conn)}
+    {}
+
     // Wait until the greeting is sent
-    void wait_for_greeting()
+    bool wait_for_greeting()
     {
       // Wait for the greeting
       // TODO: Probably want a time-out?
@@ -119,20 +157,26 @@ namespace skynet
           }
           // Otherwise just set the id
           id_ = msg.origin;
-          return;
+          return true;
+        }
+        // If the connection died then don't keep trying to connect
+        if (dead_)
+        {
+          return false;
         }
         std::this_thread::sleep_for(std::chrono::microseconds(10));
       }
     }
 
     // Send the greeting
-    void send_greeting(const std::uint32_t local_id)
+    bool send_greeting(const std::uint32_t local_id)
     {
       Message to_send;
       to_send.type = MessageType::greeting;
       to_send.message_size = 0;
       to_send.origin = local_id;
       send_message(to_bytes(to_send));
+      return !dead_;
     }
 
     // For talking with the external master
@@ -140,6 +184,9 @@ namespace skynet
 
     // The id of the external master
     std::uint32_t id_;
+
+    // If the connection is dead or not
+    bool dead_{false};
   }; // class ExternalMaster
 
   /** \brief The master Skynet instance used for communication
@@ -159,6 +206,32 @@ namespace skynet
       server_socket_.set_to_listen(port);
     }
 
+    /** \brief Destructor; tells all neighbors that the device is dead
+     */
+    ~Master()
+    {
+      Message to_send;
+      to_send.type = MessageType::goodbye;
+      to_send.message_size = 0;
+      to_send.origin = id_;
+      // ensure that the message isn't ignored
+      to_send.message_id = UINT32_MAX;
+      // Job ID doesn't matter, but needs to be set, so just set it to 0
+      to_send.job_id = 0;
+      const auto buffer = to_bytes(to_send);
+      for (auto& neighbor : neighbors_)
+      {
+        neighbor.send_message(buffer);
+      }
+    }
+
+    // Can't copy
+    Master(const Master&) = delete;
+    Master& operator=(const Master&) = delete;
+    // Movable
+    Master(Master&&) = default;
+    Master& operator=(Master&&) = default;
+
     /** \brief Connects to another instance at the specified address on
      * the specified port
      *
@@ -168,11 +241,14 @@ namespace skynet
     void connect_to_server(const char* const address, const std::uint16_t port)
     {
       SocketCommunicator to_connect;
-      if (!to_connect.connect_to_server(address, port))
+      if (to_connect.connect_to_server(address, port) != ConnectionError::no_error)
       {
         on_error("Master::connect_to_server failed!");
       }
-      neighbors_.emplace_back(ByRequest{}, std::move(to_connect), id_);
+      if (auto new_neighbor = ExternalMaster::create(ByRequest{}, std::move(to_connect), id_))
+      {
+        neighbors_.emplace_back(std::move(*new_neighbor));
+      }
     }
 
     /** \brief See if there are any pending connections and accept them if so
@@ -181,7 +257,10 @@ namespace skynet
     {
       while(auto conn = server_socket_.accept())
       {
-        neighbors_.emplace_back(ByAccept{}, std::move(*conn), id_);
+        if (auto new_neighbor = ExternalMaster::create(ByAccept{}, std::move(*conn), id_))
+        {
+          neighbors_.emplace_back(std::move(*new_neighbor));
+        }
       }
     }
 
@@ -201,6 +280,7 @@ namespace skynet
      */
     void handle_neighbor_messages()
     {
+      remove_dead_neighbors();
       for (auto&& neighbor : neighbors_)
       {
         if (auto msg_opt = neighbor.get_message())
@@ -228,7 +308,7 @@ namespace skynet
       // Prepend the message describing the data and send it to all neighbors
       std::vector<char> to_send(Message::network_size + data.size());
       Message header;
-      header.type = MessageType::broadcast;
+      header.type = MessageType::global_broadcast;
       header.job_id = job_id;
       header.tag_id = tag_id;
       header.origin = id_;
@@ -256,8 +336,11 @@ namespace skynet
     // Does all processing that needs to be done when a message is recieved
     void process_message(const Message& msg, const MessageAndDataBuffer& buffer)
     {
-      // If the message is old just ignore it
-      {
+      // TODO: Probably a systematic way to say that a message isn't related to
+      //       a job since only those should be broadcast?
+      // If the message is old just ignore it, unless it's a parting
+      // message
+      if (msg.type != MessageType::goodbye) {
         auto& last_id = last_message_id_[msg.origin][msg.job_id];
         if (msg.message_id <= last_id)
         {
@@ -274,7 +357,16 @@ namespace skynet
         on_error("Unexpected greeting in Master::process_message");
         break;
 
-      case MessageType::broadcast:
+      case MessageType::goodbye:
+        // Just exit for now; can't remove the dead neighbors as this is called
+        // during iteration
+        break;
+
+      case MessageType::local_broadcast:
+        add_data_to_queue(msg, buffer);
+        break;
+
+      case MessageType::global_broadcast:
         // Add the data to the appropriate queue
         add_data_to_queue(msg, buffer);
         // Propagate the message to all neighbors but the one it was
@@ -298,6 +390,23 @@ namespace skynet
         on_error("Job ID larger than number of jobs!");
       }
       jobs_[msg.job_id]->process_data(msg.tag_id, buffer.data(), msg.message_size);
+    }
+
+    /** \brief Removes all dead neighbors
+     */
+    void remove_dead_neighbors() noexcept
+    {
+      // TODO: Maybe want to free some of last_message_id_ since it's not required
+      //       anymore, but there's always the chance that an old broadcast message
+      //       comes along, so a list of dead ID's would be needed
+      neighbors_.erase(
+        std::remove_if(
+          neighbors_.begin(),
+          neighbors_.end(),
+          [](const ExternalMaster& m) { return m.is_dead(); }
+        ),
+        neighbors_.end()
+      );
     }
 
     // For listening to connection requests

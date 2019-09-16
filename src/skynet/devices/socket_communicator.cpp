@@ -61,6 +61,9 @@ namespace skynet
       {
         return {};
       }
+      // This should never happen and is a programming bug if it's reached
+      // Not 100% sure how to handle it, but forcefully quitting with a message
+      // seems to be fine for now
       std::perror("SocketCommunicator::accept - accept");
       std::exit(-1);
     }
@@ -68,7 +71,7 @@ namespace skynet
     return SocketCommunicator(WithRawHandle{}, raw_handle);
   }
 
-  void SocketCommunicator::set_to_listen(const std::uint16_t port) noexcept
+  ConnectionError SocketCommunicator::set_to_listen(const std::uint16_t port) noexcept
   {
     constexpr int listen_queue_size = 10;
     sockaddr_in servaddr;
@@ -77,17 +80,20 @@ namespace skynet
     servaddr.sin_port = htons(port);
     if (bind(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) < 0)
     {
-      std::perror("SocketCommunicator::set_to_listen - bind");
-      std::exit(-1);
+      // std::perror("SocketCommunicator::set_to_listen - bind");
+      // std::exit(-1);
+      return ConnectionError::unrecoverable;
     }
     if (listen(handle_, listen_queue_size) < 0)
     {
-      std::perror("SocketCommunicator::set_to_listen - listen");
-      std::exit(-1);
+      // std::perror("SocketCommunicator::set_to_listen - listen");
+      // std::exit(-1);
+      return ConnectionError::unrecoverable;
     }
+    return ConnectionError::no_error;
   }
 
-  bool SocketCommunicator::connect_to_server(const char* const address, const std::uint16_t port) noexcept
+  ConnectionError SocketCommunicator::connect_to_server(const char* const address, const std::uint16_t port) noexcept
   {
     sockaddr_in servaddr;
     servaddr.sin_family = AF_INET;
@@ -103,40 +109,49 @@ namespace skynet
         to_poll.events = POLLOUT;
         if (poll(&to_poll, 1, -1) < 0)
         {
-          perror("SocketCommunicator::connect_to_server - poll");
-          exit(-1);
+          // perror("SocketCommunicator::connect_to_server - poll");
+          // exit(-1);
+          return ConnectionError::unrecoverable;
         }
       }
       else
       {
         // std::perror("SocketCommunicator::connect_to_server - connect");
         // std::exit(-1);
-        return false;
+        return ConnectionError::unrecoverable;
       }
     }
-    return true;
+    return ConnectionError::no_error;
   }
 
-  void SocketCommunicator::send_message(const char* const message, const std::size_t size) noexcept
+  ConnectionError SocketCommunicator::send_message(const char* const message, const std::size_t size) noexcept
   {
     if (write(handle_, message, size) < 0)
     {
-      std::perror("SocketCommunicator::send_message - write");
-      std::exit(-1);
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+      {
+        return ConnectionError::would_block;
+      }
+      // std::perror("SocketCommunicator::send_message - write");
+      // std::exit(-1);
+      return ConnectionError::unrecoverable;
     }
+    return ConnectionError::no_error;
   }
 
-  bool SocketCommunicator::read_message(char* const buffer, const std::size_t size) noexcept
+  ConnectionError SocketCommunicator::read_message(char* const buffer, const std::size_t size) noexcept
   {
-    if (read(handle_, buffer, size) < 0)
+    const auto written = read(handle_, buffer, size);
+    if (written < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
-        return false;
+        return ConnectionError::would_block;
       }
-      std::perror("SocketCommunicator::read_message - read");
-      std::exit(-1);
+      // std::perror("SocketCommunicator::read_message - read");
+      // std::exit(-1);
+      return ConnectionError::unrecoverable;
     }
-    return true;
+    return written == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
 } // namespace skynet

@@ -27,8 +27,13 @@ namespace skynet
    */
   enum class MessageType
   {
+    // Set-up messages
+    goodbye,
     greeting,
-    broadcast
+
+    // Broadcast messages
+    global_broadcast,
+    local_broadcast
   }; // enum class MessageType
 
   /** \brief The message that is sent between two Skynet instances

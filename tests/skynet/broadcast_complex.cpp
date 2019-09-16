@@ -4,6 +4,8 @@
 #include "skynet/job.hpp"
 #include "skynet/tag.hpp"
 
+#include "utils.hpp"
+
 #include <cstdint>
 #include <thread>
 #include <chrono>
@@ -16,23 +18,6 @@ constexpr int num_machines = 50;
 constexpr int min_connections_per_machine = 1;
 constexpr int max_connections_per_machine = 5;
 constexpr std::uint16_t base_port = 30000;
-
-std::mt19937_64 make_prng() noexcept
-{
-  // The number of bytes required for initilizing a Mersenne Twister
-  constexpr auto bytes_needed =
-      std::mt19937_64::word_size * std::mt19937_64::state_size;
-  // Create the initial state
-  using result_type = std::random_device::result_type;
-  constexpr auto array_size = bytes_needed / sizeof(result_type);
-  std::array<result_type, array_size> values;
-  std::generate(values.begin(), values.end(), []() {
-      return std::random_device{}();
-  });
-  // Seed the PRNG with the values
-  std::seed_seq seq(values.begin(), values.end());
-  return std::mt19937_64{seq};
-}
 
 struct Tag1 : Tag<int> {};
 struct Tag2 : Tag<double> {};
