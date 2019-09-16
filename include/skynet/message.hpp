@@ -73,8 +73,8 @@ namespace skynet
     ar(m.type, m.job_id, m.tag_id, m.origin, m.message_id, m.message_size);
   }
 
-  /** \brief Simple class for holding a processing the raw bytes of a recieved
-   * message and its data
+  /** \brief Simple class for holding and processing the raw bytes of a
+   * recieved message and its data
    */
   class MessageAndDataBuffer
   {

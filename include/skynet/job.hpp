@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <tuple>
+#include <chrono>
 
 namespace skynet
 {
@@ -38,6 +39,9 @@ namespace skynet
     {
       std::vector<typename Tag::value_type> buffer;
     }; // struct TagWrapper
+
+    // The default poll frequency for Job::get_when_ready
+    static constexpr std::chrono::milliseconds default_poll_freq{1};
   } // namespace detail
 
   /** \brief A tag for sending values
@@ -77,7 +81,7 @@ namespace skynet
   /** \brief Job with known tags
    */
   template<typename... Tags>
-  class Job : public JobBase
+  class Job : public detail::JobBase
   {
   public:
     /** \brief Creates a job with the specified id and master
@@ -104,20 +108,57 @@ namespace skynet
       return value;
     }
 
+    /** \brief Waits for data to be available on a certain tag and returns it
+     * when it is.
+     */
+    template<
+      typename GetTag,
+      typename Rep = decltype(detail::default_poll_freq)::rep,
+      typename Period = decltype(detail::default_poll_freq)::period
+    >
+    typename GetTag::value_type get_when_ready(
+      const std::chrono::duration<Rep, Period>& poll_freq = detail::default_poll_freq
+    ) noexcept
+    {
+      while (!has_data<GetTag>())
+      {
+        std::this_thread::sleep_for(poll_freq);
+      }
+      return *get<GetTag>();
+    }
+
     /** \brief Checks if a tag buffer has data or not
      */
     template<typename GetTag>
-    bool has_data() const noexcept
+    bool has_data() noexcept
     {
+      // Retrieve any possible pending messages from the master's neighbors
+      Master::Accessor::handle_neighbor_message(get_master());
       return !get_buffer<GetTag>().empty();
     }
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
      */
     template<typename SendTag>
-    void broadcast(const typename SendTag::value_type& value)
+    void global_broadcast(const typename SendTag::value_type& value)
     {
-      get_master().broadcast_message(
+      Master::Accessor::global_broadcast(
+        get_master(),
+        id_,
+        tag_id<SendTag>(),
+        message_id_,
+        to_bytes(value)
+      );
+      ++message_id_;
+    }
+
+    /** \brief Broadcasts a value on a tag to all neighbors
+     */
+    template<typename SendTag>
+    void local_broadcast(const typename SendTag::value_type& value)
+    {
+      Master::Accessor::local_broadcast(
+        get_master(),
         id_,
         tag_id<SendTag>(),
         message_id_,
@@ -128,7 +169,7 @@ namespace skynet
 
   private:
     // Override processing of data
-    bool do_process_data(
+    bool process_data(
       const std::size_t tag,
       const char* const data,
       const std::size_t size

@@ -40,29 +40,14 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     if (to_remove == index)
     {
       // broadcast and remove (the data doesn't really matter)
-      my_job.broadcast<IntTag>(to_remove);
+      my_job.global_broadcast<IntTag>(to_remove);
       // Leaving the loop will cause the master to destruct, automatically
       // disconnecting
       break;
     }
     else
     {
-      while (true)
-      {
-        master.handle_neighbor_messages();
-        if (my_job.has_data<IntTag>())
-        {
-          REQUIRE(*my_job.get<IntTag>() == to_remove);
-          break;
-        }
-        std::this_thread::sleep_for(1ms);
-      }
-      // wait until the number of connections has gone down
-      while (master.number_of_neighbors() > num_machines - 2 - static_cast<int>(i))
-      {
-        master.handle_neighbor_messages();
-        std::this_thread::sleep_for(1ms);
-      }
+      REQUIRE(my_job.get_when_ready<IntTag>() == to_remove);
     }
     // Wait a bit to synchronize the machines
     std::this_thread::sleep_for(10ms);

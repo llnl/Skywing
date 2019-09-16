@@ -69,19 +69,11 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   {
     if (index == send_index)
     {
-      my_job.broadcast<SizeTTag>(send_index);
+      my_job.global_broadcast<SizeTTag>(send_index);
     }
     else
     {
-      while (true)
-      {
-        master.handle_neighbor_messages();
-        if (my_job.has_data<SizeTTag>())
-        {
-          REQUIRE(*my_job.get<SizeTTag>() == send_index);
-          break;
-        }
-      }
+      REQUIRE(my_job.get_when_ready<SizeTTag>() == send_index);
     }
     // Give some time for the broadcast to finish
     std::this_thread::sleep_for(10ms);

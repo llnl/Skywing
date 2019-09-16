@@ -5,7 +5,6 @@ tests = [
   ['broadcast_complex', 'broadcast_complex.cpp'],
   ['disconnect', 'disconnect.cpp'],
   ['master_conn', 'master_conn.cpp'],
-  ['tags', 'tags.cpp'],
 
   # devices/
   ['socket_communicator', 'devices/socket_communicator.cpp'],

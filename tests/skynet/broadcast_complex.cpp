@@ -43,40 +43,17 @@ struct ExpectedTagValue<Tag3> { enum { value = tag3_value }; };
 // If all of the tags are available and the data is correct
 // (no C++17 so just make two overloads)
 template<typename T1, typename T2, typename Job>
-bool test_tags(Job& job) noexcept
+void test_tags(Job& job) noexcept
 {
-  if (job.template has_data<T1>() && job.template has_data<T2>())
-  {
-    REQUIRE(*job.template get<T1>() == ExpectedTagValue<T1>::value);
-    REQUIRE(*job.template get<T2>() == ExpectedTagValue<T2>::value);
-    return true;
-  }
-  return false;
+  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value);
+  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value);
 }
 template<typename T1, typename T2, typename T3, typename Job>
-bool test_tags(Job& job) noexcept
+void test_tags(Job& job) noexcept
 {
-  if (job.template has_data<T1>() && job.template has_data<T2>() && job.template has_data<T3>())
-  {
-    REQUIRE(*job.template get<T1>() == ExpectedTagValue<T1>::value);
-    REQUIRE(*job.template get<T2>() == ExpectedTagValue<T2>::value);
-    REQUIRE(*job.template get<T3>() == ExpectedTagValue<T3>::value);
-    return true;
-  }
-  return false;
-}
-
-// Helper function since the broadcasting machines still need to propagate the
-// other broadcasts
-template<typename... Tags, typename Job>
-void wait_and_propagate_broadcast(Master& master, Job* const job_ptr)
-{
-  using namespace std::chrono_literals;
-  while (!test_tags<Tags...>(*job_ptr))
-  {
-    master.handle_neighbor_messages();
-    std::this_thread::sleep_for(1ms);
-  }
+  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value);
+  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value);
+  REQUIRE(job.template get_when_ready<T3>() == ExpectedTagValue<T3>::value);
 }
 
 // This wasn't working with a reference, so just use a pointer
@@ -149,22 +126,22 @@ void machine_task(Master* const master_ptr, const int index)
     switch (index)
     {
     case 0:
-      job.broadcast<Tag1>(tag1_value);
-      wait_and_propagate_broadcast<Tag2, Tag3>(master, job_ptr);
+      job.global_broadcast<Tag1>(tag1_value);
+      test_tags<Tag2, Tag3>(*job_ptr);
       break;
 
     case 1:
-      job.broadcast<Tag2>(tag2_value);
-      wait_and_propagate_broadcast<Tag1, Tag3>(master, job_ptr);
+      job.global_broadcast<Tag2>(tag2_value);
+      test_tags<Tag1, Tag3>(*job_ptr);
       break;
 
     case 2:
-      job.broadcast<Tag3>(tag3_value);
-      wait_and_propagate_broadcast<Tag1, Tag2>(master, job_ptr);
+      job.global_broadcast<Tag3>(tag3_value);
+      test_tags<Tag1, Tag2>(*job_ptr);
       break;
 
     default:
-      wait_and_propagate_broadcast<Tag1, Tag2, Tag3>(master, job_ptr);
+      test_tags<Tag1, Tag2, Tag3>(*job_ptr);
       break;
     }
   }

@@ -6,50 +6,58 @@
 namespace skynet
 {
   class Master;
-  /** \brief Job that Skynet instances are working on
-   *
-   * Handles wrapping communications and buffering information from tags
-   */
-  class JobBase
+  namespace detail
   {
-  public:
-    /** \brief Create a JobBase with the owning master
-     */
-    explicit JobBase(Master& master)
-      : master_{master}
-    {}
-
-    /** \brief Processes the raw information sent from a job on another instance
+    /** \brief Job that Skynet instances are working on
      *
-     * \param tag The tag the data was sent with
-     * \param data The raw data sent over
-     * \return True if processing went find, false if there was an error
+     * Handles wrapping communications and buffering information from tags
      */
-    bool process_data(
-      const std::size_t tag,
-      const char* const data,
-      const std::size_t size
-    )
+    class JobBase
     {
-      return do_process_data(tag, data, size);
-    }
+    public:
+      // Allow Master access to only process_data
+      struct Accessor
+      {
+      private:
+        friend class skynet::Master;
+        static bool process_data(
+          JobBase& job,
+          const std::size_t tag,
+          const char* const data,
+          const std::size_t size
+        )
+        {
+          return job.process_data(tag, data, size);
+        }
+      }; // struct Accessor
 
-    virtual ~JobBase() = default;
+      virtual ~JobBase() = default;
 
-  protected:
-    /** \brief Returns a handle to the associated master
-     */
-    Master& get_master() noexcept { return master_; }
-    const Master& get_master() const noexcept { return master_; }
+    protected:
+      /** \brief Create a JobBase with the owning master
+       */
+      explicit JobBase(Master& master)
+        : master_{master}
+      {}
 
-  private:
-    /** \brief Implementation of process_data
-     */
-    virtual bool do_process_data(std::size_t tag, const char* data, std::size_t size) = 0;
+      /** \brief Returns a handle to the associated master
+       */
+      Master& get_master() noexcept { return master_; }
+      const Master& get_master() const noexcept { return master_; }
 
-    // The handle to the associated master
-    Master& master_;
-  }; // Class JobBase
+    private:
+      /** \brief Processes the raw information sent from a job on another instance
+       *
+       * \param tag The tag the data was sent with
+       * \param data The raw data sent over
+       * \return True if processing went fine, false if there was an error
+       */
+      virtual bool process_data(std::size_t tag, const char* data, std::size_t size) = 0;
+
+      // The handle to the associated master
+      Master& master_;
+    }; // class JobBase
+  } // namespace detail
 } // namespace skynet
 
 #endif // SKYNET_JOB_BASE_HPP
