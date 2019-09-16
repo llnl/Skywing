@@ -1,15 +1,15 @@
 // We're generating the header, so don't try to include it
 #define SKYNET_GENERATE_MESSAGE_SIZE_HEADER
 
-#include "skynet/message.hpp"
-#include "skynet/utility/serialize.hpp"
+#include "skynet/detail/message.hpp"
+#include "skynet/detail/utility/serialize.hpp"
 
 #include <fstream>
 #include <iostream>
 
 int main()
 {
-  const auto size = to_bytes(skynet::Message{}).size();
+  const auto size = skynet::detail::to_bytes(skynet::detail::Message{}).size();
   std::ofstream fout("message_network_size.hpp");
   if (!fout)
   {

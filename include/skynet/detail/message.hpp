@@ -1,8 +1,8 @@
 #ifndef SKYNET_MESSAGE_HPP
 #define SKYNET_MESSAGE_HPP
 
-#include "utility/serialize.hpp"
-#include "utility/launder.hpp"
+#include "skynet/detail/utility/serialize.hpp"
+#include "skynet/detail/utility/launder.hpp"
 
 #include <cstdint>
 #include <type_traits>
@@ -21,7 +21,7 @@
   #include "message_network_size.hpp"
 #endif
 
-namespace skynet
+namespace skynet { namespace detail
 {
   /** \brief The kinds of messages that can be sent
    */
@@ -122,7 +122,7 @@ namespace skynet
     // Buffer to hold who the data is from
     std::vector<char> buffer_;
   };
-} // namespace skynet
+} } // namespace skynet::detail
 
 // Don't allow the macro to leak
 #undef SKYNET_GENERATED_MESSAGE_NETWORK_SIZE

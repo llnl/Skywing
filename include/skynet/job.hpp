@@ -1,10 +1,10 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
-#include "utility/on_error.hpp"
+#include "detail/job_base.hpp"
+#include "detail/utility/on_error.hpp"
 #include "utility/optional.hpp"
 #include "master.hpp"
-#include "job_base.hpp"
 
 #include <vector>
 #include <tuple>
@@ -67,7 +67,7 @@ namespace skynet
     )
     {
       auto* const true_append_to = static_cast<std::vector<T>*>(append_to);
-      true_append_to->push_back(from_bytes<T>(data, size));
+      true_append_to->push_back(detail::from_bytes<T>(data, size));
     }
 
     /** \brief The type being sent over this tag
@@ -147,7 +147,7 @@ namespace skynet
         id_,
         tag_id<SendTag>(),
         message_id_,
-        to_bytes(value)
+        detail::to_bytes(value)
       );
       ++message_id_;
     }
@@ -162,7 +162,7 @@ namespace skynet
         id_,
         tag_id<SendTag>(),
         message_id_,
-        to_bytes(value)
+        detail::to_bytes(value)
       );
       ++message_id_;
     }
@@ -178,7 +178,7 @@ namespace skynet
       // Ensure that the tag number isn't too large
       if (tag >= sizeof...(Tags))
       {
-        on_error("do_process_data - tag number is too large");
+        detail::on_error("do_process_data - tag number is too large");
         return false;
       }
       // Otherwise add the data to the queue

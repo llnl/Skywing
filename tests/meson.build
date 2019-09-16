@@ -10,7 +10,6 @@ tests = [
   ['socket_communicator', 'devices/socket_communicator.cpp'],
 
   # utility/
-  ['future', 'utility/future.cpp'],
   ['optional', 'utility/optional.cpp']
 ]
 

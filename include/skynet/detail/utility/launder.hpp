@@ -5,7 +5,7 @@
   #include <new>
 #endif
 
-namespace skynet
+namespace skynet { namespace detail
 {
   // This is a simple wrapper for defining std::launder if it exists,
   // which explicitly makes some undefined (but generally working) behavior
@@ -23,6 +23,6 @@ namespace skynet
       return p;
     }
   #endif
-} // namespace skynet
+} } // namespace skynet::detail
 
 #endif // SKYNET_UTILITY_LAUNDER_HPP

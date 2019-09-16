@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace skynet
+namespace skynet { namespace detail
 {
   /** Skynet exception (temporary?)
    */
@@ -32,6 +32,6 @@ namespace skynet
   {
     throw Exception(desc);
   }
-} // namespace skynet
+} } // namespace skynet::detail
 
 #endif // SKYNET_UTILITY_ON_ERROR_HPP

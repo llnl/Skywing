@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace skynet
+namespace skynet { namespace detail
 {
   /** \brief Enum returned from communication functions for connection status
    */
@@ -91,6 +91,6 @@ namespace skynet
     // The handle to the raw socket
     int handle_;
   }; // class SocketCommunicator
-} // namespace skynet
+} } // namespace skynet::detail
 
 #endif // SKYNET_DEVICES_SOCKET_COMMUNICATOR_HPP

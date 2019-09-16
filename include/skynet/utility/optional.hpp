@@ -1,7 +1,7 @@
 #ifndef SKYNET_UTILITY_OPTIONAL_HPP
 #define SKYNET_UTILITY_OPTIONAL_HPP
 
-#include "launder.hpp"
+#include "skynet/detail/utility/launder.hpp"
 
 #include <array>
 #include <new>
@@ -89,11 +89,11 @@ namespace skynet
      */
     T& operator*() & noexcept
     {
-      return *(launder(reinterpret_cast<T*>(buffer_.data())));
+      return *(detail::launder(reinterpret_cast<T*>(buffer_.data())));
     }
     const T& operator*() const& noexcept
     {
-      return *(launder(reinterpret_cast<const T*>(buffer_.data())));
+      return *(detail::launder(reinterpret_cast<const T*>(buffer_.data())));
     }
     T&& operator*() && noexcept
     {

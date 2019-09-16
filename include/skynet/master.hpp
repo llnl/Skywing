@@ -1,12 +1,10 @@
 #ifndef SKYNET_MASTER_HPP
 #define SKYNET_MASTER_HPP
 
-#include "message.hpp"
-#include "devices/socket_communicator.hpp"
-#include "job_base.hpp"
-#include "utility/serialize.hpp"
-#include "utility/on_error.hpp"
-#include "job_base.hpp"
+#include "detail/job_base.hpp"
+#include "detail/message.hpp"
+#include "detail/devices/socket_communicator.hpp"
+#include "detail/utility/on_error.hpp"
 
 #include <vector>
 #include <memory>
@@ -225,7 +223,7 @@ namespace skynet
         const std::vector<char>& data
       )
       {
-        m.do_broadcast(job_id, tag_id, msg_id, data, MessageType::local_broadcast);
+        m.do_broadcast(job_id, tag_id, msg_id, data, detail::MessageType::local_broadcast);
       }
 
       static void global_broadcast(
@@ -236,7 +234,7 @@ namespace skynet
         const std::vector<char>& data
       )
       {
-        m.do_broadcast(job_id, tag_id, msg_id, data, MessageType::global_broadcast);
+        m.do_broadcast(job_id, tag_id, msg_id, data, detail::MessageType::global_broadcast);
       }
     }; // struct Accessor
 
@@ -256,8 +254,8 @@ namespace skynet
      */
     ~Master()
     {
-      Message to_send;
-      to_send.type = MessageType::goodbye;
+      detail::Message to_send;
+      to_send.type = detail::MessageType::goodbye;
       to_send.message_size = 0;
       to_send.origin = id_;
       // ensure that the message isn't ignored
@@ -286,10 +284,10 @@ namespace skynet
      */
     void connect_to_server(const char* const address, const std::uint16_t port)
     {
-      SocketCommunicator to_connect;
-      if (to_connect.connect_to_server(address, port) != ConnectionError::no_error)
+      detail::SocketCommunicator to_connect;
+      if (to_connect.connect_to_server(address, port) != detail::ConnectionError::no_error)
       {
-        on_error("Master::connect_to_server failed!");
+        detail::on_error("Master::connect_to_server failed!");
       }
       if (auto new_neighbor = detail::ExternalMaster::create(detail::ByRequest{}, std::move(to_connect), id_))
       {
@@ -359,12 +357,12 @@ namespace skynet
       const std::uint32_t tag_id,
       const std::uint32_t msg_id,
       const std::vector<char>& data,
-      const MessageType type
+      const detail::MessageType type
     ) noexcept
     {
       // Prepend the message describing the data and send it to all neighbors
-      std::vector<char> to_send(Message::network_size + data.size());
-      Message header;
+      std::vector<char> to_send(detail::Message::network_size + data.size());
+      detail::Message header;
       header.type = type;
       header.job_id = job_id;
       header.tag_id = tag_id;
@@ -382,13 +380,13 @@ namespace skynet
     }
 
     // Does all processing that needs to be done when a message is recieved
-    void process_message(const Message& msg, const MessageAndDataBuffer& buffer)
+    void process_message(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
     {
       // TODO: Probably a systematic way to say that a message isn't related to
       //       a job since only those should be broadcast?
       // If the message is old just ignore it, unless it's a parting
       // message
-      if (msg.type != MessageType::goodbye) {
+      if (msg.type != detail::MessageType::goodbye) {
         auto& last_id = last_message_id_[msg.origin][msg.job_id];
         if (msg.message_id <= last_id)
         {
@@ -401,20 +399,20 @@ namespace skynet
       {
       // Greeting messages should never been seen here, only when the
       // connection type is first made
-      case MessageType::greeting:
-        on_error("Unexpected greeting in Master::process_message");
+      case detail::MessageType::greeting:
+        detail::on_error("Unexpected greeting in Master::process_message");
         break;
 
-      case MessageType::goodbye:
+      case detail::MessageType::goodbye:
         // Just exit for now; can't remove the dead neighbors as this is called
         // during iteration
         break;
 
-      case MessageType::local_broadcast:
+      case detail::MessageType::local_broadcast:
         add_data_to_queue(msg, buffer);
         break;
 
-      case MessageType::global_broadcast:
+      case detail::MessageType::global_broadcast:
         // Add the data to the appropriate queue
         add_data_to_queue(msg, buffer);
         // Propagate the message to all neighbors but the one it was
@@ -431,11 +429,11 @@ namespace skynet
     }
 
     // Adds data to the tag queue for a job from a message
-    void add_data_to_queue(const Message& msg, const MessageAndDataBuffer& buffer)
+    void add_data_to_queue(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
     {
       if (msg.job_id >= jobs_.size())
       {
-        on_error("Job ID larger than number of jobs!");
+        detail::on_error("Job ID larger than number of jobs!");
       }
       detail::JobBase::Accessor::process_data(
         *jobs_[msg.job_id],
@@ -463,7 +461,7 @@ namespace skynet
     }
 
     // For listening to connection requests
-    SocketCommunicator server_socket_;
+    detail::SocketCommunicator server_socket_;
 
     // List of the jobs that are present
     std::vector<std::unique_ptr<detail::JobBase>> jobs_;
