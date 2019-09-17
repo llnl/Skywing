@@ -25,35 +25,33 @@ struct Tag3 : Tag<char> {};
 using JobType = Job<Tag1, Tag2, Tag3>;
 
 constexpr int tag1_value = 10;
-constexpr unsigned tag2_value = 20;
+constexpr double tag2_value = 20;
 constexpr char tag3_value = 'c';
 
 // For helping with reducing code
-// Enum's are used because constexpr static variables require beign defined
-// again for linkage (for some reason...)
 template<typename T>
 struct ExpectedTagValue;
 template<>
-struct ExpectedTagValue<Tag1> { enum { value = tag1_value }; };
+struct ExpectedTagValue<Tag1> { static constexpr auto value() { return tag1_value; } };
 template<>
-struct ExpectedTagValue<Tag2> { enum { value = tag2_value }; };
+struct ExpectedTagValue<Tag2> { static constexpr auto value() { return tag2_value; } };
 template<>
-struct ExpectedTagValue<Tag3> { enum { value = tag3_value }; };
+struct ExpectedTagValue<Tag3> { static constexpr auto value() { return tag3_value; } };
 
 // If all of the tags are available and the data is correct
 // (no C++17 so just make two overloads)
 template<typename T1, typename T2, typename Job>
 void test_tags(Job& job) noexcept
 {
-  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value);
-  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value);
+  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value());
+  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value());
 }
 template<typename T1, typename T2, typename T3, typename Job>
 void test_tags(Job& job) noexcept
 {
-  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value);
-  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value);
-  REQUIRE(job.template get_when_ready<T3>() == ExpectedTagValue<T3>::value);
+  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value());
+  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value());
+  REQUIRE(job.template get_when_ready<T3>() == ExpectedTagValue<T3>::value());
 }
 
 // This wasn't working with a reference, so just use a pointer
@@ -98,9 +96,10 @@ void machine_task(Master* const master_ptr, const int index)
   }
   // Forcefully connect to the lower numbered machine to ensure that the graph
   // is fully connected
-  if (index > 0)
+  const auto lower_machine = base_port + index - 1;
+  if (index > 0 && std::find(connections.begin(), connections.end(), lower_machine) == connections.end())
   {
-    master.connect_to_server("127.0.0.1", base_port + index - 1);
+    master.connect_to_server("127.0.0.1", lower_machine);
   }
   // Wait for larger numbered machines to connect
   // There's no way to know when everything is connected, unfortunately, so just

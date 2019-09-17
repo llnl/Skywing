@@ -153,7 +153,15 @@ namespace skynet
        */
       void mark_as_dead() noexcept { dead_ = true; }
 
-    private:
+      /** \brief Returns true if the given neighbor is present, false otherwise
+       */
+      bool has_neighbor(const MachineID id) const noexcept
+      {
+        const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), id);
+        return loc != neighbors_.cend() && *loc == id;
+      }
+
+    public:
       // Only allow private construction
       explicit ExternalMaster(SocketCommunicator conn) noexcept
         : conn_{std::move(conn)}
@@ -169,9 +177,9 @@ namespace skynet
         const auto mid = steady_clock::now();
         if (!second()) { return {}; }
         const auto end = steady_clock::now();
-        const auto time1 = duration_cast<decltype(latency_)>(mid - start);
-        const auto time2 = duration_cast<decltype(latency_)>(end - mid);
-        m.latency_ = decltype(latency_){(time1.count() + time2.count()) / 2};
+        const auto dur1 = duration_cast<decltype(latency_)>(mid - start);
+        const auto dur2 = duration_cast<decltype(latency_)>(end - mid);
+        m.latency_ = decltype(latency_){(dur1.count() + dur2.count()) / 2};
         return std::move(m);
       }
 
@@ -216,10 +224,10 @@ namespace skynet
 
         case MessageType::removed_neighbor:
           {
-            // TODO: Fix this terrible hack
-            const auto loc = std::find(neighbors_.begin(), neighbors_.end(), msg.message_id);
+            // TODO: Fix this terrible hack with msg.message_id
+            const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.message_id);
             // Neighbor is lying; can't trust it anymore
-            if (loc == neighbors_.end())
+            if (loc == neighbors_.end() || *loc != msg.message_id)
             {
               dead_ = true;
               return;
@@ -232,8 +240,18 @@ namespace skynet
           break;
 
         case MessageType::new_neighbor:
-          // TODO: Fix this terrible hack
-          neighbors_.push_back(msg.message_id);
+          {
+            // TODO: Fix this terrible hack with msg.message_id
+            const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.message_id);
+            // Already present -> connection is bad
+            if (loc != neighbors_.cend() && *loc == msg.message_id)
+            {
+              dead_ = true;
+              break;
+            }
+            // Otherwise just insert it
+            neighbors_.insert(loc, msg.message_id);
+          }
           break;
 
         default:
@@ -244,10 +262,8 @@ namespace skynet
       // Send the greeting
       bool send_greeting(const MachineID local_id, const std::vector<MachineID>& local_neighbors) noexcept
       {
-        const auto neighbor_data = to_bytes(local_neighbors);
         Message to_send;
         to_send.type = MessageType::greeting;
-        to_send.message_size = neighbor_data.size();
         to_send.origin = local_id;
         send_message(prepare(to_send, local_neighbors));
         return !dead_;
@@ -351,8 +367,9 @@ namespace skynet
      *
      * \param address The address to connect to
      * \param port The port to connect on
+     * \return True if the connection was successful, false if it failed
      */
-    void connect_to_server(const char* const address, const std::uint16_t port)
+    bool connect_to_server(const char* const address, const std::uint16_t port)
     {
       detail::SocketCommunicator to_connect;
       if (to_connect.connect_to_server(address, port) != detail::ConnectionError::no_error)
@@ -362,9 +379,15 @@ namespace skynet
       if (auto new_neighbor = detail::ExternalMaster::create(detail::ByRequest{}, std::move(to_connect), id_, make_neighbor_vector()))
       {
         const auto new_id = new_neighbor->id();
+        // This ID already exists; so drop the connection
+        if (neighbors_.find(new_id) != neighbors_.end())
+        {
+          return false;
+        }
         notify_of_new_neighbor(new_id);
         neighbors_.emplace(new_id, std::move(*new_neighbor));
       }
+      return true;
     }
 
     /** \brief See if there are any pending connections and accept them if so
@@ -376,6 +399,11 @@ namespace skynet
         if (auto new_neighbor = detail::ExternalMaster::create(detail::ByAccept{}, std::move(*conn), id_, make_neighbor_vector()))
         {
           const auto new_id = new_neighbor->id();
+          // This ID already exists; so drop the connection
+          if (neighbors_.find(new_id) != neighbors_.end())
+          {
+            continue;
+          }
           notify_of_new_neighbor(new_id);
           neighbors_.emplace(new_id, std::move(*new_neighbor));
         }
@@ -485,13 +513,17 @@ namespace skynet
         break;
 
       case detail::MessageType::global_broadcast:
-        // Add the data to the appropriate queue
-        add_data_to_queue(msg, buffer);
-        // Propagate the message to all neighbors but the one it was
-        // recieved from and the origin
-        send_to_neighbors_if(buffer.vector(), [&](const detail::ExternalMaster& m) {
-          return m.id() != buffer.from() && m.id() != msg.origin;
-        });
+        {
+          // Add the data to the appropriate queue
+          add_data_to_queue(msg, buffer);
+          // Propagate the message to all neighbors but ones that are known to
+          // have already recieve it, so not the sender, the origin, or neighbors
+          // that the sender also has
+          const auto& from = neighbors_.find(buffer.from())->second;
+          send_to_neighbors_if(buffer.vector(), [&](const detail::ExternalMaster& m) {
+            return m.id() != buffer.from() && m.id() != msg.origin && !from.has_neighbor(m.id());
+          });
+        }
         break;
 
       default:
@@ -587,10 +619,13 @@ namespace skynet
     std::vector<MachineID> make_neighbor_vector() const
     {
       std::vector<MachineID> to_ret(neighbors_.size());
-      for (const auto& neighbor : neighbors_)
-      {
-        to_ret.push_back(neighbor.first);
-      }
+      std::transform(
+        neighbors_.cbegin(),
+        neighbors_.cend(),
+        to_ret.begin(),
+        [](const auto& val) {
+          return val.first;
+      });
       return to_ret;
     }
 
