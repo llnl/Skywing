@@ -1,8 +1,6 @@
 #ifndef SKYNET_UTILITY_OPTIONAL_HPP
 #define SKYNET_UTILITY_OPTIONAL_HPP
 
-#include "skynet/detail/utility/launder.hpp"
-
 #include <array>
 #include <new>
 
@@ -33,17 +31,15 @@ namespace skynet
      */
     constexpr Optional(const T& value) noexcept
       : has_value_{true}
-    {
-      new (buffer_.data()) T{value};
-    }
+      , value_{value}
+    {}
 
     /** \brief Construct an optional by moving from a value
      */
     constexpr Optional(T&& value) noexcept
       : has_value_{true}
-    {
-      new (buffer_.data()) T{std::move(value)};
-    }
+      , value_{std::move(value)}
+    {}
 
     // Move constructor/assignment operator
     Optional(Optional&& other) noexcept
@@ -52,7 +48,7 @@ namespace skynet
       // only need to move it if there's a value
       if (has_value_)
       {
-        new (buffer_.data()) T(std::move(*other));
+        value_ = std::move(other.value_);
       }
       // NOTE: Do NOT set other.has_value_ to false since it still holds
       //       a value; it's just been moved from
@@ -64,7 +60,7 @@ namespace skynet
       // to be valid; don't reset other.has_value_ as it still holds a
       // (moved from) value
       has_value_ = other.has_value_;
-      new (buffer_.data()) T(std::move(*other));
+      value_ = std::move(other.value_);
       return *this;
     }
 
@@ -75,7 +71,7 @@ namespace skynet
       // Only call the destructor if there's a value
       if (has_value_)
       {
-        this->operator*().~T();
+        value_.~T();
       }
     }
 
@@ -89,31 +85,31 @@ namespace skynet
      */
     T& operator*() & noexcept
     {
-      return *(detail::launder(reinterpret_cast<T*>(buffer_.data())));
+      return value_;
     }
     const T& operator*() const& noexcept
     {
-      return *(detail::launder(reinterpret_cast<const T*>(buffer_.data())));
+      return value_;
     }
     T&& operator*() && noexcept
     {
       // "this" is always an lvalue so this will call the lvalue version
-      return std::move(this->operator*());
+      return std::move(value_);
     }
     const T&& operator*() const&& noexcept
     {
-      return std::move(this->operator*());
+      return std::move(value_);
     }
 
     /** \brief Returns a pointer to the contained value
      */
     T* operator->() noexcept
     {
-      return std::addressof(this->operator*());
+      return std::addressof(value_);
     }
     const T* operator->() const noexcept
     {
-      return std::addressof(this->operator*());
+      return std::addressof(value_);
     }
 
     /** \brief Returns the contained value if the optional hold a value,
@@ -123,14 +119,14 @@ namespace skynet
     T value_or(U&& default_value) const&
     {
       return static_cast<bool>(*this)
-        ? this->operator*()
+        ? value_
         : static_cast<T>(std::forward<U>(default_value));
     }
     template<typename U>
     T value_or(T&& default_value) &&
     {
       return static_cast<bool>(*this)
-        ? std::move(this->operator*())
+        ? std::move(value_)
         : static_cast<T>(std::forward<U>(default_value));
     }
 
@@ -143,7 +139,12 @@ namespace skynet
 
   private:
     bool has_value_;
-    alignas(T) std::array<char, sizeof(T)> buffer_;
+    union
+    {
+      // dummy value to allow not forcing construction of the real value
+      char dummy_;
+      T value_;
+    };
   }; // class optional
 }; // namespace skynet
 

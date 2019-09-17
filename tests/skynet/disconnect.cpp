@@ -33,7 +33,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     master.accept_pending_connections();
     std::this_thread::sleep_for(1ms);
   }
-  auto& my_job = master.create_job<JobType>(0);
+  auto& my_job = master.make_job<JobType>(0);
   for (std::size_t i = 0; i < disconnect_order.size(); ++i)
   {
     const auto to_remove = disconnect_order[i];
@@ -52,6 +52,8 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     // Wait a bit to synchronize the machines
     std::this_thread::sleep_for(100ms);
   }
+  // Make sure the threads don't exit too soon
+  std::this_thread::sleep_for(1000ms);
 }
 
 TEST_CASE("Disconnecting machines don't break commuincations.", "[Skynet_Disconnect]")

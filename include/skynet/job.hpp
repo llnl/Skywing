@@ -158,7 +158,7 @@ namespace skynet
         id_,
         tag_id<SendTag>(),
         message_id_,
-        detail::to_bytes(value)
+        value
       );
       ++message_id_;
     }
@@ -173,7 +173,7 @@ namespace skynet
         id_,
         tag_id<SendTag>(),
         message_id_,
-        detail::to_bytes(value)
+        value
       );
       ++message_id_;
     }

@@ -64,7 +64,7 @@ void machine_task(Master* const master_ptr, const std::size_t index)
     master.accept_pending_connections();
   }
   // Submit job and broadcast on the job using each machine
-  auto& my_job = master.create_job<JobType>(0);
+  auto& my_job = master.make_job<JobType>(0);
   for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
   {
     if (index == send_index)

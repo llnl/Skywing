@@ -3,9 +3,9 @@
 
 #include "skynet/types.hpp"
 #include "skynet/detail/utility/serialize.hpp"
-#include "skynet/detail/utility/launder.hpp"
 
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 #include <vector>
 
@@ -24,27 +24,46 @@
 
 namespace skynet { namespace detail
 {
-  static constexpr std::uint8_t start_system_messages = 0x80;
+  static constexpr std::uint8_t message_type_mask  = 0b1100'0000;
+  static constexpr std::uint8_t job_message_bit    = 0b0000'0000;
+  static constexpr std::uint8_t status_message_bit = 0b0100'0000;
+  static constexpr std::uint8_t system_message_bit = 0b1000'0000;
   /** \brief The kinds of messages that can be sent
    */
   enum class MessageType : std::uint8_t
   {
     // Job-sentric messages
-    // Broadcast messages
-    global_broadcast,
+    global_broadcast = job_message_bit,
     local_broadcast,
 
+    // Status messages
+    goodbye = status_message_bit,
+    removed_neighbor,
+    new_neighbor,
+
     // System messages
-    // Set-up messages
-    goodbye = start_system_messages,
-    greeting,
+    greeting = system_message_bit,
   }; // enum class MessageType
 
-  /** \brief Returns true if the MessageType isn't correlated with a job
+  /** \brief Returns ture if the MessageType is a job message
    */
-  constexpr bool is_system_message(MessageType t)
+  constexpr bool is_job_message(const MessageType t)
   {
-    return static_cast<std::uint8_t>(t) >= start_system_messages;
+    return (static_cast<std::uint8_t>(t) & message_type_mask) == job_message_bit;
+  }
+
+  /** \brief Returns true if the MessageType is a status message
+   */
+  constexpr bool is_status_message(const MessageType t)
+  {
+    return (static_cast<std::uint8_t>(t) & message_type_mask) == status_message_bit;
+  }
+
+  /** \brief Returns true if the MessageType is a system message
+   */
+  constexpr bool is_system_message(const MessageType t)
+  {
+    return (static_cast<std::uint8_t>(t) & message_type_mask) == system_message_bit;
   }
 
   /** \brief The message that is sent between two Skynet instances
@@ -145,6 +164,20 @@ namespace skynet { namespace detail
     // Buffer to hold who the data is from
     std::vector<char> buffer_;
   };
+
+  /** Returns a vector holding a serialized header and data
+   */
+  template<typename T>
+  std::vector<char> prepare(Message m, const T& data)
+  {
+    const auto serialized_data = to_bytes(data);
+    m.message_size = serialized_data.size();
+    const auto serialized_header = to_bytes(m);
+    std::vector<char> to_ret(detail::Message::network_size + serialized_data.size());
+    std::memcpy(to_ret.data(), serialized_header.data(), serialized_header.size());
+    std::memcpy(to_ret.data() + serialized_header.size(), serialized_data.data(), serialized_data.size());
+    return to_ret;
+  }
 } } // namespace skynet::detail
 
 // Don't allow the macro to leak

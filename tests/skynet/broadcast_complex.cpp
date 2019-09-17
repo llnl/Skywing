@@ -115,8 +115,8 @@ void machine_task(Master* const master_ptr, const int index)
   }
   REQUIRE(master.number_of_neighbors() > 0);
   // Submit first and second job
-  auto& job1 = master.create_job<JobType>(0);
-  auto& job2 = master.create_job<JobType>(1);
+  auto& job1 = master.make_job<JobType>(0);
+  auto& job2 = master.make_job<JobType>(1);
   // First three machines do broadcasts on different tags for both jobs
   // Pointer in intitilizer list since things in them are always const
   // The first machines also then have to propagate the other broadcasts
