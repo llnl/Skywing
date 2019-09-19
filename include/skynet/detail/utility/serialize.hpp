@@ -27,22 +27,6 @@ namespace skynet { namespace detail
     return {s.begin(), s.end()};
   }
 
-  /** \brief Serializes a value to an already existing buffer
-   *
-   * \pre The buffer is large enough to hold the serialized value
-   */
-  template<typename T, typename OutputIterator>
-  void to_bytes(const T& t, const OutputIterator it)
-  {
-    std::stringstream ss;
-    cereal::PortableBinaryOutputArchive ar(ss);
-
-    ar(t);
-
-    auto s = ss.str();
-    std::copy(s.begin(), s.end(), it);
-  }
-
   /** \brief Turn raw data into a value
    */
   template<typename T>

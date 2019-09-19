@@ -78,50 +78,57 @@ namespace skynet
         );
       }
 
+      /** \brief Function to pass for the reading Callable for MessageHandler functions
+       */
+      auto make_reader() noexcept
+      {
+        return [this](char* const buffer, const std::size_t count) {
+          const auto err = conn_.read_message(buffer, count);
+          switch (err)
+          {
+          case ConnectionError::no_error: break;
+          case ConnectionError::would_block: return false;
+
+          case ConnectionError::closed:
+            // [[fallthrough]];
+          case ConnectionError::unrecoverable:
+            dead_ = true;
+            return false;
+          }
+          return true;
+        };
+      }
+
+      /** \brief Returns a lambda that marks the connection as dead
+       */
+      auto make_dead_marker() noexcept
+      {
+        return [this]() {
+          dead_ = true;
+        };
+      }
+
       /** \brief Recieve a skynet::Message from an external connection if one exists
        *
-       * Returns the message as well as the buffer containing the serialized message
-       * and data.  Also marks the connection as dead if any errors occur.  Does
-       * nothing if the connection is marked as dead.
+       * Returns the handler for the message if one exists.
        */
-      Optional<std::pair<Message, MessageAndDataBuffer>> get_message() noexcept
+      Optional<MessageHandler> get_message() noexcept
       {
         if (dead_)
         {
           return {};
         }
-        MessageAndDataBuffer buffer{id_};
-        const auto err = conn_.read_message(buffer.buffer(), Message::network_size);
-        switch (err)
+        if (const auto handler = MessageHandler::try_to_get(make_reader(), make_dead_marker()))
         {
-        case ConnectionError::no_error: break;
-        case ConnectionError::would_block: return {};
-
-        case ConnectionError::closed:
-          // [[fallthrough]];
-        case ConnectionError::unrecoverable:
-          dead_ = true;
-          return {};
-        }
-        // Get the message and adjust the buffer
-        const Message msg = buffer.message();
-        // Read the rest (if there's anything)
-        if (msg.message_size != 0)
-        {
-          if (conn_.read_message(buffer.data(), msg.message_size) != ConnectionError::no_error)
+          // handle status messages here
+          if (handler->category() == MessageCategory::status)
           {
-            // on_error("ExternalMaster::get_message failed to read the data part of the message!");
-            dead_ = true;
+            handle_message(*handler);
             return {};
           }
+          return *handler;
         }
-        // Handle all status messages here
-        if (is_status_message(msg.type))
-        {
-          handle_message(msg, buffer);
-          return {};
-        }
-        return std::make_pair(msg, std::move(buffer));
+        return {};
       }
 
       /** \brief Sends a raw message to the other master
@@ -161,7 +168,7 @@ namespace skynet
         return loc != neighbors_.cend() && *loc == id;
       }
 
-    public:
+    private:
       // Only allow private construction
       explicit ExternalMaster(SocketCommunicator conn) noexcept
         : conn_{std::move(conn)}
@@ -183,6 +190,13 @@ namespace skynet
         return std::move(m);
       }
 
+      // Send the greeting
+      bool send_greeting(const MachineID local_id, const std::vector<MachineID>& local_neighbors) noexcept
+      {
+        send_message(make_greeting(local_id, local_neighbors));
+        return !dead_;
+      }
+
       // Wait until the greeting is sent
       bool wait_for_greeting() noexcept
       {
@@ -190,83 +204,71 @@ namespace skynet
         // TODO: Probably want a time-out?
         while (true)
         {
-          if (const auto msg_data = get_message())
+          if (const auto handle = MessageHandler::try_to_get(make_reader(), make_dead_marker()))
           {
-            const auto& msg = msg_data->first;
-            if (msg.type != MessageType::greeting)
+            if (handle->category() != MessageCategory::status)
             {
-              // on_error("ExternalMaster::ExternalMaster got non-greeting on connection!");
               return false;
             }
-            // Otherwise just set the id and neighbors
-            id_ = msg.origin;
-            neighbors_ = from_bytes<std::vector<MachineID>>(msg_data->second.data(), msg.message_size);
-            return true;
-          }
-          // If the connection died then don't keep trying to connect
-          if (dead_)
-          {
-            return false;
+            return handle->do_status_callback(
+              make_reader(),
+              [&](const GreetingHeader& msg, std::vector<MachineID> neighbors) {
+                neighbors_ = std::move(neighbors);
+                id_ = msg.from;
+                return true;
+              },
+              // Any other kind of message is an error
+              [&](...) { return false; }
+            );
           }
           std::this_thread::sleep_for(std::chrono::microseconds{10});
         }
       }
 
       // Handle status messages
-      void handle_message(const Message& msg, const MessageAndDataBuffer& /* buffer */) noexcept
+      void handle_message(const MessageHandler& handle) noexcept
       {
-        assert(is_status_message(msg.type));
-        switch(msg.type)
-        {
-        case MessageType::goodbye:
-          dead_ = true;
-          break;
-
-        case MessageType::removed_neighbor:
-          {
-            // TODO: Fix this terrible hack with msg.message_id
-            const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.message_id);
-            // Neighbor is lying; can't trust it anymore
-            if (loc == neighbors_.end() || *loc != msg.message_id)
+        assert(handle.category() == MessageCategory::status);
+        const auto okay = handle.do_status_callback(
+          make_reader(),
+          [&](const GreetingHeader&, std::vector<MachineID>) {
+            // shouldn't be seeing a greeting here
+            return false;
+          },
+          [&](const GoodbyeHeader&) {
+            dead_ = true;
+            return true;
+          },
+          [&](const NewNeighborHeader& msg) {
+            const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor);
+            // Already present -> connection is bad
+            if (loc != neighbors_.cend() && *loc == msg.neighbor)
             {
-              dead_ = true;
-              return;
+              return false;
+            }
+            // Otherwise just insert it
+            neighbors_.insert(loc, msg.neighbor);
+            return true;
+          },
+          [&](const RemoveNeighborHeader& msg) {
+            const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor);
+            // Neighbor is lying; can't trust it anymore
+            if (loc == neighbors_.end() || *loc != msg.neighbor)
+            {
+              return false;
             }
             // otherwise just remove it
             using std::swap;
             swap(*loc, neighbors_.back());
             neighbors_.pop_back();
+            return true;
           }
-          break;
-
-        case MessageType::new_neighbor:
-          {
-            // TODO: Fix this terrible hack with msg.message_id
-            const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.message_id);
-            // Already present -> connection is bad
-            if (loc != neighbors_.cend() && *loc == msg.message_id)
-            {
-              dead_ = true;
-              break;
-            }
-            // Otherwise just insert it
-            neighbors_.insert(loc, msg.message_id);
-          }
-          break;
-
-        default:
-          break;
+        );
+        // Something incorrect happened
+        if (!okay)
+        {
+          dead_ = true;
         }
-      }
-
-      // Send the greeting
-      bool send_greeting(const MachineID local_id, const std::vector<MachineID>& local_neighbors) noexcept
-      {
-        Message to_send;
-        to_send.type = MessageType::greeting;
-        to_send.origin = local_id;
-        send_message(prepare(to_send, local_neighbors));
-        return !dead_;
       }
 
       // For talking with the external master
@@ -304,27 +306,16 @@ namespace skynet
       }
 
       template<typename T>
-      static void local_broadcast(
+      static void broadcast(
         Master& m,
+        const MessageID msg_id,
         const JobID job_id,
         const TagID tag_id,
-        const MessageID msg_id,
+        const std::uint32_t hops_left_p1,
         const T& data
       )
       {
-        m.do_broadcast(job_id, tag_id, msg_id, data, detail::MessageType::local_broadcast);
-      }
-
-      template<typename T>
-      static void global_broadcast(
-        Master& m,
-        const JobID job_id,
-        const TagID tag_id,
-        const MessageID msg_id,
-        const T& data
-      )
-      {
-        m.do_broadcast(job_id, tag_id, msg_id, data, detail::MessageType::global_broadcast);
+        m.do_broadcast(msg_id, job_id, tag_id, hops_left_p1, detail::to_bytes(data));
       }
     }; // struct Accessor
 
@@ -344,20 +335,13 @@ namespace skynet
      */
     ~Master()
     {
-      detail::Message to_send;
-      to_send.type = detail::MessageType::goodbye;
-      to_send.message_size = 0;
-      to_send.origin = id_;
-      const auto buffer = to_bytes(to_send);
-      for (auto& neighbor : neighbors_)
-      {
-        neighbor.second.send_message(buffer);
-      }
+      send_to_neighbors(detail::make_goodbye());
     }
 
     // Can't copy
     Master(const Master&) = delete;
     Master& operator=(const Master&) = delete;
+
     // Movable
     Master(Master&&) = default;
     Master& operator=(Master&&) = default;
@@ -374,7 +358,8 @@ namespace skynet
       detail::SocketCommunicator to_connect;
       if (to_connect.connect_to_server(address, port) != detail::ConnectionError::no_error)
       {
-        detail::on_error("Master::connect_to_server failed!");
+        // detail::on_error("Master::connect_to_server failed!");
+        return false;
       }
       if (auto new_neighbor = detail::ExternalMaster::create(detail::ByRequest{}, std::move(to_connect), id_, make_neighbor_vector()))
       {
@@ -421,7 +406,7 @@ namespace skynet
       {
         detail::on_error("Job with duplicate ID created!");
       }
-      // std::pair<iterator, bool>
+      // decltype(res) == std::pair<iterator, bool>
       const auto res = jobs_.emplace(id, std::make_unique<JobType>(id, *this));
       return static_cast<JobType&>(*res.first->second);
     }
@@ -443,8 +428,7 @@ namespace skynet
       {
         while (auto msg_opt = neighbor.second.get_message())
         {
-          const auto& msg = *msg_opt;
-          process_message(msg.first, msg.second);
+          process_message(*msg_opt, neighbor.second);
         }
       }
       remove_dead_neighbors();
@@ -452,112 +436,114 @@ namespace skynet
 
     /** \brief Broadcast a message to the entire network
      *
-     * \param job_id The id of the job the message is for
-     * \param tag_id The id of the tag the message is fo
      * \param msg_id The message's id
+     * \param job_id The id of the job the message is for
+     * \param tag_id The id of the tag the message is for
+     * \param hops_p1 The number of hops left + 1
      * \param data The data to broadcast
-     * \param type The type of broadcast
      */
-    template<typename T>
     void do_broadcast(
+      const MessageID msg_id,
       const JobID job_id,
       const TagID tag_id,
-      const MessageID msg_id,
-      const T& data,
-      const detail::MessageType type
+      const std::uint32_t hops_left_p1,
+      const std::vector<char>& data
     ) noexcept
     {
       // Prepend the message describing the data and send it to all neighbors
-      detail::Message header;
-      header.type = type;
-      header.job_id = job_id;
-      header.tag_id = tag_id;
-      header.origin = id_;
-      header.message_id = msg_id;
-      send_to_neighbors(detail::prepare(header, data));
+      send_to_neighbors(detail::make_broadcast(msg_id, job_id, tag_id, id_, hops_left_p1, data));
     }
 
     // Does all processing that needs to be done when a message is recieved
-    void process_message(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
+    void process_message(const detail::MessageHandler& handle, detail::ExternalMaster& from)
     {
-      assert(!detail::is_status_message(msg.type));
-      // If the message is bad ignore it and mark the connection as dead
-      if (message_is_bad(msg, buffer))
-      {
-        mark_as_dead(buffer);
-        return;
-      }
-      if (detail::is_job_message(msg.type)) {
-        // If the message is old just ignore it
-        auto& last_id = last_message_id_[msg.origin][msg.job_id];
-        if (msg.message_id <= last_id)
-        {
-          return;
+      assert(handle.category() == detail::MessageCategory::job);
+      const auto okay = handle.do_job_callback(from.make_reader(),
+        [&](detail::BroadcastHeader msg, const std::vector<char>& data) {
+          if (!message_is_okay(msg))
+          {
+            return false;
+          }
+          if (is_old_message(msg))
+          {
+            return true;
+          }
+          if (!add_data_to_queue(msg, data))
+          {
+            return false;
+          }
+          if (msg.hops_left_p1 != 1)
+          {
+            if (msg.hops_left_p1 > 0)
+            {
+              --msg.hops_left_p1;
+            }
+            const auto to_send = detail::rebuild_broadcast(msg, data);
+            // Propagate the message to all neighbors but ones that are known to
+            // have already recieve it, so not the sender, the origin, or neighbors
+            // that the sender also has
+            send_to_neighbors_if(to_send, [&](const detail::ExternalMaster& m) {
+              return
+                m.id() != from.id() &&
+                m.id() != msg.origin &&
+                !from.has_neighbor(m.id());
+            });
+          }
+          return true;
         }
-        last_id = msg.message_id;
-      }
-
-      switch(msg.type)
+      );
+      if (!okay)
       {
-      case detail::MessageType::greeting:
-        // Greeting messages should never been seen here, only when the
-        // connection type is first made; this connection is malfunctioning
-        // so consider it dead
-        // detail::on_error("Unexpected greeting in Master::process_message");
-        // break;
-        mark_as_dead(buffer);
-        break;
-
-      case detail::MessageType::local_broadcast:
-        add_data_to_queue(msg, buffer);
-        break;
-
-      case detail::MessageType::global_broadcast:
-        {
-          // Add the data to the appropriate queue
-          add_data_to_queue(msg, buffer);
-          // Propagate the message to all neighbors but ones that are known to
-          // have already recieve it, so not the sender, the origin, or neighbors
-          // that the sender also has
-          const auto& from = neighbors_.find(buffer.from())->second;
-          send_to_neighbors_if(buffer.vector(), [&](const detail::ExternalMaster& m) {
-            return m.id() != buffer.from() && m.id() != msg.origin && !from.has_neighbor(m.id());
-          });
-        }
-        break;
-
-      default:
-        break;
+        from.mark_as_dead();
       }
     }
 
     // Adds data to the tag queue for a job from a message
-    void add_data_to_queue(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer)
+    // Returns true if it was successful, false if something went wrong
+    bool add_data_to_queue(const detail::BroadcastHeader& msg, const std::vector<char>& data)
     {
-      assert(jobs_.find(msg.job_id) != jobs_.end());
-      const auto okay = detail::JobBase::Accessor::process_data(
+      // Make sure the given size is correct
+      if (data.size() != msg.message_size)
+      {
+        return false;
+      }
+      return detail::JobBase::Accessor::process_data(
         *jobs_.find(msg.job_id)->second,
         msg.tag_id,
-        buffer.data(),
+        data.data(),
         msg.message_size
       );
-      if (!okay)
+    }
+
+    /** \brief Returns true if a message is okay/well-formed, false otherwise
+     */
+    bool message_is_okay(const detail::BroadcastHeader& msg) noexcept
+    {
+      if (jobs_.find(msg.job_id) == jobs_.end())
       {
-        mark_as_dead(buffer);
+        return false;
       }
+      return true;
+    }
+
+    /** \brief Returns true if a message is old, false otherwise
+     */
+    bool is_old_message(const detail::BroadcastHeader& msg) noexcept
+    {
+      auto& last_id = last_message_id_[msg.origin][msg.job_id];
+      if (msg.message_id <= last_id)
+      {
+        return true;
+      }
+      last_id = msg.message_id;
+      return false;
     }
 
     /** \brief Notify neighbors of a new new neighbor
      */
     void notify_of_new_neighbor(const MachineID id)
     {
-      detail::Message msg;
-      msg.origin = id_;
-      msg.message_size = 0;
-      // TODO: Fix this hack
-      msg.message_id = id;
-      msg.type = detail::MessageType::new_neighbor;
-      send_to_neighbors(to_bytes(msg));
+      send_to_neighbors(detail::make_neighbor_notification<detail::NewNeighborHeader>(id));
     }
 
     /** \brief Removes all dead neighbors
@@ -568,15 +554,7 @@ namespace skynet
       {
         if (it->second.is_dead())
         {
-          // notify neighbors that a neighbor has been lost
-          detail::Message msg;
-          msg.origin = id_;
-          msg.message_size = 0;
-          // TODO: This is a dirty hack to re-use memory; come up
-          //       with a better solution later
-          msg.message_id = it->first;
-          msg.type = detail::MessageType::removed_neighbor;
-          send_to_neighbors(to_bytes(msg));
+          send_to_neighbors(detail::make_neighbor_notification<detail::RemoveNeighborHeader>(it->first));
           it = neighbors_.erase(it);
         }
         else
@@ -584,34 +562,6 @@ namespace skynet
           ++it;
         }
       }
-    }
-
-    /** \brief Checks if a message is bad or not
-     */
-    bool message_is_bad(const detail::Message& msg, const detail::MessageAndDataBuffer& buffer) const
-    {
-      // If the message is from a machine that isn't known
-      if (neighbors_.find(buffer.from()) == neighbors_.end())
-      {
-        return true;
-      }
-      if (!detail::is_system_message(msg.type))
-      {
-        // If the job id isn't found
-        if (jobs_.find(msg.job_id) == jobs_.end())
-        {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    /** \brief Marks the message a buffer was recieved from as dead
-     */
-    void mark_as_dead(const detail::MessageAndDataBuffer& buffer) noexcept
-    {
-      assert(neighbors_.find(buffer.from()) != neighbors_.end());
-      neighbors_.find(buffer.from())->second.mark_as_dead();
     }
 
     /** \brief Returns a vector of all the neighboring ID's
@@ -629,7 +579,7 @@ namespace skynet
       return to_ret;
     }
 
-    /** \biref Broadcasts a message to all neighbors that fit a criteria
+    /** \brief Broadcasts a message to all neighbors that fit a criteria
      */
     template<typename Callable>
     void send_to_neighbors_if(const std::vector<char>& to_send, Callable c)

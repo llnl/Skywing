@@ -12,9 +12,9 @@ using namespace skynet;
 
 // Emulate multiple machines with multiple threads at this point
 // The network looks like this:
-//  M1   +--M2
+//  M0   +--M1
 //   |   |   |
-//  M3--M4--M5
+//  M2--M3--M4
 //   |       |
 //   +-------+
 // Higher numbered machines make connection requests to lower numbered ones
@@ -56,7 +56,11 @@ void machine_task(Master* const master_ptr, const std::size_t index)
     {
       break;
     }
-    master.connect_to_server("127.0.0.1", ports[machine]);
+    if (!master.connect_to_server("127.0.0.1", ports[machine]))
+    {
+      std::cerr << index << " failed to connect to " << machine << "!\n";
+      std::terminate();
+    }
   }
   // Wait until all machines have connected
   while (master.number_of_neighbors() != machine_counts[index])

@@ -153,11 +153,12 @@ namespace skynet
     template<typename SendTag>
     void global_broadcast(const typename SendTag::value_type& value)
     {
-      Master::Accessor::global_broadcast(
+      Master::Accessor::broadcast(
         get_master(),
+        message_id_,
         id_,
         tag_id<SendTag>(),
-        message_id_,
+        0,
         value
       );
       ++message_id_;
@@ -166,13 +167,15 @@ namespace skynet
     /** \brief Broadcasts a value on a tag to all neighbors
      */
     template<typename SendTag>
-    void local_broadcast(const typename SendTag::value_type& value)
+    void local_broadcast(const typename SendTag::value_type& value, const std::uint32_t num_hops = 1)
     {
-      Master::Accessor::local_broadcast(
+      assert(num_hops >= 1);
+      Master::Accessor::broadcast(
         get_master(),
+        message_id_,
         id_,
         tag_id<SendTag>(),
-        message_id_,
+        num_hops,
         value
       );
       ++message_id_;

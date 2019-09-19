@@ -34,10 +34,10 @@ make_network_message_size = executable(
 
 # Having an output to a sub-directory errors; not sure how / if it's
 # worth writing to a sub-directory
-gen_network_message_size = custom_target(
-  'get_network_message_size',
+gen_message_header_information = custom_target(
+  'gen_message_header_information',
   input : [],
-  output : ['message_network_size.hpp'],
+  output : ['message_header_information.hpp'],
   command : [make_network_message_size]
 )
 
@@ -45,7 +45,7 @@ skynet_inc = include_directories('include')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
   dependencies : [thread_dep, cereal_dep],
-  sources : gen_network_message_size
+  sources : gen_message_header_information
 )
 
 subdir('src/skynet')
