@@ -1,11 +1,11 @@
-#ifndef SKYNET_DETAIL_UTILITY_LAUNDER_HPP
-#define SKYNET_DETAIL_UTILITY_LAUNDER_HPP
+#ifndef SKYNET_INTERNAL_UTILITY_LAUNDER_HPP
+#define SKYNET_INTERNAL_UTILITY_LAUNDER_HPP
 
 #if __cplusplus >= 201703L
   #include <new>
 #endif
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   // This is a simple wrapper for defining std::launder if it exists,
   // which explicitly makes some undefined (but generally working) behavior
@@ -23,6 +23,6 @@ namespace skynet { namespace detail
       return p;
     }
   #endif
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_UTILITY_LAUNDER_HPP
+#endif // SKYNET_INTERNAL_UTILITY_LAUNDER_HPP

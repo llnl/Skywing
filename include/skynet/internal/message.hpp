@@ -1,15 +1,15 @@
-#ifndef SKYNET_DETAIL_MESSAGE_HPP
-#define SKYNET_DETAIL_MESSAGE_HPP
+#ifndef SKYNET_INTERNAL_MESSAGE_HPP
+#define SKYNET_INTERNAL_MESSAGE_HPP
 
 #include "skynet/utility/optional.hpp"
-#include "skynet/detail/utility/overload_set.hpp"
+#include "skynet/internal/utility/overload_set.hpp"
 
 #include <array>
 #include <cassert>
 #include <cstring>
 #include <vector>
 
-// namespace skynet::detail::header_info {
+// namespace skynet::internal::header_info {
 // // Base size for reading a UniversalHeader
 // constexpr int base_size = ...;
 // // Additional number of bytes to read to read the corresponding header
@@ -17,7 +17,7 @@
 // }
 #include "message_header_information.hpp"
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   // Appends many std::vectors into a single std::vector
   template<typename... T>
@@ -208,6 +208,6 @@ namespace skynet { namespace detail
     // For knowing what type of header follows
     UniversalHeader start_;
   }; // class MessageHandler
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_MESSAGE_HPP
+#endif // SKYNET_INTERNAL_MESSAGE_HPP

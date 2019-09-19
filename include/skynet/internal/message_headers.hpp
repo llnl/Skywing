@@ -1,13 +1,13 @@
-#ifndef SKYNET_DETAIL_MESSAGE_HEADERS_HPP
-#define SKYNET_DETAIL_MESSAGE_HEADERS_HPP
+#ifndef SKYNET_INTERNAL_MESSAGE_HEADERS_HPP
+#define SKYNET_INTERNAL_MESSAGE_HEADERS_HPP
 
 #include "skynet/types.hpp"
-#include "skynet/detail/utility/serialize.hpp"
-#include "skynet/detail/utility/type_list.hpp"
+#include "skynet/internal/utility/serialize.hpp"
+#include "skynet/internal/utility/type_list.hpp"
 
 #include <cstdint>
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   /** \brief Type to allow headers to declare what category of message they
    * represent.
@@ -191,6 +191,6 @@ namespace skynet { namespace detail
   /** \brief The total number of headers
    */
   constexpr int num_headers = size<JobHeaders> + size<StatusHeaders>;
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_MESSAGE_HEADERS_HPP
+#endif // SKYNET_INTERNAL_MESSAGE_HEADERS_HPP

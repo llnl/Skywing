@@ -1,11 +1,11 @@
-#ifndef SKYNET_DETAIL_UTILITY_ON_ERROR_HPP
-#define SKYNET_DETAIL_UTILITY_ON_ERROR_HPP
+#ifndef SKYNET_INTERNAL_UTILITY_ON_ERROR_HPP
+#define SKYNET_INTERNAL_UTILITY_ON_ERROR_HPP
 
 #include <stdexcept>
 #include <string>
 #include <iostream>
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   /** Skynet exception (temporary?)
    */
@@ -37,6 +37,6 @@ namespace skynet { namespace detail
     std::terminate();
     // throw Exception(desc);
   }
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_UTILITY_ON_ERROR_HPP
+#endif // SKYNET_INTERNAL_UTILITY_ON_ERROR_HPP

@@ -1,5 +1,5 @@
-#include "skynet/detail/message_headers.hpp"
-#include "skynet/detail/utility/serialize.hpp"
+#include "skynet/internal/message_headers.hpp"
+#include "skynet/internal/utility/serialize.hpp"
 
 #include <array>
 #include <fstream>
@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-using namespace skynet::detail;
+using namespace skynet::internal;
 
 template<typename T>
 void output_header_size(T, std::ostream& out)
@@ -48,8 +48,8 @@ int main()
   constexpr auto num_headers = size<JobHeaders> + size<StatusHeaders>;
   fout
     << "#include <array>\n"
-    << "#include \"skynet/detail/message_headers.hpp\"\n"
-    << "namespace skynet { namespace detail { namespace header_info {\n"
+    << "#include \"skynet/internal/message_headers.hpp\"\n"
+    << "namespace skynet { namespace internal { namespace header_info {\n"
     << "constexpr int base_size = " << base_size << ";\n"
     << "constexpr std::array<int, " << num_headers << "> continue_sizes{";
   for_each(JobHeaders{}, [&](auto val) { output_header_size(val, fout); });

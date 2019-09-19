@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "skynet/detail/devices/socket_communicator.hpp"
+#include "skynet/internal/devices/socket_communicator.hpp"
 
 #include <thread>
 #include <cstring>
@@ -8,7 +8,7 @@
 #include <chrono>
 
 using namespace skynet;
-using namespace skynet::detail;
+using namespace skynet::internal;
 
 constexpr std::uint16_t port = 40000;
 constexpr int value_to_send = 3871;

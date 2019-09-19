@@ -1,11 +1,11 @@
-#ifndef SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP
-#define SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
 #include "skynet/utility/optional.hpp"
 
 #include <cstdint>
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   /** \brief Enum returned from communication functions for connection status
    */
@@ -91,6 +91,6 @@ namespace skynet { namespace detail
     // The handle to the raw socket
     int handle_;
   }; // class SocketCommunicator
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

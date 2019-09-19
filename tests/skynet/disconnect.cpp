@@ -8,6 +8,7 @@
 #include <vector>
 #include <thread>
 #include <random>
+#include <numeric>
 
 using namespace skynet;
 

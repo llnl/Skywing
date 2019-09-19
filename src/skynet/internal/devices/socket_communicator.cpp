@@ -1,4 +1,4 @@
-#include "skynet/detail/devices/socket_communicator.hpp"
+#include "skynet/internal/devices/socket_communicator.hpp"
 
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -12,7 +12,7 @@ namespace
   constexpr int invalid_handle = -1;
 } // namespace {anonymous}
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   SocketCommunicator::SocketCommunicator() noexcept
     : handle_{socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)}
@@ -154,4 +154,4 @@ namespace skynet { namespace detail
     }
     return written == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
-} } // namespace skynet::detail
+} } // namespace skynet::internal

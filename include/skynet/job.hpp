@@ -2,8 +2,8 @@
 #define SKYNET_JOB_HPP
 
 #include "skynet/types.hpp"
-#include "skynet/detail/job_base.hpp"
-#include "skynet/detail/utility/on_error.hpp"
+#include "skynet/internal/job_base.hpp"
+#include "skynet/internal/utility/on_error.hpp"
 #include "skynet/utility/optional.hpp"
 #include "skynet/master.hpp"
 
@@ -14,7 +14,7 @@
 
 namespace skynet
 {
-  namespace detail
+  namespace internal
   {
     // Calculates the index in a list of tags
     template<typename SearchFor, typename... Tags>
@@ -44,7 +44,7 @@ namespace skynet
 
     // The default poll frequency for Job::get_when_ready
     static constexpr std::chrono::milliseconds default_poll_freq{1};
-  } // namespace detail
+  } // namespace internal
 
   /** \brief A tag for sending values
    *
@@ -77,7 +77,7 @@ namespace skynet
     )
     {
       auto* const true_append_to = static_cast<std::vector<T>*>(append_to);
-      true_append_to->push_back(detail::from_bytes<T>(data, size));
+      true_append_to->push_back(internal::from_bytes<T>(data, size));
     }
 
     Tag() = default;
@@ -86,7 +86,7 @@ namespace skynet
   /** \brief Job with known tags
    */
   template<typename... Tags>
-  class Job : public detail::JobBase
+  class Job : public internal::JobBase
   {
     // Make sure there aren't too many tags
     static_assert(
@@ -124,11 +124,11 @@ namespace skynet
      */
     template<
       typename GetTag,
-      typename Rep = decltype(detail::default_poll_freq)::rep,
-      typename Period = decltype(detail::default_poll_freq)::period
+      typename Rep = decltype(internal::default_poll_freq)::rep,
+      typename Period = decltype(internal::default_poll_freq)::period
     >
     typename GetTag::value_type get_when_ready(
-      const std::chrono::duration<Rep, Period>& poll_freq = detail::default_poll_freq
+      const std::chrono::duration<Rep, Period>& poll_freq = internal::default_poll_freq
     ) noexcept
     {
       while (!has_data<GetTag>())
@@ -192,7 +192,7 @@ namespace skynet
       // Ensure that the tag number isn't too large
       if (tag >= sizeof...(Tags))
       {
-        // detail::on_error("do_process_data - tag number is too large");
+        // internal::on_error("do_process_data - tag number is too large");
         return false;
       }
       // Otherwise add the data to the queue
@@ -208,12 +208,12 @@ namespace skynet
     template<typename GetTag>
     auto& get_buffer() noexcept
     {
-      return std::get<detail::TagWrapper<GetTag>>(buffers_).buffer;
+      return std::get<internal::TagWrapper<GetTag>>(buffers_).buffer;
     }
     template<typename GetTag>
     const auto& get_buffer() const noexcept
     {
-      return std::get<detail::TagWrapper<GetTag>>(buffers_).buffer;
+      return std::get<internal::TagWrapper<GetTag>>(buffers_).buffer;
     }
 
     // Retrieve a buffer as a void* based on an index
@@ -225,7 +225,7 @@ namespace skynet
       // arithmetic?  Can't use offsetof since this is a non-standard layout
       // type due to the virtual functions)
       const std::array<void*, sizeof...(Tags)> pointers{
-        static_cast<void*>(&std::get<detail::TagWrapper<Tags>>(buffers_).buffer)...
+        static_cast<void*>(&std::get<internal::TagWrapper<Tags>>(buffers_).buffer)...
       };
       return pointers[index];
     }
@@ -234,11 +234,11 @@ namespace skynet
     template<typename Tag>
     static TagID tag_id() noexcept
     {
-      return detail::tag_id_impl<Tag, Tags...>::value;
+      return internal::tag_id_impl<Tag, Tags...>::value;
     }
 
     // The buffer of data for each tag
-    std::tuple<detail::TagWrapper<Tags>...> buffers_;
+    std::tuple<internal::TagWrapper<Tags>...> buffers_;
 
     // The id for the message to send
     // Could keep a seperate id for each tag, but running out of message id's

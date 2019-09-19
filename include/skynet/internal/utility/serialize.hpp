@@ -1,5 +1,5 @@
-#ifndef SKYNET_DETAIL_UTILITY_SERIALIZE_HPP
-#define SKYNET_DETAIL_UTILITY_SERIALIZE_HPP
+#ifndef SKYNET_INTERNAL_UTILITY_SERIALIZE_HPP
+#define SKYNET_INTERNAL_UTILITY_SERIALIZE_HPP
 
 #include <vector>
 #include <sstream>
@@ -11,7 +11,7 @@
 // as Cereal uses ADL on those names to find how to process data and that can
 // cause ambiguity
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   /** \brief Turn a value into a std::vector<char>
    */
@@ -49,6 +49,6 @@ namespace skynet { namespace detail
   {
     return from_bytes<T>(data.data(), data.size());
   }
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_UTILITY_SERIALIZE_HPP
+#endif // SKYNET_INTERNAL_UTILITY_SERIALIZE_HPP

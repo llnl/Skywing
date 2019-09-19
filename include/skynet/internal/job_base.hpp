@@ -1,5 +1,5 @@
-#ifndef SKYNET_DETAIL_JOB_BASE_HPP
-#define SKYNET_DETAIL_JOB_BASE_HPP
+#ifndef SKYNET_INTERNAL_JOB_BASE_HPP
+#define SKYNET_INTERNAL_JOB_BASE_HPP
 
 #include "skynet/types.hpp"
 #include <vector>
@@ -7,7 +7,7 @@
 namespace skynet
 {
   class Master;
-  namespace detail
+  namespace internal
   {
     /** \brief Job that Skynet instances are working on
      *
@@ -58,7 +58,7 @@ namespace skynet
       // The handle to the associated master
       Master& master_;
     }; // class JobBase
-  } // namespace detail
+  } // namespace internal
 } // namespace skynet
 
-#endif // SKYNET_DETAIL_JOB_BASE_HPP
+#endif // SKYNET_INTERNAL_JOB_BASE_HPP

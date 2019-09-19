@@ -2,10 +2,10 @@
 #define SKYNET_MASTER_HPP
 
 #include "skynet/types.hpp"
-#include "skynet/detail/job_base.hpp"
-#include "skynet/detail/message.hpp"
-#include "skynet/detail/devices/socket_communicator.hpp"
-#include "skynet/detail/utility/on_error.hpp"
+#include "skynet/internal/job_base.hpp"
+#include "skynet/internal/message.hpp"
+#include "skynet/internal/devices/socket_communicator.hpp"
+#include "skynet/internal/utility/on_error.hpp"
 
 #include <vector>
 #include <memory>
@@ -23,7 +23,7 @@
 
 namespace skynet
 {
-  namespace detail
+  namespace internal
   {
     /** \brief Tag to indicate that this connection was made by accepting a connection
      */
@@ -286,7 +286,7 @@ namespace skynet
       // If the connection is dead or not
       bool dead_{false};
     }; // class ExternalMaster
-  } // namespace detail
+  } // namespace internal
 
   /** \brief The master Skynet instance used for communication
    */
@@ -315,7 +315,7 @@ namespace skynet
         const T& data
       )
       {
-        m.do_broadcast(msg_id, job_id, tag_id, hops_left_p1, detail::to_bytes(data));
+        m.do_broadcast(msg_id, job_id, tag_id, hops_left_p1, internal::to_bytes(data));
       }
     }; // struct Accessor
 
@@ -335,7 +335,7 @@ namespace skynet
      */
     ~Master()
     {
-      send_to_neighbors(detail::make_goodbye());
+      send_to_neighbors(internal::make_goodbye());
     }
 
     // Can't copy
@@ -355,13 +355,17 @@ namespace skynet
      */
     bool connect_to_server(const char* const address, const std::uint16_t port)
     {
-      detail::SocketCommunicator to_connect;
-      if (to_connect.connect_to_server(address, port) != detail::ConnectionError::no_error)
+      internal::SocketCommunicator to_connect;
+      if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
       {
-        // detail::on_error("Master::connect_to_server failed!");
+        // internal::on_error("Master::connect_to_server failed!");
         return false;
       }
-      if (auto new_neighbor = detail::ExternalMaster::create(detail::ByRequest{}, std::move(to_connect), id_, make_neighbor_vector()))
+      if (auto new_neighbor = internal::ExternalMaster::create(
+        internal::ByRequest{},
+        std::move(to_connect),
+        id_,
+        make_neighbor_vector()))
       {
         const auto new_id = new_neighbor->id();
         // This ID already exists; so drop the connection
@@ -381,7 +385,11 @@ namespace skynet
     {
       while(auto conn = server_socket_.accept())
       {
-        if (auto new_neighbor = detail::ExternalMaster::create(detail::ByAccept{}, std::move(*conn), id_, make_neighbor_vector()))
+        if (auto new_neighbor = internal::ExternalMaster::create(
+          internal::ByAccept{},
+          std::move(*conn),
+          id_,
+          make_neighbor_vector()))
         {
           const auto new_id = new_neighbor->id();
           // This ID already exists; so drop the connection
@@ -404,7 +412,7 @@ namespace skynet
     {
       if (jobs_.find(id) != jobs_.end())
       {
-        detail::on_error("Job with duplicate ID created!");
+        internal::on_error("Job with duplicate ID created!");
       }
       // decltype(res) == std::pair<iterator, bool>
       const auto res = jobs_.emplace(id, std::make_unique<JobType>(id, *this));
@@ -451,15 +459,15 @@ namespace skynet
     ) noexcept
     {
       // Prepend the message describing the data and send it to all neighbors
-      send_to_neighbors(detail::make_broadcast(msg_id, job_id, tag_id, id_, hops_left_p1, data));
+      send_to_neighbors(internal::make_broadcast(msg_id, job_id, tag_id, id_, hops_left_p1, data));
     }
 
     // Does all processing that needs to be done when a message is recieved
-    void process_message(const detail::MessageHandler& handle, detail::ExternalMaster& from)
+    void process_message(const internal::MessageHandler& handle, internal::ExternalMaster& from)
     {
-      assert(handle.category() == detail::MessageCategory::job);
+      assert(handle.category() == internal::MessageCategory::job);
       const auto okay = handle.do_job_callback(from.make_reader(),
-        [&](detail::BroadcastHeader msg, const std::vector<char>& data) {
+        [&](internal::BroadcastHeader msg, const std::vector<char>& data) {
           if (!message_is_okay(msg))
           {
             return false;
@@ -478,11 +486,11 @@ namespace skynet
             {
               --msg.hops_left_p1;
             }
-            const auto to_send = detail::rebuild_broadcast(msg, data);
+            const auto to_send = internal::rebuild_broadcast(msg, data);
             // Propagate the message to all neighbors but ones that are known to
             // have already recieve it, so not the sender, the origin, or neighbors
             // that the sender also has
-            send_to_neighbors_if(to_send, [&](const detail::ExternalMaster& m) {
+            send_to_neighbors_if(to_send, [&](const internal::ExternalMaster& m) {
               return
                 m.id() != from.id() &&
                 m.id() != msg.origin &&
@@ -500,14 +508,14 @@ namespace skynet
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
-    bool add_data_to_queue(const detail::BroadcastHeader& msg, const std::vector<char>& data)
+    bool add_data_to_queue(const internal::BroadcastHeader& msg, const std::vector<char>& data)
     {
       // Make sure the given size is correct
       if (data.size() != msg.message_size)
       {
         return false;
       }
-      return detail::JobBase::Accessor::process_data(
+      return internal::JobBase::Accessor::process_data(
         *jobs_.find(msg.job_id)->second,
         msg.tag_id,
         data.data(),
@@ -517,7 +525,7 @@ namespace skynet
 
     /** \brief Returns true if a message is okay/well-formed, false otherwise
      */
-    bool message_is_okay(const detail::BroadcastHeader& msg) noexcept
+    bool message_is_okay(const internal::BroadcastHeader& msg) noexcept
     {
       if (jobs_.find(msg.job_id) == jobs_.end())
       {
@@ -528,7 +536,7 @@ namespace skynet
 
     /** \brief Returns true if a message is old, false otherwise
      */
-    bool is_old_message(const detail::BroadcastHeader& msg) noexcept
+    bool is_old_message(const internal::BroadcastHeader& msg) noexcept
     {
       auto& last_id = last_message_id_[msg.origin][msg.job_id];
       if (msg.message_id <= last_id)
@@ -543,7 +551,7 @@ namespace skynet
      */
     void notify_of_new_neighbor(const MachineID id)
     {
-      send_to_neighbors(detail::make_neighbor_notification<detail::NewNeighborHeader>(id));
+      send_to_neighbors(internal::make_neighbor_notification<internal::NewNeighborHeader>(id));
     }
 
     /** \brief Removes all dead neighbors
@@ -554,7 +562,7 @@ namespace skynet
       {
         if (it->second.is_dead())
         {
-          send_to_neighbors(detail::make_neighbor_notification<detail::RemoveNeighborHeader>(it->first));
+          send_to_neighbors(internal::make_neighbor_notification<internal::RemoveNeighborHeader>(it->first));
           it = neighbors_.erase(it);
         }
         else
@@ -597,17 +605,17 @@ namespace skynet
      */
     void send_to_neighbors(const std::vector<char>& to_send)
     {
-      send_to_neighbors_if(to_send, [](const detail::ExternalMaster&) { return true; });
+      send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });
     }
 
     // For listening to connection requests
-    detail::SocketCommunicator server_socket_;
+    internal::SocketCommunicator server_socket_;
 
     // List of the jobs that are present
-    std::unordered_map<JobID, std::unique_ptr<detail::JobBase>> jobs_;
+    std::unordered_map<JobID, std::unique_ptr<internal::JobBase>> jobs_;
 
     // List of neighboring connections
-    std::unordered_map<MachineID, detail::ExternalMaster> neighbors_;
+    std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
     // The message id of each last heard message from each machine for each job in the network
     std::unordered_map<

@@ -1,9 +1,9 @@
-#ifndef SKYNET_DETAIL_UTILITY_OVERLOAD_SET_HPP
-#define SKYNET_DETAIL_UTILITY_OVERLOAD_SET_HPP
+#ifndef SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
+#define SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
 
 #include <utility>
 
-namespace skynet { namespace detail
+namespace skynet { namespace internal
 {
   // C++17 version:
   // template<typename... Bases>
@@ -39,6 +39,6 @@ namespace skynet { namespace detail
   {
     return OverloadSet<T...>{std::forward<T>(callables)...};
   }
-} } // namespace skynet::detail
+} } // namespace skynet::internal
 
-#endif // SKYNET_DETAIL_UTILITY_OVERLOAD_SET_HPP
+#endif // SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
