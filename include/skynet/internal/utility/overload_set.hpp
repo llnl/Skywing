@@ -5,7 +5,7 @@
 
 namespace skynet { namespace internal
 {
-  // C++17 version:
+  // C++17 version: (plus constructors, etc.)
   // template<typename... Bases>
   // struct OverloadSet { using Bases::operator()...; };
 

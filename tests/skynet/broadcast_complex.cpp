@@ -18,9 +18,9 @@ constexpr int min_connections_per_machine = 1;
 constexpr int max_connections_per_machine = 5;
 constexpr std::uint16_t base_port = 30000;
 
-struct Tag1 : Tag<int> {};
-struct Tag2 : Tag<double> {};
-struct Tag3 : Tag<char> {};
+using Tag1 = Tag<int>;
+using Tag2 = Tag<double>;
+using Tag3 = Tag<char>;
 
 using JobType = Job<Tag1, Tag2, Tag3>;
 
@@ -41,17 +41,17 @@ struct ExpectedTagValue<Tag3> { static constexpr auto value() { return tag3_valu
 // If all of the tags are available and the data is correct
 // (no C++17 so just make two overloads)
 template<typename T1, typename T2, typename Job>
-void test_tags(Job& job) noexcept
+void test_tags(Job& job, const TagID id) noexcept
 {
-  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value());
-  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value());
+  REQUIRE(job.template get_when_ready(T1(id)) == ExpectedTagValue<T1>::value());
+  REQUIRE(job.template get_when_ready(T2(id)) == ExpectedTagValue<T2>::value());
 }
 template<typename T1, typename T2, typename T3, typename Job>
-void test_tags(Job& job) noexcept
+void test_tags(Job& job, const TagID id) noexcept
 {
-  REQUIRE(job.template get_when_ready<T1>() == ExpectedTagValue<T1>::value());
-  REQUIRE(job.template get_when_ready<T2>() == ExpectedTagValue<T2>::value());
-  REQUIRE(job.template get_when_ready<T3>() == ExpectedTagValue<T3>::value());
+  REQUIRE(job.template get_when_ready(T1(id)) == ExpectedTagValue<T1>::value());
+  REQUIRE(job.template get_when_ready(T2(id)) == ExpectedTagValue<T2>::value());
+  REQUIRE(job.template get_when_ready(T3(id)) == ExpectedTagValue<T3>::value());
 }
 
 // This wasn't working with a reference, so just use a pointer
@@ -122,25 +122,26 @@ void machine_task(Master* const master_ptr, const int index)
   for (auto job_ptr : {&job1, &job2})
   {
     auto& job = *job_ptr;
+    const auto job_index = (job_ptr == &job1 ? 0 : 1);
     switch (index)
     {
     case 0:
-      job.global_broadcast<Tag1>(tag1_value);
-      test_tags<Tag2, Tag3>(*job_ptr);
+      job.global_broadcast(Tag1(job_index), tag1_value);
+      test_tags<Tag2, Tag3>(*job_ptr, job_index);
       break;
 
     case 1:
-      job.global_broadcast<Tag2>(tag2_value);
-      test_tags<Tag1, Tag3>(*job_ptr);
+      job.global_broadcast(Tag2(job_index), tag2_value);
+      test_tags<Tag1, Tag3>(*job_ptr, job_index);
       break;
 
     case 2:
-      job.global_broadcast<Tag3>(tag3_value);
-      test_tags<Tag1, Tag2>(*job_ptr);
+      job.global_broadcast(Tag3(job_index), tag3_value);
+      test_tags<Tag1, Tag2>(*job_ptr, job_index);
       break;
 
     default:
-      test_tags<Tag1, Tag2, Tag3>(*job_ptr);
+      test_tags<Tag1, Tag2, Tag3>(*job_ptr, job_index);
       break;
     }
   }

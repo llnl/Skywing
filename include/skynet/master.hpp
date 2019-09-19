@@ -311,11 +311,12 @@ namespace skynet
         const MessageID msg_id,
         const JobID job_id,
         const TagID tag_id,
+        const TagIndex tag_index,
         const std::uint32_t hops_left_p1,
         const T& data
       )
       {
-        m.do_broadcast(msg_id, job_id, tag_id, hops_left_p1, internal::to_bytes(data));
+        m.do_broadcast(msg_id, job_id, tag_id, tag_index, hops_left_p1, internal::to_bytes(data));
       }
     }; // struct Accessor
 
@@ -447,6 +448,7 @@ namespace skynet
      * \param msg_id The message's id
      * \param job_id The id of the job the message is for
      * \param tag_id The id of the tag the message is for
+     * \param tag_index The index of the tag
      * \param hops_p1 The number of hops left + 1
      * \param data The data to broadcast
      */
@@ -454,12 +456,13 @@ namespace skynet
       const MessageID msg_id,
       const JobID job_id,
       const TagID tag_id,
+      const TagIndex tag_index,
       const std::uint32_t hops_left_p1,
       const std::vector<char>& data
     ) noexcept
     {
       // Prepend the message describing the data and send it to all neighbors
-      send_to_neighbors(internal::make_broadcast(msg_id, job_id, tag_id, id_, hops_left_p1, data));
+      send_to_neighbors(internal::make_broadcast(msg_id, job_id, tag_id, tag_index, id_, hops_left_p1, data));
     }
 
     // Does all processing that needs to be done when a message is recieved
@@ -518,6 +521,7 @@ namespace skynet
       return internal::JobBase::Accessor::process_data(
         *jobs_.find(msg.job_id)->second,
         msg.tag_id,
+        msg.tag_index,
         data.data(),
         msg.message_size
       );

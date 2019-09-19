@@ -15,7 +15,7 @@ using namespace skynet;
 static constexpr std::uint16_t base_port = 5000;
 static constexpr int num_machines = 10;
 
-struct IntTag : Tag<int> {};
+using IntTag = Tag<int>;
 using JobType = Job<IntTag>;
 
 void machine_task(const int index, const std::array<int, num_machines>* const disconnect_order_ptr)
@@ -41,17 +41,15 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     if (to_remove == index)
     {
       // broadcast and remove (the data doesn't really matter)
-      my_job.global_broadcast<IntTag>(to_remove);
+      my_job.global_broadcast(IntTag(i), to_remove);
       // Leaving the loop will cause the master to destruct, automatically
       // disconnecting
       break;
     }
     else
     {
-      REQUIRE(my_job.get_when_ready<IntTag>() == to_remove);
+      REQUIRE(my_job.get_when_ready(IntTag(i)) == to_remove);
     }
-    // Wait a bit to synchronize the machines
-    std::this_thread::sleep_for(100ms);
   }
   // Make sure the threads don't exit too soon
   std::this_thread::sleep_for(1000ms);

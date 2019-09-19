@@ -40,7 +40,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
   std::array<int, 3>{ 1,  2,  3}
 };
 
-struct SizeTTag : Tag<std::size_t> {};
+using SizeTTag = Tag<std::size_t>;
 
 using JobType = Job<SizeTTag>;
 
@@ -73,14 +73,12 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   {
     if (index == send_index)
     {
-      my_job.global_broadcast<SizeTTag>(send_index);
+      my_job.global_broadcast(SizeTTag(send_index), send_index);
     }
     else
     {
-      REQUIRE(my_job.get_when_ready<SizeTTag>() == send_index);
+      REQUIRE(my_job.get_when_ready(SizeTTag(send_index)) == send_index);
     }
-    // Give some time for the broadcast to finish
-    std::this_thread::sleep_for(10ms);
   }
 }
 

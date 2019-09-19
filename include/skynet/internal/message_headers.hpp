@@ -54,8 +54,10 @@ namespace skynet { namespace internal
     MessageID message_id;
     /// The job that this message is for
     JobID job_id;
-    /// The tag that the message was sent with
+    /// The id of the tag that the message was sent with
     TagID tag_id;
+    /// The index of the tag that the message was sent with
+    TagIndex tag_index;
     /// The id of the computer that the message is originally from
     MachineID origin;
     /// The number of further hops to do, plus 1
@@ -68,7 +70,7 @@ namespace skynet { namespace internal
   template <class Archive>
   void serialize(Archive& ar, BroadcastHeader& h) noexcept
   {
-    ar(h.message_id, h.job_id, h.tag_id, h.origin, h.hops_left_p1, h.message_size);
+    ar(h.message_id, h.job_id, h.tag_id, h.tag_index, h.origin, h.hops_left_p1, h.message_size);
   }
 
   /** \brief The header for the greeting message

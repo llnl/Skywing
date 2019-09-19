@@ -23,12 +23,13 @@ namespace skynet
         friend class skynet::Master;
         static bool process_data(
           JobBase& job,
-          const std::size_t tag,
+          const TagID tag,
+          const TagIndex tag_index,
           const char* const data,
           const std::size_t size
         )
         {
-          return job.process_data(tag, data, size);
+          return job.process_data(tag, tag_index, data, size);
         }
       }; // struct Accessor
 
@@ -49,11 +50,13 @@ namespace skynet
     private:
       /** \brief Processes the raw information sent from a job on another instance
        *
-       * \param tag The tag the data was sent with
+       * \param tag The id of the tag the data was sent with
+       * \param tag_index The index of the tag the data was sent with
        * \param data The raw data sent over
+       * \param size The size of the data
        * \return True if processing went fine, false if there was an error
        */
-      virtual bool process_data(TagID tag, const char* data, std::size_t size) = 0;
+      virtual bool process_data(TagID tag, TagIndex tag_index, const char* data, std::size_t size) = 0;
 
       // The handle to the associated master
       Master& master_;

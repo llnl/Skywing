@@ -39,6 +39,7 @@ namespace skynet { namespace internal
     const MessageID message_id,
     const JobID job_id,
     const TagID tag_id,
+    const TagIndex tag_index,
     const MachineID origin,
     const std::uint32_t hops_left_p1,
     const std::vector<char>& data
@@ -48,6 +49,7 @@ namespace skynet { namespace internal
     base.message_id = message_id;
     base.job_id = job_id;
     base.tag_id = tag_id;
+    base.tag_index = tag_index;
     base.origin = origin;
     base.hops_left_p1 = hops_left_p1;
     base.message_size = data.size();

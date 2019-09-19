@@ -16,6 +16,9 @@ namespace skynet
 
   /// The ID type for tags
   using TagID = std::uint8_t;
+
+  /// The ID type for tag indexes
+  using TagIndex = std::uint8_t;
 } // namespace skynet
 
 #endif // SKYNET_TYPES_HPP
