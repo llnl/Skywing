@@ -11,7 +11,7 @@
 // as Cereal uses ADL on those names to find how to process data and that can
 // cause ambiguity
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   /** \brief Turn a value into a std::vector<char>
    */
@@ -49,6 +49,6 @@ namespace skynet { namespace internal
   {
     return from_bytes<T>(data.data(), data.size());
   }
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_UTILITY_SERIALIZE_HPP

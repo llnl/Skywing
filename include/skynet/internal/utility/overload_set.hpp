@@ -3,33 +3,19 @@
 
 #include <utility>
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
-  // C++17 version: (plus constructors, etc.)
-  // template<typename... Bases>
-  // struct OverloadSet { using Bases::operator()...; };
-
+  /** \brief A struct to create and overload set from unrelated function objects
+   */
   template<typename... Bases>
-  struct OverloadSet;
-
-  template<typename Base>
-  struct OverloadSet<Base> : Base
+  struct OverloadSet : Bases...
   {
-    OverloadSet(Base&& base)
-      : Base{std::forward<Base>(base)}
+    OverloadSet(Bases&&... bases) noexcept
+      : Bases{std::forward<Bases>(bases)}...
     {}
-    using Base::operator();
-  };
 
-  template<typename Base1, typename... Rest>
-  struct OverloadSet<Base1, Rest...> : Base1, OverloadSet<Rest...>
-  {
-    OverloadSet(Base1&& base, Rest&&... rest)
-      : Base1{std::forward<Base1>(base)}
-      , OverloadSet<Rest...>{std::forward<Rest>(rest)...}
-    {}
-    using Base1::operator();
-    using OverloadSet<Rest...>::operator();
+    // Bring all the call operators in
+    using Bases::operator()...;
   };
 
   /** \brief Creates an overload set from the passed Callables
@@ -39,6 +25,6 @@ namespace skynet { namespace internal
   {
     return OverloadSet<T...>{std::forward<T>(callables)...};
   }
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP

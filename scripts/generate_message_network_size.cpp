@@ -11,6 +11,8 @@
 
 using namespace skynet::internal;
 
+// Determine the number of bytes that that a serialized object will take up and
+// output it to an ostream followed by a comma
 template<typename T>
 void output_header_size(T, std::ostream& out)
 {
@@ -25,10 +27,10 @@ void output_header_size(T, std::ostream& out)
 template<typename Callable, typename... T>
 void for_each(TypeList<T...>, Callable c)
 {
-  int dummy[sizeof...(T)]{(c(T{}), 0)...};
-  (void)dummy;
+  (c(T{}), ...);
 }
 
+// Output all of the members of a container, seperated by commas
 template<typename T>
 void output_container(std::ostream& out, const T& container)
 {
@@ -44,17 +46,20 @@ int main()
     std::cerr << "Error opening file for output.\n";
     return 1;
   }
+  // First calculate the size of
   const auto base_size = to_bytes(UniversalHeader{}).size();
+  // The total number of headers
   constexpr auto num_headers = size<JobHeaders> + size<StatusHeaders>;
   fout
     << "#include <array>\n"
     << "#include \"skynet/internal/message_headers.hpp\"\n"
-    << "namespace skynet { namespace internal { namespace header_info {\n"
+    << "namespace skynet::internal::header_info {\n"
     << "constexpr int base_size = " << base_size << ";\n"
     << "constexpr std::array<int, " << num_headers << "> continue_sizes{";
+  // Output the size of each header when serialized
   for_each(JobHeaders{}, [&](auto val) { output_header_size(val, fout); });
   for_each(StatusHeaders{}, [&](auto val) { output_header_size(val, fout); });
   fout << "};\n";
   // Close the namespace
-  fout << "} } }\n";
+  fout << "}\n";
 }

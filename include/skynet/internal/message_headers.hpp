@@ -7,7 +7,7 @@
 
 #include <cstdint>
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   /** \brief Type to allow headers to declare what category of message they
    * represent.
@@ -193,6 +193,6 @@ namespace skynet { namespace internal
   /** \brief The total number of headers
    */
   constexpr int num_headers = size<JobHeaders> + size<StatusHeaders>;
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_HEADERS_HPP

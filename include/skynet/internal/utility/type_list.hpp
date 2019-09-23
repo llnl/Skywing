@@ -1,7 +1,7 @@
 #ifndef SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP
 #define SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   /** \brief Structure for representing a list of types
    */
@@ -34,41 +34,30 @@ namespace skynet { namespace internal
     {
       static constexpr int value = 1 + IndexOfImpl<SearchFor, TypeList<Rest...>>::value;
     };
-  } // namespace detail
 
-  /** \brief The index of a type in a TypeList, or the size of the list if it is not present
-   */
-  template<typename SearchFor, typename List>
-  constexpr int index_of = detail::IndexOfImpl<SearchFor, List>::value;
-
-  namespace detail
-  {
-    template<typename... T>
+    // Base
+    template<typename T>
     struct SizeImpl;
 
+    // Match
     template<typename... T>
     struct SizeImpl<TypeList<T...>>
     {
       static constexpr int value = sizeof...(T);
     };
-  } // namespace detail
 
-  /** \brief The size of a type list
-   */
-  template<typename List>
-  constexpr int size = detail::SizeImpl<List>::value;
-
-  namespace detail
-  {
+    // Base
     template<int Index, typename... T>
     struct AtImpl;
 
+    // Match
     template<typename First, typename... Rest>
     struct AtImpl<0, TypeList<First, Rest...>>
     {
       using Type = First;
     };
 
+    // No match
     template<int Index, typename First, typename... Rest>
     struct AtImpl<Index, TypeList<First, Rest...>>
     {
@@ -76,10 +65,20 @@ namespace skynet { namespace internal
     };
   } // namespace detail
 
+  /** \brief The index of a type in a TypeList, or the size of the list if it is not present
+   */
+  template<typename SearchFor, typename List>
+  constexpr int index_of = detail::IndexOfImpl<SearchFor, List>::value;
+
+  /** \brief The size of a type list
+   */
+  template<typename List>
+  constexpr int size = detail::SizeImpl<List>::value;
+
   /** \brief The type at the specified index
    */
   template<int Index, typename List>
   using At = typename detail::AtImpl<Index, List>::Type;
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP

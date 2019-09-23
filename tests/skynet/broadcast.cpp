@@ -44,11 +44,9 @@ using SizeTTag = Tag<std::size_t>;
 
 using JobType = Job<SizeTTag>;
 
-// Reference wasn't working
-void machine_task(Master* const master_ptr, const std::size_t index)
+void setup_network(Master& master, const std::size_t index)
 {
   using namespace std::chrono_literals;
-  auto& master = *master_ptr;
   // Connect to the corresponding machines (if any)
   for (const auto& machine : to_connect[index])
   {
@@ -67,6 +65,13 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   {
     master.accept_pending_connections();
   }
+}
+
+// Reference wasn't working
+void machine_task(Master* const master_ptr, const std::size_t index)
+{
+  auto& master = *master_ptr;
+  setup_network(master, index);
   // Submit job and broadcast on the job using each machine
   auto& my_job = master.make_job<JobType>(0);
   // Subscribe to everything ahead of time

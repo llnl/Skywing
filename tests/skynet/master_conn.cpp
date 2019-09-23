@@ -18,13 +18,15 @@ void server()
   {
     server.accept_pending_connections();
   }
+  REQUIRE(server.number_of_neighbors() == 1);
 }
 
 void client()
 {
   Master client{client_port, client_id};
   // This will block until it connects
-  client.connect_to_server("127.0.0.1", server_port);
+  REQUIRE(client.connect_to_server("127.0.0.1", server_port));
+  REQUIRE(client.number_of_neighbors() == 1);
 }
 
 TEST_CASE("Connecting Masters works", "[Skynet_MasterConn]")

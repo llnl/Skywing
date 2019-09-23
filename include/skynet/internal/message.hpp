@@ -17,7 +17,7 @@
 // }
 #include "message_header_information.hpp"
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   // Appends many std::vectors into a single std::vector
   template<typename... T>
@@ -210,6 +210,6 @@ namespace skynet { namespace internal
     // For knowing what type of header follows
     UniversalHeader start_;
   }; // class MessageHandler
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_HPP

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   /** \brief Enum returned from communication functions for connection status
    */
@@ -90,6 +90,6 @@ namespace skynet { namespace internal
     // The handle to the raw socket
     int handle_;
   }; // class SocketCommunicator
-} } // namespace skynet::internal
+} // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

@@ -38,18 +38,17 @@ struct ExpectedTagValue<Tag2> { static constexpr auto value() { return tag2_valu
 template<>
 struct ExpectedTagValue<Tag3> { static constexpr auto value() { return tag3_value; } };
 
-// If all of the tags are available and the data is correct
-template<typename Job>
-void test_tags(Job& /* job */, const TagID /* id */) noexcept
+// Tests if a specified tag holds the correct value
+template<typename Job, typename Tag>
+void test_tag(Job& job, const Tag tag) noexcept
 {
-  // End of recurssion
+  REQUIRE(job.get_when_ready(tag) == ExpectedTagValue<Tag>::value());
 }
-template<typename Job, typename Tag, typename... Rest>
+// Tests if the specified tags hold the correct value
+template<typename... Tags, typename Job>
 void test_tags(Job& job, const TagID id) noexcept
 {
-  job.subscribe(Tag{id});
-  REQUIRE(job.get_when_ready(Tag{id}) == ExpectedTagValue<Tag>::value());
-  test_tags<Job, Rest...>(job, id);
+  (test_tag(job, Tags(id)), ...);
 }
 
 // This wasn't working with a reference, so just use a pointer
@@ -128,21 +127,21 @@ void machine_task(Master* const master_ptr, const int index)
     {
     case 0:
       job.publish(Tag1(job_index), tag1_value);
-      test_tags<JobType, Tag2, Tag3>(*job_ptr, job_index);
+      test_tags<Tag2, Tag3>(*job_ptr, job_index);
       break;
 
     case 1:
       job.publish(Tag2(job_index), tag2_value);
-      test_tags<JobType, Tag1, Tag3>(*job_ptr, job_index);
+      test_tags<Tag1, Tag3>(*job_ptr, job_index);
       break;
 
     case 2:
       job.publish(Tag3(job_index), tag3_value);
-      test_tags<JobType, Tag1, Tag2>(*job_ptr, job_index);
+      test_tags<Tag1, Tag2>(*job_ptr, job_index);
       break;
 
     default:
-      test_tags<JobType, Tag1, Tag2, Tag3>(*job_ptr, job_index);
+      test_tags<Tag1, Tag2, Tag3>(*job_ptr, job_index);
       break;
     }
   }
