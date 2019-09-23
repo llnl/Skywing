@@ -14,8 +14,7 @@
 using namespace skynet;
 
 constexpr int num_machines = 50;
-constexpr int min_connections_per_machine = 1;
-constexpr int max_connections_per_machine = 5;
+constexpr int num_connections = num_machines * 3;
 constexpr std::uint16_t base_port = 30000;
 
 using Tag1 = Tag<int>;
@@ -52,64 +51,13 @@ void test_tags(Job& job, const TagID id) noexcept
 }
 
 // This wasn't working with a reference, so just use a pointer
-void machine_task(Master* const master_ptr, const int index)
+void machine_task(Master* const master_ptr, const NetworkInfo* const info, const int index)
 {
   using namespace std::chrono_literals;
   auto& master = *master_ptr;
-  auto prng = make_prng();
-  // Select the maximum number of devices to support
-  const int num_connections =
-    std::uniform_int_distribution<int>{
-      min_connections_per_machine,
-      max_connections_per_machine
-    }(prng);
-  // Select the machines that are going to be connected
-  std::vector<int> connections(num_connections);
-  std::generate(connections.begin(), connections.end(), [&]() {
-    while (true)
-    {
-      const auto val = std::uniform_int_distribution<int>{0, num_machines - 1}(prng);
-      if (val != index)
-      {
-        return val;
-      }
-    }
+  connect_network(*info, master, index, [](Master& m, const int i) {
+    m.connect_to_server("127.0.0.1", base_port + i);
   });
-  // Remove any duplicate connections
-  std::sort(connections.begin(), connections.end());
-  connections.erase(
-    std::unique(connections.begin(), connections.end()),
-    connections.end()
-  );
-  // Finally, set up the connections
-  // Connect to smaller numbered computers
-  for (const auto conn : connections)
-  {
-    if (conn > index)
-    {
-      break;
-    }
-    master.connect_to_server("127.0.0.1", base_port + conn);
-  }
-  // Forcefully connect to the lower numbered machine to ensure that the graph
-  // is fully connected
-  const auto lower_machine = base_port + index - 1;
-  if (index > 0 && std::find(connections.begin(), connections.end(), lower_machine) == connections.end())
-  {
-    master.connect_to_server("127.0.0.1", lower_machine);
-  }
-  // Wait for larger numbered machines to connect
-  // There's no way to know when everything is connected, unfortunately, so just
-  // wait and assume everyone is connected
-  // (Could also pre-generated and parse the connections and do it like that,
-  //  probably want to change it to that later)
-  const auto end_time = std::chrono::steady_clock::now() + 1s;
-  while (std::chrono::steady_clock::now() < end_time)
-  {
-    master.accept_pending_connections();
-    std::this_thread::sleep_for(1ms);
-  }
-  REQUIRE(master.number_of_neighbors() > 0);
   // Submit first and second job
   auto& job1 = master.make_job<JobType>(0);
   auto& job2 = master.make_job<JobType>(1);
@@ -151,6 +99,7 @@ TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
 {
   using namespace std::chrono_literals;
   std::vector<Master> masters;
+  const auto network_info = make_network(num_machines, num_connections);
   // Construct masters here so that they don't disconnect early
   for (auto i = 0; i < num_machines; ++i)
   {
@@ -159,7 +108,7 @@ TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {
-    threads.emplace_back(machine_task, &masters[i], i);
+    threads.emplace_back(machine_task, &masters[i], &network_info, i);
     std::this_thread::sleep_for(10ms);
   }
   for (auto&& thread : threads)
