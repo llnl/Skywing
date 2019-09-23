@@ -69,11 +69,16 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   }
   // Submit job and broadcast on the job using each machine
   auto& my_job = master.make_job<JobType>(0);
+  // Subscribe to everything ahead of time
+  for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
+  {
+    my_job.subscribe(SizeTTag(send_index));
+  }
   for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
   {
     if (index == send_index)
     {
-      my_job.global_broadcast(SizeTTag(send_index), send_index);
+      my_job.publish(SizeTTag(send_index), send_index);
     }
     else
     {

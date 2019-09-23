@@ -43,11 +43,15 @@ namespace skynet
       : id_{id}
     {}
 
+    /** \brief Return the id of the tag
+     */
+    constexpr TagID id() const noexcept { return id_; }
+
   private:
     template<typename...>
     friend class Job;
 
-    /** \brief Parses raw data and appends it to a vector
+    /** \brief Parses raw data and appends it to a vector if it's been subscribed to
      *
      * This shouldn't be publicly exposed.
      * \param data The data to parse to add the the vector
@@ -64,7 +68,13 @@ namespace skynet
     {
       using MapType = std::unordered_map<TagID, std::vector<T>>;
       auto& the_map = *static_cast<MapType*>(map_ptr);
-      the_map[tag_id].push_back(internal::from_bytes<T>(data, size));
+      // If the tag id isn't present then this tag hasn't been subscribed to
+      const auto loc = the_map.find(tag_id);
+      if (loc == the_map.end())
+      {
+        return;
+      }
+      loc->second.push_back(internal::from_bytes<T>(data, size));
     }
 
     // The id of this tag
@@ -101,7 +111,13 @@ namespace skynet
       {
         return {};
       }
-      auto& buffer = get_buffer(tag);
+      auto& map = get_buffer_map(tag);
+      auto loc = map.find(tag.id());
+      if (loc == map.end())
+      {
+        return {};
+      }
+      auto& buffer = loc->second;
       auto value = std::move(buffer.back());
       buffer.pop_back();
       return value;
@@ -134,7 +150,123 @@ namespace skynet
     {
       // Retrieve any possible pending messages from the master's neighbors
       Master::Accessor::handle_neighbor_message(get_master());
-      return !get_buffer(tag).empty();
+      const auto& tag_map = get_buffer_map(tag);
+      const auto loc = tag_map.find(tag.id());
+      if (loc == tag_map.cend())
+      {
+        return false;
+      }
+      return !loc->second.empty();
+    }
+
+    /** \brief Subscribes to the passed tag, does nothing if the job is
+     * already subscribed to the tag
+     */
+    template<typename Tag>
+    void subscribe(const Tag tag) noexcept
+    {
+      // Having the tag ID in the corresponding map is all that's needed for
+      // subscription
+      // C++17: try_emplace
+      get_buffer_map(tag).emplace(
+        tag.id(),
+        std::vector<typename Tag::ValueType>{}
+      );
+    }
+    /** \brief Subscribes to all of the passed tags
+     */
+    template<typename Tag, typename... Rest>
+    void subscribe(const Tag tag, const Rest... rest) noexcept
+    {
+      subscribe(tag);
+      subscribe(rest...);
+    }
+
+    /** \brief Unsubscribes to the passed tag, does nothing if the job is not
+     * subscribed to the tag
+     */
+    template<typename Tag>
+    void unsubscribe(const Tag tag) noexcept
+    {
+      get_buffer_map(tag).erase(tag.id());
+    }
+    /** \brief Unsubscribes from all of the passed tags
+     */
+    template<typename Tag, typename... Rest>
+    void unsubscribe(const Tag tag, const Rest... rest) noexcept
+    {
+      unsubscribe(tag);
+      unsubscribe(rest...);
+    }
+
+    /** \brief Publish data on the passed tag
+     */
+    template<typename Tag>
+    void publish(const Tag tag, const typename Tag::ValueType& value) noexcept
+    {
+      global_broadcast(tag, value);
+    }
+
+  private:
+    // Type list of all the tag types
+    using TagList = internal::TypeList<Tags...>;
+
+    // Override processing of data, adds some data to a buffer
+    bool process_data(
+      const TagID tag_id,
+      const TagIndex tag_index,
+      const char* const data,
+      const std::size_t size
+    ) override
+    {
+      // Ensure that the tag number isn't too large
+      if (tag_index >= sizeof...(Tags))
+      {
+        // internal::on_error("do_process_data - tag number is too large");
+        return false;
+      }
+      // Otherwise add the data to the queue
+      using func_ptr = void (*)(const char*, std::size_t, TagID, void*);
+      static constexpr std::array<func_ptr, sizeof...(Tags)> func_ptrs{
+        &Tags::append_to_queue...
+      };
+      func_ptrs[tag_index](data, size, tag_id, get_buffer_map(tag_index));
+      return true;
+    }
+
+    // Retrieve a buffer as a reference based on a tag
+    template<typename GetTag>
+    auto& get_buffer_map(const GetTag /* tag */) noexcept
+    {
+      using MapType = std::unordered_map<TagID, std::vector<typename GetTag::ValueType>>;
+      return std::get<MapType>(buffers_);
+    }
+    template<typename GetTag>
+    const auto& get_buffer_map(const GetTag /* tag */) const noexcept
+    {
+      using MapType = std::unordered_map<TagID, std::vector<typename GetTag::ValueType>>;
+      return std::get<MapType>(buffers_);
+    }
+
+    // Retrieve a buffer map as a void* based on an index
+    void* get_buffer_map(const TagIndex index) noexcept
+    {
+      // Make an array of void* to all of the buffers
+      // It seems like there should be a way to just save these as offsets, but
+      // I'm not sure if there is (maybe can just do some gross pointer
+      // arithmetic?  Can't use offsetof since this is a non-standard layout
+      // type due to the virtual functions)
+      const std::array<void*, sizeof...(Tags)> pointers{
+        static_cast<void*>(
+          &std::get<
+            std::unordered_map<
+              TagID,
+              std::vector<typename Tags::ValueType>
+            >
+          >(buffers_)
+        )...
+      };
+      return pointers[index];
     }
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
@@ -177,68 +309,6 @@ namespace skynet
         value
       );
       ++message_id_;
-    }
-
-  private:
-    // Type list of all the tag types
-    using TagList = internal::TypeList<Tags...>;
-
-    // Override processing of data
-    bool process_data(
-      const TagID tag_id,
-      const TagIndex tag_index,
-      const char* const data,
-      const std::size_t size
-    ) override
-    {
-      // Ensure that the tag number isn't too large
-      if (tag_index >= sizeof...(Tags))
-      {
-        // internal::on_error("do_process_data - tag number is too large");
-        return false;
-      }
-      // Otherwise add the data to the queue
-      using func_ptr = void (*)(const char*, std::size_t, TagID, void*);
-      static constexpr std::array<func_ptr, sizeof...(Tags)> func_ptrs{
-        &Tags::append_to_queue...
-      };
-      func_ptrs[tag_index](data, size, tag_id, get_buffer_map(tag_index));
-      return true;
-    }
-
-    // Retrieve a buffer as a reference based on a tag
-    template<typename GetTag>
-    auto& get_buffer(const GetTag tag) noexcept
-    {
-      using MapType = std::unordered_map<TagID, std::vector<typename GetTag::ValueType>>;
-      return std::get<MapType>(buffers_)[tag.id_];
-    }
-    template<typename GetTag>
-    const auto& get_buffer(const GetTag tag) const noexcept
-    {
-      using MapType = std::unordered_map<TagID, std::vector<typename GetTag::ValueType>>;
-      return std::get<MapType>(buffers_)[tag.id_];
-    }
-
-    // Retrieve a buffer map as a void* based on an index
-    void* get_buffer_map(const TagIndex index) noexcept
-    {
-      // Make an array of void* to all of the buffers
-      // It seems like there should be a way to just save these as offsets, but
-      // I'm not sure if there is (maybe can just do some gross pointer
-      // arithmetic?  Can't use offsetof since this is a non-standard layout
-      // type due to the virtual functions)
-      const std::array<void*, sizeof...(Tags)> pointers{
-        static_cast<void*>(
-          &std::get<
-            std::unordered_map<
-              TagID,
-              std::vector<typename Tags::ValueType>
-            >
-          >(buffers_)
-        )...
-      };
-      return pointers[index];
     }
 
     // The buffer of data for each tag

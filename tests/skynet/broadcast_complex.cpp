@@ -39,19 +39,17 @@ template<>
 struct ExpectedTagValue<Tag3> { static constexpr auto value() { return tag3_value; } };
 
 // If all of the tags are available and the data is correct
-// (no C++17 so just make two overloads)
-template<typename T1, typename T2, typename Job>
-void test_tags(Job& job, const TagID id) noexcept
+template<typename Job>
+void test_tags(Job& /* job */, const TagID /* id */) noexcept
 {
-  REQUIRE(job.template get_when_ready(T1(id)) == ExpectedTagValue<T1>::value());
-  REQUIRE(job.template get_when_ready(T2(id)) == ExpectedTagValue<T2>::value());
+  // End of recurssion
 }
-template<typename T1, typename T2, typename T3, typename Job>
+template<typename Job, typename Tag, typename... Rest>
 void test_tags(Job& job, const TagID id) noexcept
 {
-  REQUIRE(job.template get_when_ready(T1(id)) == ExpectedTagValue<T1>::value());
-  REQUIRE(job.template get_when_ready(T2(id)) == ExpectedTagValue<T2>::value());
-  REQUIRE(job.template get_when_ready(T3(id)) == ExpectedTagValue<T3>::value());
+  job.subscribe(Tag{id});
+  REQUIRE(job.get_when_ready(Tag{id}) == ExpectedTagValue<Tag>::value());
+  test_tags<Job, Rest...>(job, id);
 }
 
 // This wasn't working with a reference, so just use a pointer
@@ -116,6 +114,9 @@ void machine_task(Master* const master_ptr, const int index)
   // Submit first and second job
   auto& job1 = master.make_job<JobType>(0);
   auto& job2 = master.make_job<JobType>(1);
+  // Subscribe to everything ahead of time
+  job1.subscribe(Tag1{0}, Tag2{0}, Tag3{0});
+  job2.subscribe(Tag1{1}, Tag2{1}, Tag3{1});
   // First three machines do broadcasts on different tags for both jobs
   // Pointer in intitilizer list since things in them are always const
   // The first machines also then have to propagate the other broadcasts
@@ -126,22 +127,22 @@ void machine_task(Master* const master_ptr, const int index)
     switch (index)
     {
     case 0:
-      job.global_broadcast(Tag1(job_index), tag1_value);
-      test_tags<Tag2, Tag3>(*job_ptr, job_index);
+      job.publish(Tag1(job_index), tag1_value);
+      test_tags<JobType, Tag2, Tag3>(*job_ptr, job_index);
       break;
 
     case 1:
-      job.global_broadcast(Tag2(job_index), tag2_value);
-      test_tags<Tag1, Tag3>(*job_ptr, job_index);
+      job.publish(Tag2(job_index), tag2_value);
+      test_tags<JobType, Tag1, Tag3>(*job_ptr, job_index);
       break;
 
     case 2:
-      job.global_broadcast(Tag3(job_index), tag3_value);
-      test_tags<Tag1, Tag2>(*job_ptr, job_index);
+      job.publish(Tag3(job_index), tag3_value);
+      test_tags<JobType, Tag1, Tag2>(*job_ptr, job_index);
       break;
 
     default:
-      test_tags<Tag1, Tag2, Tag3>(*job_ptr, job_index);
+      test_tags<JobType, Tag1, Tag2, Tag3>(*job_ptr, job_index);
       break;
     }
   }

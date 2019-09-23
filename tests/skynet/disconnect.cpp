@@ -35,13 +35,18 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     std::this_thread::sleep_for(1ms);
   }
   auto& my_job = master.make_job<JobType>(0);
+  // Subscribe to all tags ahead of time
+  for (std::size_t i = 0; i < disconnect_order.size(); ++i)
+  {
+    my_job.subscribe(IntTag(i));
+  }
   for (std::size_t i = 0; i < disconnect_order.size(); ++i)
   {
     const auto to_remove = disconnect_order[i];
     if (to_remove == index)
     {
       // broadcast and remove (the data doesn't really matter)
-      my_job.global_broadcast(IntTag(i), to_remove);
+      my_job.publish(IntTag(i), to_remove);
       // Leaving the loop will cause the master to destruct, automatically
       // disconnecting
       break;
