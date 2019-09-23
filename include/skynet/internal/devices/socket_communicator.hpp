@@ -1,9 +1,8 @@
 #ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 #define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
-#include "skynet/utility/optional.hpp"
-
 #include <cstdint>
+#include <optional>
 
 namespace skynet { namespace internal
 {
@@ -47,7 +46,7 @@ namespace skynet { namespace internal
 
     /** \brief Accepts an incoming connection if one is pending
      */
-    Optional<SocketCommunicator> accept() noexcept;
+    std::optional<SocketCommunicator> accept() noexcept;
 
     /** \brief Listens for requests on the specified port
      *

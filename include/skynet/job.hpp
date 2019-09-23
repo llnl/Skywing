@@ -5,7 +5,6 @@
 #include "skynet/internal/job_base.hpp"
 #include "skynet/internal/utility/on_error.hpp"
 #include "skynet/internal/utility/type_list.hpp"
-#include "skynet/utility/optional.hpp"
 #include "skynet/master.hpp"
 
 #include <vector>
@@ -13,6 +12,7 @@
 #include <chrono>
 #include <limits>
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 
 namespace skynet
@@ -105,7 +105,7 @@ namespace skynet
      * \pre The specified tag has data in its buffer.
      */
     template<typename GetTag>
-    Optional<typename GetTag::ValueType> get(const GetTag tag) noexcept
+    std::optional<typename GetTag::ValueType> get(const GetTag tag) noexcept
     {
       if (!has_data(tag))
       {

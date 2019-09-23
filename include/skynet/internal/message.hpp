@@ -1,12 +1,12 @@
 #ifndef SKYNET_INTERNAL_MESSAGE_HPP
 #define SKYNET_INTERNAL_MESSAGE_HPP
 
-#include "skynet/utility/optional.hpp"
 #include "skynet/internal/utility/overload_set.hpp"
 
 #include <array>
 #include <cassert>
 #include <cstring>
+#include <optional>
 #include <vector>
 
 // namespace skynet::internal::header_info {
@@ -119,7 +119,7 @@ namespace skynet { namespace internal
      * successful, false otherwise.
      */
     template<typename Callable1, typename Callable2>
-    static Optional<MessageHandler> try_to_get(Callable1 read_from, Callable2 on_error)
+    static std::optional<MessageHandler> try_to_get(Callable1 read_from, Callable2 on_error)
     {
       MessageHandler to_ret;
       // Start by loading the universal header

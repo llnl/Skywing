@@ -47,7 +47,7 @@ namespace skynet { namespace internal
     }
   }
 
-  Optional<SocketCommunicator> SocketCommunicator::accept() noexcept
+  std::optional<SocketCommunicator> SocketCommunicator::accept() noexcept
   {
     sockaddr_in client_address_struct;
     // len can't be const as accept takes a non-const pointer

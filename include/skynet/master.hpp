@@ -16,6 +16,7 @@
 #include <thread>
 #include <cassert>
 #include <chrono>
+#include <optional>
 
 // TODO: Support other types of communicators; will probably make
 //       it a template and have it as a parameter, so not making a seperate
@@ -44,7 +45,7 @@ namespace skynet
        * send/recieve greetings, but need to do so in the opposite order so
        * have seperate constructors for both.
        */
-      static Optional<ExternalMaster> create(
+      static std::optional<ExternalMaster> create(
         ByAccept,
         SocketCommunicator conn,
         const MachineID local_id,
@@ -63,7 +64,7 @@ namespace skynet
        *
        * This is for when a client connects to a server.
        */
-      static Optional<ExternalMaster> create(
+      static std::optional<ExternalMaster> create(
         ByRequest,
         SocketCommunicator conn,
         const MachineID local_id,
@@ -112,7 +113,7 @@ namespace skynet
        *
        * Returns the handler for the message if one exists.
        */
-      Optional<MessageHandler> get_message() noexcept
+      std::optional<MessageHandler> get_message() noexcept
       {
         if (dead_)
         {
@@ -124,7 +125,8 @@ namespace skynet
           if (handler->category() == MessageCategory::status)
           {
             handle_message(*handler);
-            return {};
+            // There could be non-status messages so check those as well
+            return get_message();
           }
           return *handler;
         }
@@ -176,7 +178,7 @@ namespace skynet
 
       // Function that handles the joining/accepting connection
       template<typename First, typename Second>
-      static Optional<ExternalMaster> init_conn(ExternalMaster& m, First first, Second second) noexcept
+      static std::optional<ExternalMaster> init_conn(ExternalMaster& m, First first, Second second) noexcept
       {
         using namespace std::chrono;
         const auto start = steady_clock::now();

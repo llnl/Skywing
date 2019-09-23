@@ -7,10 +7,7 @@ tests = [
   ['master_conn', 'master_conn.cpp'],
 
   # devices/
-  ['socket_communicator', 'devices/socket_communicator.cpp'],
-
-  # utility/
-  ['optional', 'utility/optional.cpp']
+  ['socket_communicator', 'devices/socket_communicator.cpp']
 ]
 
 foreach t : tests
