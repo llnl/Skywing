@@ -1,6 +1,7 @@
 #ifndef SKYNET_INTERNAL_MESSAGE_HPP
 #define SKYNET_INTERNAL_MESSAGE_HPP
 
+#include "skynet/internal/utility/algorithms.hpp"
 #include "skynet/internal/utility/overload_set.hpp"
 
 #include <array>
@@ -19,21 +20,6 @@
 
 namespace skynet::internal
 {
-  // Appends many std::vectors into a single std::vector
-  template<typename... T>
-  std::vector<std::byte> append_vectors(const T&... vecs)
-  {
-    std::vector<std::byte> to_ret;
-    // Use a pointer instead of references since it'll copy the vectors otherwise
-    for (const auto& vec : {&vecs...})
-    {
-      const auto old_size = to_ret.size();
-      to_ret.resize(to_ret.size() + vec->size());
-      std::copy(vec->cbegin(), vec->cend(), to_ret.begin() + old_size);
-    }
-    return to_ret;
-  }
-
   /** \brief Create data for a broadcast
    */
   std::vector<std::byte> make_broadcast(
@@ -54,7 +40,7 @@ namespace skynet::internal
     base.origin = origin;
     base.hops_left_p1 = hops_left_p1;
     base.message_size = data.size();
-    return append_vectors(
+    return concatenate(
       UniversalHeader{header_index<BroadcastHeader>()}.to_bytes(),
       base.to_bytes(),
       data
@@ -65,7 +51,7 @@ namespace skynet::internal
    */
   std::vector<std::byte> rebuild_broadcast(const BroadcastHeader& b, const std::vector<std::byte>& data)
   {
-    return append_vectors(
+    return concatenate(
       UniversalHeader{header_index<BroadcastHeader>()}.to_bytes(),
       b.to_bytes(),
       data
@@ -80,7 +66,7 @@ namespace skynet::internal
   ) noexcept
   {
     const auto neighbor_data = Serializer{}.add(neighbors).bytes();
-    return append_vectors(
+    return concatenate(
       UniversalHeader{header_index<GreetingHeader>()}.to_bytes(),
       GreetingHeader{from, static_cast<std::uint32_t>(neighbor_data.size())}.to_bytes(),
       neighbor_data
@@ -91,7 +77,7 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_goodbye() noexcept
   {
-    return append_vectors(
+    return concatenate(
       UniversalHeader{header_index<GoodbyeHeader>()}.to_bytes(),
       GoodbyeHeader{}.to_bytes()
     );
@@ -102,7 +88,7 @@ namespace skynet::internal
   template<typename Type>
   std::vector<std::byte> make_neighbor_notification(const MachineID neighbor) noexcept
   {
-    return append_vectors(
+    return concatenate(
       UniversalHeader{header_index<Type>()}.to_bytes(),
       static_cast<Type&&>(BaseNeighborHeader{neighbor}).to_bytes()
     );

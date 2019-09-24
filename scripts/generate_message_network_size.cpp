@@ -1,3 +1,6 @@
+// This script is in C++ as it depends on the output of C++ functions and
+// object sizes
+
 #include "skynet/internal/message_headers.hpp"
 #include "skynet/internal/utility/serialize.hpp"
 
