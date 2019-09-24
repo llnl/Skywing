@@ -20,7 +20,21 @@ void output_header_size(T, std::ostream& out)
     "A header type is non-trivally copyable!\n"
     "Not fit for serialization as a header."
   );
-  out << to_bytes(T{}).size() << ',';
+  const auto size = T{}.to_bytes().size();
+  out << size << ',';
+  // The kind of check below would be nice to have, but doesn't seem possible
+  // as the serialization removes padding
+  // // For right now, the serialized header should ALWAYS be the same size as the
+  // // class being serialized (or 0 if the class is empty).  This may change in
+  // // the future, but make sure this is the case for now
+  // if ((size != 0 && std::is_empty_v<T>) || size != sizeof(T))
+  // {
+  //   std::cerr
+  //     << "One of the headers has a mis-matched size!\n"
+  //     << "Expected a size of " << (std::is_empty_v<T> ? 0 : sizeof(T)) << '\n'
+  //     << "But got a size of " << size << '\n';
+  //   std::exit(1);
+  // }
 }
 
 // Call something with each type in the list default constructed as the first argument
@@ -47,7 +61,7 @@ int main()
     return 1;
   }
   // First calculate the size of
-  const auto base_size = to_bytes(UniversalHeader{}).size();
+  const auto base_size = UniversalHeader{}.to_bytes().size();
   // The total number of headers
   constexpr auto num_headers = size<JobHeaders> + size<StatusHeaders>;
   fout

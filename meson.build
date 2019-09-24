@@ -19,17 +19,24 @@ endif
 zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
 cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
-cereal_dep = subproject('cereal').get_variable('cereal_dep')
+
+# Is there a better way to say that this depends on the serialization source file?
+skynet_serialize= library('skynet_serialize',
+  [
+    'src/skynet/internal/utility/serialize.cpp'
+  ],
+  include_directories : include_directories('include')
+)
 
 make_network_message_size = executable(
   'make_network_message_size',
   'scripts/generate_message_network_size.cpp',
   dependencies : [
     declare_dependency(
-      include_directories : include_directories('include'),
-      dependencies : [cereal_dep]
+      include_directories : include_directories('include')
     )
-  ]
+  ],
+  link_with : skynet_serialize
 )
 
 # Having an output to a sub-directory errors; not sure how / if it's
@@ -44,7 +51,8 @@ gen_message_header_information = custom_target(
 skynet_inc = include_directories('include')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
-  dependencies : [thread_dep, cereal_dep],
+  dependencies : [thread_dep],
+  link_with : skynet_serialize,
   sources : gen_message_header_information
 )
 

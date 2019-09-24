@@ -19,13 +19,13 @@ constexpr std::uint16_t base_port = 30000;
 
 using Tag1 = Tag<int>;
 using Tag2 = Tag<double>;
-using Tag3 = Tag<char>;
+using Tag3 = Tag<long>;
 
 using JobType = Job<Tag1, Tag2, Tag3>;
 
 constexpr int tag1_value = 10;
 constexpr double tag2_value = 20;
-constexpr char tag3_value = 'c';
+constexpr long tag3_value = 1023570;
 
 // For helping with reducing code
 template<typename T>

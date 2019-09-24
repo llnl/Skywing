@@ -83,7 +83,7 @@ namespace skynet
        */
       auto make_reader() noexcept
       {
-        return [this](char* const buffer, const std::size_t count) {
+        return [this](std::byte* const buffer, const std::size_t count) {
           const auto err = conn_.read_message(buffer, count);
           switch (err)
           {
@@ -138,7 +138,7 @@ namespace skynet
        * Also marks the connection as dead if any errors occur.  Does nothing
        * if the connection is marked as dead.
        */
-      void send_message(const std::vector<char>& c) noexcept
+      void send_message(const std::vector<std::byte>& c) noexcept
       {
         if (dead_)
         {
@@ -318,7 +318,7 @@ namespace skynet
         const T& data
       )
       {
-        m.do_broadcast(msg_id, job_id, tag_id, tag_index, hops_left_p1, internal::to_bytes(data));
+        m.do_broadcast(msg_id, job_id, tag_id, tag_index, hops_left_p1, internal::Serializer{}.add(data).bytes());
       }
     }; // struct Accessor
 
@@ -374,6 +374,7 @@ namespace skynet
         // This ID already exists; so drop the connection
         if (neighbors_.find(new_id) != neighbors_.end())
         {
+          std::cerr << "oh no repeat of " << new_id << "\n";
           return false;
         }
         notify_of_new_neighbor(new_id);
@@ -460,7 +461,7 @@ namespace skynet
       const TagID tag_id,
       const TagIndex tag_index,
       const std::uint32_t hops_left_p1,
-      const std::vector<char>& data
+      const std::vector<std::byte>& data
     ) noexcept
     {
       // Prepend the message describing the data and send it to all neighbors
@@ -472,7 +473,7 @@ namespace skynet
     {
       assert(handle.category() == internal::MessageCategory::job);
       const auto okay = handle.do_job_callback(from.make_reader(),
-        [&](internal::BroadcastHeader msg, const std::vector<char>& data) {
+        [&](internal::BroadcastHeader msg, const std::vector<std::byte>& data) {
           if (!message_is_okay(msg))
           {
             return false;
@@ -513,7 +514,7 @@ namespace skynet
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
-    bool add_data_to_queue(const internal::BroadcastHeader& msg, const std::vector<char>& data)
+    bool add_data_to_queue(const internal::BroadcastHeader& msg, const std::vector<std::byte>& data)
     {
       // Make sure the given size is correct
       if (data.size() != msg.message_size)
@@ -596,7 +597,7 @@ namespace skynet
     /** \brief Broadcasts a message to all neighbors that fit a criteria
      */
     template<typename Callable>
-    void send_to_neighbors_if(const std::vector<char>& to_send, Callable c)
+    void send_to_neighbors_if(const std::vector<std::byte>& to_send, Callable c)
     {
       for (auto&& neighbor : neighbors_)
       {
@@ -609,7 +610,7 @@ namespace skynet
 
     /** \brief Broadcasts a message to all neighbors
      */
-    void send_to_neighbors(const std::vector<char>& to_send)
+    void send_to_neighbors(const std::vector<std::byte>& to_send)
     {
       send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });
     }

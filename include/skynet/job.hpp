@@ -60,7 +60,7 @@ namespace skynet
      * \param map_ptr The map of vectors to append to
      */
     static void append_to_queue(
-      const char* const data,
+      const std::byte* const data,
       const std::size_t size,
       const TagID tag_id,
       void* const map_ptr
@@ -74,7 +74,8 @@ namespace skynet
       {
         return;
       }
-      loc->second.push_back(internal::from_bytes<T>(data, size));
+      T temp;
+      loc->second.push_back(internal::Deserializer{data, size}.get(temp));
     }
 
     // The id of this tag
@@ -215,7 +216,7 @@ namespace skynet
     bool process_data(
       const TagID tag_id,
       const TagIndex tag_index,
-      const char* const data,
+      const std::byte* const data,
       const std::size_t size
     ) override
     {
@@ -226,7 +227,7 @@ namespace skynet
         return false;
       }
       // Otherwise add the data to the queue
-      using func_ptr = void (*)(const char*, std::size_t, TagID, void*);
+      using func_ptr = void (*)(const std::byte*, std::size_t, TagID, void*);
       static constexpr std::array<func_ptr, sizeof...(Tags)> func_ptrs{
         &Tags::append_to_queue...
       };

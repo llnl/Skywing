@@ -28,7 +28,7 @@ void server()
     }
   }();
   // Wait for an int to be send
-  std::array<char, sizeof(int)> int_buffer;
+  std::array<std::byte, sizeof(int)> int_buffer;
   while (with_client.read_message(int_buffer.data(), int_buffer.size()) != ConnectionError::no_error)
   {
     // empty
@@ -43,7 +43,7 @@ void client()
 {
   SocketCommunicator conn;
   REQUIRE(conn.connect_to_server("127.0.0.1", port) == ConnectionError::no_error);
-  std::array<char, sizeof(int)> int_buffer;
+  std::array<std::byte, sizeof(int)> int_buffer;
   std::memcpy(int_buffer.data(), &value_to_send, sizeof(int));
   conn.send_message(int_buffer.data(), int_buffer.size());
 }

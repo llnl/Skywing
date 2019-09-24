@@ -1,6 +1,7 @@
 #ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 #define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -66,7 +67,7 @@ namespace skynet::internal
      * \param message The message to send
      * \param size The size of the message
      */
-    ConnectionError send_message(const char* message, std::size_t size) noexcept;
+    ConnectionError send_message(const std::byte* message, std::size_t size) noexcept;
 
     /** \brief Recieve a message from the socket if one is available
      *
@@ -76,7 +77,7 @@ namespace skynet::internal
      * \param buffer The buffer to write to
      * \param size The size of the buffer / number of bytes to read
      */
-    ConnectionError read_message(char* buffer, std::size_t size) noexcept;
+    ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
 
   private:
     // Tag for using the raw handle constructor

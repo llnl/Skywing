@@ -7,6 +7,60 @@
 
 #include <cstdint>
 
+/** \brief Convience macro that only appears in this header to keep serialization
+ * and deserialization in sync and to reduce repetition.  It should be used in
+ * the class to serialize or deserialize, and the parameters should be the list
+ * of member variables in the class
+ *
+ * This adds the following methods to the class:
+ *
+ * ```
+ * std::vector<std::byte> to_bytes() const noexcept
+ * ```
+ * Returns a serialized version of the header
+ *
+ * ```
+ * class_name(const std::byte* data, std::size_t count) noexcept
+ * explicit class_name(const std::vector<std::byte>& data) noexcept;
+ * template<std::size_t N>
+ * explicit class_name(const std::array<std::byte, N>& data) noexcept;
+ * ```
+ * Constructs the header from a serizalized source
+ *
+ * ```
+ * class_name() = default;
+ * ```
+ * Allows default construction
+ */
+#define SKYNET_MAKE_SERIALIZABLE(class_name, ...) \
+  std::vector<std::byte> to_bytes() const noexcept \
+  { \
+    return Serializer{}.add(__VA_ARGS__).bytes(); \
+  } \
+  class_name(const std::byte* const data, const std::size_t count) noexcept \
+  { \
+    Deserializer{data, count}.get(__VA_ARGS__); \
+  } \
+  explicit class_name(const std::vector<std::byte>& data) noexcept \
+    : class_name{data.data(), data.size()} \
+  {} \
+  template<std::size_t N> \
+  explicit class_name(const std::array<std::byte, N>& data) noexcept \
+    : class_name{data.data(), data.size()} \
+  {} \
+  class_name() = default;
+
+/** \brief No-op version of SKYNET_MAKE_SERIALIZABLE, for headers that don't carry
+ * any additional data
+ */
+#define SKYNET_MAKE_SERIALIZABLE_NO_OP(class_name) \
+  std::vector<std::byte> to_bytes() const noexcept { return {}; } \
+  explicit class_name(const std::byte*, std::size_t) noexcept {} \
+  explicit class_name(const std::vector<std::byte>&) noexcept {} \
+  template<std::size_t N> \
+  explicit class_name(const std::array<std::byte, N>&) noexcept {} \
+  class_name() = default;
+
 namespace skynet::internal
 {
   /** \brief Type to allow headers to declare what category of message they
@@ -22,6 +76,14 @@ namespace skynet::internal
    */
   struct UniversalHeader
   {
+    SKYNET_MAKE_SERIALIZABLE(UniversalHeader,
+      index
+    );
+    // Allow construction with an index
+    explicit UniversalHeader(const std::uint8_t i) noexcept
+      : index{i}
+    {}
+
     /// The index for the type of header that follows this header
     std::uint8_t index;
   }; // Struct UniversalHeader
@@ -36,12 +98,16 @@ namespace skynet::internal
    */
   struct BroadcastHeader
   {
+    SKYNET_MAKE_SERIALIZABLE(BroadcastHeader,
+      message_id, job_id, tag_id, tag_index, origin, hops_left_p1, message_size
+    );
+
     template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<char>& data, Callable1 callback, Callable2 read_from)
+    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
     {
       // Get the header and read the required number of bytes
-      const auto header = from_bytes<BroadcastHeader>(data);
-      std::vector<char> buffer(header.message_size);
+      const BroadcastHeader header{data};
+      std::vector<std::byte> buffer(header.message_size);
       if (!read_from(buffer.data(), buffer.size()))
       {
         return false;
@@ -67,27 +133,31 @@ namespace skynet::internal
     std::uint32_t message_size;
   }; // struct BroadcastHeader
 
-  template <class Archive>
-  void serialize(Archive& ar, BroadcastHeader& h) noexcept
-  {
-    ar(h.message_id, h.job_id, h.tag_id, h.tag_index, h.origin, h.hops_left_p1, h.message_size);
-  }
-
   /** \brief The header for the greeting message
    */
   struct GreetingHeader
   {
+    SKYNET_MAKE_SERIALIZABLE(GreetingHeader,
+      from,
+      message_size
+    );
+
+    GreetingHeader(const MachineID from, const std::uint32_t size)
+      : from{from}
+      , message_size{size}
+    {}
+
     template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<char>& data, Callable1 callback, Callable2 read_from)
+    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
     {
       // Get the header and read the required number of bytes
-      const auto header = from_bytes<GreetingHeader>(data);
-      std::vector<char> buffer(header.message_size);
+      const GreetingHeader header{data};
+      std::vector<std::byte> buffer(header.message_size);
       if (!read_from(buffer.data(), buffer.size()))
       {
         return false;
       }
-      return callback(header, from_bytes<std::vector<MachineID>>(buffer));
+      return callback(header, deserialize<std::vector<MachineID>>(buffer));
     }
 
     /// The machine that the greeting is from
@@ -96,49 +166,44 @@ namespace skynet::internal
     std::uint32_t message_size;
   }; // struct GreetingHeader
 
-  template <class Archive>
-  void serialize(Archive& ar, GreetingHeader& h) noexcept
-  {
-    ar(h.from, h.message_size);
-  }
-
   struct GoodbyeHeader
   {
+    SKYNET_MAKE_SERIALIZABLE_NO_OP(GoodbyeHeader);
+
     template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<char>& /* data */, Callable1 callback, Callable2 /* read_from */)
+    static bool do_callback(const std::vector<std::byte>& /* data */, Callable1 callback, Callable2 /* read_from */)
     {
       return callback(GoodbyeHeader{});
     }
   }; // struct GoodbyeHeader
 
-  template <class Archive>
-  void serialize(Archive& /* ar */, GoodbyeHeader& /* h */) noexcept
-  {}
-
   /** \brief The header for the neighbor messages
    */
   struct BaseNeighborHeader
   {
+    SKYNET_MAKE_SERIALIZABLE(BaseNeighborHeader,
+      neighbor
+    );
+
+    // Allow construction with just the neighbor
+    explicit BaseNeighborHeader(const MachineID id)
+      : neighbor{id}
+    {}
+
     template<typename Derived, typename Callable1, typename Callable2>
-    static bool base_callback(const std::vector<char>& data, Callable1 callback, Callable2 /* read_from */)
+    static bool base_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 /* read_from */)
     {
-      const auto header = from_bytes<BaseNeighborHeader>(data);
+      const BaseNeighborHeader header{data};
       return callback(static_cast<const Derived&>(header));
     }
 
     MachineID neighbor;
   }; // struct BaseNeighborHeader
 
-  template <class Archive>
-  void serialize(Archive& ar, BaseNeighborHeader& h) noexcept
-  {
-    ar(h.neighbor);
-  }
-
   struct NewNeighborHeader : BaseNeighborHeader
   {
     template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<char>& data, Callable1 callback, Callable2 read_from)
+    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
     {
       return base_callback<NewNeighborHeader>(data, callback, read_from);
     }
@@ -147,7 +212,7 @@ namespace skynet::internal
   struct RemoveNeighborHeader: BaseNeighborHeader
   {
     template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<char>& data, Callable1 callback, Callable2 read_from)
+    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
     {
       return base_callback<RemoveNeighborHeader>(data, callback, read_from);
     }
@@ -194,5 +259,9 @@ namespace skynet::internal
    */
   constexpr int num_headers = size<JobHeaders> + size<StatusHeaders>;
 } // namespace skynet::internal
+
+// Remove the macros meant for only this header
+#undef SKYNET_MAKE_SERIALIZABLE
+#undef SKYNET_MAKE_SERIALIZABLE_NO_OP
 
 #endif // SKYNET_INTERNAL_MESSAGE_HEADERS_HPP

@@ -25,7 +25,7 @@ namespace skynet
           JobBase& job,
           const TagID tag,
           const TagIndex tag_index,
-          const char* const data,
+          const std::byte* const data,
           const std::size_t size
         )
         {
@@ -56,7 +56,7 @@ namespace skynet
        * \param size The size of the data
        * \return True if processing went fine, false if there was an error
        */
-      virtual bool process_data(TagID tag, TagIndex tag_index, const char* data, std::size_t size) = 0;
+      virtual bool process_data(TagID tag, TagIndex tag_index, const std::byte* data, std::size_t size) = 0;
 
       // The handle to the associated master
       Master& master_;

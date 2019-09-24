@@ -124,9 +124,9 @@ namespace skynet { namespace internal
     return ConnectionError::no_error;
   }
 
-  ConnectionError SocketCommunicator::send_message(const char* const message, const std::size_t size) noexcept
+  ConnectionError SocketCommunicator::send_message(const std::byte* const message, const std::size_t size) noexcept
   {
-    if (write(handle_, message, size) < 0)
+    if (write(handle_, reinterpret_cast<const char*>(message), size) < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
@@ -139,9 +139,9 @@ namespace skynet { namespace internal
     return ConnectionError::no_error;
   }
 
-  ConnectionError SocketCommunicator::read_message(char* const buffer, const std::size_t size) noexcept
+  ConnectionError SocketCommunicator::read_message(std::byte* const buffer, const std::size_t size) noexcept
   {
-    const auto written = read(handle_, buffer, size);
+    const auto written = read(handle_, reinterpret_cast<char*>(buffer), size);
     if (written < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)

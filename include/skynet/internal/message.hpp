@@ -21,28 +21,29 @@ namespace skynet::internal
 {
   // Appends many std::vectors into a single std::vector
   template<typename... T>
-  std::vector<char> append_vectors(const T&... vecs)
+  std::vector<std::byte> append_vectors(const T&... vecs)
   {
-    std::vector<char> to_ret;
-    for (const auto& vec : {vecs...})
+    std::vector<std::byte> to_ret;
+    // Use a pointer instead of references since it'll copy the vectors otherwise
+    for (const auto& vec : {&vecs...})
     {
       const auto old_size = to_ret.size();
-      to_ret.resize(to_ret.size() + vec.size());
-      std::copy(vec.cbegin(), vec.cend(), to_ret.begin() + old_size);
+      to_ret.resize(to_ret.size() + vec->size());
+      std::copy(vec->cbegin(), vec->cend(), to_ret.begin() + old_size);
     }
     return to_ret;
   }
 
   /** \brief Create data for a broadcast
    */
-  std::vector<char> make_broadcast(
+  std::vector<std::byte> make_broadcast(
     const MessageID message_id,
     const JobID job_id,
     const TagID tag_id,
     const TagIndex tag_index,
     const MachineID origin,
     const std::uint32_t hops_left_p1,
-    const std::vector<char>& data
+    const std::vector<std::byte>& data
   ) noexcept
   {
     BroadcastHeader base;
@@ -54,56 +55,56 @@ namespace skynet::internal
     base.hops_left_p1 = hops_left_p1;
     base.message_size = data.size();
     return append_vectors(
-      to_bytes(UniversalHeader{header_index<BroadcastHeader>()}),
-      to_bytes(base),
+      UniversalHeader{header_index<BroadcastHeader>()}.to_bytes(),
+      base.to_bytes(),
       data
     );
   }
 
   /** \brief Rebuilds a broadcast message for resending
    */
-  std::vector<char> rebuild_broadcast(const BroadcastHeader& b, const std::vector<char>& data)
+  std::vector<std::byte> rebuild_broadcast(const BroadcastHeader& b, const std::vector<std::byte>& data)
   {
     return append_vectors(
-      to_bytes(UniversalHeader{header_index<BroadcastHeader>()}),
-      to_bytes(b),
+      UniversalHeader{header_index<BroadcastHeader>()}.to_bytes(),
+      b.to_bytes(),
       data
     );
   }
 
   /** \brief Create data for a greeting
    */
-  std::vector<char> make_greeting(
+  std::vector<std::byte> make_greeting(
     const MachineID from,
     const std::vector<MachineID>& neighbors
   ) noexcept
   {
-    const auto neighbor_data = to_bytes(neighbors);
+    const auto neighbor_data = Serializer{}.add(neighbors).bytes();
     return append_vectors(
-      to_bytes(UniversalHeader{header_index<GreetingHeader>()}),
-      to_bytes(GreetingHeader{from, static_cast<std::uint32_t>(neighbor_data.size())}),
+      UniversalHeader{header_index<GreetingHeader>()}.to_bytes(),
+      GreetingHeader{from, static_cast<std::uint32_t>(neighbor_data.size())}.to_bytes(),
       neighbor_data
     );
   }
 
   /** \brief Create data for a goodbyte
    */
-  std::vector<char> make_goodbye() noexcept
+  std::vector<std::byte> make_goodbye() noexcept
   {
     return append_vectors(
-      to_bytes(UniversalHeader{header_index<GoodbyeHeader>()}),
-      to_bytes(GoodbyeHeader{})
+      UniversalHeader{header_index<GoodbyeHeader>()}.to_bytes(),
+      GoodbyeHeader{}.to_bytes()
     );
   }
 
   /** \brief Create data for a neighbor notification
    */
   template<typename Type>
-  std::vector<char> make_neighbor_notification(const MachineID neighbor) noexcept
+  std::vector<std::byte> make_neighbor_notification(const MachineID neighbor) noexcept
   {
     return append_vectors(
-      to_bytes(UniversalHeader{header_index<Type>()}),
-      to_bytes(static_cast<Type&&>(BaseNeighborHeader{neighbor}))
+      UniversalHeader{header_index<Type>()}.to_bytes(),
+      static_cast<Type&&>(BaseNeighborHeader{neighbor}).to_bytes()
     );
   }
 
@@ -123,12 +124,12 @@ namespace skynet::internal
     {
       MessageHandler to_ret;
       // Start by loading the universal header
-      std::array<char, header_info::base_size> buf;
+      std::array<std::byte, header_info::base_size> buf;
       if (!read_from(buf.data(), buf.size()))
       {
         return {};
       }
-      to_ret.start_ = from_bytes<UniversalHeader>(buf);
+      to_ret.start_ = UniversalHeader{buf};
       if (to_ret.start_.index >= num_headers)
       {
         on_error();
@@ -137,7 +138,7 @@ namespace skynet::internal
       // Load the next header
       const auto bytes_to_read = header_info::continue_sizes[to_ret.start_.index];
       to_ret.data_.resize(bytes_to_read);
-      // Just a safety; this should always be true
+      // Don't try reading more if there's nothing to read
       if (bytes_to_read > 0)
       {
         // Couldn't read the second header, which should never happen
@@ -198,14 +199,14 @@ namespace skynet::internal
     template<typename OverloadSet, typename ReadFrom, typename... Headers>
     static constexpr auto make_job_callback_array(TypeList<Headers...>) noexcept
     {
-      using call_type = bool (*)(const std::vector<char>&, OverloadSet, ReadFrom);
+      using call_type = bool (*)(const std::vector<std::byte>&, OverloadSet, ReadFrom);
       return std::array<call_type, sizeof...(Headers)>{
         &Headers::template do_callback<OverloadSet, ReadFrom>...
       };
     }
 
     // The data of the following header
-    std::vector<char> data_;
+    std::vector<std::byte> data_;
 
     // For knowing what type of header follows
     UniversalHeader start_;
