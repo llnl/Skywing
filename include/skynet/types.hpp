@@ -15,7 +15,7 @@ namespace skynet
   using MessageID = std::uint32_t;
 
   /// The ID type for tags
-  using TagID = std::uint8_t;
+  using TagID = std::uint32_t;
 
   /// The ID type for tag indexes
   using TagIndex = std::uint8_t;
