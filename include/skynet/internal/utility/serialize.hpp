@@ -8,10 +8,6 @@
 #include <type_traits>
 #include <vector>
 
-// The names to_bytes/from_bytes are used instead of serialize and deserialize
-// as Cereal uses ADL on those names to find how to process data and that can
-// cause ambiguity
-
 namespace skynet::internal
 {
   /** \brief A class for serialization of data
@@ -67,7 +63,7 @@ namespace skynet::internal
     std::vector<std::byte> bytes() const noexcept;
 
   private:
-    // PIMPL so that Cereal headers can be excluded
+    // PIMPL so that headers can be excluded
     class Impl;
     std::unique_ptr<Impl> impl_;
   }; // class Serializer
@@ -127,7 +123,7 @@ namespace skynet::internal
     }
 
   private:
-    // PIMPL to exclude Cereal headers
+    // PIMPL to exclude headers
     class Impl;
     std::unique_ptr<Impl> impl_;
   }; // class Deserializer

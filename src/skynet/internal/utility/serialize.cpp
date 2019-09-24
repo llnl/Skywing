@@ -1,12 +1,5 @@
 #include "skynet/internal/utility/serialize.hpp"
 
-// Cereal was being difficult, it really doesn't like the seperation of
-// interface and implementation, so I'm not sure if it's really usable for this
-// Since the set of types is so restricted, I'm not sure if it's really needed
-// either
-// #include <cereal/archives/portable_binary.hpp>
-// #include <cereal/types/vector.hpp>
-
 #include <array>
 #include <cassert>
 #include <cstdlib>
