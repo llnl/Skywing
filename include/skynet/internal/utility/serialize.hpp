@@ -50,8 +50,8 @@ namespace skynet::internal
     /** \brief Add many values to the serializer
      */
     // Only use this overload if more than one parameter is passed
-    template<typename... T>
-    std::enable_if_t<(sizeof...(T) > 1), Serializer&> add(const T&... values)
+    template<typename... Ts>
+    std::enable_if_t<(sizeof...(Ts) > 1), Serializer&> add(const Ts&... values)
     {
       // Call add for each parameter
       (add(values), ...);
@@ -115,8 +115,8 @@ namespace skynet::internal
     /** \brief Get many values from the serializer
      */
     // Only enable this overload if more than one parameter is passed
-    template<typename... T>
-    std::enable_if_t<(sizeof...(T) > 1)> get(T&... values)
+    template<typename... Ts>
+    std::enable_if_t<(sizeof...(Ts) > 1)> get(Ts&... values)
     {
       // Call get for each parameter
       (get(values), ...);

@@ -5,13 +5,13 @@ namespace skynet::internal
 {
   /** \brief Structure for representing a list of types
    */
-  template<typename... T>
+  template<typename... Ts>
   struct TypeList{};
 
   namespace detail
   {
     // Base class for specialization
-    template<typename SearchFor, typename... T>
+    template<typename SearchFor, typename... Ts>
     struct IndexOfImpl;
 
     // No match, just have it be zero so the size of the list is returned
@@ -22,8 +22,8 @@ namespace skynet::internal
     };
 
     // Match
-    template<typename SearchFor, typename... T>
-    struct IndexOfImpl<SearchFor, TypeList<SearchFor, T...>>
+    template<typename SearchFor, typename... Ts>
+    struct IndexOfImpl<SearchFor, TypeList<SearchFor, Ts...>>
     {
       static constexpr int value = 0;
     };
@@ -40,14 +40,14 @@ namespace skynet::internal
     struct SizeImpl;
 
     // Match
-    template<typename... T>
-    struct SizeImpl<TypeList<T...>>
+    template<typename... Ts>
+    struct SizeImpl<TypeList<Ts...>>
     {
-      static constexpr int value = sizeof...(T);
+      static constexpr int value = sizeof...(Ts);
     };
 
     // Base
-    template<int Index, typename... T>
+    template<int Index, typename... Ts>
     struct AtImpl;
 
     // Match

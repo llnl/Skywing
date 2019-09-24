@@ -41,10 +41,10 @@ void output_header_size(T, std::ostream& out)
 }
 
 // Call something with each type in the list default constructed as the first argument
-template<typename Callable, typename... T>
-void for_each(TypeList<T...>, Callable c)
+template<typename Callable, typename... Ts>
+void for_each(TypeList<Ts...>, Callable c)
 {
-  (c(T{}), ...);
+  (c(Ts{}), ...);
 }
 
 // Output all of the members of a container, seperated by commas

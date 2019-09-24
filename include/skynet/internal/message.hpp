@@ -152,11 +152,11 @@ namespace skynet::internal
      *
      * \pre category() == MessageCategory::job
      */
-    template<typename Callable, typename... T>
-    bool do_job_callback(Callable read_from, T&&... callbacks) const
+    template<typename Callable, typename... Ts>
+    bool do_job_callback(Callable read_from, Ts&&... callbacks) const
     {
       assert(category() == MessageCategory::job);
-      const auto callback_set = make_overload_set(std::forward<T>(callbacks)...);
+      const auto callback_set = make_overload_set(std::forward<Ts>(callbacks)...);
       using callback_type = decltype(callback_set);
       constexpr auto ptrs = make_job_callback_array<callback_type, Callable>(JobHeaders{});
       return ptrs[start_.index](data_, callback_set, read_from);
@@ -166,11 +166,11 @@ namespace skynet::internal
      *
      * \pre category() == MessageCategory::status
      */
-    template<typename Callable, typename... T>
-    bool do_status_callback(Callable read_from, T&&... callbacks) const
+    template<typename Callable, typename... Ts>
+    bool do_status_callback(Callable read_from, Ts&&... callbacks) const
     {
       assert(category() == MessageCategory::status);
-      const auto callback_set = make_overload_set(std::forward<T>(callbacks)...);
+      const auto callback_set = make_overload_set(std::forward<Ts>(callbacks)...);
       using callback_type = decltype(callback_set);
       constexpr auto ptrs = make_job_callback_array<callback_type, Callable>(StatusHeaders{});
       // Need to remember to adjust the index for status headers

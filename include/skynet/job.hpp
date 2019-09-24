@@ -176,11 +176,10 @@ namespace skynet
     }
     /** \brief Subscribes to all of the passed tags
      */
-    template<typename Tag, typename... Rest>
-    void subscribe(const Tag tag, const Rest... rest) noexcept
+    template<typename... SubTags>
+    void subscribe(const SubTags... tags) noexcept
     {
-      subscribe(tag);
-      subscribe(rest...);
+      (subscribe(tags), ...);
     }
 
     /** \brief Unsubscribes to the passed tag, does nothing if the job is not
@@ -193,11 +192,10 @@ namespace skynet
     }
     /** \brief Unsubscribes from all of the passed tags
      */
-    template<typename Tag, typename... Rest>
-    void unsubscribe(const Tag tag, const Rest... rest) noexcept
+    template<typename... UnsubTags>
+    void unsubscribe(const UnsubTags... tags) noexcept
     {
-      unsubscribe(tag);
-      unsubscribe(rest...);
+      (unsubscribe(tags), ...);
     }
 
     /** \brief Publish data on the passed tag

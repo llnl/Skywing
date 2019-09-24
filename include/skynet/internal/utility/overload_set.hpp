@@ -20,10 +20,10 @@ namespace skynet::internal
 
   /** \brief Creates an overload set from the passed Callables
    */
-  template<typename... T>
-  OverloadSet<T...> make_overload_set(T&&... callables) noexcept
+  template<typename... Ts>
+  OverloadSet<Ts...> make_overload_set(Ts&&... callables) noexcept
   {
-    return OverloadSet<T...>{std::forward<T>(callables)...};
+    return OverloadSet<Ts...>{std::forward<Ts>(callables)...};
   }
 } // namespace skynet::internal
 
