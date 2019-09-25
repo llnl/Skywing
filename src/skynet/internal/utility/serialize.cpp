@@ -29,9 +29,9 @@
 
 namespace
 {
-  // Converts a number to little endian, if needed
+  // Determine if a type needs swapping
   template<typename T>
-  T to_little_endian(T value) noexcept
+  constexpr bool needs_swapping()
   {
     // Determine if the machine is big or little endian, method from
     // https://en.cppreference.com/w/cpp/types/endian
@@ -40,9 +40,16 @@ namespace
     #else
       constexpr bool is_little_endian = (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
     #endif
+    return !is_little_endian && std::is_integral_v<T> && sizeof(T) > 1;
+  }
+
+  // Converts a number to little endian, if needed
+  template<typename T>
+  T to_little_endian(T value) noexcept
+  {
     // only matters for integral types larger than one and
     // if the machine is little endian it's a no-op
-    if constexpr (!is_little_endian && std::is_integral_v<T> && sizeof(T) > 1)
+    if constexpr (needs_swapping<T>())
     {
       return byte_swap(value);
     }
@@ -104,9 +111,20 @@ namespace skynet::internal
       // Start with the size
       add(vals.size());
       // Then serialize each member
-      for (const auto& val : vals)
+      if constexpr (needs_swapping<T>())
       {
-        add(val);
+        // Must convert each value to the appropriate format
+        for (const auto& val : vals)
+        {
+          add(val);
+        }
+      }
+      else if (vals.size() > 0)
+      {
+        // Can just add copy over the raw bytes
+        const auto old_size = data_.size();
+        data_.resize(data_.size() + sizeof(T) * vals.size());
+        std::memcpy(data_.data() + old_size, vals.data(), sizeof(T) * vals.size());
       }
     }
 
@@ -137,9 +155,9 @@ namespace skynet::internal
   {
   public:
     // Constructor
-    Impl(const std::byte* data, std::size_t count) noexcept
+    Impl(const std::byte* const data, const std::size_t num_bytes) noexcept
       : data_{data}
-      , count_{count}
+      , num_bytes_{num_bytes}
     {}
 
     // Object version
@@ -147,7 +165,7 @@ namespace skynet::internal
     T get() noexcept
     {
       // Don't go off the end
-      assert(sizeof(T) + loc_ <= count_);
+      assert(loc_ + sizeof(T) <= num_bytes_);
       // Otherwise just read the data and advance the location
       const auto val = from_bytes<T>(data_ + loc_);
       loc_ += sizeof(T);
@@ -162,20 +180,30 @@ namespace skynet::internal
       const auto size = get<std::size_t>();
       std::vector<T> to_ret(size);
       // Then read each of the members
-      for (auto& val : to_ret)
+      if constexpr (needs_swapping<T>())
       {
-        val = get<T>();
+        for (auto& val : to_ret)
+        {
+          val = get<T>();
+        }
+      }
+      else if (size > 0)
+      {
+        // no need to convert, can just memcpy
+        assert(loc_ + sizeof(T) * size <= num_bytes_);
+        std::memcpy(to_ret.data(), data_ + loc_, size);
+        loc_ += sizeof(T) * size;
       }
       return to_ret;
     }
   private:
     const std::byte* data_;
-    std::size_t count_;
+    std::size_t num_bytes_;
     std::size_t loc_{0};
   }; // class Deserializer::Impl
 
-  Deserializer::Deserializer(const std::byte* data, std::size_t count)
-    : impl_{std::make_unique<Impl>(data, count)}
+  Deserializer::Deserializer(const std::byte* const data, const std::size_t num_bytes)
+    : impl_{std::make_unique<Impl>(data, num_bytes)}
   {}
 
   Deserializer::~Deserializer() = default;
