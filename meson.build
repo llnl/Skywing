@@ -20,7 +20,7 @@ zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
 cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
 
-# Is there a better way to say that this depends on the serialization source file?
+# The message network size script relies on just the serialization of Skynet
 skynet_serialize= library('skynet_serialize',
   [
     'src/skynet/internal/utility/serialize.cpp'
@@ -39,8 +39,6 @@ make_network_message_size = executable(
   link_with : skynet_serialize
 )
 
-# Having an output to a sub-directory errors; not sure how / if it's
-# worth writing to a sub-directory
 gen_message_header_information = custom_target(
   'gen_message_header_information',
   input : [],
