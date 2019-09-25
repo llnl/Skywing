@@ -2,13 +2,13 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-// MacOS needs some wrappers to make it function
+// OSX needs some wrappers to make it function
 #ifdef __APPLE__
-  #include <fcntl.h>
   #ifndef SOCK_NONBLOCK
     #define SOCK_NONBLOCK O_NONBLOCK
   #endif // SOCK_NONBLOCK
@@ -20,6 +20,25 @@
 namespace
 {
   constexpr int invalid_handle = -1;
+
+  // Wrapper for OSX since it doesn't have accept4
+  int accept_non_block(const int sockfd, sockaddr* addr, socklen_t* addrlen) noexcept
+  {
+    #ifdef __APPLE__
+      // Potentially accept any connections
+      const auto handle = accept(sockfd, addr, addrlen);
+      if (handle == invalid_handle)
+      {
+        return handle;
+      }
+      // A connection was made, make it non-blocking now
+      const auto flags = fcntl(handle, F_GETFL, 0) | O_NONBLOCK;
+      fcntl(handle, F_SETFL, flags);
+      return handle;
+    #else
+      return accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
+    #endif
+  }
 } // namespace {anonymous}
 
 namespace skynet { namespace internal
@@ -63,7 +82,7 @@ namespace skynet { namespace internal
     // len can't be const as accept takes a non-const pointer
     socklen_t len = sizeof(client_address_struct);
 
-    const int raw_handle = accept4(handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len, SOCK_NONBLOCK);
+    const int raw_handle = accept_non_block(handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
     if (raw_handle == invalid_handle)
     {
       // No connection to be made
