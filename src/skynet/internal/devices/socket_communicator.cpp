@@ -7,19 +7,22 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-// OSX needs some wrappers to make it function
-#ifdef __APPLE__
-  #ifndef SOCK_NONBLOCK
-    #define SOCK_NONBLOCK O_NONBLOCK
-  #endif // SOCK_NONBLOCK
-#endif // __APPLE__
-
 #include <cstdio>
 #include <cstring>
 
 namespace
 {
   constexpr int invalid_handle = -1;
+
+  #ifdef __APPLE__
+    // Set a socket to non-blocking mode, returns the socket handle
+    int set_non_blocking(const int sockfd) noexcept
+    {
+      const auto flags = fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK;
+      fcntl(sockfd, F_SETFL, flags);
+      return sockfd;
+    }
+  #endif // __APPLE__
 
   // Wrapper for OSX since it doesn't have accept4
   int accept_non_block(const int sockfd, sockaddr* addr, socklen_t* addrlen) noexcept
@@ -32,9 +35,7 @@ namespace
         return handle;
       }
       // A connection was made, make it non-blocking now
-      const auto flags = fcntl(handle, F_GETFL, 0) | O_NONBLOCK;
-      fcntl(handle, F_SETFL, flags);
-      return handle;
+      return set_non_blocking(handle);
     #else
       return accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
     #endif
@@ -43,15 +44,28 @@ namespace
 
 namespace skynet { namespace internal
 {
-  SocketCommunicator::SocketCommunicator() noexcept
-    : handle_{socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)}
-  {
-    if (handle_ == invalid_handle)
+  #ifdef __APPLE__
+    SocketCommunicator::SocketCommunicator() noexcept
+      : handle_{socket(AF_INET, SOCK_STREAM, 0)}
     {
-      std::perror("SocketCommunicator::SocketCommunicator - socket");
-      std::exit(-1);
+      if (handle_ == invalid_handle)
+      {
+        std::perror("SocketCommunicator::SocketCommunicator - socket");
+        std::exit(-1);
+      }
+      set_non_blocking(handle_);
     }
-  }
+  #else
+    SocketCommunicator::SocketCommunicator() noexcept
+      : handle_{socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)}
+    {
+      if (handle_ == invalid_handle)
+      {
+        std::perror("SocketCommunicator::SocketCommunicator - socket");
+        std::exit(-1);
+      }
+    }
+  #endif
 
   SocketCommunicator::SocketCommunicator(SocketCommunicator&& other) noexcept
     : handle_{other.handle_}
