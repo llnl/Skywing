@@ -26,26 +26,28 @@ namespace skynet::internal
     /** \brief Functions to add data the be serialized
      * Returns a reference to the calling object so adds can be chained, etc.
      */
-    Serializer& add(std::int8_t) noexcept;
-    Serializer& add(const std::vector<std::int8_t>&) noexcept;
-    Serializer& add(std::int16_t) noexcept;
-    Serializer& add(const std::vector<std::int16_t>&) noexcept;
-    Serializer& add(std::int32_t) noexcept;
-    Serializer& add(const std::vector<std::int32_t>&) noexcept;
-    Serializer& add(std::int64_t) noexcept;
-    Serializer& add(const std::vector<std::int64_t>&) noexcept;
-    Serializer& add(std::uint8_t) noexcept;
-    Serializer& add(const std::vector<std::uint8_t>&) noexcept;
-    Serializer& add(std::uint16_t) noexcept;
-    Serializer& add(const std::vector<std::uint16_t>&) noexcept;
-    Serializer& add(std::uint32_t) noexcept;
-    Serializer& add(const std::vector<std::uint32_t>&) noexcept;
-    Serializer& add(std::uint64_t) noexcept;
-    Serializer& add(const std::vector<std::uint64_t>&) noexcept;
+    Serializer& add(short) noexcept;
+    Serializer& add(const std::vector<short>&) noexcept;
+    Serializer& add(int) noexcept;
+    Serializer& add(const std::vector<int>&) noexcept;
+    Serializer& add(long) noexcept;
+    Serializer& add(const std::vector<long>&) noexcept;
+    Serializer& add(long long) noexcept;
+    Serializer& add(const std::vector<long long>&) noexcept;
+    Serializer& add(unsigned short) noexcept;
+    Serializer& add(const std::vector<unsigned short>&) noexcept;
+    Serializer& add(unsigned int) noexcept;
+    Serializer& add(const std::vector<unsigned int>&) noexcept;
+    Serializer& add(unsigned long) noexcept;
+    Serializer& add(const std::vector<unsigned long>&) noexcept;
+    Serializer& add(unsigned long long) noexcept;
+    Serializer& add(const std::vector<unsigned long long>&) noexcept;
     Serializer& add(float) noexcept;
     Serializer& add(const std::vector<float>&) noexcept;
     Serializer& add(double) noexcept;
     Serializer& add(const std::vector<double>&) noexcept;
+    Serializer& add(std::uint8_t) noexcept;
+    Serializer& add(const std::vector<std::uint8_t>&) noexcept;
 
     /** \brief Add many values to the serializer
      */
@@ -91,26 +93,28 @@ namespace skynet::internal
     /** \brief Retrieve a value from the deserializer, putting it into the
      * passed parameter and also returning a reference to it
      */
-    std::int8_t& get(std::int8_t&) noexcept;
-    std::vector<std::int8_t>& get(std::vector<std::int8_t>&) noexcept;
-    std::int16_t& get(std::int16_t&) noexcept;
-    std::vector<std::int16_t>& get(std::vector<std::int16_t>&) noexcept;
-    std::int32_t& get(std::int32_t&) noexcept;
-    std::vector<std::int32_t>& get(std::vector<std::int32_t>&) noexcept;
-    std::int64_t& get(std::int64_t&) noexcept;
-    std::vector<std::int64_t>& get(std::vector<std::int64_t>&) noexcept;
-    std::uint8_t& get(std::uint8_t&) noexcept;
-    std::vector<std::uint8_t>& get(std::vector<std::uint8_t>&) noexcept;
-    std::uint16_t& get(std::uint16_t&) noexcept;
-    std::vector<std::uint16_t>& get(std::vector<std::uint16_t>&) noexcept;
-    std::uint32_t& get(std::uint32_t&) noexcept;
-    std::vector<std::uint32_t>& get(std::vector<std::uint32_t>&) noexcept;
-    std::uint64_t& get(std::uint64_t&) noexcept;
-    std::vector<std::uint64_t>& get(std::vector<std::uint64_t>&) noexcept;
+    short& get(short&) noexcept;
+    std::vector<short>& get(std::vector<short>&) noexcept;
+    int& get(int&) noexcept;
+    std::vector<int>& get(std::vector<int>&) noexcept;
+    long& get(long&) noexcept;
+    std::vector<long>& get(std::vector<long>&) noexcept;
+    long long& get(long long&) noexcept;
+    std::vector<long long>& get(std::vector<long long>&) noexcept;
+    unsigned short& get(unsigned short&) noexcept;
+    std::vector<unsigned short>& get(std::vector<unsigned short>&) noexcept;
+    unsigned int& get(unsigned int&) noexcept;
+    std::vector<unsigned int>& get(std::vector<unsigned int>&) noexcept;
+    unsigned long& get(unsigned long&) noexcept;
+    std::vector<unsigned long>& get(std::vector<unsigned long>&) noexcept;
+    unsigned long long& get(unsigned long long&) noexcept;
+    std::vector<unsigned long long>& get(std::vector<unsigned long long>&) noexcept;
     float& get(float&) noexcept;
     std::vector<float>& get(std::vector<float>&) noexcept;
     double& get(double&) noexcept;
     std::vector<double>& get(std::vector<double>&) noexcept;
+    std::uint8_t& get(std::uint8_t&) noexcept;
+    std::vector<std::uint8_t>& get(std::vector<std::uint8_t>&) noexcept;
 
     /** \brief Get many values from the serializer
      */

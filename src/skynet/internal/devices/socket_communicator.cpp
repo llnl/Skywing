@@ -1,9 +1,19 @@
 #include "skynet/internal/devices/socket_communicator.hpp"
 
 #include <arpa/inet.h>
-#include <unistd.h>
+#include <errno.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
+
+// MacOS needs some wrappers to make it function
+#ifdef __APPLE__
+  #include <fcntl.h>
+  #ifndef SOCK_NONBLOCK
+    #define SOCK_NONBLOCK O_NONBLOCK
+  #endif // SOCK_NONBLOCK
+#endif // __APPLE__
+
 #include <cstdio>
 #include <cstring>
 
