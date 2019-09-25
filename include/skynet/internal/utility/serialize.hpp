@@ -10,6 +10,14 @@
 
 namespace skynet::internal
 {
+  // Determine if the machine is big or little endian, method from
+  // https://en.cppreference.com/w/cpp/types/endian
+  #ifdef _WIN32
+    constexpr bool machine_is_little_endian = true;
+  #else
+    constexpr bool machine_is_little_endian = (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
+  #endif
+
   /** \brief A class for serialization of data
    */
   class Serializer
@@ -77,7 +85,10 @@ namespace skynet::internal
   public:
     /** \brief Create a deserializer from raw bytes
      */
-    Deserializer(const std::byte* data, std::size_t count);
+    Deserializer(
+      const std::byte* data,
+      std::size_t count
+    );
 
     /** \brief Create a deserializer from a continguous container of raw bytes
      */

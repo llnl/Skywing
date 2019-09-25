@@ -25,7 +25,7 @@ skynet_serialize= library('skynet_serialize',
   [
     'src/skynet/internal/utility/serialize.cpp'
   ],
-  include_directories : include_directories('include')
+  include_directories : include_directories('include', 'src/include')
 )
 
 make_network_message_size = executable(
@@ -33,7 +33,7 @@ make_network_message_size = executable(
   'scripts/generate_message_network_size.cpp',
   dependencies : [
     declare_dependency(
-      include_directories : include_directories('include')
+      include_directories : include_directories('include', 'src/include')
     )
   ],
   link_with : skynet_serialize

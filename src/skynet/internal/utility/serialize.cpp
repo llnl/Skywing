@@ -27,74 +27,70 @@
   std::int64_t  byte_swap(std::int64_t val)  noexcept { return __builtin_bswap64(val); }
 #endif
 
-namespace
-{
-  // Determine if a type needs swapping
-  template<typename T>
-  constexpr bool needs_swapping()
-  {
-    // Determine if the machine is big or little endian, method from
-    // https://en.cppreference.com/w/cpp/types/endian
-    #ifdef _WIN32
-      constexpr bool is_little_endian = true;
-    #else
-      constexpr bool is_little_endian = (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
-    #endif
-    return !is_little_endian && std::is_integral_v<T> && sizeof(T) > 1;
-  }
-
-  // Converts a number to little endian, if needed
-  template<typename T>
-  T to_little_endian(T value) noexcept
-  {
-    // only matters for integral types larger than one and
-    // if the machine is little endian it's a no-op
-    if constexpr (needs_swapping<T>())
-    {
-      return byte_swap(value);
-    }
-    else
-    {
-      return value;
-    }
-  }
-
-  // Lazy shortcut for const std::vector<type>
-  template<typename T>
-  using cvec = const std::vector<T>;
-
-  // Lazy shortcut for std::vector<Type>
-  template<typename T>
-  using vec = std::vector<T>;
-
-  // Turn a type into an array of bytes
-  template<typename T>
-  std::array<std::byte, sizeof(T)> to_bytes(const T& val) noexcept
-  {
-    std::array<std::byte, sizeof(T)> buffer;
-    const T temp = to_little_endian(val);
-    std::memcpy(buffer.data(), &temp, sizeof(T));
-    return buffer;
-  }
-
-  // Get a type from some bytes
-  template<typename T>
-  T from_bytes(const std::byte* buffer) noexcept
-  {
-    T temp;
-    std::memcpy(&temp, buffer, sizeof(T));
-    return to_little_endian(temp);
-  }
-} // end anonymous namespace
-
 namespace skynet::internal
 {
+  namespace
+  {
+    // Determine if a type needs swapping
+    template<typename T>
+    constexpr bool needs_swapping()
+    {
+      return !machine_is_little_endian && std::is_integral_v<T> && sizeof(T) > 1;
+    }
+
+    // Converts a number to little endian, if needed
+    template<typename T>
+    T to_little_endian(T value) noexcept
+    {
+      // only matters for integral types larger than one and
+      // if the machine is little endian it's a no-op
+      if constexpr (needs_swapping<T>())
+      {
+        return byte_swap(value);
+      }
+      else
+      {
+        return value;
+      }
+    }
+
+    // Lazy shortcut for const std::vector<type>
+    template<typename T>
+    using cvec = const std::vector<T>;
+
+    // Lazy shortcut for std::vector<Type>
+    template<typename T>
+    using vec = std::vector<T>;
+
+    // Turn a type into an array of bytes
+    template<typename T>
+    std::array<std::byte, sizeof(T)> to_bytes(const T& val) noexcept
+    {
+      std::array<std::byte, sizeof(T)> buffer;
+      const T temp = to_little_endian(val);
+      std::memcpy(buffer.data(), &temp, sizeof(T));
+      return buffer;
+    }
+
+    // Get a type from some bytes
+    template<typename T>
+    T from_bytes(const std::byte* buffer) noexcept
+    {
+      T temp;
+      std::memcpy(&temp, buffer, sizeof(T));
+      return to_little_endian(temp);
+    }
+  } // end namespace {anonymous}
+
   /////////////////////////////////////////
   // Serializer (aside from add)
   /////////////////////////////////////////
   class Serializer::Impl
   {
   public:
+    explicit Impl() noexcept
+    {}
+
     // Object version
     template<typename T>
     void add(const T& val) noexcept

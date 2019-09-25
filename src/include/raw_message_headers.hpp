@@ -4,8 +4,11 @@
 #include "skynet/types.hpp"
 #include "skynet/internal/utility/serialize.hpp"
 #include "skynet/internal/utility/type_list.hpp"
+#include "skynet/internal/message.hpp"
 
 #include <cstdint>
+
+                                  #include <iostream>
 
 /** \brief Convience macro that only appears in this header to keep serialization
  * and deserialization in sync and to reduce repetition.  It should be used in
@@ -63,36 +66,42 @@
 
 namespace skynet::internal
 {
-  /** \brief Type to allow headers to declare what category of message they
-   * represent.
-   */
-  enum class MessageCategory : std::uint8_t
-  {
-    job,
-    status
-  };
-
   /** \brief The universal header that all messages start with
    */
   struct UniversalHeader
   {
     SKYNET_MAKE_SERIALIZABLE(UniversalHeader,
-      index
+      info_
     );
-    // Allow construction with an index
-    explicit UniversalHeader(const std::uint8_t i) noexcept
-      : index{i}
+
+    // Allow construction with an index / endian information
+    // Don't use the endianness quite yet, still have to work out how to pass
+    // it around and such, but will want it eventually to speed-up serialization
+    // and deserialization
+    explicit UniversalHeader(
+      const std::uint8_t index
+      // const bool data_is_little_endian = machine_is_little_endian,
+      // const bool headers_are_little_endian = machine_is_little_endian
+    ) noexcept
+      : info_{
+        static_cast<std::uint8_t>(
+          //(data_is_little_endian ? 0b1000'0000 : 0) |
+          //(headers_are_little_endian ? 0b0100'0000 : 0) |
+          (index & 0b0011'1111)
+        )
+      }
     {}
 
-    /// The index for the type of header that follows this header
-    std::uint8_t index;
-  }; // Struct UniversalHeader
+    /// The index of the tag
+    std::uint8_t index() const noexcept { return info_ & 0b0011'1111; }
+    // /// If the data is in little endian
+    // bool data_is_little_endian() const noexcept { return info_ & 0b0100'0000; }
+    // /// If the headers are in little endian
+    // bool headers_are_little_endian() const noexcept { return info_ & 0b1000'0000; }
 
-  template <class Archive>
-  void serialize(Archive& ar, UniversalHeader& h) noexcept
-  {
-    ar(h.index);
-  }
+    /// The index for the type of header that follows this header
+    std::uint8_t info_;
+  }; // Struct UniversalHeader
 
   /** \brief The header for broadcast messages
    */
@@ -102,18 +111,27 @@ namespace skynet::internal
       message_id, job_id, tag_id, tag_index, origin, hops_left_p1, message_size
     );
 
-    template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
+    template<typename Callable>
+    static std::optional<MessageVariant> build(const std::vector<std::byte>& data, Callable read_from) noexcept
     {
       // Get the header and read the required number of bytes
       const BroadcastHeader header{data};
       std::vector<std::byte> buffer(header.message_size);
       if (!read_from(buffer.data(), buffer.size()))
       {
-        return false;
+        return {};
       }
+      // Just copy all of the fields over
+      Broadcast to_ret;
+      to_ret.message_id = header.message_id;
+      to_ret.job_id = header.job_id;
+      to_ret.tag_id = header.tag_id;
+      to_ret.tag_index = header.tag_index;
+      to_ret.origin = header.origin;
+      to_ret.hops_left_p1 = header.hops_left_p1;
+      to_ret.data = std::move(buffer);
       // otherwise can go ahead and do the callback
-      return callback(header, std::move(buffer));
+      return to_ret;
     }
 
     /// The id of the message
@@ -142,22 +160,25 @@ namespace skynet::internal
       message_size
     );
 
-    GreetingHeader(const MachineID from, const std::uint32_t size)
+    GreetingHeader(const MachineID from, const std::uint32_t size) noexcept
       : from{from}
       , message_size{size}
     {}
 
-    template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
+    template<typename Callable>
+    static std::optional<MessageVariant> build(const std::vector<std::byte>& data, Callable read_from) noexcept
     {
       // Get the header and read the required number of bytes
       const GreetingHeader header{data};
       std::vector<std::byte> buffer(header.message_size);
       if (!read_from(buffer.data(), buffer.size()))
       {
-        return false;
+        return {};
       }
-      return callback(header, deserialize<std::vector<MachineID>>(buffer));
+      Greeting to_ret;
+      to_ret.from = header.from;
+      to_ret.neighbors = deserialize<std::vector<MachineID>>(buffer);
+      return to_ret;
     }
 
     /// The machine that the greeting is from
@@ -170,10 +191,10 @@ namespace skynet::internal
   {
     SKYNET_MAKE_SERIALIZABLE_NO_OP(GoodbyeHeader);
 
-    template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<std::byte>& /* data */, Callable1 callback, Callable2 /* read_from */)
+    template<typename Callable>
+    static std::optional<MessageVariant> build(const std::vector<std::byte>&  /* data */, Callable /* read_from */) noexcept
     {
-      return callback(GoodbyeHeader{});
+      return Goodbye{};
     }
   }; // struct GoodbyeHeader
 
@@ -190,11 +211,13 @@ namespace skynet::internal
       : neighbor{id}
     {}
 
-    template<typename Derived, typename Callable1, typename Callable2>
-    static bool base_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 /* read_from */)
+    template<typename RetType>
+    static std::optional<MessageVariant> base_build(const std::vector<std::byte>& data) noexcept
     {
       const BaseNeighborHeader header{data};
-      return callback(static_cast<const Derived&>(header));
+      RetType to_ret;
+      to_ret.neighbor_id = header.neighbor;
+      return to_ret;
     }
 
     MachineID neighbor;
@@ -202,19 +225,19 @@ namespace skynet::internal
 
   struct NewNeighborHeader : BaseNeighborHeader
   {
-    template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
+    template<typename Callable>
+    static std::optional<MessageVariant> build(const std::vector<std::byte>& data, Callable /* read_from */) noexcept
     {
-      return base_callback<NewNeighborHeader>(data, callback, read_from);
+      return base_build<NewNeighbor>(data);
     }
   }; // struct NewNeighborHeader
 
-  struct RemoveNeighborHeader: BaseNeighborHeader
+  struct RemoveNeighborHeader : BaseNeighborHeader
   {
-    template<typename Callable1, typename Callable2>
-    static bool do_callback(const std::vector<std::byte>& data, Callable1 callback, Callable2 read_from)
+    template<typename Callable>
+    static std::optional<MessageVariant> build(const std::vector<std::byte>& data, Callable /* read_from */) noexcept
     {
-      return base_callback<RemoveNeighborHeader>(data, callback, read_from);
+      return base_build<RemoveNeighbor>(data);
     }
   }; // struct RemoveNeighborHeader
 

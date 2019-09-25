@@ -6,17 +6,19 @@
 #include "skynet/internal/message.hpp"
 #include "skynet/internal/devices/socket_communicator.hpp"
 #include "skynet/internal/utility/on_error.hpp"
+#include "skynet/internal/utility/serialize.hpp"
 
-#include <vector>
-#include <memory>
+#include <algorithm>
 #include <array>
-#include <cstdint>
-#include <cstring>
-#include <unordered_map>
-#include <thread>
 #include <cassert>
 #include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <memory>
 #include <optional>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 // TODO: Support other types of communicators; will probably make
 //       it a template and have it as a parameter, so not making a seperate
@@ -79,36 +81,6 @@ namespace skynet
         );
       }
 
-      /** \brief Function to pass for the reading Callable for MessageHandler functions
-       */
-      auto make_reader() noexcept
-      {
-        return [this](std::byte* const buffer, const std::size_t count) {
-          const auto err = conn_.read_message(buffer, count);
-          switch (err)
-          {
-          case ConnectionError::no_error: break;
-          case ConnectionError::would_block: return false;
-
-          case ConnectionError::closed:
-            // [[fallthrough]];
-          case ConnectionError::unrecoverable:
-            dead_ = true;
-            return false;
-          }
-          return true;
-        };
-      }
-
-      /** \brief Returns a lambda that marks the connection as dead
-       */
-      auto make_dead_marker() noexcept
-      {
-        return [this]() {
-          dead_ = true;
-        };
-      }
-
       /** \brief Recieve a skynet::Message from an external connection if one exists
        *
        * Returns the handler for the message if one exists.
@@ -119,7 +91,7 @@ namespace skynet
         {
           return {};
         }
-        if (const auto handler = MessageHandler::try_to_get(make_reader(), make_dead_marker()))
+        if (auto handler = MessageHandler::try_to_get(*this))
         {
           // handle status messages here
           if (handler->category() == MessageCategory::status)
@@ -128,7 +100,7 @@ namespace skynet
             // There could be non-status messages so check those as well
             return get_message();
           }
-          return *handler;
+          return std::move(*handler);
         }
         return {};
       }
@@ -170,6 +142,31 @@ namespace skynet
         return loc != neighbors_.cend() && *loc == id;
       }
 
+      // Allow the MessageHandler to read bytes
+      class Accessor
+      {
+        friend class MessageHandler;
+
+        // Reads the specified data into the buffer, returns true if it succeeded,
+        // false if it either couldn't read or it would've blocked
+        static bool read(ExternalMaster& m, std::byte* const buffer, const std::size_t count)
+        {
+          const auto err = m.conn_.read_message(buffer, count);
+          switch (err)
+          {
+          case ConnectionError::no_error: break;
+          case ConnectionError::would_block: return false;
+
+          case ConnectionError::closed:
+            // [[fallthrough]];
+          case ConnectionError::unrecoverable:
+            m.dead_ = true;
+            return false;
+          }
+          return true;
+        }
+      };
+
     private:
       // Only allow private construction
       explicit ExternalMaster(SocketCommunicator conn) noexcept
@@ -206,16 +203,16 @@ namespace skynet
         // TODO: Probably want a time-out?
         while (true)
         {
-          if (const auto handle = MessageHandler::try_to_get(make_reader(), make_dead_marker()))
+          if (const auto handle = MessageHandler::try_to_get(*this))
           {
             if (handle->category() != MessageCategory::status)
             {
               return false;
             }
-            return handle->do_status_callback(
-              make_reader(),
-              [&](const GreetingHeader& msg, std::vector<MachineID> neighbors) {
-                neighbors_ = std::move(neighbors);
+            return handle->do_callback(
+              *this,
+              [&](Greeting msg) {
+                neighbors_ = std::move(msg.neighbors);
                 id_ = msg.from;
                 return true;
               },
@@ -231,31 +228,31 @@ namespace skynet
       void handle_message(const MessageHandler& handle) noexcept
       {
         assert(handle.category() == MessageCategory::status);
-        const auto okay = handle.do_status_callback(
-          make_reader(),
-          [&](const GreetingHeader&, std::vector<MachineID>) {
+        const auto okay = handle.do_callback(
+          *this,
+          [&](const Greeting&) {
             // shouldn't be seeing a greeting here
             return false;
           },
-          [&](const GoodbyeHeader&) {
+          [&](const Goodbye&) {
             dead_ = true;
             return true;
           },
-          [&](const NewNeighborHeader& msg) {
-            const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor);
+          [&](const NewNeighbor& msg) {
+            const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id);
             // Already present -> connection is bad
-            if (loc != neighbors_.cend() && *loc == msg.neighbor)
+            if (loc != neighbors_.cend() && *loc == msg.neighbor_id)
             {
               return false;
             }
             // Otherwise just insert it
-            neighbors_.insert(loc, msg.neighbor);
+            neighbors_.insert(loc, msg.neighbor_id);
             return true;
           },
-          [&](const RemoveNeighborHeader& msg) {
-            const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor);
+          [&](const RemoveNeighbor& msg) {
+            const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor_id);
             // Neighbor is lying; can't trust it anymore
-            if (loc == neighbors_.end() || *loc != msg.neighbor)
+            if (loc == neighbors_.end() || *loc != msg.neighbor_id)
             {
               return false;
             }
@@ -264,6 +261,11 @@ namespace skynet
             swap(*loc, neighbors_.back());
             neighbors_.pop_back();
             return true;
+          },
+          [](...) {
+            // Anything else is a programming bug
+            assert(false && "Invalid message type in ExternalMaster::handle_message");
+            return false;
           }
         );
         // Something incorrect happened
@@ -472,8 +474,8 @@ namespace skynet
     void process_message(const internal::MessageHandler& handle, internal::ExternalMaster& from)
     {
       assert(handle.category() == internal::MessageCategory::job);
-      const auto okay = handle.do_job_callback(from.make_reader(),
-        [&](internal::BroadcastHeader msg, const std::vector<std::byte>& data) {
+      const auto okay = handle.do_callback(from,
+        [&](const internal::Broadcast& msg) {
           if (!message_is_okay(msg))
           {
             return false;
@@ -482,17 +484,13 @@ namespace skynet
           {
             return true;
           }
-          if (!add_data_to_queue(msg, data))
+          if (!add_data_to_queue(msg))
           {
             return false;
           }
           if (msg.hops_left_p1 != 1)
           {
-            if (msg.hops_left_p1 > 0)
-            {
-              --msg.hops_left_p1;
-            }
-            const auto to_send = internal::rebuild_broadcast(msg, data);
+            const auto to_send = handle.rebuild_broadcast(msg);
             // Propagate the message to all neighbors but ones that are known to
             // have already recieve it, so not the sender, the origin, or neighbors
             // that the sender also has
@@ -504,6 +502,10 @@ namespace skynet
             });
           }
           return true;
+        },
+        [](...) {
+          assert(false && "Invalid message type in Master::process_message");
+          return false;
         }
       );
       if (!okay)
@@ -514,25 +516,20 @@ namespace skynet
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
-    bool add_data_to_queue(const internal::BroadcastHeader& msg, const std::vector<std::byte>& data)
+    bool add_data_to_queue(const internal::Broadcast& msg)
     {
-      // Make sure the given size is correct
-      if (data.size() != msg.message_size)
-      {
-        return false;
-      }
       return internal::JobBase::Accessor::process_data(
         *jobs_.find(msg.job_id)->second,
         msg.tag_id,
         msg.tag_index,
-        data.data(),
-        msg.message_size
+        msg.data.data(),
+        msg.data.size()
       );
     }
 
     /** \brief Returns true if a message is okay/well-formed, false otherwise
      */
-    bool message_is_okay(const internal::BroadcastHeader& msg) noexcept
+    bool message_is_okay(const internal::Broadcast& msg) noexcept
     {
       if (jobs_.find(msg.job_id) == jobs_.end())
       {
@@ -543,7 +540,7 @@ namespace skynet
 
     /** \brief Returns true if a message is old, false otherwise
      */
-    bool is_old_message(const internal::BroadcastHeader& msg) noexcept
+    bool is_old_message(const internal::Broadcast& msg) noexcept
     {
       auto& last_id = last_message_id_[msg.origin][msg.job_id];
       if (msg.message_id <= last_id)
@@ -558,7 +555,7 @@ namespace skynet
      */
     void notify_of_new_neighbor(const MachineID id)
     {
-      send_to_neighbors(internal::make_neighbor_notification<internal::NewNeighborHeader>(id));
+      send_to_neighbors(internal::make_new_neighbor(id));
     }
 
     /** \brief Removes all dead neighbors
@@ -569,7 +566,7 @@ namespace skynet
       {
         if (it->second.is_dead())
         {
-          send_to_neighbors(internal::make_neighbor_notification<internal::RemoveNeighborHeader>(it->first));
+          send_to_neighbors(internal::make_remove_neighbor(it->first));
           it = neighbors_.erase(it);
         }
         else

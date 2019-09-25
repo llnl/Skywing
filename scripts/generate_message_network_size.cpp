@@ -1,8 +1,8 @@
 // This script is in C++ as it depends on the output of C++ functions and
 // object sizes
 
-#include "skynet/internal/message_headers.hpp"
 #include "skynet/internal/utility/serialize.hpp"
+#include "raw_message_headers.hpp"
 
 #include <array>
 #include <fstream>
@@ -69,7 +69,7 @@ int main()
   constexpr auto num_headers = size<JobHeaders> + size<StatusHeaders>;
   fout
     << "#include <array>\n"
-    << "#include \"skynet/internal/message_headers.hpp\"\n"
+    << "#include \"raw_message_headers.hpp\"\n"
     << "namespace skynet::internal::header_info {\n"
     << "constexpr int base_size = " << base_size << ";\n"
     << "constexpr std::array<int, " << num_headers << "> continue_sizes{";

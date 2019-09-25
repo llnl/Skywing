@@ -3,21 +3,20 @@
 
 #include <iterator>
 #include <type_traits>
+#include <vector>
 
 namespace skynet::internal
 {
-  /** \brief Concatenates many vectors into a single vector
+  /** \brief Concatenates many containers into a single vector
    */
   template<typename... Ts>
-  std::common_type_t<Ts...> concatenate(const Ts&... vecs)
+  std::vector<std::common_type_t<typename Ts::value_type...>> concatenate(const Ts&... containers) noexcept
   {
-    std::common_type_t<Ts...> to_ret((std::size(vecs) + ...));
-    // Use a pointer instead of references since it'll copy otherwise
+    // Allocate enough space for all the data at the start
+    std::vector<std::common_type_t<typename Ts::value_type...>> to_ret((std::size(containers) + ...));
+    // Copy all of the data
     auto copy_loc = begin(to_ret);
-    for (const auto& vec : {&vecs...})
-    {
-      copy_loc = std::copy(std::cbegin(*vec), std::cend(*vec), copy_loc);
-    }
+    ((copy_loc = std::copy(std::cbegin(containers), std::cend(containers), copy_loc)), ...);
     return to_ret;
   }
 } // namespace skynet::internal
