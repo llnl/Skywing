@@ -10,14 +10,6 @@
 
 namespace skynet::internal
 {
-  // Determine if the machine is big or little endian, method from
-  // https://en.cppreference.com/w/cpp/types/endian
-  #ifdef _WIN32
-    constexpr bool machine_is_little_endian = true;
-  #else
-    constexpr bool machine_is_little_endian = (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
-  #endif
-
   /** \brief A class for serialization of data
    */
   class Serializer

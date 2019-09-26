@@ -9,7 +9,7 @@
 // // Additional number of bytes to read to read the corresponding header
 // constexpr std::array<int, ...> continue_sizes{...};
 // }
-#include "message_header_information.hpp"
+#include "generated/message_header_information.hpp"
 
 #include <array>
 #include <cassert>

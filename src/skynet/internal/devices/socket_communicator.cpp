@@ -1,5 +1,7 @@
 #include "skynet/internal/devices/socket_communicator.hpp"
 
+#include "socket_wrappers.hpp"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -13,59 +15,19 @@
 namespace
 {
   constexpr int invalid_handle = -1;
-
-  #ifdef __APPLE__
-    // Set a socket to non-blocking mode, returns the socket handle
-    int set_non_blocking(const int sockfd) noexcept
-    {
-      const auto flags = fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK;
-      fcntl(sockfd, F_SETFL, flags);
-      return sockfd;
-    }
-  #endif // __APPLE__
-
-  // Wrapper for OSX since it doesn't have accept4
-  int accept_non_block(const int sockfd, sockaddr* addr, socklen_t* addrlen) noexcept
-  {
-    #ifdef __APPLE__
-      // Potentially accept any connections
-      const auto handle = accept(sockfd, addr, addrlen);
-      if (handle == invalid_handle)
-      {
-        return handle;
-      }
-      // A connection was made, make it non-blocking now
-      return set_non_blocking(handle);
-    #else
-      return accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
-    #endif
-  }
 } // namespace {anonymous}
 
 namespace skynet { namespace internal
 {
-  #ifdef __APPLE__
-    SocketCommunicator::SocketCommunicator() noexcept
-      : handle_{socket(AF_INET, SOCK_STREAM, 0)}
+  SocketCommunicator::SocketCommunicator() noexcept
+    : handle_{create_non_blocking()}
+  {
+    if (handle_ == invalid_handle)
     {
-      if (handle_ == invalid_handle)
-      {
-        std::perror("SocketCommunicator::SocketCommunicator - socket");
-        std::exit(-1);
-      }
-      set_non_blocking(handle_);
+      std::perror("SocketCommunicator::SocketCommunicator - socket");
+      std::exit(-1);
     }
-  #else
-    SocketCommunicator::SocketCommunicator() noexcept
-      : handle_{socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)}
-    {
-      if (handle_ == invalid_handle)
-      {
-        std::perror("SocketCommunicator::SocketCommunicator - socket");
-        std::exit(-1);
-      }
-    }
-  #endif
+  }
 
   SocketCommunicator::SocketCommunicator(SocketCommunicator&& other) noexcept
     : handle_{other.handle_}
@@ -96,7 +58,7 @@ namespace skynet { namespace internal
     // len can't be const as accept takes a non-const pointer
     socklen_t len = sizeof(client_address_struct);
 
-    const int raw_handle = accept_non_block(handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
+    const int raw_handle = accept_make_non_blocking(handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
     if (raw_handle == invalid_handle)
     {
       // No connection to be made

@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_MESSAGE_HEADERS_HPP
-#define SKYNET_INTERNAL_MESSAGE_HEADERS_HPP
+#ifndef SKYNET_SRC_MESSAGE_HEADERS_HPP
+#define SKYNET_SRC_MESSAGE_HEADERS_HPP
 
 #include "skynet/types.hpp"
 #include "skynet/internal/utility/serialize.hpp"
@@ -7,8 +7,6 @@
 #include "skynet/internal/message.hpp"
 
 #include <cstdint>
-
-                                  #include <iostream>
 
 /** \brief Convience macro that only appears in this header to keep serialization
  * and deserialization in sync and to reduce repetition.  It should be used in
@@ -287,4 +285,4 @@ namespace skynet::internal
 #undef SKYNET_MAKE_SERIALIZABLE
 #undef SKYNET_MAKE_SERIALIZABLE_NO_OP
 
-#endif // SKYNET_INTERNAL_MESSAGE_HEADERS_HPP
+#endif // SKYNET_SRC_MESSAGE_HEADERS_HPP

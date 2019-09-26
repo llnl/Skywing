@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iterator>
 
+#include "generated/endian.hpp"
+
 // Intrinsics information pulled from
 // https://github.com/boostorg/endian/blob/develop/include/boost/endian/detail/intrinsic.hpp
 // These SHOULD be in the anonymous namespace, but Clang will complain about them

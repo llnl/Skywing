@@ -20,33 +20,9 @@ zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
 cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
 
-# The message network size script relies on just the serialization of Skynet
-skynet_serialize= library('skynet_serialize',
-  [
-    'src/skynet/internal/utility/serialize.cpp'
-  ],
-  include_directories : include_directories('include', 'src/include')
-)
+subdir('generated_includes/generated')
 
-make_network_message_size = executable(
-  'make_network_message_size',
-  'scripts/generate_message_network_size.cpp',
-  dependencies : [
-    declare_dependency(
-      include_directories : include_directories('include', 'src/include')
-    )
-  ],
-  link_with : skynet_serialize
-)
-
-gen_message_header_information = custom_target(
-  'gen_message_header_information',
-  input : [],
-  output : ['message_header_information.hpp'],
-  command : [make_network_message_size]
-)
-
-skynet_inc = include_directories('include')
+skynet_inc = include_directories('include', 'generated_includes')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
   dependencies : [thread_dep],

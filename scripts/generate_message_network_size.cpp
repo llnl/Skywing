@@ -57,7 +57,7 @@ void output_container(std::ostream& out, const T& container)
 
 int main()
 {
-  std::ofstream fout("message_header_information.hpp");
+  std::ofstream fout("generated_includes/generated/message_header_information.hpp");
   if (!fout)
   {
     std::cerr << "Error opening file for output.\n";
