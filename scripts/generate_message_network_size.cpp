@@ -55,9 +55,14 @@ void output_container(std::ostream& out, const T& container)
   out << container.back();
 }
 
-int main()
+int main(const int argc, const char* const argv[])
 {
-  std::ofstream fout("generated_includes/generated/message_header_information.hpp");
+  if (argc != 2)
+  {
+    std::cerr << "Usage:\n" << argv[0] << " output_location\n";
+    return 1;
+  }
+  std::ofstream fout(argv[1]);
   if (!fout)
   {
     std::cerr << "Error opening file for output.\n";

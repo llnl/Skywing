@@ -29,7 +29,7 @@ gen_message_header_information = custom_target(
   'gen_message_header_information',
   input : [],
   output : ['message_header_information.hpp'],
-  command : [make_network_message_size]
+  command : [make_network_message_size, '@OUTPUT0@']
 )
 
 # Set up the platform specific include for endian stuff

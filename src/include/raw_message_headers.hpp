@@ -70,7 +70,7 @@ namespace skynet::internal
   {
     SKYNET_MAKE_SERIALIZABLE(UniversalHeader,
       info_
-    );
+    )
 
     // Allow construction with an index / endian information
     // Don't use the endianness quite yet, still have to work out how to pass
@@ -107,7 +107,7 @@ namespace skynet::internal
   {
     SKYNET_MAKE_SERIALIZABLE(BroadcastHeader,
       message_id, job_id, tag_id, tag_index, origin, hops_left_p1, message_size
-    );
+    )
 
     template<typename Callable>
     static std::optional<MessageVariant> build(const std::vector<std::byte>& data, Callable read_from) noexcept
@@ -156,7 +156,7 @@ namespace skynet::internal
     SKYNET_MAKE_SERIALIZABLE(GreetingHeader,
       from,
       message_size
-    );
+    )
 
     GreetingHeader(const MachineID from, const std::uint32_t size) noexcept
       : from{from}
@@ -187,7 +187,7 @@ namespace skynet::internal
 
   struct GoodbyeHeader
   {
-    SKYNET_MAKE_SERIALIZABLE_NO_OP(GoodbyeHeader);
+    SKYNET_MAKE_SERIALIZABLE_NO_OP(GoodbyeHeader)
 
     template<typename Callable>
     static std::optional<MessageVariant> build(const std::vector<std::byte>&  /* data */, Callable /* read_from */) noexcept
@@ -202,7 +202,7 @@ namespace skynet::internal
   {
     SKYNET_MAKE_SERIALIZABLE(BaseNeighborHeader,
       neighbor
-    );
+    )
 
     // Allow construction with just the neighbor
     explicit BaseNeighborHeader(const MachineID id)

@@ -158,7 +158,7 @@ namespace skynet::internal
         return {};
       }
     }
-    return to_ret;
+    return std::move(to_ret);
   }
 
   // Initializer just needs to create an object

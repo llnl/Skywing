@@ -217,17 +217,17 @@ namespace skynet::internal
     type& Deserializer::get(type& val)           noexcept { val = impl_->get<type>(); return val; } \
     vec<type>& Deserializer::get(vec<type>& val) noexcept { val = impl_->get_vec<type>(); return val; }
 
-  MAKE_ADD_GET(short);
-  MAKE_ADD_GET(int);
-  MAKE_ADD_GET(long);
-  MAKE_ADD_GET(long long);
-  MAKE_ADD_GET(unsigned short);
-  MAKE_ADD_GET(unsigned int);
-  MAKE_ADD_GET(unsigned long);
-  MAKE_ADD_GET(unsigned long long);
-  MAKE_ADD_GET(float);
-  MAKE_ADD_GET(double);
-  MAKE_ADD_GET(std::uint8_t);
+  MAKE_ADD_GET(short)
+  MAKE_ADD_GET(int)
+  MAKE_ADD_GET(long)
+  MAKE_ADD_GET(long long)
+  MAKE_ADD_GET(unsigned short)
+  MAKE_ADD_GET(unsigned int)
+  MAKE_ADD_GET(unsigned long)
+  MAKE_ADD_GET(unsigned long long)
+  MAKE_ADD_GET(float)
+  MAKE_ADD_GET(double)
+  MAKE_ADD_GET(std::uint8_t)
 
   // All the add and get functions have been defined, get rid of the macro
   // (Doesn't really matter since this is a source file, but just to be safe)
