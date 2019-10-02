@@ -1,0 +1,8 @@
+#ifndef SKYNET_GENERATED_ENDIAN_HPP
+#define SKYNET_GENERATED_ENDIAN_HPP
+
+inline constexpr bool machine_is_little_endian = @is_little_endian@;
+
+#include @endian_include@
+
+#endif // SKYNET_GENERATED_ENDIAN_HPP
