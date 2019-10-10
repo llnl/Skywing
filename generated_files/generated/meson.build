@@ -6,30 +6,20 @@
 # (i.e., will generally need to output to generated_includes/generated/file_name
 #  instead of just file_name)
 
-# The message network size script relies on just the serialization of Skynet
-skynet_serialize= library('skynet_serialize',
-  [
-    '../../src/skynet/internal/utility/serialize.cpp'
-  ],
-  include_directories : include_directories('../../include', '../../src/include', '../../generated_includes')
-)
+cpn_builder = find_program('capnp')
+cpn_builder_cpp = find_program('capnpc-c++')
 
-make_network_message_size = executable(
-  'make_network_message_size',
-  '../../scripts/generate_message_network_size.cpp',
-  dependencies : [
-    declare_dependency(
-      include_directories : include_directories('../../include', '../../src/include')
-    )
-  ],
-  link_with : skynet_serialize
-)
-
-gen_message_header_information = custom_target(
-  'gen_message_header_information',
-  input : [],
-  output : ['message_header_information.hpp'],
-  command : [make_network_message_size, '@OUTPUT0@']
+gen_messages = custom_target('gen_messages',
+  input : ['message_format.capnp'],
+  output : ['message_format.capnp.c++', 'message_format.capnp.h'],
+  command : [
+    cpn_builder,
+    '-I' + meson.current_source_dir(),
+    'compile',
+    '--src-prefix=' + meson.current_source_dir(),
+    '-o' + cpn_builder_cpp.path() + ':' + meson.current_build_dir(),
+    '@INPUT0@'
+  ]
 )
 
 # Set up the platform specific include for endian stuff
@@ -47,3 +37,5 @@ configure_file(
   output : 'endian.hpp',
   configuration : endian_data
 )
+
+generated_sources = [gen_messages]

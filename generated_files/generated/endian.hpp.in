@@ -1,0 +1,12 @@
+#ifndef SKYNET_GENERATED_ENDIAN_HPP
+#define SKYNET_GENERATED_ENDIAN_HPP
+
+#include @endian_include@
+
+namespace skynet::internal
+{
+  /// If the machine is little endian
+  inline constexpr bool machine_is_little_endian = @is_little_endian@;
+} // namespace skynet::internal
+
+#endif // SKYNET_GENERATED_ENDIAN_HPP

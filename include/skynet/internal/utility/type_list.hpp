@@ -74,6 +74,16 @@ namespace skynet::internal
     {
       using Type = TypeList<Ts1..., Ts2...>;
     };
+
+    // Base
+    template<typename List, template<typename...> typename Template>
+    struct ApplyToImpl;
+
+    template<typename... Ts, template<typename...> typename Template>
+    struct ApplyToImpl<TypeList<Ts...>, Template>
+    {
+      using Type = Template<Ts...>;
+    };
   } // namespace detail
 
   /** \brief The index of a type in a TypeList, or the size of the list if it is not present
@@ -95,6 +105,11 @@ namespace skynet::internal
    */
   template<typename List1, typename List2>
   using Append = typename detail::AppendImpl<List1, List2>::Type;
+
+  /** \brief Apply a type list to a template
+   */
+  template<typename List, template<typename...> typename Template>
+  using ApplyTo = typename detail::ApplyToImpl<List, Template>::Type;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP

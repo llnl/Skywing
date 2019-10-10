@@ -20,14 +20,15 @@ zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
 cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
 
-subdir('generated_includes/generated')
+capnproto_dep = dependency('capnp')
 
-skynet_inc = include_directories('include', 'generated_includes')
+subdir('generated_files/generated')
+
+skynet_inc = include_directories('include', 'generated_files')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
-  dependencies : [thread_dep],
-  link_with : skynet_serialize,
-  sources : gen_message_header_information
+  dependencies : [thread_dep, capnproto_dep],
+  sources : [generated_sources]
 )
 
 subdir('src/skynet')
