@@ -57,14 +57,17 @@ namespace skynet
   public:
     /** \brief Creates a job with the specified id and master
      */
-    explicit Job(const JobID& id, Master& master) noexcept
-      : id_{id}
-      , master_{&master}
-    {}
+    explicit Job(const JobID& id, Master& master) noexcept;
 
     /** \brief Destructor; tells the master to no longer track job
      */
     ~Job();
+
+    // Disable copying and moving; can add moving later if it is needed
+    Job(const Job&) = delete;
+    Job& operator=(const Job&) = delete;
+    Job(Job&&) = delete;
+    Job& operator=(Job&&) = delete;
 
     /** \brief Gets the latest data on a tag (if any exists)
      */

@@ -2,10 +2,18 @@
 
 #include "skynet/master.hpp"
 
+#include <iomanip>
 #include <iostream>
 
 namespace skynet
 {
+  Job::Job(const JobID& id, Master& master) noexcept
+    : id_{id}
+    , master_{&master}
+  {
+    Master::Accessor::add_job(*master_, id_, *this);
+  }
+
   Job::~Job()
   {
     Master::Accessor::remove_job(*master_, id_);
@@ -83,7 +91,7 @@ namespace skynet
     // Already subscribed - hard error
     if (expected_types_.find(tag_id) != expected_types_.cend())
     {
-      std::cerr << "Job \"" << id_ << "\" subscribed to tag \"" << tag_id << "\" after already being subscribed to it.\n";
+      std::cerr << "Job " << std::quoted(id_) << " subscribed to tag " << std::quoted(tag_id) << " after already being subscribed to it.\n";
       std::terminate();
     }
     // Then add the expected type; marking the tag as watched

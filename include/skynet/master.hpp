@@ -24,8 +24,6 @@
 //       it a template and have it as a parameter, so not making a seperate
 //       .cpp file even though there currently could be one.
 
-                    #include <iostream>
-
 namespace skynet
 {
   namespace internal
@@ -323,6 +321,15 @@ namespace skynet
         m.handle_neighbor_messages();
       }
 
+      static void add_job(
+        Master& m,
+        const JobID& id,
+        Job& to_add
+      ) noexcept
+      {
+        m.jobs_.emplace(id, &to_add);
+      }
+
       static void broadcast(
         Master& m,
         const MessageID msg_id,
@@ -424,24 +431,6 @@ namespace skynet
       }
     }
 
-    /** \brief Creates a job for the master
-     *
-     * \return A reference to the job
-     */
-    Job& make_job(const JobID& id)
-    {
-      if (jobs_.find(id) != jobs_.end())
-      {
-        // TODO: Handle this
-        // internal::on_error("Job with duplicate ID created!");
-      }
-      // decltype(res) == std::pair<iterator, bool>
-      const auto res = jobs_.emplace(id, Job{id, *this});
-      // Returning a reference here is safe because unordered_map rehashes don't
-      // invalidate iterators to the individual elements
-      return res.first->second;
-    }
-
     /** \brief Returns the number of machines connected
      */
     int number_of_neighbors() const noexcept
@@ -534,18 +523,15 @@ namespace skynet
     // Returns true if it was successful, false if something went wrong
     bool add_data_to_queue(const internal::Broadcast& msg)
     {
-      bool okay = true;
       for (auto& [name, job] : jobs_)
       {
         (void)name;
-        // This is kind of ugly, but probably the best way to do it
-        okay = okay && Job::Accessor::process_data(
-          job,
-          msg.tag_id(),
-          *msg.data().get_variant()
-        );
+        if (!Job::Accessor::process_data(*job, msg.tag_id(), *msg.data().get_variant()))
+        {
+          return false;
+        }
       }
-      return okay;
+      return true;
     }
 
     /** \brief Returns true if a message is old, false otherwise
@@ -626,7 +612,7 @@ namespace skynet
     internal::SocketCommunicator server_socket_;
 
     // List of the jobs that are present
-    std::unordered_map<JobID, Job> jobs_;
+    std::unordered_map<JobID, Job*> jobs_;
 
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
