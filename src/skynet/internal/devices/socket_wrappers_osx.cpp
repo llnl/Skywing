@@ -10,9 +10,9 @@ namespace skynet::internal
      */
     int set_non_blocking(const int sockfd) noexcept
     {
-      if (handle == -1)
+      if (sockfd == -1)
       {
-        return handle;
+        return sockfd;
       }
       const auto flags = fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK;
       fcntl(sockfd, F_SETFL, flags);
