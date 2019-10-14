@@ -6,19 +6,17 @@
 # (i.e., will generally need to output to generated_includes/generated/file_name
 #  instead of just file_name)
 
-cpn_builder = find_program('capnp')
-cpn_builder_cpp = find_program('capnpc-c++')
+cpn_builder_prog = find_program('capnp')
+cpn_builder_cpp_prog = find_program('capnpc-c++')
 
-gen_messages = custom_target('gen_messages',
-  input : ['message_format.capnp'],
-  output : ['message_format.capnp.c++', 'message_format.capnp.h'],
-  command : [
-    cpn_builder,
+capn_proto_gen = generator(cpn_builder_prog,
+  output : ['@PLAINNAME@.c++', '@PLAINNAME@.h'],
+  arguments : [
     '-I' + meson.current_source_dir(),
     'compile',
     '--src-prefix=' + meson.current_source_dir(),
-    '-o' + cpn_builder_cpp.path() + ':' + meson.current_build_dir(),
-    '@INPUT0@'
+    '-o' + cpn_builder_cpp_prog.path() + ':@BUILD_DIR@',
+    '@INPUT@'
   ]
 )
 
@@ -38,4 +36,4 @@ configure_file(
   configuration : endian_data
 )
 
-generated_sources = [gen_messages]
+generated_sources = capn_proto_gen.process('message_format.capnp')
