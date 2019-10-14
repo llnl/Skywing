@@ -242,11 +242,6 @@ namespace skynet
   ////////////////////////////////////////////////
   // Class Master
   ////////////////////////////////////////////////
-  void Master::Accessor::handle_neighbor_message(Master& m) noexcept
-  {
-    m.handle_neighbor_messages();
-  }
-
   void Master::Accessor::add_job(
     Master& m,
     const JobID& id,
@@ -265,11 +260,6 @@ namespace skynet
   ) noexcept
   {
     m.do_broadcast(msg_id, tag_id, hops_left_p1, std::move(data));
-  }
-
-  void Master::Accessor::remove_job(Master& m, const JobID& id) noexcept
-  {
-    m.jobs_.erase(id);
   }
 
   /** \brief Creates a Master instance that listens on the specified
@@ -353,6 +343,40 @@ namespace skynet
   int Master::number_of_neighbors() const noexcept
   {
     return static_cast<int>(neighbors_.size());
+  }
+
+  /** \brief Start running all submitted jobs
+   */
+  void Master::run() noexcept
+  {
+    std::vector<std::thread> threads;
+    threads.reserve(jobs_.size());
+    for (auto& [name, job] : jobs_)
+    {
+      (void)name;
+      threads.push_back(Job::Accessor::run(*job));
+    }
+    // Do processing while there are still jobs
+    while (!jobs_.empty()) {
+      // Remove any finished jobs
+      for (auto iter = jobs_.cbegin(); iter != jobs_.cend(); ) {
+        if (iter->second->is_finished()) {
+          iter = jobs_.erase(iter);
+        }
+        else {
+          ++iter;
+        }
+      }
+      // Handle any messages from neighbors
+      handle_neighbor_messages();
+      // Wait a bit for other messages
+      std::this_thread::yield();
+    }
+    // Join all of the threads now
+    for (auto& thread : threads)
+    {
+      thread.join();
+    }
   }
 
   /** \brief Listens for messages from neighbors and handles them if there

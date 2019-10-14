@@ -78,23 +78,26 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   auto& master = *master_ptr;
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
-  Job my_job{"job 0", master};
+  Job my_job{"job 0", master, [index](Job& the_job) {
+    for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
+    {
+      if (index == send_index)
+      {
+        the_job.publish(Uint64Tag{tag_names[send_index]}, send_index);
+      }
+      else
+      {
+        REQUIRE(the_job.get_when_ready(Uint64Tag{tag_names[send_index]}) == send_index);
+      }
+    }
+  }};
   // Subscribe to everything ahead of time
   for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
   {
     my_job.subscribe(Uint64Tag{tag_names[send_index]});
   }
-  for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
-  {
-    if (index == send_index)
-    {
-      my_job.publish(Uint64Tag{tag_names[send_index]}, send_index);
-    }
-    else
-    {
-      REQUIRE(my_job.get_when_ready(Uint64Tag{tag_names[send_index]}) == send_index);
-    }
-  }
+  // Start processing messages
+  master.run();
 }
 
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")

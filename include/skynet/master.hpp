@@ -157,8 +157,6 @@ namespace skynet
     private:
       friend class Job;
 
-      static void handle_neighbor_message(Master& m) noexcept;
-
       static void add_job(
         Master& m,
         const JobID& id,
@@ -172,8 +170,6 @@ namespace skynet
         const std::uint32_t hops_left_p1,
         BroadcastDataVariant data
       ) noexcept;
-
-      static void remove_job(Master& m, const JobID& id) noexcept;
     }; // struct Accessor
 
     /** \brief Creates a Master instance that listens on the specified
@@ -212,6 +208,10 @@ namespace skynet
     /** \brief Returns the number of machines connected
      */
     int number_of_neighbors() const noexcept;
+
+    /** \brief Start running all submitted jobs
+     */
+    void run() noexcept;
 
   private:
     /** \brief Listens for messages from neighbors and handles them if there

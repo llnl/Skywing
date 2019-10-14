@@ -15,32 +15,31 @@ public:
   /** \brief Construct a guarded object with the passed parameters
    */
   template<typename... Args>
-  constexpr explicit MutexGuarded(Args&& args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
-    : value_{std::forward<Args>(args)}
+  constexpr explicit MutexGuarded(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
+    : value_{std::forward<Args>(args)...}
   {
     ;
   }
 
   /** \brief Returns the object, locking if it is not available
    */
-  std::pair<T&, std::unique_lock<std::mutex>> get() const noexcept
+  std::pair<T&, std::unique_lock<std::mutex>> get() noexcept
   {
-    return {value_, mutex_};
+    return {value_, std::unique_lock{mutex_}};
   }
 
   /** \brief Trys to lock the object, returns nullptr for the object
    * if it failed to do so
    */
-  std::pair<T*, std::unique_lock<std::mutex>> try_get() const noexcept
+  std::pair<T*, std::unique_lock<std::mutex>> try_get() noexcept
   {
-    std::lock_guard locker{mutex_, std::defer_lock};
-    if (locker.try_lock()) {
+    if (mutex_.try_lock()) {
       // Lock worked
-      return {&value_, std::move(locker)};
+      return {&value_, {mutex_, std::adopt_lock}};
     }
     else {
       // Lock failed
-      return {nullptr, std::move(locker)};
+      return {nullptr, {}};
     }
   }
 

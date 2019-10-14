@@ -1,11 +1,13 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
+#include "skynet/internal/utility/mutex_guarded.hpp"
 #include "skynet/internal/utility/type_list.hpp"
 #include "skynet/types.hpp"
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <thread>
 #include <unordered_map>
@@ -57,11 +59,7 @@ namespace skynet
   public:
     /** \brief Creates a job with the specified id and master
      */
-    explicit Job(const JobID& id, Master& master) noexcept;
-
-    /** \brief Destructor; tells the master to no longer track job
-     */
-    ~Job();
+    explicit Job(const JobID& id, Master& master, std::function<void(Job&)> to_run) noexcept;
 
     // Disable copying and moving; can add moving later if it is needed
     Job(const Job&) = delete;
@@ -155,9 +153,15 @@ namespace skynet
       global_broadcast(tag.id(), value);
     }
 
-    // Allow the master to call process data
+    /** \brief Returns true if the job is finished, false if it is not
+     */
+    bool is_finished() const noexcept;
+
+    // Allow the master to call process data and run
     struct Accessor
     {
+    private:
+      friend class Master;
       static bool process_data(
         Job& j,
         const TagID& tag,
@@ -165,6 +169,14 @@ namespace skynet
       ) noexcept
       {
         return j.process_data(tag, data);
+      }
+
+      static std::thread run(Job& j) noexcept
+      {
+        return std::thread{[&j]() {
+          j.to_run_(j);
+          j.is_finished_ = true;
+        }};
       }
     };
 
@@ -191,11 +203,16 @@ namespace skynet
     void subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept;
     void unsubscribe_impl(const TagID& tag_id) noexcept;
 
-    // The buffer of data for each tag
-    std::unordered_map<TagID, BroadcastDataVariant> values_;
+    // Put both buffers in a struct so they can be guarded by the same mutex easily
+    struct Buffers {
+      // The buffer of data for each tag
+      std::unordered_map<TagID, BroadcastDataVariant> values_;
 
-    // The expected type for each tag ID
-    std::unordered_map<TagID, std::uint8_t> expected_types_;
+      // The expected type for each tag ID
+      std::unordered_map<TagID, std::uint8_t> expected_types_;
+    };
+
+    MutexGuarded<Buffers> bufs_;
 
     // The id for the message to send
     // Could keep a seperate id for each tag, but running out of message id's
@@ -207,6 +224,12 @@ namespace skynet
 
     // The master that this job is working with
     Master* master_;
+
+    // The function this job will run
+    std::function<void(Job&)> to_run_;
+
+    // If the job is finished
+    bool is_finished_{false};
   }; // Class Job
 } // namespace skynet
 
