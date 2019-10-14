@@ -1,0 +1,52 @@
+#ifndef SKYNET_INTERNAL_UTILITY_MUTEX_GUARDED_HPP
+#define SKYNET_INTERNAL_UTILITY_MUTEX_GUARDED_HPP
+
+#include <mutex>
+#include <type_traits>
+#include <utility>
+
+/** \brief Class that holds data that is guarded by a mutex so that
+ * only one class can access it at a time
+ */
+template<typename T>
+class MutexGuarded
+{
+public:
+  /** \brief Construct a guarded object with the passed parameters
+   */
+  template<typename... Args>
+  constexpr explicit MutexGuarded(Args&& args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
+    : value_{std::forward<Args>(args)}
+  {
+    ;
+  }
+
+  /** \brief Returns the object, locking if it is not available
+   */
+  std::pair<T&, std::unique_lock<std::mutex>> get() const noexcept
+  {
+    return {value_, mutex_};
+  }
+
+  /** \brief Trys to lock the object, returns nullptr for the object
+   * if it failed to do so
+   */
+  std::pair<T*, std::unique_lock<std::mutex>> try_get() const noexcept
+  {
+    std::lock_guard locker{mutex_, std::defer_lock};
+    if (locker.try_lock()) {
+      // Lock worked
+      return {&value_, std::move(locker)};
+    }
+    else {
+      // Lock failed
+      return {nullptr, std::move(locker)};
+    }
+  }
+
+private:
+  T value_;
+  std::mutex mutex_;
+};
+
+#endif // SKYNET_INTERNAL_UTILITY_MUTEX_GUARDED_HPP
