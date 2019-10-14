@@ -58,13 +58,39 @@ void machine_task(Master* const master_ptr, const NetworkInfo* const info, const
     m.connect_to_server("127.0.0.1", base_port + i);
   });
   // Submit first and second job
-  std::array jobs{
-    Job{"job 1", master},
-    Job{"job 2", master}
-  };
   const std::array tags{
     std::make_tuple(Tag1{"job1tag1"}, Tag2{"job1tag2"}, Tag3{"job1tag3"}),
     std::make_tuple(Tag1{"job2tag1"}, Tag2{"job2tag2"}, Tag3{"job2tag3"})
+  };
+  // Function to create a job task
+  const auto make_job_task = [&](std::size_t i) {
+    return [&tags, &index, i](Job& job) {
+      switch (index)
+      {
+      case 0:
+        job.publish(std::get<Tag1>(tags[i]), tag1_value);
+        test_tags(job, std::get<Tag2>(tags[i]), std::get<Tag3>(tags[i]));
+        break;
+
+      case 1:
+        job.publish(std::get<Tag2>(tags[i]), tag2_value);
+        test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag3>(tags[i]));
+        break;
+
+      case 2:
+        job.publish(std::get<Tag3>(tags[i]), tag3_value);
+        test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag2>(tags[i]));
+        break;
+
+      default:
+        test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag2>(tags[i]), std::get<Tag3>(tags[i]));
+        break;
+      }
+    };
+  };
+  std::array jobs{
+    Job{"job 1", master, make_job_task(0)},
+    Job{"job 2", master, make_job_task(1)}
   };
   // Just make sure the tags and jobs are the same size
   static_assert(jobs.size() == tags.size());
@@ -77,34 +103,7 @@ void machine_task(Master* const master_ptr, const NetworkInfo* const info, const
       std::get<Tag3>(tags[i])
     );
   }
-  // First three machines do broadcasts on different tags for both jobs
-  // Pointer in intitilizer list since things in them are always const
-  // The first machines also then have to propagate the other broadcasts
-  for (std::size_t i = 0; i < jobs.size(); ++i)
-  {
-    auto& job = jobs[i];
-    switch (index)
-    {
-    case 0:
-      job.publish(std::get<Tag1>(tags[i]), tag1_value);
-      test_tags(job, std::get<Tag2>(tags[i]), std::get<Tag3>(tags[i]));
-      break;
-
-    case 1:
-      job.publish(std::get<Tag2>(tags[i]), tag2_value);
-      test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag3>(tags[i]));
-      break;
-
-    case 2:
-      job.publish(std::get<Tag3>(tags[i]), tag3_value);
-      test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag2>(tags[i]));
-      break;
-
-    default:
-      test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag2>(tags[i]), std::get<Tag3>(tags[i]));
-      break;
-    }
-  }
+  master.run();
 }
 
 TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")

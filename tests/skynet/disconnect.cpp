@@ -42,29 +42,31 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   setup_network(index, master);
-  Job my_job{"Job 0", master};
+  Job the_job{"Job 0", master, [&](Job& my_job) {
+    for (std::size_t i = 0; i < disconnect_order.size(); ++i)
+    {
+      const Int32Tag tag{std::to_string(i)};
+      const auto to_remove = disconnect_order[i];
+      if (to_remove == index)
+      {
+        // broadcast and remove (the data doesn't really matter)
+        my_job.publish(tag, to_remove);
+        // Leaving the loop will cause the master to destruct, automatically
+        // disconnecting
+        break;
+      }
+      else
+      {
+        REQUIRE(my_job.get_when_ready(tag) == to_remove);
+      }
+    }
+  }};
   // Subscribe to all tags ahead of time
   for (std::size_t i = 0; i < disconnect_order.size(); ++i)
   {
-    my_job.subscribe(Int32Tag{std::to_string(i)});
+    the_job.subscribe(Int32Tag{std::to_string(i)});
   }
-  for (std::size_t i = 0; i < disconnect_order.size(); ++i)
-  {
-    const Int32Tag tag{std::to_string(i)};
-    const auto to_remove = disconnect_order[i];
-    if (to_remove == index)
-    {
-      // broadcast and remove (the data doesn't really matter)
-      my_job.publish(tag, to_remove);
-      // Leaving the loop will cause the master to destruct, automatically
-      // disconnecting
-      break;
-    }
-    else
-    {
-      REQUIRE(my_job.get_when_ready(tag) == to_remove);
-    }
-  }
+  master.run();
   // Make sure the threads don't exit too soon
   std::this_thread::sleep_for(1000ms);
 }
