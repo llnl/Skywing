@@ -41,6 +41,7 @@ namespace skynet::internal
     // Mapping for the Broadcast data to retrieve things from it as a template
     template<typename T> struct BroadcastDataHandler;
 
+    // Create a mapping for a type and a vector of that type
     #define SKYNET_MAKE_BROADCAST_DATA_HANDLER(cpp_type, capn_suffix) \
       template<> struct BroadcastDataHandler<cpp_type> \
       { \
@@ -131,12 +132,18 @@ namespace skynet::internal
     job
   };
 
+  /** \brief Class representing the data that can be sent on a broadcast
+   */
   class BroadcastData
   {
   public:
+    /** \brief Return a T if the broadcast holds it
+     */
     template<typename T>
     std::optional<T> get() const noexcept { return detail::BroadcastDataHandler<T>::get(r); }
 
+    /** \brief Return the held value as a variant
+     */
     std::optional<BroadcastDataVariant> get_variant() const noexcept
     {
       using namespace detail;
@@ -171,7 +178,7 @@ namespace skynet::internal
     }
 
   private:
-    // Only allow Broadcast to construct
+    // Only allow Broadcast to construct this
     friend class Broadcast;
     explicit BroadcastData(cpnpro::BroadcastData::Reader reader) noexcept
       : r{std::move(reader)}
@@ -180,6 +187,8 @@ namespace skynet::internal
     cpnpro::BroadcastData::Reader r;
   };
 
+  /** \brief Class representing a broadcast message
+   */
   class Broadcast
   {
   public:
@@ -198,6 +207,8 @@ namespace skynet::internal
       {}
   };
 
+  /** \brief Class representing a greeting message
+   */
   class Greeting
   {
   public:
@@ -213,17 +224,15 @@ namespace skynet::internal
       {}
   };
 
+  /** \brief Class representing a goodbye message
+   */
   class Goodbye
   {
-  private:
-    cpnpro::Goodbye::Reader r;
-
-    friend class MessageHandler;
-    explicit Goodbye(cpnpro::Goodbye::Reader reader) noexcept
-      : r{std::move(reader)}
-      {}
+    // Intentionally empty
   };
 
+  /** \brief Class representing a new neighbor message
+   */
   class NewNeighbor
   {
   public:
@@ -238,6 +247,8 @@ namespace skynet::internal
       {}
   };
 
+  /** \brief Class representing a remove neighbor message
+   */
   class RemoveNeighbor
   {
   public:
@@ -252,6 +263,15 @@ namespace skynet::internal
       {}
   };
 
+  /** \brief Class representing a heartbeat
+   */
+  class Heartbeat
+  {
+    // Intentionally empty
+  };
+
+  /** \brief Class for converting the raw bytes of a message into a useable format
+   */
   class MessageHandler
   {
   public:
@@ -295,6 +315,7 @@ namespace skynet::internal
       case vals::GOODBYE:         return MessageCategory::status;
       case vals::NEW_NEIGHBOR:    return MessageCategory::status;
       case vals::REMOVE_NEIGHBOR: return MessageCategory::status;
+      case vals::HEARTBEAT:       return MessageCategory::status;
       }
       // this should never happen
       return MessageCategory::status;
@@ -307,7 +328,8 @@ namespace skynet::internal
       Greeting,
       Goodbye,
       NewNeighbor,
-      RemoveNeighbor
+      RemoveNeighbor,
+      Heartbeat
     >;
 
     // Process the stored message and return its internal type
@@ -317,9 +339,10 @@ namespace skynet::internal
       switch(impl_->root.which()) {
       case vals::BROADCAST:       return Broadcast{impl_->root.getBroadcast()};
       case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
-      case vals::GOODBYE:         return Goodbye{impl_->root.getGoodbye()};
+      case vals::GOODBYE:         return Goodbye{/* impl_->root.getGoodbye() */};
       case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};
       case vals::REMOVE_NEIGHBOR: return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+      case vals::HEARTBEAT:       return Heartbeat{/* impl_->root.getHeartbeat() */};
       }
       // This should never happen
       return {};

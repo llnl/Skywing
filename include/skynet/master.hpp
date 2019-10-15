@@ -28,6 +28,9 @@ namespace skynet
 {
   namespace internal
   {
+    // The default hearbeat interval
+    inline static constexpr std::chrono::milliseconds default_heartbeat_interval{2000};
+
     /** \brief Tag to indicate that this connection was made by accepting a connection
      */
     struct ByAccept{};
@@ -94,6 +97,10 @@ namespace skynet
        */
       bool has_neighbor(const MachineID id) const noexcept;
 
+      /** \brief Sends a heartbeat if enough time has passed
+       */
+      void send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept;
+
     private:
       // Only allow private construction
       explicit ExternalMaster(SocketCommunicator conn) noexcept;
@@ -138,6 +145,9 @@ namespace skynet
       // Estimated latency to the other machine
       std::chrono::microseconds latency_;
 
+      // The last time the machine was heard from
+      std::chrono::steady_clock::time_point last_heard_;
+
       // The neighbors that the external machine has
       std::vector<MachineID> neighbors_;
 
@@ -177,8 +187,27 @@ namespace skynet
      *
      * \param port The port to listen on
      * \param id The ID to assign to this machine
+     * \param heartbeat_interval The interval to wait between heartbeats
      */
-    explicit Master(const std::uint16_t port, const MachineID& id) noexcept;
+    template<
+      typename Rep = decltype(internal::default_heartbeat_interval)::rep,
+      typename Period = decltype(internal::default_heartbeat_interval)::period
+    >
+    Master(
+      const std::uint16_t port,
+      const MachineID& id,
+      const std::chrono::duration<Rep, Period> heartbeat_interval = internal::default_heartbeat_interval
+    ) noexcept
+      : Master{port, id, std::chrono::duration_cast<std::chrono::milliseconds>(heartbeat_interval)}
+    {}
+
+    /** \brief Constructor specifically for milliseconds
+     */
+    Master(
+      const std::uint16_t port,
+      const MachineID& id,
+      const std::chrono::milliseconds heartbeat_interval
+    ) noexcept;
 
     /** \brief Destructor; tells all neighbors that the device is dead
      */
@@ -291,6 +320,9 @@ namespace skynet
 
     // The id of this machine
     MachineID id_;
+
+    // The time to send a heartbeat if nothing has been heard in the time
+    std::chrono::milliseconds heartbeat_interval_;
   }; // class Master
 } // namespace skynet
 

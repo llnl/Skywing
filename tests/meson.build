@@ -5,6 +5,7 @@ tests = [
   ['broadcast_data_wrapper', 'broadcast_data_wrapper.cpp'],
   ['broadcast', 'broadcast.cpp'],
   ['disconnect', 'disconnect.cpp'],
+  ['heartbeat', 'heartbeat.cpp'],
   ['master_conn', 'master_conn.cpp'],
 
   # devices/

@@ -36,6 +36,10 @@ namespace skynet::internal
   /** \brief Create data for a removed neighbor notification
    */
   std::vector<std::byte> make_remove_neighbor(const MachineID& neighbor) noexcept;
+
+  /** \brief Create data for a heartbeat
+   */
+  std::vector<std::byte> make_heartbeat() noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_CREATORS_HPP

@@ -93,7 +93,7 @@ namespace skynet::internal
   std::vector<std::byte> make_goodbye() noexcept
   {
     capnp::MallocMessageBuilder builder;
-    builder.initRoot<cpnpro::Message>().initGoodbye();
+    builder.initRoot<cpnpro::Message>().setGoodbye();
     return finalize_message(builder);
   }
 
@@ -114,6 +114,15 @@ namespace skynet::internal
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::Message>().initRemoveNeighbor();
     message.setNeighborID(neighbor);
+    return finalize_message(builder);
+  }
+
+  /** \brief Create data for a heartbeat
+   */
+  std::vector<std::byte> make_heartbeat() noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    builder.initRoot<cpnpro::Message>().setHeartbeat();
     return finalize_message(builder);
   }
 } // namespace skynet::internal

@@ -48,9 +48,9 @@ struct Greeting {
   neighbors @1 : List(Text);
 }
 
-struct Goodbye {
-  # Empty
-}
+# struct Goodbye {
+#   # Empty
+# }
 
 struct NewNeighbor {
   neighborID @0 : Text;
@@ -64,8 +64,9 @@ struct Message {
   union {
     broadcast @0 : Broadcast;
     greeting @1 : Greeting;
-    goodbye @2 : Goodbye;
+    goodbye @2 : Void;
     newNeighbor @3 : NewNeighbor;
     removeNeighbor @4 : RemoveNeighbor;
+    heartbeat @5 : Void;
   }
 }

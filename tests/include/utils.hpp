@@ -42,17 +42,24 @@ namespace skynet
     std::vector<int> num_connections;
   };
 
+  // Returns the maximum number of connections possible for a given number of
+  // machines
+  constexpr int maximum_connections(const int num_machines)
+  {
+    // The total number of connections possible is the sum from 1 to
+    // (number of machines - 1) which is equal to n * (n + 1) / 2
+    // (Where n = number of machines - 1)
+    return (num_machines - 1) * num_machines / 2;
+  }
+
   // Create a random network with the specified number of machines and roughly
   // the number of connections.  The number of connections will generally exceed
-  // the given amount as a random path  is done at the end to make the network
+  // the given amount as a random path is done at the end to make the network
   // fully connected
   NetworkInfo make_network(const int num_machines, const int num_connections)
   {
     assert(num_machines > 1);
-    // The total number of connections possible is the sum from 1 to
-    // (number of machines - 1) which is equal to n * (n + 1) / 2
-    const auto maximum_connections = [](int n) { return (n - 1) * n / 2; };
-    assert(num_connections < maximum_connections(num_connections));
+    assert(num_connections <= maximum_connections(num_machines));
     // Reserve enough room in the return object for each machine
     NetworkInfo to_ret{num_machines};
     // Adds a random connection; doing nothing if it already exists or is a

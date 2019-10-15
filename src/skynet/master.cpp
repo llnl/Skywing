@@ -60,6 +60,8 @@ namespace skynet
       }
       if (auto handler = try_to_get_message_handler())
       {
+        // Update the last time something was heard
+        last_heard_ = std::chrono::steady_clock::now();
         // Handle status messages here
         if (handler->category() == MessageCategory::status)
         {
@@ -108,9 +110,25 @@ namespace skynet
       return loc != neighbors_.cend() && *loc == id;
     }
 
+    /** \brief Sends a heartbeat if enough time has passed
+     */
+    void ExternalMaster::send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept
+    {
+      using namespace std::chrono;
+      const auto time_expired = steady_clock::now() - last_heard_;
+      if (time_expired >= interval)
+      {
+        // Try to send a message
+        send_message(make_heartbeat());
+        // This count as hearing from the device
+        last_heard_ = steady_clock::now();
+      }
+    }
+
     // Only allow private construction
     ExternalMaster::ExternalMaster(SocketCommunicator conn) noexcept
       : conn_{std::move(conn)}
+      , last_heard_{std::chrono::steady_clock::now()}
     {}
 
     // Read some bytes from the connection, returning false if the read failed
@@ -225,6 +243,11 @@ namespace skynet
           neighbors_.pop_back();
           return true;
         },
+        [](const Heartbeat&) {
+          // Nothing to do; this is just to acknowledge it exists
+          // (Last heard time was already updated)
+          return true;
+        },
         [](...) {
           // Anything else is a programming bug
           assert(false && "Invalid message type in ExternalMaster::handle_message");
@@ -262,14 +285,13 @@ namespace skynet
     m.do_broadcast(msg_id, tag_id, hops_left_p1, std::move(data));
   }
 
-  /** \brief Creates a Master instance that listens on the specified
-   * port for connections.
-   *
-   * \param port The port to listen on
-   * \param id The ID to assign to this machine
-   */
-  Master::Master(const std::uint16_t port, const MachineID& id) noexcept
+  Master::Master(
+    const std::uint16_t port,
+    const MachineID& id,
+    const std::chrono::milliseconds heartbeat_interval
+  ) noexcept
     : id_{id}
+    , heartbeat_interval_{heartbeat_interval}
   {
     server_socket_.set_to_listen(port);
   }
@@ -369,6 +391,11 @@ namespace skynet
       }
       // Handle any messages from neighbors
       handle_neighbor_messages();
+      // Send any heartbeat messages if needed
+      for (auto&& neighbor : neighbors_)
+      {
+        neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
+      }
       // Wait a bit for other messages
       std::this_thread::yield();
     }

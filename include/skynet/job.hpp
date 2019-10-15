@@ -92,7 +92,7 @@ namespace skynet
     >
     typename GetTag::ValueType get_when_ready(
       const GetTag& tag,
-      const std::chrono::duration<Rep, Period>& poll_freq = internal::default_poll_freq
+      const std::chrono::duration<Rep, Period> poll_freq = internal::default_poll_freq
     ) noexcept
     {
       while (!has_data(tag))
