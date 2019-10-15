@@ -4,7 +4,7 @@
 #include "skynet/internal/capn_proto_wrapper.hpp"
 #include "skynet/types.hpp"
 
-#include "generated/message_format.capnp.h"
+#include "message_format.capnp.h"
 
 #include <capnp/serialize.h>
 
