@@ -108,6 +108,10 @@ namespace skynet
       // Read some bytes from the connection, returning false if the read failed
       bool read_from_conn(std::byte* const buffer, const std::size_t count) noexcept;
 
+      // Read some bytes from the connection, returning an empty vector if
+      // the number of bytes couldn't be read
+      std::vector<std::byte> read_from_conn(const std::size_t count) noexcept;
+
       // Attempt to get a MessageHandler from the connection
       std::optional<MessageHandler> try_to_get_message_handler() noexcept;
 

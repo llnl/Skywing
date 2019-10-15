@@ -149,6 +149,44 @@ namespace skynet
       return true;
     }
 
+    std::vector<std::byte> ExternalMaster::read_from_conn(const std::size_t count) noexcept
+    {
+      // Size of memory to allocate/read each step
+      constexpr std::size_t read_step_size     = 0x0'1000;
+      constexpr std::size_t allocate_step_size = read_step_size * 16;
+      // How often memory needs to be resized
+      constexpr std::size_t resize_every_n_steps = allocate_step_size / read_step_size;
+      // Ensure that the allocate size is evenly divisible by the read size
+      static_assert(allocate_step_size % read_step_size == 0);
+      static_assert(allocate_step_size >= read_step_size);
+      // To prevent overallocation of memory, don't allocate a ton of memory to start
+      std::vector<std::byte> read_bytes;
+      // The final bytes to read in the end
+      const int final_read_size = count % read_step_size;
+      // Read memory in 4KiB chunks
+      const int num_iters = count / read_step_size + (final_read_size == 0 ? 0 : 1);
+      for (int i = 0; i < num_iters; ++i)
+      {
+        if (i % resize_every_n_steps == 0)
+        {
+          // Allocate more memory
+          const std::size_t mem_left_to_read = count - read_bytes.size();
+          const std::size_t additional_size =
+            mem_left_to_read > allocate_step_size
+              ? allocate_step_size
+              : mem_left_to_read;
+          read_bytes.resize(read_bytes.size() + additional_size);
+        }
+        const std::size_t num_bytes_to_read = (i == num_iters - 1 ? final_read_size : read_step_size);
+        // Allocate more memory if needed
+        if (!read_from_conn(&read_bytes[i * read_step_size], num_bytes_to_read))
+        {
+          return {};
+        }
+      }
+      return read_bytes;
+    }
+
     // Attempt to get a MessageHandler from the connection
     std::optional<MessageHandler> ExternalMaster::try_to_get_message_handler() noexcept
     {
@@ -157,8 +195,7 @@ namespace skynet
       {
         const auto bytes_to_read = from_network_bytes(size_buffer);
         // Then read the actual message and parse it
-        std::vector<std::byte> message_buffer(bytes_to_read);
-        if (read_from_conn(message_buffer.data(), message_buffer.size()))
+        if (const auto message_buffer = read_from_conn(bytes_to_read); !message_buffer.empty())
         {
           return MessageHandler{message_buffer};
         }
