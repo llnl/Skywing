@@ -4,7 +4,7 @@
 // This header exists to allow more convienent and (within the codebase)
 // conventional access to the Cap'n Proto messages
 
-#include "generated/message_format.capnp.h"
+#include "message_format.capnp.h"
 
 #include <capnp/serialize.h>
 
