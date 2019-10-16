@@ -14,7 +14,9 @@ capn_proto_gen = generator(cpn_builder_prog,
   arguments : [
     '-I' + meson.current_source_dir(),
     'compile',
-    '--src-prefix=' + meson.current_source_dir(),
+    # This is ugly and I don't know why it was working before but isn't now
+    # Just hardcode the path
+    '--src-prefix=../generated_files/generated',
     '-o' + cpn_builder_cpp_prog.path() + ':@BUILD_DIR@',
     '@INPUT@'
   ]

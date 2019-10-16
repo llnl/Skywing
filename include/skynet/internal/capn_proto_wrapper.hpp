@@ -252,22 +252,61 @@ namespace skynet::internal
       {}
   };
 
+  /** \brief Class that supresses Cap'n Proto's exceptions so that they
+   * can be used in a non-exception friendly environment
+   *
+   * Note that all that has to be done to supress exceptions is to create
+   * one of these on the stack.
+   */
+  class ExceptionSuppressor : public kj::ExceptionCallback
+  {
+  public:
+    bool failed() const noexcept { return failed_; }
+
+  private:
+    void onRecoverableException(kj::Exception&&) override
+    {
+      // Mark it as failed
+      failed_ = true;
+    }
+
+    void onFatalException(kj::Exception&&) override
+    {
+      // just return - nothing can be done here
+      return;
+    }
+
+    bool failed_ = false;
+  };
+
+  /** \brief Class for converting the raw bytes of a message into a useable format
+   */
   class MessageHandler
   {
   public:
     /** \brief Construct a message handler from a raw set of bytes
      */
-    explicit MessageHandler(const std::vector<std::byte>& data) noexcept
+    static std::optional<MessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept
     {
+      ExceptionSuppressor suppressor;
       // Read the message from the passed bytes
+      MessageHandler to_ret;
       kj::Array<const kj::byte> buffer{
         reinterpret_cast<const kj::byte*>(data.data()),
         data.size(),
-        impl_->null_disposer
+        to_ret.impl_->null_disposer
       };
       kj::ArrayInputStream in_s{buffer};
-      capnp::readMessageCopy(in_s, impl_->message);
-      impl_->root = impl_->message.getRoot<cpnpro::Message>();
+      capnp::readMessageCopy(in_s, to_ret.impl_->message);
+      to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Message>();
+      if (suppressor.failed())
+      {
+        return {};
+      }
+      else
+      {
+        return std::move(to_ret);
+      }
     }
 
     /** \brief Perform a callback on the stored message
@@ -314,15 +353,27 @@ namespace skynet::internal
     std::optional<MessageVariant> extract_message() const noexcept
     {
       using vals = cpnpro::Message::Which;
-      switch(impl_->root.which()) {
-      case vals::BROADCAST:       return Broadcast{impl_->root.getBroadcast()};
-      case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
-      case vals::GOODBYE:         return Goodbye{impl_->root.getGoodbye()};
-      case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};
-      case vals::REMOVE_NEIGHBOR: return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+      ExceptionSuppressor suppressor;
+      // This is kind of messy, but need to make sure that there's a way
+      // to signify that there's no data due to, e.g., malformed input
+      const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
+        switch(impl_->root.which()) {
+        case vals::BROADCAST:       return Broadcast{impl_->root.getBroadcast()};
+        case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
+        case vals::GOODBYE:         return Goodbye{impl_->root.getGoodbye()};
+        case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};
+        case vals::REMOVE_NEIGHBOR: return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+        }
+        return {};
+      }();
+      if (suppressor.failed())
+      {
+        return {};
       }
-      // This should never happen
-      return {};
+      else
+      {
+        return to_ret;
+      }
     }
 
     // Message isn't copyable or movable... so have a unique_ptr to allow moving
