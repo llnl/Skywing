@@ -182,7 +182,7 @@ namespace skynet
         const MessageID msg_id,
         const TagID& tag_id,
         const std::uint32_t hops_left_p1,
-        BroadcastDataVariant data
+        PublishDataVariant data
       ) noexcept;
     }; // struct Accessor
 
@@ -263,7 +263,7 @@ namespace skynet
       const MessageID msg_id,
       const TagID& tag_id,
       const std::uint8_t hops_left_p1,
-      BroadcastDataVariant data
+      PublishDataVariant data
     ) noexcept;
 
     // Does all processing that needs to be done when a message is recieved
@@ -271,11 +271,11 @@ namespace skynet
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
-    bool add_data_to_queue(const internal::Broadcast& msg) noexcept;
+    bool add_data_to_queue(const internal::Publish& msg) noexcept;
 
     /** \brief Returns true if a message is old, false otherwise
      */
-    bool is_old_message(const internal::Broadcast& msg) noexcept;
+    bool is_old_message(const internal::Publish& msg) noexcept;
 
     /** \brief Notify neighbors of a new new neighbor
      */
@@ -316,11 +316,8 @@ namespace skynet
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
-    // The message id of each last heard message from each machine for each tag in the network
-    std::unordered_map<
-      MachineID,
-      std::unordered_map<TagID, MessageID>
-    > last_message_id_;
+    // The last heard message id for each tag in the network
+    std::unordered_map<TagID, MessageID> last_tag_id_;
 
     // The id of this machine
     MachineID id_;

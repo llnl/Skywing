@@ -117,7 +117,7 @@ namespace skynet
     void subscribe(const Tag& tag) noexcept
     {
       using ValueType = typename Tag::ValueType;
-      subscribe_impl(tag.id(), internal::index_of<ValueType, BroadcastDataTypeList>);
+      subscribe_impl(tag.id(), internal::index_of<ValueType, PublishDataTypeList>);
     }
 
     /** \brief Subscribes to all of the passed tags
@@ -165,7 +165,7 @@ namespace skynet
       static bool process_data(
         Job& j,
         const TagID& tag,
-        BroadcastDataVariant data
+        PublishDataVariant data
       ) noexcept
       {
         return j.process_data(tag, data);
@@ -187,18 +187,18 @@ namespace skynet
      * \param data The data sent on the tag
      * \return True if processing went fine, false if there was an error
      */
-    bool process_data(const TagID& tag_id, BroadcastDataVariant data) noexcept;
+    bool process_data(const TagID& tag_id, PublishDataVariant data) noexcept;
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
      */
-    void global_broadcast(const TagID& tag_id, BroadcastDataVariant to_send) noexcept;
+    void global_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept;
 
     /** \brief Broadcasts a value on a tag to all neighbors
      */
-    void local_broadcast(const TagID& tag_id, BroadcastDataVariant to_send) noexcept;
+    void local_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept;
 
     // Implementation of public functions
-    std::optional<BroadcastDataVariant> get_impl(const TagID& tag_id) noexcept;
+    std::optional<PublishDataVariant> get_impl(const TagID& tag_id) noexcept;
     bool has_data_impl(const TagID& tag_id) noexcept;
     void subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept;
     void unsubscribe_impl(const TagID& tag_id) noexcept;
@@ -206,7 +206,7 @@ namespace skynet
     // Put both buffers in a struct so they can be guarded by the same mutex easily
     struct Buffers {
       // The buffer of data for each tag
-      std::unordered_map<TagID, BroadcastDataVariant> values_;
+      std::unordered_map<TagID, PublishDataVariant> values_;
 
       // The expected type for each tag ID
       std::unordered_map<TagID, std::uint8_t> expected_types_;

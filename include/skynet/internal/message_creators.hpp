@@ -10,12 +10,12 @@ namespace skynet::internal
 {
   /** \brief Create data for a broadcast
    */
-  std::vector<std::byte> make_broadcast(
+  std::vector<std::byte> make_publish(
     const MessageID message_id,
     const TagID& tag_id,
     const MachineID& origin,
     const std::uint8_t hops_left_p1,
-    const BroadcastDataVariant& data
+    const PublishDataVariant& data
   ) noexcept;
 
   /** \brief Create data for a greeting

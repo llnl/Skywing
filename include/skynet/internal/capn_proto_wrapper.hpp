@@ -38,31 +38,31 @@ namespace skynet::internal
       return to_ret;
     }
 
-    // Mapping for the Broadcast data to retrieve things from it as a template
-    template<typename T> struct BroadcastDataHandler;
+    // Mapping for the publish data to retrieve things from it as a template
+    template<typename T> struct PublishDataHandler;
 
     // Create a mapping for a type and a vector of that type
-    #define SKYNET_MAKE_BROADCAST_DATA_HANDLER(cpp_type, capn_suffix) \
-      template<> struct BroadcastDataHandler<cpp_type> \
+    #define SKYNET_MAKE_PUBLISH_DATA_HANDLER(cpp_type, capn_suffix) \
+      template<> struct PublishDataHandler<cpp_type> \
       { \
-        static std::optional<cpp_type> get(const cpnpro::BroadcastData::Reader& r) noexcept \
+        static std::optional<cpp_type> get(const cpnpro::PublishData::Reader& r) noexcept \
         { \
           if (!r.is##capn_suffix()) { return {}; } \
           return r.get##capn_suffix(); \
         } \
-        static void set(cpnpro::BroadcastData::Builder& b, const cpp_type& value) noexcept \
+        static void set(cpnpro::PublishData::Builder& b, const cpp_type& value) noexcept \
         { \
           b.set##capn_suffix(value); \
         } \
       }; \
-      template<> struct BroadcastDataHandler<std::vector<cpp_type>> \
+      template<> struct PublishDataHandler<std::vector<cpp_type>> \
       { \
-        static std::optional<std::vector<cpp_type>> get(const cpnpro::BroadcastData::Reader& r) noexcept \
+        static std::optional<std::vector<cpp_type>> get(const cpnpro::PublishData::Reader& r) noexcept \
         { \
           if (!r.isR##capn_suffix()) { return {}; } \
           return list_to_vector<cpp_type>(r.getR##capn_suffix()); \
         } \
-        static void set(cpnpro::BroadcastData::Builder& b, const std::vector<cpp_type>& values) noexcept \
+        static void set(cpnpro::PublishData::Builder& b, const std::vector<cpp_type>& values) noexcept \
         { \
           auto serialized_data = b.initR##capn_suffix(values.size()); \
           for (std::size_t i = 0; i < values.size(); ++i) \
@@ -72,42 +72,42 @@ namespace skynet::internal
         } \
       }
 
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(double, D);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(float, F);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::int8_t, I8);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::int16_t, I16);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::int32_t, I32);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::int64_t, I64);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::uint8_t, U8);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::uint16_t, U16);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::uint32_t, U32);
-    SKYNET_MAKE_BROADCAST_DATA_HANDLER(std::uint64_t, U64);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(double, D);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(float, F);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int8_t, I8);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int16_t, I16);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int32_t, I32);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int64_t, I64);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint8_t, U8);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint16_t, U16);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint32_t, U32);
+    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint64_t, U64);
 
-    #undef SKYNET_MAKE_BROADCAST_DATA_HANDLER
+    #undef SKYNET_MAKE_PUBLISH_DATA_HANDLER
 
     // String is a little bit different
-    template<> struct BroadcastDataHandler<std::string>
+    template<> struct PublishDataHandler<std::string>
     {
-      static std::optional<std::string> get(const cpnpro::BroadcastData::Reader& r) noexcept
+      static std::optional<std::string> get(const cpnpro::PublishData::Reader& r) noexcept
       {
         if (!r.isStr()) { return {}; }
         return r.getStr();
       }
-      static void set(cpnpro::BroadcastData::Builder& b, const std::string& value) noexcept
+      static void set(cpnpro::PublishData::Builder& b, const std::string& value) noexcept
       {
         b.setStr(value);
       }
     };
 
-    template<> struct BroadcastDataHandler<std::vector<std::string>>
+    template<> struct PublishDataHandler<std::vector<std::string>>
     {
-      static std::optional<std::vector<std::string>> get(const cpnpro::BroadcastData::Reader& r) noexcept
+      static std::optional<std::vector<std::string>> get(const cpnpro::PublishData::Reader& r) noexcept
       {
         if (!r.isRStr()) { return {}; }
         return list_to_vector<std::string>(r.getRStr());
       }
 
-      static void set(cpnpro::BroadcastData::Builder& b, const std::vector<std::string>& values) noexcept
+      static void set(cpnpro::PublishData::Builder& b, const std::vector<std::string>& values) noexcept
       {
         auto serialized_data = b.initRStr(values.size());
         for (std::size_t i = 0; i < values.size(); ++i)
@@ -120,9 +120,9 @@ namespace skynet::internal
     // Short name entirely for the one function below
     // (type alias templates can't be local)
     template<typename T>
-    using bdh = BroadcastDataHandler<T>;
+    using pdh = PublishDataHandler<T>;
     template<typename T>
-    using bdh_v = BroadcastDataHandler<std::vector<T>>;
+    using pdh_v = PublishDataHandler<std::vector<T>>;
   } // namespace detail
 
   // The categories each message type can be
@@ -132,77 +132,77 @@ namespace skynet::internal
     job
   };
 
-  /** \brief Class representing the data that can be sent on a broadcast
+  /** \brief Class representing the data that can be published
    */
-  class BroadcastData
+  class PublishData
   {
   public:
-    /** \brief Return a T if the broadcast holds it
+    /** \brief Return a T if it was published
      */
     template<typename T>
-    std::optional<T> get() const noexcept { return detail::BroadcastDataHandler<T>::get(r); }
+    std::optional<T> get() const noexcept { return detail::PublishDataHandler<T>::get(r); }
 
     /** \brief Return the held value as a variant
      */
-    std::optional<BroadcastDataVariant> get_variant() const noexcept
+    std::optional<PublishDataVariant> get_variant() const noexcept
     {
       using namespace detail;
       // This is gross and I hate it, but...
-      using vals = cpnpro::BroadcastData::Which;
+      using vals = cpnpro::PublishData::Which;
       switch (r.which())
       {
-      case vals::D:     return bdh<double>::get(r);
-      case vals::R_D:   return bdh_v<double>::get(r);
-      case vals::F:     return bdh<float>::get(r);
-      case vals::R_F:   return bdh_v<float>::get(r);
-      case vals::STR:   return bdh<std::string>::get(r);
-      case vals::R_STR: return bdh_v<std::string>::get(r);
-      case vals::I8:    return bdh<std::int8_t>::get(r);
-      case vals::I16:   return bdh<std::int16_t>::get(r);
-      case vals::I32:   return bdh<std::int32_t>::get(r);
-      case vals::I64:   return bdh<std::int64_t>::get(r);
-      case vals::U8:    return bdh<std::uint8_t>::get(r);
-      case vals::U16:   return bdh<std::uint16_t>::get(r);
-      case vals::U32:   return bdh<std::uint32_t>::get(r);
-      case vals::U64:   return bdh<std::uint64_t>::get(r);
-      case vals::R_I8:  return bdh_v<std::int8_t>::get(r);
-      case vals::R_I16: return bdh_v<std::int16_t>::get(r);
-      case vals::R_I32: return bdh_v<std::int32_t>::get(r);
-      case vals::R_I64: return bdh_v<std::int64_t>::get(r);
-      case vals::R_U8:  return bdh_v<std::uint8_t>::get(r);
-      case vals::R_U16: return bdh_v<std::uint16_t>::get(r);
-      case vals::R_U32: return bdh_v<std::uint32_t>::get(r);
-      case vals::R_U64: return bdh_v<std::uint64_t>::get(r);
+      case vals::D:     return pdh<double>::get(r);
+      case vals::R_D:   return pdh_v<double>::get(r);
+      case vals::F:     return pdh<float>::get(r);
+      case vals::R_F:   return pdh_v<float>::get(r);
+      case vals::STR:   return pdh<std::string>::get(r);
+      case vals::R_STR: return pdh_v<std::string>::get(r);
+      case vals::I8:    return pdh<std::int8_t>::get(r);
+      case vals::I16:   return pdh<std::int16_t>::get(r);
+      case vals::I32:   return pdh<std::int32_t>::get(r);
+      case vals::I64:   return pdh<std::int64_t>::get(r);
+      case vals::U8:    return pdh<std::uint8_t>::get(r);
+      case vals::U16:   return pdh<std::uint16_t>::get(r);
+      case vals::U32:   return pdh<std::uint32_t>::get(r);
+      case vals::U64:   return pdh<std::uint64_t>::get(r);
+      case vals::R_I8:  return pdh_v<std::int8_t>::get(r);
+      case vals::R_I16: return pdh_v<std::int16_t>::get(r);
+      case vals::R_I32: return pdh_v<std::int32_t>::get(r);
+      case vals::R_I64: return pdh_v<std::int64_t>::get(r);
+      case vals::R_U8:  return pdh_v<std::uint8_t>::get(r);
+      case vals::R_U16: return pdh_v<std::uint16_t>::get(r);
+      case vals::R_U32: return pdh_v<std::uint32_t>::get(r);
+      case vals::R_U64: return pdh_v<std::uint64_t>::get(r);
       }
       return {};
     }
 
   private:
-    // Only allow Broadcast to construct this
-    friend class Broadcast;
-    explicit BroadcastData(cpnpro::BroadcastData::Reader reader) noexcept
+    // Only allow Publish to construct this
+    friend class Publish;
+    explicit PublishData(cpnpro::PublishData::Reader reader) noexcept
       : r{std::move(reader)}
       {}
 
-    cpnpro::BroadcastData::Reader r;
+    cpnpro::PublishData::Reader r;
   };
 
-  /** \brief Class representing a broadcast message
+  /** \brief Class representing a publish message
    */
-  class Broadcast
+  class Publish
   {
   public:
     MessageID message_id() const noexcept { return r.getMessageID(); }
     TagID tag_id() const noexcept { return r.getTagID(); }
     MachineID origin() const noexcept { return r.getOrigin(); }
     std::uint8_t hops_left_p1() const noexcept { return r.getHopsLeftP1(); }
-    BroadcastData data() const noexcept { return BroadcastData{r.getData()}; }
+    PublishData data() const noexcept { return PublishData{r.getData()}; }
 
   private:
-    cpnpro::Broadcast::Reader r;
+    cpnpro::Publish::Reader r;
 
     friend class MessageHandler;
-    explicit Broadcast(cpnpro::Broadcast::Reader reader) noexcept
+    explicit Publish(cpnpro::Publish::Reader reader) noexcept
       : r{std::move(reader)}
       {}
   };
@@ -347,7 +347,7 @@ namespace skynet::internal
     {
       using vals = cpnpro::Message::Which;
       switch(impl_->root.which()) {
-      case vals::BROADCAST:       return MessageCategory::job;
+      case vals::PUBLISH:         return MessageCategory::job;
       case vals::GREETING:        return MessageCategory::status;
       case vals::GOODBYE:         return MessageCategory::status;
       case vals::NEW_NEIGHBOR:    return MessageCategory::status;
@@ -361,7 +361,7 @@ namespace skynet::internal
   private:
     // The types of messages that can be produced
     using MessageVariant = std::variant<
-      Broadcast,
+      Publish,
       Greeting,
       Goodbye,
       NewNeighbor,
@@ -378,7 +378,7 @@ namespace skynet::internal
       // to signify that there's no data due to, e.g., malformed input
       const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
         switch(impl_->root.which()) {
-        case vals::BROADCAST:       return Broadcast{impl_->root.getBroadcast()};
+        case vals::PUBLISH:         return Publish{impl_->root.getPublish()};
         case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
         case vals::GOODBYE:         return Goodbye{/* impl_->root.getGoodbye() */};
         case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};

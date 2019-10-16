@@ -42,28 +42,28 @@ namespace skynet::internal
     }
   } // namespace {anonymous}
 
-  /** \brief Create data for a broadcast
+  /** \brief Create data for a publish
    */
-  std::vector<std::byte> make_broadcast(
+  std::vector<std::byte> make_publish(
     const MessageID message_id,
     const TagID& tag_id,
     const MachineID& origin,
     const std::uint8_t hops_left_p1,
-    const BroadcastDataVariant& data
+    const PublishDataVariant& data
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Message>().initBroadcast();
+    auto message = builder.initRoot<cpnpro::Message>().initPublish();
     // Just set the data now
     message.setMessageID(message_id);
     message.setTagID(tag_id);
     message.setOrigin(origin);
     message.setHopsLeftP1(hops_left_p1);
-    auto broadcast_data = message.initData();
+    auto publish_data = message.initData();
     std::visit(
       [&](const auto& value) {
         using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-        detail::BroadcastDataHandler<ValueType>::set(broadcast_data, value);
+        detail::PublishDataHandler<ValueType>::set(publish_data, value);
       },
       data
     );

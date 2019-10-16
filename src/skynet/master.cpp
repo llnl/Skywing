@@ -316,7 +316,7 @@ namespace skynet
     const MessageID msg_id,
     const TagID& tag_id,
     const std::uint32_t hops_left_p1,
-    BroadcastDataVariant data
+    PublishDataVariant data
   ) noexcept
   {
     m.do_broadcast(msg_id, tag_id, hops_left_p1, std::move(data));
@@ -469,11 +469,11 @@ namespace skynet
     const MessageID msg_id,
     const TagID& tag_id,
     const std::uint8_t hops_left_p1,
-    BroadcastDataVariant data
+    PublishDataVariant data
   ) noexcept
   {
     // Prepend the message describing the data and send it to all neighbors
-    send_to_neighbors(internal::make_broadcast(msg_id, tag_id, id_, hops_left_p1, std::move(data)));
+    send_to_neighbors(internal::make_publish(msg_id, tag_id, id_, hops_left_p1, std::move(data)));
   }
 
   // Does all processing that needs to be done when a message is recieved
@@ -481,7 +481,7 @@ namespace skynet
   {
     assert(handle.category() == internal::MessageCategory::job);
     const auto okay = handle.do_callback(
-      [&](const internal::Broadcast& msg) {
+      [&](const internal::Publish& msg) {
         if (is_old_message(msg))
         {
           return true;
@@ -493,7 +493,7 @@ namespace skynet
         if (msg.hops_left_p1() != 1)
         {
           const auto hops_p1 = msg.hops_left_p1();
-          const auto to_send = internal::make_broadcast(
+          const auto to_send = internal::make_publish(
             msg.message_id(),
             msg.tag_id(),
             msg.origin(),
@@ -525,7 +525,7 @@ namespace skynet
 
   // Adds data to the tag queue for a job from a message
   // Returns true if it was successful, false if something went wrong
-  bool Master::add_data_to_queue(const internal::Broadcast& msg) noexcept
+  bool Master::add_data_to_queue(const internal::Publish& msg) noexcept
   {
     for (auto& [name, job] : jobs_)
     {
@@ -540,9 +540,9 @@ namespace skynet
 
   /** \brief Returns true if a message is old, false otherwise
    */
-  bool Master::is_old_message(const internal::Broadcast& msg) noexcept
+  bool Master::is_old_message(const internal::Publish& msg) noexcept
   {
-    auto& last_id = last_message_id_[msg.origin()][msg.tag_id()];
+    auto& last_id = last_tag_id_[msg.tag_id()];
     if (msg.message_id() <= last_id)
     {
       return true;

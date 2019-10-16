@@ -26,7 +26,7 @@ namespace skynet
    * \param data The data sent on the tag
    * \return True if processing went fine, false if there was an error
    */
-  bool Job::process_data(const TagID& tag_id, BroadcastDataVariant data) noexcept
+  bool Job::process_data(const TagID& tag_id, PublishDataVariant data) noexcept
   {
     auto buf_pair = bufs_.get();
     auto& buf = buf_pair.first;
@@ -44,7 +44,7 @@ namespace skynet
 
   /** \brief Broadcasts a value on a tag to all nodes in the network
    */
-  void Job::global_broadcast(const TagID& tag_id, BroadcastDataVariant to_send) noexcept
+  void Job::global_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept
   {
     Master::Accessor::broadcast(
       *master_,
@@ -58,7 +58,7 @@ namespace skynet
 
   /** \brief Broadcasts a value on a tag to all neighbors
    */
-  void Job::local_broadcast(const TagID& tag_id, BroadcastDataVariant to_send) noexcept
+  void Job::local_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept
   {
     Master::Accessor::broadcast(
       *master_,
@@ -71,7 +71,7 @@ namespace skynet
   }
 
   // Implementation of public functions
-  std::optional<BroadcastDataVariant> Job::get_impl(const TagID& tag_id) noexcept
+  std::optional<PublishDataVariant> Job::get_impl(const TagID& tag_id) noexcept
   {
     auto buf_pair = bufs_.get();
     auto& buf = buf_pair.first;

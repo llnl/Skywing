@@ -5,7 +5,7 @@
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("cpnpro");
 
-struct BroadcastData {
+struct PublishData {
   union {
     # Cap'n Proto FORCES camelCase to be used for these...
     d     @0  : Float64;
@@ -35,12 +35,12 @@ struct BroadcastData {
   }
 }
 
-struct Broadcast {
+struct Publish {
   messageID @0 : UInt32;
   tagID @1 : Text;
   origin @2 : Text;
   hopsLeftP1 @3 : UInt8;
-  data @4 : BroadcastData;
+  data @4 : PublishData;
 }
 
 struct Greeting {
@@ -62,7 +62,7 @@ struct RemoveNeighbor {
 
 struct Message {
   union {
-    broadcast @0 : Broadcast;
+    publish @0 : Publish;
     greeting @1 : Greeting;
     goodbye @2 : Void;
     newNeighbor @3 : NewNeighbor;

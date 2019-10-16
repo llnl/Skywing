@@ -25,8 +25,8 @@ namespace skynet
   /// The type used for communicating message sizes over the network
   using NetworkSizeType = std::uint32_t;
 
-  /// A typelist of all the types that can be used in a broadcast
-  using BroadcastDataTypeList = internal::TypeList<
+  /// A typelist of all the types that can be published
+  using PublishDataTypeList = internal::TypeList<
     float,
     std::vector<float>,
     double,
@@ -52,7 +52,7 @@ namespace skynet
   >;
 
   /// Variant version of the above
-  using BroadcastDataVariant = internal::ApplyTo<BroadcastDataTypeList, std::variant>;
+  using PublishDataVariant = internal::ApplyTo<PublishDataTypeList, std::variant>;
 } // namespace skynet
 
 #endif // SKYNET_TYPES_HPP
