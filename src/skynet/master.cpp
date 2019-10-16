@@ -197,7 +197,7 @@ namespace skynet
         // Then read the actual message and parse it
         if (const auto message_buffer = read_from_conn(bytes_to_read); !message_buffer.empty())
         {
-          return MessageHandler{message_buffer};
+          return MessageHandler::try_to_create(message_buffer);
         }
         else
         {
