@@ -31,6 +31,8 @@ namespace skynet { namespace internal
 
   SocketCommunicator::SocketCommunicator(SocketCommunicator&& other) noexcept
     : handle_{other.handle_}
+    , address_{std::move(other.address_)}
+    , port_{other.port_}
   {
     other.handle_ = invalid_handle;
   }
@@ -95,6 +97,7 @@ namespace skynet { namespace internal
       // std::exit(-1);
       return ConnectionError::unrecoverable;
     }
+    port_ = port;
     return ConnectionError::no_error;
   }
 
@@ -126,6 +129,8 @@ namespace skynet { namespace internal
         return ConnectionError::unrecoverable;
       }
     }
+    address_ = address;
+    port_ = port;
     return ConnectionError::no_error;
   }
 

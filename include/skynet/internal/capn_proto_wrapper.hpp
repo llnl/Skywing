@@ -192,7 +192,7 @@ namespace skynet::internal
   class Publish
   {
   public:
-    MessageID message_id() const noexcept { return r.getMessageID(); }
+    VersionID version() const noexcept { return r.getVersion(); }
     TagID tag_id() const noexcept { return r.getTagID(); }
     MachineID origin() const noexcept { return r.getOrigin(); }
     std::uint8_t hops_left_p1() const noexcept { return r.getHopsLeftP1(); }

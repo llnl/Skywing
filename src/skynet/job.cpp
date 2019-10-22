@@ -20,103 +20,125 @@ namespace skynet
     return is_finished_;
   }
 
+  VersionID Job::update_version(VersionID& to_update, const VersionID new_version) noexcept
+  {
+    to_update =
+      new_version == tag_default_version
+        ? to_update + 1
+        : new_version;
+    return to_update;
+  }
+
   /** \brief Processes the raw information sent from a job on another instance
    *
    * \param tag The id of the tag the data was sent with
    * \param data The data sent on the tag
+   * \param version The version of the data
    * \return True if processing went fine, false if there was an error
    */
-  bool Job::process_data(const TagID& tag_id, PublishDataVariant data) noexcept
+  bool Job::process_data(
+    const TagID& tag_id,
+    PublishDataVariant data,
+    const VersionID version
+  ) noexcept
   {
     auto buf_pair = bufs_.get();
-    auto& buf = buf_pair.first;
-    auto& expected_types = buf.expected_types_;
-    auto& values = buf.values_;
-    const auto loc = expected_types.find(tag_id);
+    auto& buffers = buf_pair.first;
+    const auto loc = buffers.find(tag_id);
     // Not subscribed; don't do anything, but not an error
-    if (loc == expected_types.cend()) { return true; }
+    if (loc == buffers.cend()) { return true; }
     // If the type is wrong then something went wrong
-    if (data.index() != loc->second) { return false; }
+    if (data.index() != loc->second.expected_type) { return false; }
     // Otherwise just make it the current value
-    values.insert_or_assign(tag_id, std::move(data));
+    loc->second.value = std::move(data);
+    loc->second.stored_version = version;
     return true;
   }
 
   /** \brief Broadcasts a value on a tag to all nodes in the network
    */
-  void Job::global_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept
+  void Job::global_broadcast(
+    const TagID& tag_id,
+    PublishDataVariant to_send,
+    const VersionID version
+  ) noexcept
   {
+    // Find / create the last version and obtain a reference to it
+    auto& last_version =
+      last_published_version_.try_emplace(tag_id, tag_default_version).first->second;
+    update_version(last_version, version);
     Master::Accessor::broadcast(
       *master_,
-      message_id_,
+      last_version,
       tag_id,
       0,
       std::move(to_send)
     );
-    ++message_id_;
-  }
-
-  /** \brief Broadcasts a value on a tag to all neighbors
-   */
-  void Job::local_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept
-  {
-    Master::Accessor::broadcast(
-      *master_,
-      message_id_,
-      tag_id,
-      1,
-      std::move(to_send)
-    );
-    ++message_id_;
   }
 
   // Implementation of public functions
-  std::optional<PublishDataVariant> Job::get_impl(const TagID& tag_id) noexcept
+  std::optional<PublishDataVariant> Job::get_impl(
+    const TagID& tag_id,
+    const VersionID version
+  ) noexcept
   {
     auto buf_pair = bufs_.get();
-    auto& buf = buf_pair.first;
-    auto& values = buf.values_;
-    // Then check if there's been anything seen on the tag and return it if so
-    if (const auto loc = values.find(tag_id); loc != values.cend())
+    auto& buffers = buf_pair.first;
+    auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
+    update_version(version_needed, version);
+    // Then check if there's been anything seen on the tag and return it if it's
+    // at least the required version
+    if (const auto loc = buffers.find(tag_id);
+      loc != buffers.cend() &&
+      loc->second.stored_version != tag_default_version &&
+      loc->second.stored_version >= version_needed)
     {
-      return loc->second;
+      loc->second.last_fetched_version = version_needed;
+      return loc->second.value;
     }
     return {};
   }
 
-  bool Job::has_data_impl(const TagID& tag_id) noexcept
+  bool Job::has_data_impl(const TagID& tag_id, const VersionID version) noexcept
   {
     auto buf_pair = bufs_.get();
-    auto& buf = buf_pair.first;
-    auto& values = buf.values_;
-    // If there's anything in the values_ map then there's data
-    return (values.find(tag_id) != values.cend());
+    auto& buffers = buf_pair.first;
+    const auto loc = buffers.find(tag_id);
+    auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
+    update_version(version_needed, version);
+    return loc != buffers.cend() &&
+      loc->second.stored_version != tag_default_version &&
+      loc->second.stored_version >= version_needed;
   }
 
   void Job::subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept
   {
     auto buf_pair = bufs_.get();
-    auto& buf = buf_pair.first;
-    auto& expected_types = buf.expected_types_;
+    auto& buffers = buf_pair.first;
     // Already subscribed - hard error
-    if (expected_types.find(tag_id) != expected_types.cend())
+    if (buffers.find(tag_id) != buffers.cend())
     {
       std::cerr << "Job " << std::quoted(id_) << " subscribed to tag " << std::quoted(tag_id) << " after already being subscribed to it.\n";
       std::terminate();
     }
     // Then add the expected type; marking the tag as watched
-    expected_types.try_emplace(
+    buffers.try_emplace(
       tag_id,
-      expected_type
+      TagInfo{
+        // Just need a dummy value here
+        std::int32_t{},
+        expected_type,
+        tag_default_version,
+        tag_default_version
+      }
     );
   }
 
   void Job::unsubscribe_impl(const TagID& tag_id) noexcept
   {
     auto buf_pair = bufs_.get();
-    auto& buf = buf_pair.first;
+    auto& buffers = buf_pair.first;
     // Just remove any the expected types and data maps
-    buf.expected_types_.erase(tag_id);
-    buf.values_.erase(tag_id);
+    buffers.erase(tag_id);
   }
 } // namespace skynet

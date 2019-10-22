@@ -79,6 +79,14 @@ namespace skynet::internal
      */
     ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
 
+    /** \brief Returns the IP address of the socket
+     */
+    std::string ip_address() const noexcept;
+
+    /** \brief Returns the port of the socket
+     */
+    std::uint16_t port() const noexcept;
+
   private:
     // Tag for using the raw handle constructor
     struct WithRawHandle{};
@@ -90,6 +98,12 @@ namespace skynet::internal
 
     // The handle to the raw socket
     int handle_;
+
+    // The address of the socket
+    std::string address_;
+
+    // The port of the socket
+    std::uint16_t port_;
   }; // class SocketCommunicator
 } // namespace skynet::internal
 

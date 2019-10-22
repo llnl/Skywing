@@ -179,7 +179,7 @@ namespace skynet
 
       static void broadcast(
         Master& m,
-        const MessageID msg_id,
+        const VersionID version,
         const TagID& tag_id,
         const std::uint32_t hops_left_p1,
         PublishDataVariant data
@@ -254,13 +254,13 @@ namespace skynet
 
     /** \brief Broadcast a message to the entire network
      *
-     * \param msg_id The message's id
+     * \param msg_id The message's version
      * \param tag_id The id of the tag the message is for
      * \param hops_p1 The number of hops left + 1
      * \param data The data to broadcast
      */
     void do_broadcast(
-      const MessageID msg_id,
+      const VersionID version,
       const TagID& tag_id,
       const std::uint8_t hops_left_p1,
       PublishDataVariant data
@@ -317,7 +317,7 @@ namespace skynet
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
     // The last heard message id for each tag in the network
-    std::unordered_map<TagID, MessageID> last_tag_id_;
+    std::unordered_map<TagID, VersionID> last_tag_id_;
 
     // The id of this machine
     MachineID id_;

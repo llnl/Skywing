@@ -36,7 +36,7 @@ struct PublishData {
 }
 
 struct Publish {
-  messageID @0 : UInt32;
+  version @0 : UInt32;
   tagID @1 : Text;
   origin @2 : Text;
   hopsLeftP1 @3 : UInt8;

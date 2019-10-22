@@ -5,6 +5,7 @@
 #include "skynet/internal/utility/type_list.hpp"
 #include "skynet/types.hpp"
 
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -57,6 +58,11 @@ namespace skynet
   class Job
   {
   public:
+    /** \brief The value to pass to use default behavior for
+     * versions when publishing and subscribing.
+     */
+    inline static constexpr VersionID tag_default_version = -1;
+
     /** \brief Creates a job with the specified id and master
      */
     explicit Job(const JobID& id, Master& master, std::function<void(Job&)> to_run) noexcept;
@@ -70,9 +76,12 @@ namespace skynet
     /** \brief Gets the latest data on a tag (if any exists)
      */
     template<typename GetTag>
-    std::optional<typename GetTag::ValueType> get(const GetTag& tag) noexcept
+    std::optional<typename GetTag::ValueType> get(
+      const GetTag& tag,
+      const VersionID version = tag_default_version
+    ) noexcept
     {
-      if (const auto val = get_impl(tag.id()))
+      if (const auto val = get_impl(tag.id(), version))
       {
         // Wrong types should never be put in the buffer
         using ValueType = typename GetTag::ValueType;
@@ -92,10 +101,11 @@ namespace skynet
     >
     typename GetTag::ValueType get_when_ready(
       const GetTag& tag,
+      const VersionID version = tag_default_version,
       const std::chrono::duration<Rep, Period> poll_freq = internal::default_poll_freq
     ) noexcept
     {
-      while (!has_data(tag))
+      while (!has_data(tag, version))
       {
         std::this_thread::sleep_for(poll_freq);
       }
@@ -105,9 +115,9 @@ namespace skynet
     /** \brief Checks if a tag buffer has data or not
      */
     template<typename GetTag>
-    bool has_data(const GetTag& tag) noexcept
+    bool has_data(const GetTag& tag, const VersionID version = tag_default_version) noexcept
     {
-      return has_data_impl(tag.id());
+      return has_data_impl(tag.id(), version);
     }
 
     /** \brief Subscribes to the passed tag, hard errors if already the job
@@ -148,9 +158,13 @@ namespace skynet
     /** \brief Publish data on the passed tag
      */
     template<typename Tag>
-    void publish(const Tag& tag, const typename Tag::ValueType& value) noexcept
+    void publish(
+      const Tag& tag,
+      const typename Tag::ValueType& value,
+      const VersionID version = tag_default_version
+    ) noexcept
     {
-      global_broadcast(tag.id(), value);
+      global_broadcast(tag.id(), value, version);
     }
 
     /** \brief Returns true if the job is finished, false if it is not
@@ -165,10 +179,11 @@ namespace skynet
       static bool process_data(
         Job& j,
         const TagID& tag,
-        PublishDataVariant data
+        PublishDataVariant data,
+        const VersionID version
       ) noexcept
       {
-        return j.process_data(tag, data);
+        return j.process_data(tag, data, version);
       }
 
       static std::thread run(Job& j) noexcept
@@ -181,43 +196,52 @@ namespace skynet
     };
 
   private:
+    // Updates the version that's passed in and returns a copy of it
+    // Do it like this instead of with a tag ID to prevent trying to double lock a mutex
+    VersionID update_version(VersionID& to_update, const VersionID new_version) noexcept;
+
     /** \brief Processes the raw information sent from a job on another instance
      *
      * \param tag The id of the tag the data was sent with
      * \param data The data sent on the tag
+     * \param version The version of the data
      * \return True if processing went fine, false if there was an error
      */
-    bool process_data(const TagID& tag_id, PublishDataVariant data) noexcept;
+    bool process_data(const TagID& tag_id, PublishDataVariant data, VersionID version) noexcept;
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
      */
-    void global_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept;
-
-    /** \brief Broadcasts a value on a tag to all neighbors
-     */
-    void local_broadcast(const TagID& tag_id, PublishDataVariant to_send) noexcept;
+    void global_broadcast(
+      const TagID& tag_id,
+      PublishDataVariant to_send,
+      VersionID version
+    ) noexcept;
 
     // Implementation of public functions
-    std::optional<PublishDataVariant> get_impl(const TagID& tag_id) noexcept;
-    bool has_data_impl(const TagID& tag_id) noexcept;
+    std::optional<PublishDataVariant> get_impl(const TagID& tag_id, VersionID version) noexcept;
+    bool has_data_impl(const TagID& tag_id, VersionID version) noexcept;
     void subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept;
     void unsubscribe_impl(const TagID& tag_id) noexcept;
 
-    // Put both buffers in a struct so they can be guarded by the same mutex easily
-    struct Buffers {
-      // The buffer of data for each tag
-      std::unordered_map<TagID, PublishDataVariant> values_;
+    // Group all of the related data to a tag ID in a single structure
+    struct TagInfo {
+      // The data for the tag
+      PublishDataVariant value;
 
-      // The expected type for each tag ID
-      std::unordered_map<TagID, std::uint8_t> expected_types_;
+      // The expected type
+      std::uint8_t expected_type;
+
+      // The last version retrieved
+      VersionID last_fetched_version;
+
+      // The version of the data that is currently stored
+      VersionID stored_version;
     };
 
-    MutexGuarded<Buffers> bufs_;
+    MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
 
-    // The id for the message to send
-    // Could keep a seperate id for each tag, but running out of message id's
-    // isn't very realistic
-    MessageID message_id_{1};
+    // The last version published on each tag
+    std::unordered_map<std::string, VersionID> last_published_version_;
 
     // The id for this job; must be the same across all instances
     JobID id_;

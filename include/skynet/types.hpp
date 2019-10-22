@@ -16,8 +16,8 @@ namespace skynet
   /// The ID type for jobs
   using JobID = std::string;
 
-  /// The ID type for messages
-  using MessageID = std::uint32_t;
+  /// The ID type for message versions.
+  using VersionID = std::uint32_t;
 
   /// The ID type for tags
   using TagID = std::string;

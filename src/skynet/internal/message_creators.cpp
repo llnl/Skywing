@@ -45,7 +45,7 @@ namespace skynet::internal
   /** \brief Create data for a publish
    */
   std::vector<std::byte> make_publish(
-    const MessageID message_id,
+    const VersionID version,
     const TagID& tag_id,
     const MachineID& origin,
     const std::uint8_t hops_left_p1,
@@ -55,7 +55,7 @@ namespace skynet::internal
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::Message>().initPublish();
     // Just set the data now
-    message.setMessageID(message_id);
+    message.setVersion(version);
     message.setTagID(tag_id);
     message.setOrigin(origin);
     message.setHopsLeftP1(hops_left_p1);

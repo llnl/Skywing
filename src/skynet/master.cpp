@@ -1,8 +1,6 @@
 #include "skynet/master.hpp"
 
-// TODO: Support other types of communicators; will probably make
-//       it a template and have it as a parameter, so not making a seperate
-//       .cpp file even though there currently could be one.
+// TODO: Support other types of communicators
 
 namespace skynet
 {
@@ -313,13 +311,13 @@ namespace skynet
 
   void Master::Accessor::broadcast(
     Master& m,
-    const MessageID msg_id,
+    const VersionID version,
     const TagID& tag_id,
     const std::uint32_t hops_left_p1,
     PublishDataVariant data
   ) noexcept
   {
-    m.do_broadcast(msg_id, tag_id, hops_left_p1, std::move(data));
+    m.do_broadcast(version, tag_id, hops_left_p1, std::move(data));
   }
 
   Master::Master(
@@ -466,14 +464,14 @@ namespace skynet
    * \param data The data to broadcast
    */
   void Master::do_broadcast(
-    const MessageID msg_id,
+    const VersionID version,
     const TagID& tag_id,
     const std::uint8_t hops_left_p1,
     PublishDataVariant data
   ) noexcept
   {
     // Prepend the message describing the data and send it to all neighbors
-    send_to_neighbors(internal::make_publish(msg_id, tag_id, id_, hops_left_p1, std::move(data)));
+    send_to_neighbors(internal::make_publish(version, tag_id, id_, hops_left_p1, std::move(data)));
   }
 
   // Does all processing that needs to be done when a message is recieved
@@ -494,7 +492,7 @@ namespace skynet
         {
           const auto hops_p1 = msg.hops_left_p1();
           const auto to_send = internal::make_publish(
-            msg.message_id(),
+            msg.version(),
             msg.tag_id(),
             msg.origin(),
             hops_p1 == 0 ? 0 : hops_p1 - 1,
@@ -530,7 +528,7 @@ namespace skynet
     for (auto& [name, job] : jobs_)
     {
       (void)name;
-      if (!Job::Accessor::process_data(*job, msg.tag_id(), *msg.data().get_variant()))
+      if (!Job::Accessor::process_data(*job, msg.tag_id(), *msg.data().get_variant(), msg.version()))
       {
         return false;
       }
@@ -542,12 +540,19 @@ namespace skynet
    */
   bool Master::is_old_message(const internal::Publish& msg) noexcept
   {
-    auto& last_id = last_tag_id_[msg.tag_id()];
-    if (msg.message_id() <= last_id)
+    // If the message can't be found it's always new
+    const auto loc = last_tag_id_.find(msg.tag_id());
+    if (loc == last_tag_id_.cend())
+    {
+      last_tag_id_.emplace(msg.tag_id(), msg.version());
+      return false;
+    }
+    // Otherwise have to check if it's old
+    if (msg.version() <= loc->second)
     {
       return true;
     }
-    last_id = msg.message_id();
+    loc->second = msg.version();
     return false;
   }
 
