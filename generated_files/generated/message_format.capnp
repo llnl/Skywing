@@ -6,7 +6,7 @@ using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("cpnpro");
 
 struct PublishData {
-  union {
+  value : union {
     # Cap'n Proto FORCES camelCase to be used for these...
     d     @0  : Float64;
     rD    @1  : List(Float64);
@@ -33,24 +33,23 @@ struct PublishData {
     # TODO: Actually figure out how to use bytes?
     # bytes @22 : Data;
   }
+  version    @22 : UInt32;
+  tagID      @23 : Text;
+  origin     @24 : Text;
+  hopsLeftP1 @25 : UInt8;
 }
 
 struct Publish {
-  version @0 : UInt32;
-  tagID @1 : Text;
-  origin @2 : Text;
-  hopsLeftP1 @3 : UInt8;
-  data @4 : PublishData;
+  union {
+    closingConnection @0 : Void;
+    data              @1 : PublishData;
+  }
 }
 
 struct Greeting {
-  from @0 : Text;
+  from      @0 : Text;
   neighbors @1 : List(Text);
 }
-
-# struct Goodbye {
-#   # Empty
-# }
 
 struct NewNeighbor {
   neighborID @0 : Text;
@@ -60,13 +59,23 @@ struct RemoveNeighbor {
   neighborID @0 : Text;
 }
 
-struct Message {
+struct TagPublishers {
+  machines @0 : List(Text);
+  tags     @1 : List(List(Text));
+}
+
+struct GetPublishers {
+  tags @0 : List(Text);
+}
+
+struct StatusMessage {
   union {
-    publish @0 : Publish;
-    greeting @1 : Greeting;
-    goodbye @2 : Void;
-    newNeighbor @3 : NewNeighbor;
-    removeNeighbor @4 : RemoveNeighbor;
-    heartbeat @5 : Void;
+    greeting       @0 : Greeting;
+    goodbye        @1 : Void;
+    newNeighbor    @2 : NewNeighbor;
+    removeNeighbor @3 : RemoveNeighbor;
+    heartbeat      @4 : Void;
+    tagPublishers  @5 : TagPublishers;
+    getPublishers  @6 : GetPublishers;
   }
 }

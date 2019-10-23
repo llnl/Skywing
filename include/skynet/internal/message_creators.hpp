@@ -8,15 +8,19 @@
 
 namespace skynet::internal
 {
-  /** \brief Create data for a broadcast
+  /** \brief Create data for a publish
    */
   std::vector<std::byte> make_publish(
     const VersionID message_id,
     const TagID& tag_id,
     const MachineID& origin,
     const std::uint8_t hops_left_p1,
-    const PublishDataVariant& data
+    const PublishValueVariant& data
   ) noexcept;
+
+  /** \brief Create data to signify that a publication channel is closing
+   */
+  std::vector<std::byte> make_close_publish() noexcept;
 
   /** \brief Create data for a greeting
    */

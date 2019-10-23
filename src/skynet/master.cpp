@@ -46,29 +46,19 @@ namespace skynet
       );
     }
 
-    /** \brief Recieve a skynet::Message from an external connection if one exists
-     *
-     * Returns the handler for the message if one exists.
-     */
-    std::optional<MessageHandler> ExternalMaster::get_message() noexcept
+    void ExternalMaster::get_and_handle_messages() noexcept
     {
       if (dead_)
       {
-        return {};
+        return;
       }
-      if (auto handler = try_to_get_message_handler())
+      while (auto handler = try_to_get_status_message())
       {
         // Update the last time something was heard
         last_heard_ = std::chrono::steady_clock::now();
-        // Handle status messages here
-        if (handler->category() == MessageCategory::status)
-        {
-          handle_message(*handler);
-          return get_message();
-        }
-        return std::move(*handler);
+        // Handle the message
+        handle_message(*handler);
       }
-      return {};
     }
 
     /** \brief Sends a raw message to the other master
@@ -185,8 +175,7 @@ namespace skynet
       return read_bytes;
     }
 
-    // Attempt to get a MessageHandler from the connection
-    std::optional<MessageHandler> ExternalMaster::try_to_get_message_handler() noexcept
+    std::optional<StatusMessageHandler> ExternalMaster::try_to_get_status_message() noexcept
     {
       std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
       if (read_from_conn(size_buffer.data(), size_buffer.size()))
@@ -195,7 +184,7 @@ namespace skynet
         // Then read the actual message and parse it
         if (const auto message_buffer = read_from_conn(bytes_to_read); !message_buffer.empty())
         {
-          return MessageHandler::try_to_create(message_buffer);
+          return StatusMessageHandler::try_to_create(message_buffer);
         }
         else
         {
@@ -221,12 +210,8 @@ namespace skynet
       // TODO: Probably want a time-out?
       while (true)
       {
-        if (auto handle = try_to_get_message_handler())
+        if (auto handle = try_to_get_status_message())
         {
-          if (handle->category() != MessageCategory::status)
-          {
-            return false;
-          }
           return handle->do_callback(
             [&](const Greeting& msg) {
               neighbors_ = msg.neighbors();
@@ -242,9 +227,8 @@ namespace skynet
     }
 
     // Handle status messages
-    void ExternalMaster::handle_message(MessageHandler& handle) noexcept
+    void ExternalMaster::handle_message(StatusMessageHandler& handle) noexcept
     {
-      assert(handle.category() == MessageCategory::status);
       const auto okay = handle.do_callback(
         [&](const Greeting&) {
           // shouldn't be seeing a greeting here
@@ -283,9 +267,18 @@ namespace skynet
           // (Last heard time was already updated)
           return true;
         },
+        [&](const TagPublishers& msg) {
+          // Remove any tags that the local machine produces
+          auto tags_left = msg.tags();
+          return true;
+        },
+        [&](const GetPublishers& msg) {
+          (void)msg;
+          return true;
+        },
         [](...) {
-          // Anything else is a programming bug
-          assert(false && "Invalid message type in ExternalMaster::handle_message");
+          // Anything else is a programming bug, this shouldn't be reached
+          assert(false && "Missing message type in ExternalMaster::handle_message");
           return false;
         }
       );
@@ -300,27 +293,6 @@ namespace skynet
   ////////////////////////////////////////////////
   // Class Master
   ////////////////////////////////////////////////
-  void Master::Accessor::add_job(
-    Master& m,
-    const JobID& id,
-    Job& to_add
-  ) noexcept
-  {
-    std::unique_lock lock{m.job_mut_};
-    m.jobs_.emplace(id, &to_add);
-  }
-
-  void Master::Accessor::broadcast(
-    Master& m,
-    const VersionID version,
-    const TagID& tag_id,
-    const std::uint32_t hops_left_p1,
-    PublishDataVariant data
-  ) noexcept
-  {
-    std::unique_lock lock{m.job_mut_};
-    m.do_broadcast(version, tag_id, hops_left_p1, std::move(data));
-  }
 
   Master::Master(
     const std::uint16_t port,
@@ -404,37 +376,58 @@ namespace skynet
     return static_cast<int>(neighbors_.size());
   }
 
+  bool Master::submit_job(
+    JobID name,
+    std::vector<TagID> tags_produced,
+    std::function<void(Job&)> to_run
+  ) noexcept
+  {
+    const auto res = jobs_.try_emplace(
+      std::move(name),
+      Job::Accessor::AllowConstruction{},
+      *this,
+      std::move(tags_produced),
+      std::move(to_run)
+    );
+    return res.second;
+  }
+
   /** \brief Start running all submitted jobs
    */
   void Master::run() noexcept
   {
+    using namespace std::chrono_literals;
     std::vector<std::thread> threads;
     threads.reserve(jobs_.size());
     for (auto& [name, job] : jobs_)
     {
       (void)name;
-      threads.push_back(Job::Accessor::run(*job));
+      threads.push_back(Job::Accessor::run(job));
     }
     // Do processing while there are still jobs
     while (!jobs_.empty()) {
       // Remove any finished jobs
       for (auto iter = jobs_.cbegin(); iter != jobs_.cend(); ) {
-        if (iter->second->is_finished()) {
+        if (iter->second.is_finished()) {
           iter = jobs_.erase(iter);
         }
         else {
           ++iter;
         }
       }
-      // Handle any messages from neighbors
-      handle_neighbor_messages();
-      // Send any heartbeat messages if needed
-      for (auto&& neighbor : neighbors_)
       {
-        neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
+        // Ensure there's no data race with jobs
+        std::unique_lock lock{job_mut_};
+        // Handle any messages from neighbors
+        handle_neighbor_messages();
+        // Send any heartbeat messages if needed
+        for (auto&& neighbor : neighbors_)
+        {
+          neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
+        }
       }
       // Wait a bit for other messages
-      std::this_thread::yield();
+      std::this_thread::sleep_for(100us);
     }
     // Join all of the threads now
     for (auto& thread : threads)
@@ -450,10 +443,7 @@ namespace skynet
   {
     for (auto&& neighbor : neighbors_)
     {
-      while (auto msg_opt = neighbor.second.get_message())
-      {
-        process_message(*msg_opt, neighbor.second);
-      }
+      neighbor.second.get_and_handle_messages();
     }
     remove_dead_neighbors();
   }
@@ -469,7 +459,7 @@ namespace skynet
     const VersionID version,
     const TagID& tag_id,
     const std::uint8_t hops_left_p1,
-    PublishDataVariant data
+    PublishValueVariant data
   ) noexcept
   {
     // Prepend the message describing the data and send it to all neighbors
@@ -477,60 +467,60 @@ namespace skynet
   }
 
   // Does all processing that needs to be done when a message is recieved
-  void Master::process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept
-  {
-    assert(handle.category() == internal::MessageCategory::job);
-    const auto okay = handle.do_callback(
-      [&](const internal::Publish& msg) {
-        if (is_old_message(msg))
-        {
-          return true;
-        }
-        if (!add_data_to_queue(msg))
-        {
-          return false;
-        }
-        if (msg.hops_left_p1() != 1)
-        {
-          const auto hops_p1 = msg.hops_left_p1();
-          const auto to_send = internal::make_publish(
-            msg.version(),
-            msg.tag_id(),
-            msg.origin(),
-            hops_p1 == 0 ? 0 : hops_p1 - 1,
-            *msg.data().get_variant()
-          );
-          // Propagate the message to all neighbors but ones that are known to
-          // have already recieve it, so not the sender, the origin, or neighbors
-          // that the sender also has
-          send_to_neighbors_if(to_send, [&](const internal::ExternalMaster& m) {
-            return
-              m.id() != from.id() &&
-              m.id() != msg.origin() &&
-              !from.has_neighbor(m.id());
-          });
-        }
-        return true;
-      },
-      [](...) {
-        assert(false && "Invalid message type in Master::process_message");
-        return false;
-      }
-    );
-    if (!okay)
-    {
-      from.mark_as_dead();
-    }
-  }
+  // void Master::process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept
+  // {
+  //   assert(handle.category() == internal::MessageCategory::job);
+  //   const auto okay = handle.do_callback(
+  //     [&](const internal::Publish& msg) {
+  //       if (is_old_message(msg))
+  //       {
+  //         return true;
+  //       }
+  //       if (!add_data_to_queue(msg))
+  //       {
+  //         return false;
+  //       }
+  //       if (msg.hops_left_p1() != 1)
+  //       {
+  //         const auto hops_p1 = msg.hops_left_p1();
+  //         const auto to_send = internal::make_publish(
+  //           msg.version(),
+  //           msg.tag_id(),
+  //           msg.origin(),
+  //           hops_p1 == 0 ? 0 : hops_p1 - 1,
+  //           *msg.data().get_variant()
+  //         );
+  //         // Propagate the message to all neighbors but ones that are known to
+  //         // have already recieve it, so not the sender, the origin, or neighbors
+  //         // that the sender also has
+  //         send_to_neighbors_if(to_send, [&](const internal::ExternalMaster& m) {
+  //           return
+  //             m.id() != from.id() &&
+  //             m.id() != msg.origin() &&
+  //             !from.has_neighbor(m.id());
+  //         });
+  //       }
+  //       return true;
+  //     },
+  //     [](...) {
+  //       assert(false && "Invalid message type in Master::process_message");
+  //       return false;
+  //     }
+  //   );
+  //   if (!okay)
+  //   {
+  //     from.mark_as_dead();
+  //   }
+  // }
 
   // Adds data to the tag queue for a job from a message
   // Returns true if it was successful, false if something went wrong
-  bool Master::add_data_to_queue(const internal::Publish& msg) noexcept
+  bool Master::add_data_to_queue(const internal::PublishData& msg) noexcept
   {
     for (auto& [name, job] : jobs_)
     {
       (void)name;
-      if (!Job::Accessor::process_data(*job, msg.tag_id(), *msg.data().get_variant(), msg.version()))
+      if (!Job::Accessor::process_data(job, msg.tag_id(), *msg.data().get_variant(), msg.version()))
       {
         return false;
       }
@@ -540,21 +530,21 @@ namespace skynet
 
   /** \brief Returns true if a message is old, false otherwise
    */
-  bool Master::is_old_message(const internal::Publish& msg) noexcept
+  bool Master::is_old_message(const internal::PublishData& msg) noexcept
   {
     // If the message can't be found it's always new
-    const auto loc = last_tag_id_.find(msg.tag_id());
-    if (loc == last_tag_id_.cend())
+    const auto loc = tag_data_.find(msg.tag_id());
+    if (loc == tag_data_.cend())
     {
-      last_tag_id_.emplace(msg.tag_id(), msg.version());
+      tag_data_.try_emplace(msg.tag_id(), TagData{msg.version(), {}, {}});
       return false;
     }
     // Otherwise have to check if it's old
-    if (msg.version() <= loc->second)
+    if (msg.version() <= loc->second.last_version)
     {
       return true;
     }
-    loc->second = msg.version();
+    loc->second.last_version = msg.version();
     return false;
   }
 
@@ -603,5 +593,41 @@ namespace skynet
   void Master::send_to_neighbors(const std::vector<std::byte>& to_send) noexcept
   {
     send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });
+  }
+
+  bool Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
+  {
+    bool okay = true;
+    for (const auto tag_id : tag_ids)
+    {
+      // Check if there is a list of known producers for the tag
+      auto loc = tag_data_.find(tag_id);
+      // Create the entry if required
+      if (loc == tag_data_.end())
+      {
+        loc = tag_data_.try_emplace(
+          tag_id,
+          TagData{
+            Job::tag_default_version,
+            {},
+            {}
+          }
+        ).first;
+      }
+      // If there are known subscribers, subscribe to them if not already subscribed
+      if (!loc->second.producers.empty())
+      {
+        if (!loc->second.subscription)
+        {
+          // TODO: Actually subscription stuff
+        }
+      }
+      else
+      {
+        // Couldn't fulfill all of the subscriptions; report failure
+        okay = false;
+      }
+    }
+    return okay;
   }
 } // namespace skynet

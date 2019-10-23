@@ -18,6 +18,7 @@
 #include <optional>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // TODO: Support other types of communicators; will probably just be a build
@@ -68,11 +69,9 @@ namespace skynet
         const std::vector<MachineID>& local_neighbors
       ) noexcept;
 
-      /** \brief Recieve a skynet::Message from an external connection if one exists
-       *
-       * Returns the handler for the message if one exists.
+      /** \brief Handles any messages sent from the connection
        */
-      std::optional<MessageHandler> get_message() noexcept;
+      void get_and_handle_messages() noexcept;
 
       /** \brief Sends a raw message to the other master
        *
@@ -112,8 +111,8 @@ namespace skynet
       // the number of bytes couldn't be read
       std::vector<std::byte> read_from_conn(const std::size_t count) noexcept;
 
-      // Attempt to get a MessageHandler from the connection
-      std::optional<MessageHandler> try_to_get_message_handler() noexcept;
+      // Attempt to get a StatusMessageHandler from the connection
+      std::optional<StatusMessageHandler> try_to_get_status_message() noexcept;
 
       // Function that handles the joining/accepting connection
       template<typename First, typename Second>
@@ -138,7 +137,7 @@ namespace skynet
       bool wait_for_greeting() noexcept;
 
       // Handle status messages
-      void handle_message(MessageHandler& handle) noexcept;
+      void handle_message(StatusMessageHandler& handle) noexcept;
 
       // For talking with the external master
       SocketCommunicator conn_;
@@ -155,6 +154,9 @@ namespace skynet
       // The neighbors that the external machine has
       std::vector<MachineID> neighbors_;
 
+      // Tags that are waiting for a response for which machine publishes them
+      std::unordered_set<std::string> pending_tags_;
+
       // If the connection is dead or not
       bool dead_{false};
     }; // class ExternalMaster
@@ -165,27 +167,6 @@ namespace skynet
   class Master
   {
   public:
-    // Allow Job classes to broadcast and handle neighbors but nothing else
-    struct Accessor
-    {
-    private:
-      friend class Job;
-
-      static void add_job(
-        Master& m,
-        const JobID& id,
-        Job& to_add
-      ) noexcept;
-
-      static void broadcast(
-        Master& m,
-        const VersionID version,
-        const TagID& tag_id,
-        const std::uint32_t hops_left_p1,
-        PublishDataVariant data
-      ) noexcept;
-    }; // struct Accessor
-
     /** \brief Creates a Master instance that listens on the specified
      * port for connections.
      *
@@ -234,9 +215,48 @@ namespace skynet
      */
     int number_of_neighbors() const noexcept;
 
+    /** \brief Creates a job for the master to execute that produces the
+     * specified tags.
+     *
+     * Returns false if the job could not be inserted (only happens on name collision)
+     */
+    bool submit_job(
+      JobID name,
+      std::vector<TagID> tags_produced,
+      std::function<void(Job&)> to_run
+    ) noexcept;
+
     /** \brief Start running all submitted jobs
      */
     void run() noexcept;
+
+    // Allow Job classes to broadcast and handle neighbors but nothing else
+    struct Accessor
+    {
+    private:
+      friend class Job;
+
+      static void broadcast(
+        Master& m,
+        const VersionID version,
+        const TagID& tag_id,
+        const std::uint32_t hops_left_p1,
+        PublishValueVariant data
+      ) noexcept
+      {
+        std::unique_lock lock{m.job_mut_};
+        m.do_broadcast(version, tag_id, hops_left_p1, std::move(data));
+      }
+
+      static bool subscribe(
+        Master& m,
+        const std::vector<TagID>& tag_ids
+      ) noexcept
+      {
+        std::unique_lock lock{m.job_mut_};
+        return m.subscribe(tag_ids);
+      }
+    }; // struct Accessor
 
   private:
     /** \brief Listens for messages from neighbors and handles them if there
@@ -255,19 +275,19 @@ namespace skynet
       const VersionID version,
       const TagID& tag_id,
       const std::uint8_t hops_left_p1,
-      PublishDataVariant data
+      PublishValueVariant data
     ) noexcept;
 
     // Does all processing that needs to be done when a message is recieved
-    void process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept;
+    // void process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept;
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
-    bool add_data_to_queue(const internal::Publish& msg) noexcept;
+    bool add_data_to_queue(const internal::PublishData& msg) noexcept;
 
     /** \brief Returns true if a message is old, false otherwise
      */
-    bool is_old_message(const internal::Publish& msg) noexcept;
+    bool is_old_message(const internal::PublishData& msg) noexcept;
 
     /** \brief Notify neighbors of a new new neighbor
      */
@@ -299,17 +319,33 @@ namespace skynet
      */
     void send_to_neighbors(const std::vector<std::byte>& to_send) noexcept;
 
+    /** \brief Subscribes to the passed tags, returning true if successful.
+     *
+     * If the machines that produce the specified tags are not known, then the
+     * process of getting that information is started in a non-blocking fashion.
+     */
+    bool subscribe(const std::vector<TagID>& tag_ids) noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
     // List of the jobs that are present
-    std::unordered_map<JobID, Job*> jobs_;
+    std::unordered_map<JobID, Job> jobs_;
 
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
-    // The last heard message id for each tag in the network
-    std::unordered_map<TagID, VersionID> last_tag_id_;
+    // Information about each tag
+    struct TagData
+    {
+      // The last version heard for the tag
+      VersionID last_version;
+      // A list of known addresses that produce the tag
+      std::vector<std::string> producers;
+      // The subscription to get the data from, if any
+      std::optional<internal::Subscription> subscription;
+    };
+    std::unordered_map<TagID, TagData> tag_data_;
 
     // The id of this machine
     MachineID id_;

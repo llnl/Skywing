@@ -2,22 +2,22 @@
 
 #include "skynet/master.hpp"
 
-#include <iomanip>
-#include <iostream>
-
 namespace skynet
 {
-  Job::Job(const JobID& id, Master& master, std::function<void(Job&)> to_run) noexcept
-    : id_{id}
-    , master_{&master}
+  Job::Job(
+    Accessor::AllowConstruction,
+    Master& master,
+    std::vector<TagID> tags,
+    std::function<void(Job&)> to_run
+  ) noexcept
+    : master_{&master}
     , to_run_{std::move(to_run)}
-  {
-    Master::Accessor::add_job(*master_, id_, *this);
-  }
+    , tags_produced_(std::move(tags))
+  {}
 
   bool Job::is_finished() const noexcept
   {
-    return is_finished_;
+    return to_run_ == nullptr;
   }
 
   VersionID Job::update_version(VersionID& to_update, const VersionID new_version) noexcept
@@ -38,7 +38,7 @@ namespace skynet
    */
   bool Job::process_data(
     const TagID& tag_id,
-    PublishDataVariant data,
+    PublishValueVariant data,
     const VersionID version
   ) noexcept
   {
@@ -59,10 +59,12 @@ namespace skynet
    */
   void Job::global_broadcast(
     const TagID& tag_id,
-    PublishDataVariant to_send,
+    PublishValueVariant to_send,
     const VersionID version
   ) noexcept
   {
+    assert(std::find(tags_produced_.cbegin(), tags_produced_.cend(), tag_id) != tags_produced_.cend()
+      && "Attempted to publish on a tag that was not declared for publishing!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
       last_published_version_.try_emplace(tag_id, tag_default_version).first->second;
@@ -77,7 +79,7 @@ namespace skynet
   }
 
   // Implementation of public functions
-  std::optional<PublishDataVariant> Job::get_impl(
+  std::optional<PublishValueVariant> Job::get_impl(
     const TagID& tag_id,
     const VersionID version
   ) noexcept
@@ -111,34 +113,43 @@ namespace skynet
       loc->second.stored_version >= version_needed;
   }
 
-  void Job::subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept
+  bool Job::subscribe_impl(
+    const std::vector<TagID>& tag_ids,
+    const std::vector<std::uint8_t>& expected_types
+  ) noexcept
   {
+    assert(tag_ids.size() == expected_types.size());
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    // Already subscribed - hard error
-    if (buffers.find(tag_id) != buffers.cend())
+    if (Master::Accessor::subscribe(*master_, tag_ids))
     {
-      std::cerr << "Job " << std::quoted(id_) << " subscribed to tag " << std::quoted(tag_id) << " after already being subscribed to it.\n";
-      std::terminate();
-    }
-    // Then add the expected type; marking the tag as watched
-    buffers.try_emplace(
-      tag_id,
-      TagInfo{
-        // Just need a dummy value here
-        std::int32_t{},
-        expected_type,
-        tag_default_version,
-        tag_default_version
+      for (std::size_t i = 0; i < tag_ids.size(); ++i)
+      {
+        const auto& tag_id = tag_ids[i];
+        const auto& expected_type = expected_types[i];
+        // Then add the expected type; marking the tag as watched
+        buffers.try_emplace(
+          tag_id,
+          TagInfo{
+            // Just need a dummy value here
+            std::int32_t{},
+            expected_type,
+            tag_default_version,
+            tag_default_version
+          }
+        );
       }
-    );
+      return true;
+    }
+    return false;
   }
 
-  void Job::unsubscribe_impl(const TagID& tag_id) noexcept
-  {
-    auto [buffers, lock] = bufs_.get();
-    (void)lock;
-    // Just remove any the expected types and data maps
-    buffers.erase(tag_id);
-  }
+  // void Job::unsubscribe_impl(const TagID& tag_id) noexcept
+  // {
+  //   auto [buffers, lock] = bufs_.get();
+  //   (void)lock;
+  //   // Just remove any the expected types and data maps
+  //   buffers.erase(tag_id);
+  // }
+
 } // namespace skynet

@@ -107,6 +107,13 @@ namespace skynet::internal
     // The port of the socket
     std::uint16_t port_;
   }; // class SocketCommunicator
+
+  /** \brief Class for recieving information from a publisher
+   */
+  class Subscription
+  {
+    // Empty for now
+  }; // class Subscription
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

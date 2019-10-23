@@ -26,7 +26,7 @@ namespace skynet
   using NetworkSizeType = std::uint32_t;
 
   /// A typelist of all the types that can be published
-  using PublishDataTypeList = internal::TypeList<
+  using PublishValueTypeList = internal::TypeList<
     float,
     std::vector<float>,
     double,
@@ -52,7 +52,7 @@ namespace skynet
   >;
 
   /// Variant version of the above
-  using PublishDataVariant = internal::ApplyTo<PublishDataTypeList, std::variant>;
+  using PublishValueVariant = internal::ApplyTo<PublishValueTypeList, std::variant>;
 } // namespace skynet
 
 #endif // SKYNET_TYPES_HPP

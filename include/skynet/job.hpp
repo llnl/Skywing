@@ -58,20 +58,50 @@ namespace skynet
   class Job
   {
   public:
+    // Allow the master to call process data and run
+    struct Accessor
+    {
+    private:
+      friend class Master;
+      friend class Job;
+
+      static bool process_data(
+        Job& j,
+        const TagID& tag,
+        PublishValueVariant data,
+        const VersionID version
+      ) noexcept
+      {
+        return j.process_data(tag, data, version);
+      }
+
+      static std::thread run(Job& j) noexcept
+      {
+        return std::thread{[&j]() {
+          j.to_run_(j);
+          // Signify that the work is done
+          j.to_run_ = nullptr;
+        }};
+      }
+
+      // Work around to disallow construction outside of the master
+      // A public constructor is needed due to it being emplaced into a map
+      struct AllowConstruction{};
+    };
+
+    /** \brief Creates a job with the specified master and work
+     */
+    Job(
+      Accessor::AllowConstruction,
+      Master& master,
+      std::vector<TagID> tags,
+      std::function<void(Job&)> to_run
+    ) noexcept;
+
     /** \brief The value to pass to use default behavior for
      * versions when publishing and subscribing.
      */
     inline static constexpr VersionID tag_default_version = -1;
-
-    /** \brief Creates a job with the specified id and master
-     */
-    explicit Job(const JobID& id, Master& master, std::function<void(Job&)> to_run) noexcept;
-
-    // Disable copying and moving; can add moving later if it is needed
-    Job(const Job&) = delete;
-    Job& operator=(const Job&) = delete;
-    Job(Job&&) = delete;
-    Job& operator=(Job&&) = delete;
 
     /** \brief Gets the latest data on a tag (if any exists)
      */
@@ -120,42 +150,55 @@ namespace skynet
       return has_data_impl(tag.id(), version);
     }
 
-    /** \brief Subscribes to the passed tag, hard errors if already the job
-     * is already subscribed to the tag (this is never valid)
+    /** \brief Subscribes to the passed tag, does nothing if the tag is
+     * already subscribed to.
+     *
+     * Returns true if the tag could be subscribed to (there's a known producer for the tag)
+     * or false if it couldn't.
      */
     template<typename Tag>
-    void subscribe(const Tag& tag) noexcept
+    bool subscribe(const Tag& tag) noexcept
     {
       using ValueType = typename Tag::ValueType;
-      subscribe_impl(tag.id(), internal::index_of<ValueType, PublishDataTypeList>);
+      return subscribe_impl(
+        {tag.id()},
+        {internal::index_of<ValueType, PublishValueTypeList>}
+      );
     }
 
-    /** \brief Subscribes to all of the passed tags
+    /** \brief Subscribes to all of the passed tags.
+     *
+     * Returns true only if all of the passed tags could be subscribed to.
      */
     template<typename... SubTags>
-    void subscribe(const SubTags&... tags) noexcept
+    bool subscribe(const SubTags&... tags) noexcept
     {
-      (subscribe(tags), ...);
+      return subscribe_impl(
+        {tags.id()...},
+        {internal::index_of<typename SubTags::ValueType, PublishValueTypeList>...}
+      );
     }
 
-    /** \brief Unsubscribes to the passed tag, does nothing if the job is not
-     * subscribed to the tag
-     */
-    template<typename Tag>
-    void unsubscribe(const Tag& tag) noexcept
-    {
-      unsubscribe_impl(tag.id());
-    }
+    // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
+    //  * subscribed to the tag
+    //  */
+    // template<typename Tag>
+    // void unsubscribe(const Tag& tag) noexcept
+    // {
+    //   unsubscribe_impl(tag.id());
+    // }
 
-    /** \brief Unsubscribes from all of the passed tags
-     */
-    template<typename... UnsubTags>
-    void unsubscribe(const UnsubTags&... tags) noexcept
-    {
-      (unsubscribe(tags), ...);
-    }
+    // /** \brief Unsubscribes from all of the passed tags
+    //  */
+    // template<typename... UnsubTags>
+    // void unsubscribe(const UnsubTags&... tags) noexcept
+    // {
+    //   (unsubscribe(tags), ...);
+    // }
 
     /** \brief Publish data on the passed tag
+     *
+     * Will abort in debug mode if the tag has not been declared for publication
      */
     template<typename Tag>
     void publish(
@@ -171,30 +214,6 @@ namespace skynet
      */
     bool is_finished() const noexcept;
 
-    // Allow the master to call process data and run
-    struct Accessor
-    {
-    private:
-      friend class Master;
-      static bool process_data(
-        Job& j,
-        const TagID& tag,
-        PublishDataVariant data,
-        const VersionID version
-      ) noexcept
-      {
-        return j.process_data(tag, data, version);
-      }
-
-      static std::thread run(Job& j) noexcept
-      {
-        return std::thread{[&j]() {
-          j.to_run_(j);
-          j.is_finished_ = true;
-        }};
-      }
-    };
-
   private:
     // Updates the version that's passed in and returns a copy of it
     // Do it like this instead of with a tag ID to prevent trying to double lock a mutex
@@ -207,26 +226,29 @@ namespace skynet
      * \param version The version of the data
      * \return True if processing went fine, false if there was an error
      */
-    bool process_data(const TagID& tag_id, PublishDataVariant data, VersionID version) noexcept;
+    bool process_data(const TagID& tag_id, PublishValueVariant data, VersionID version) noexcept;
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
      */
     void global_broadcast(
       const TagID& tag_id,
-      PublishDataVariant to_send,
+      PublishValueVariant to_send,
       VersionID version
     ) noexcept;
 
     // Implementation of public functions
-    std::optional<PublishDataVariant> get_impl(const TagID& tag_id, VersionID version) noexcept;
+    std::optional<PublishValueVariant> get_impl(const TagID& tag_id, VersionID version) noexcept;
     bool has_data_impl(const TagID& tag_id, VersionID version) noexcept;
-    void subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept;
-    void unsubscribe_impl(const TagID& tag_id) noexcept;
+    bool subscribe_impl(
+      const std::vector<TagID>& tag_ids,
+      const std::vector<std::uint8_t>& expected_types
+    ) noexcept;
+    // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
     // Group all of the related data to a tag ID in a single structure
     struct TagInfo {
       // The data for the tag
-      PublishDataVariant value;
+      PublishValueVariant value;
 
       // The expected type
       std::uint8_t expected_type;
@@ -237,14 +259,10 @@ namespace skynet
       // The version of the data that is currently stored
       VersionID stored_version;
     };
-
     MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
 
     // The last version published on each tag
     std::unordered_map<std::string, VersionID> last_published_version_;
-
-    // The id for this job; must be the same across all instances
-    JobID id_;
 
     // The master that this job is working with
     Master* master_;
@@ -252,8 +270,8 @@ namespace skynet
     // The function this job will run
     std::function<void(Job&)> to_run_;
 
-    // If the job is finished
-    bool is_finished_{false};
+    // The list of tags this job produces
+    std::vector<TagID> tags_produced_;
   }; // Class Job
 } // namespace skynet
 

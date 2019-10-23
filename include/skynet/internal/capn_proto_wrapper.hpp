@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -24,6 +25,10 @@ namespace skynet::internal
 {
   namespace detail
   {
+    // For recursing below, I feel like there's a better way of doing this, but I can't think of it.
+    template<typename T> struct IsVector : std::false_type {};
+    template<typename T> struct IsVector<std::vector<T>> : std::true_type {};
+
     // Changing from Cap'n Proto's list of things to a vector of things is a common
     // operation; provide a function to do it
     template<typename To, typename From>
@@ -31,38 +36,45 @@ namespace skynet::internal
     {
       std::vector<To> to_ret;
       to_ret.reserve(values.size());
-      for (const auto& val : values)
+      for (std::size_t i = 0; i < values.size(); ++i)
       {
-        to_ret.push_back(val);
+        if constexpr (IsVector<To>::value)
+        {
+          to_ret.push_back(list_to_vector<typename To::value_type>(values[i]));
+        }
+        else
+        {
+          to_ret.push_back(values[i]);
+        }
       }
       return to_ret;
     }
 
     // Mapping for the publish data to retrieve things from it as a template
-    template<typename T> struct PublishDataHandler;
+    template<typename T> struct PublishValueHandler;
 
     // Create a mapping for a type and a vector of that type
-    #define SKYNET_MAKE_PUBLISH_DATA_HANDLER(cpp_type, capn_suffix) \
-      template<> struct PublishDataHandler<cpp_type> \
+    #define SKYNET_MAKE_PUBLISH_VALUE_HANDLER(cpp_type, capn_suffix) \
+      template<> struct PublishValueHandler<cpp_type> \
       { \
-        static std::optional<cpp_type> get(const cpnpro::PublishData::Reader& r) noexcept \
+        static std::optional<cpp_type> get(const cpnpro::PublishData::Value::Reader& r) noexcept \
         { \
           if (!r.is##capn_suffix()) { return {}; } \
           return r.get##capn_suffix(); \
         } \
-        static void set(cpnpro::PublishData::Builder& b, const cpp_type& value) noexcept \
+        static void set(cpnpro::PublishData::Value::Builder& b, const cpp_type& value) noexcept \
         { \
           b.set##capn_suffix(value); \
         } \
       }; \
-      template<> struct PublishDataHandler<std::vector<cpp_type>> \
+      template<> struct PublishValueHandler<std::vector<cpp_type>> \
       { \
-        static std::optional<std::vector<cpp_type>> get(const cpnpro::PublishData::Reader& r) noexcept \
+        static std::optional<std::vector<cpp_type>> get(const cpnpro::PublishData::Value::Reader& r) noexcept \
         { \
           if (!r.isR##capn_suffix()) { return {}; } \
           return list_to_vector<cpp_type>(r.getR##capn_suffix()); \
         } \
-        static void set(cpnpro::PublishData::Builder& b, const std::vector<cpp_type>& values) noexcept \
+        static void set(cpnpro::PublishData::Value::Builder& b, const std::vector<cpp_type>& values) noexcept \
         { \
           auto serialized_data = b.initR##capn_suffix(values.size()); \
           for (std::size_t i = 0; i < values.size(); ++i) \
@@ -72,42 +84,42 @@ namespace skynet::internal
         } \
       }
 
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(double, D);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(float, F);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int8_t, I8);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int16_t, I16);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int32_t, I32);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::int64_t, I64);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint8_t, U8);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint16_t, U16);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint32_t, U32);
-    SKYNET_MAKE_PUBLISH_DATA_HANDLER(std::uint64_t, U64);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(double, D);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(float, F);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int8_t, I8);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int16_t, I16);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int32_t, I32);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int64_t, I64);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint8_t, U8);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint16_t, U16);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint32_t, U32);
+    SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint64_t, U64);
 
-    #undef SKYNET_MAKE_PUBLISH_DATA_HANDLER
+    #undef SKYNET_MAKE_PUBLISH_VALUE_HANDLER
 
     // String is a little bit different
-    template<> struct PublishDataHandler<std::string>
+    template<> struct PublishValueHandler<std::string>
     {
-      static std::optional<std::string> get(const cpnpro::PublishData::Reader& r) noexcept
+      static std::optional<std::string> get(const cpnpro::PublishData::Value::Reader& r) noexcept
       {
         if (!r.isStr()) { return {}; }
         return r.getStr();
       }
-      static void set(cpnpro::PublishData::Builder& b, const std::string& value) noexcept
+      static void set(cpnpro::PublishData::Value::Builder& b, const std::string& value) noexcept
       {
         b.setStr(value);
       }
     };
 
-    template<> struct PublishDataHandler<std::vector<std::string>>
+    template<> struct PublishValueHandler<std::vector<std::string>>
     {
-      static std::optional<std::vector<std::string>> get(const cpnpro::PublishData::Reader& r) noexcept
+      static std::optional<std::vector<std::string>> get(const cpnpro::PublishData::Value::Reader& r) noexcept
       {
         if (!r.isRStr()) { return {}; }
         return list_to_vector<std::string>(r.getRStr());
       }
 
-      static void set(cpnpro::PublishData::Builder& b, const std::vector<std::string>& values) noexcept
+      static void set(cpnpro::PublishData::Value::Builder& b, const std::vector<std::string>& values) noexcept
       {
         auto serialized_data = b.initRStr(values.size());
         for (std::size_t i = 0; i < values.size(); ++i)
@@ -120,89 +132,82 @@ namespace skynet::internal
     // Short name entirely for the one function below
     // (type alias templates can't be local)
     template<typename T>
-    using pdh = PublishDataHandler<T>;
+    using pvh = PublishValueHandler<T>;
     template<typename T>
-    using pdh_v = PublishDataHandler<std::vector<T>>;
+    using pvh_v = PublishValueHandler<std::vector<T>>;
   } // namespace detail
 
-  // The categories each message type can be
-  enum class MessageCategory
-  {
-    status,
-    job
-  };
-
-  /** \brief Class representing the data that can be published
+  /** \brief Class representing values that can be published
    */
-  class PublishData
+  class PublishValue
   {
   public:
     /** \brief Return a T if it was published
      */
     template<typename T>
-    std::optional<T> get() const noexcept { return detail::PublishDataHandler<T>::get(r); }
+    std::optional<T> get() const noexcept { return detail::PublishValueHandler<T>::get(r); }
 
     /** \brief Return the held value as a variant
      */
-    std::optional<PublishDataVariant> get_variant() const noexcept
+    std::optional<PublishValueVariant> get_variant() const noexcept
     {
       using namespace detail;
       // This is gross and I hate it, but...
-      using vals = cpnpro::PublishData::Which;
+      using vals = cpnpro::PublishData::Value::Which;
       switch (r.which())
       {
-      case vals::D:     return pdh<double>::get(r);
-      case vals::R_D:   return pdh_v<double>::get(r);
-      case vals::F:     return pdh<float>::get(r);
-      case vals::R_F:   return pdh_v<float>::get(r);
-      case vals::STR:   return pdh<std::string>::get(r);
-      case vals::R_STR: return pdh_v<std::string>::get(r);
-      case vals::I8:    return pdh<std::int8_t>::get(r);
-      case vals::I16:   return pdh<std::int16_t>::get(r);
-      case vals::I32:   return pdh<std::int32_t>::get(r);
-      case vals::I64:   return pdh<std::int64_t>::get(r);
-      case vals::U8:    return pdh<std::uint8_t>::get(r);
-      case vals::U16:   return pdh<std::uint16_t>::get(r);
-      case vals::U32:   return pdh<std::uint32_t>::get(r);
-      case vals::U64:   return pdh<std::uint64_t>::get(r);
-      case vals::R_I8:  return pdh_v<std::int8_t>::get(r);
-      case vals::R_I16: return pdh_v<std::int16_t>::get(r);
-      case vals::R_I32: return pdh_v<std::int32_t>::get(r);
-      case vals::R_I64: return pdh_v<std::int64_t>::get(r);
-      case vals::R_U8:  return pdh_v<std::uint8_t>::get(r);
-      case vals::R_U16: return pdh_v<std::uint16_t>::get(r);
-      case vals::R_U32: return pdh_v<std::uint32_t>::get(r);
-      case vals::R_U64: return pdh_v<std::uint64_t>::get(r);
+      case vals::D:     return pvh<double>::get(r);
+      case vals::R_D:   return pvh_v<double>::get(r);
+      case vals::F:     return pvh<float>::get(r);
+      case vals::R_F:   return pvh_v<float>::get(r);
+      case vals::STR:   return pvh<std::string>::get(r);
+      case vals::R_STR: return pvh_v<std::string>::get(r);
+      case vals::I8:    return pvh<std::int8_t>::get(r);
+      case vals::I16:   return pvh<std::int16_t>::get(r);
+      case vals::I32:   return pvh<std::int32_t>::get(r);
+      case vals::I64:   return pvh<std::int64_t>::get(r);
+      case vals::U8:    return pvh<std::uint8_t>::get(r);
+      case vals::U16:   return pvh<std::uint16_t>::get(r);
+      case vals::U32:   return pvh<std::uint32_t>::get(r);
+      case vals::U64:   return pvh<std::uint64_t>::get(r);
+      case vals::R_I8:  return pvh_v<std::int8_t>::get(r);
+      case vals::R_I16: return pvh_v<std::int16_t>::get(r);
+      case vals::R_I32: return pvh_v<std::int32_t>::get(r);
+      case vals::R_I64: return pvh_v<std::int64_t>::get(r);
+      case vals::R_U8:  return pvh_v<std::uint8_t>::get(r);
+      case vals::R_U16: return pvh_v<std::uint16_t>::get(r);
+      case vals::R_U32: return pvh_v<std::uint32_t>::get(r);
+      case vals::R_U64: return pvh_v<std::uint64_t>::get(r);
       }
       return {};
     }
 
   private:
-    // Only allow Publish to construct this
-    friend class Publish;
-    explicit PublishData(cpnpro::PublishData::Reader reader) noexcept
+    // Only allow PublishData to construct this
+    friend class PublishData;
+    explicit PublishValue(cpnpro::PublishData::Value::Reader reader) noexcept
       : r{std::move(reader)}
       {}
 
-    cpnpro::PublishData::Reader r;
+    cpnpro::PublishData::Value::Reader r;
   };
 
   /** \brief Class representing a publish message
    */
-  class Publish
+  class PublishData
   {
   public:
     VersionID version() const noexcept { return r.getVersion(); }
     TagID tag_id() const noexcept { return r.getTagID(); }
     MachineID origin() const noexcept { return r.getOrigin(); }
     std::uint8_t hops_left_p1() const noexcept { return r.getHopsLeftP1(); }
-    PublishData data() const noexcept { return PublishData{r.getData()}; }
+    PublishValue data() const noexcept { return PublishValue{r.getValue()}; }
 
   private:
-    cpnpro::Publish::Reader r;
+    cpnpro::PublishData::Reader r;
 
-    friend class MessageHandler;
-    explicit Publish(cpnpro::Publish::Reader reader) noexcept
+    friend class StatusMessageHandler;
+    explicit PublishData(cpnpro::PublishData::Reader reader) noexcept
       : r{std::move(reader)}
       {}
   };
@@ -218,7 +223,7 @@ namespace skynet::internal
   private:
     cpnpro::Greeting::Reader r;
 
-    friend class MessageHandler;
+    friend class StatusMessageHandler;
     explicit Greeting(cpnpro::Greeting::Reader reader) noexcept
       : r{std::move(reader)}
       {}
@@ -241,7 +246,7 @@ namespace skynet::internal
   private:
     cpnpro::NewNeighbor::Reader r;
 
-    friend class MessageHandler;
+    friend class StatusMessageHandler;
     explicit NewNeighbor(cpnpro::NewNeighbor::Reader reader) noexcept
       : r{std::move(reader)}
       {}
@@ -257,7 +262,7 @@ namespace skynet::internal
   private:
     cpnpro::RemoveNeighbor::Reader r;
 
-    friend class MessageHandler;
+    friend class StatusMessageHandler;
     explicit RemoveNeighbor(cpnpro::RemoveNeighbor::Reader reader) noexcept
       : r{std::move(reader)}
       {}
@@ -268,6 +273,39 @@ namespace skynet::internal
   class Heartbeat
   {
     // Intentionally empty
+  };
+
+  /** \brief Class representing information on which machines produce what tags
+   */
+  class TagPublishers
+  {
+  public:
+    std::vector<std::string> machines() const noexcept { return detail::list_to_vector<MachineID>(r.getMachines()); }
+    std::vector<std::vector<std::string>> tags() const noexcept { return detail::list_to_vector<std::vector<TagID>>(r.getTags()); }
+
+  private:
+    cpnpro::TagPublishers::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit TagPublishers(cpnpro::TagPublishers::Reader reader) noexcept
+      : r{std::move(reader)}
+      {}
+  };
+
+  /** \brief Request information for which machines produce which tags
+   */
+  class GetPublishers
+  {
+  public:
+    std::vector<std::string> tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
+
+  private:
+    cpnpro::GetPublishers::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept
+      : r{std::move(reader)}
+      {}
   };
 
   /** \brief Class that supresses Cap'n Proto's exceptions so that they
@@ -299,16 +337,16 @@ namespace skynet::internal
 
   /** \brief Class for converting the raw bytes of a message into a useable format
    */
-  class MessageHandler
+  class StatusMessageHandler
   {
   public:
     /** \brief Construct a message handler from a raw set of bytes
      */
-    static std::optional<MessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept
+    static std::optional<StatusMessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept
     {
       ExceptionSuppressor suppressor;
       // Read the message from the passed bytes
-      MessageHandler to_ret;
+      StatusMessageHandler to_ret;
       kj::Array<const kj::byte> buffer{
         reinterpret_cast<const kj::byte*>(data.data()),
         data.size(),
@@ -316,7 +354,7 @@ namespace skynet::internal
       };
       kj::ArrayInputStream in_s{buffer};
       capnp::readMessageCopy(in_s, to_ret.impl_->message);
-      to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Message>();
+      to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
       if (suppressor.failed())
       {
         return {};
@@ -341,49 +379,34 @@ namespace skynet::internal
       return false;
     }
 
-    /** \brief Return the category that the message represents
-     */
-    MessageCategory category() const noexcept
-    {
-      using vals = cpnpro::Message::Which;
-      switch(impl_->root.which()) {
-      case vals::PUBLISH:         return MessageCategory::job;
-      case vals::GREETING:        return MessageCategory::status;
-      case vals::GOODBYE:         return MessageCategory::status;
-      case vals::NEW_NEIGHBOR:    return MessageCategory::status;
-      case vals::REMOVE_NEIGHBOR: return MessageCategory::status;
-      case vals::HEARTBEAT:       return MessageCategory::status;
-      }
-      // this should never happen
-      return MessageCategory::status;
-    }
-
   private:
     // The types of messages that can be produced
     using MessageVariant = std::variant<
-      Publish,
       Greeting,
       Goodbye,
       NewNeighbor,
       RemoveNeighbor,
-      Heartbeat
+      Heartbeat,
+      TagPublishers,
+      GetPublishers
     >;
 
     // Process the stored message and return its internal type
     std::optional<MessageVariant> extract_message() const noexcept
     {
-      using vals = cpnpro::Message::Which;
+      using vals = cpnpro::StatusMessage::Which;
       ExceptionSuppressor suppressor;
       // This is kind of messy, but need to make sure that there's a way
       // to signify that there's no data due to, e.g., malformed input
       const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
         switch(impl_->root.which()) {
-        case vals::PUBLISH:         return Publish{impl_->root.getPublish()};
         case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
         case vals::GOODBYE:         return Goodbye{/* impl_->root.getGoodbye() */};
         case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};
         case vals::REMOVE_NEIGHBOR: return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
         case vals::HEARTBEAT:       return Heartbeat{/* impl_->root.getHeartbeat() */};
+        case vals::TAG_PUBLISHERS:  return TagPublishers{impl_->root.getTagPublishers()};
+        case vals::GET_PUBLISHERS:  return GetPublishers{impl_->root.getGetPublishers()};
         }
         return {};
       }();
@@ -401,7 +424,7 @@ namespace skynet::internal
     struct Impl {
       kj::NullArrayDisposer null_disposer;
       capnp::MallocMessageBuilder message;
-      cpnpro::Message::Reader root;
+      cpnpro::StatusMessage::Reader root;
     };
     std::unique_ptr<Impl> impl_ = std::make_unique<Impl>();
   };

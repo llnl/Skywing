@@ -49,24 +49,33 @@ namespace skynet::internal
     const TagID& tag_id,
     const MachineID& origin,
     const std::uint8_t hops_left_p1,
-    const PublishDataVariant& data
+    const PublishValueVariant& data
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Message>().initPublish();
+    auto message = builder.initRoot<cpnpro::Publish>().initData();
     // Just set the data now
     message.setVersion(version);
     message.setTagID(tag_id);
     message.setOrigin(origin);
     message.setHopsLeftP1(hops_left_p1);
-    auto publish_data = message.initData();
+    auto publish_value = message.initValue();
     std::visit(
       [&](const auto& value) {
         using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-        detail::PublishDataHandler<ValueType>::set(publish_data, value);
+        detail::PublishValueHandler<ValueType>::set(publish_value, value);
       },
       data
     );
+    return finalize_message(builder);
+  }
+
+  /** \brief Create data to signify that a publication channel is closing
+   */
+  std::vector<std::byte> make_close_publish() noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    builder.initRoot<cpnpro::Publish>().setClosingConnection();
     return finalize_message(builder);
   }
 
@@ -78,7 +87,7 @@ namespace skynet::internal
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Message>().initGreeting();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initGreeting();
     message.setFrom(from);
     auto to_set = message.initNeighbors(neighbors.size());
     for (std::size_t i = 0; i < neighbors.size(); ++i)
@@ -93,7 +102,7 @@ namespace skynet::internal
   std::vector<std::byte> make_goodbye() noexcept
   {
     capnp::MallocMessageBuilder builder;
-    builder.initRoot<cpnpro::Message>().setGoodbye();
+    builder.initRoot<cpnpro::StatusMessage>().setGoodbye();
     return finalize_message(builder);
   }
 
@@ -102,7 +111,7 @@ namespace skynet::internal
   std::vector<std::byte> make_new_neighbor(const MachineID& neighbor) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Message>().initNewNeighbor();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initNewNeighbor();
     message.setNeighborID(neighbor);
     return finalize_message(builder);
   }
@@ -112,7 +121,7 @@ namespace skynet::internal
   std::vector<std::byte> make_remove_neighbor(const MachineID& neighbor) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Message>().initRemoveNeighbor();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initRemoveNeighbor();
     message.setNeighborID(neighbor);
     return finalize_message(builder);
   }
@@ -122,7 +131,7 @@ namespace skynet::internal
   std::vector<std::byte> make_heartbeat() noexcept
   {
     capnp::MallocMessageBuilder builder;
-    builder.initRoot<cpnpro::Message>().setHeartbeat();
+    builder.initRoot<cpnpro::StatusMessage>().setHeartbeat();
     return finalize_message(builder);
   }
 } // namespace skynet::internal
