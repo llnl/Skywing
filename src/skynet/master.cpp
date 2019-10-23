@@ -306,6 +306,7 @@ namespace skynet
     Job& to_add
   ) noexcept
   {
+    std::unique_lock lock{m.job_mut_};
     m.jobs_.emplace(id, &to_add);
   }
 
@@ -317,6 +318,7 @@ namespace skynet
     PublishDataVariant data
   ) noexcept
   {
+    std::unique_lock lock{m.job_mut_};
     m.do_broadcast(version, tag_id, hops_left_p1, std::move(data));
   }
 
@@ -360,7 +362,7 @@ namespace skynet
       make_neighbor_vector()))
     {
       const auto new_id = new_neighbor->id();
-      // This ID already exists; so drop the connection
+      // This ID already exists; drop the connection
       if (neighbors_.find(new_id) != neighbors_.end())
       {
         return false;
@@ -375,7 +377,7 @@ namespace skynet
    */
   void Master::accept_pending_connections() noexcept
   {
-    while(auto conn = server_socket_.accept())
+    while (auto conn = server_socket_.accept())
     {
       if (auto new_neighbor = internal::ExternalMaster::create(
         internal::ByAccept{},

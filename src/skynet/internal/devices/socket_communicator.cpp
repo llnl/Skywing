@@ -43,6 +43,8 @@ namespace skynet { namespace internal
     const auto new_handle = other.handle_;
     other.handle_ = invalid_handle;
     handle_ = new_handle;
+    address_ = std::move(other.address_);
+    port_ = other.port_;
     return *this;
   }
 
@@ -107,7 +109,7 @@ namespace skynet { namespace internal
     servaddr.sin_family = AF_INET;
     inet_pton(AF_INET, address, &servaddr.sin_addr);
     servaddr.sin_port = ntohs(port);
-    if (connect(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) != 0)
+    if (connect(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) == -1)
     {
       if (errno == EINPROGRESS)
       {
@@ -119,6 +121,12 @@ namespace skynet { namespace internal
         {
           // perror("SocketCommunicator::connect_to_server - poll");
           // exit(-1);
+          return ConnectionError::unrecoverable;
+        }
+        // Check if any error occured
+        constexpr auto err_mask = POLLERR | POLLHUP | POLLNVAL;
+        if ((to_poll.revents & err_mask) != 0)
+        {
           return ConnectionError::unrecoverable;
         }
       }

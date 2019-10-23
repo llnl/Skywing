@@ -9,6 +9,8 @@
 #include <random>
 #include <vector>
 
+        #include <iostream>
+
 namespace skynet
 {
   std::mt19937_64 make_prng() noexcept
@@ -105,16 +107,19 @@ namespace skynet
   }
 
   // Performs the required steps to create the network from a NetworkInfo
-  // The connection argument should have the signature `void(Master&, int)`
+  // The connection argument should have the signature `bool(Master&, int)`
   // with the int parameter corresponding to the index of the machine to
-  // connect to
+  // connect to, and returning true if it connected
   template<typename Callable>
   void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
     {
-      connect(master, connect_to);
+      while (!connect(master, connect_to))
+      {
+        std::this_thread::sleep_for(1ms);
+      }
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {

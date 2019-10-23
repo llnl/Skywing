@@ -18,11 +18,15 @@ constexpr std::uint16_t base_port = 60000;
 
 using namespace skynet;
 
-void machine_task(Master* const master_ptr, const NetworkInfo* const info, const int index)
+void machine_task(const NetworkInfo* const info, const int index)
 {
-  auto& master = *master_ptr;
+  Master master{
+    static_cast<std::uint16_t>(base_port + index),
+    std::to_string(index),
+    heartbeat_interval
+  };
   connect_network(*info, master, index, [](Master& m, const int i) {
-    m.connect_to_server("127.0.0.1", base_port + i);
+    return m.connect_to_server("127.0.0.1", base_port + i);
   });
   // Just send heartbeats for a while, give it a dummy job
   Job dummy{"dummy job", master, [](Job&) {
@@ -34,22 +38,11 @@ void machine_task(Master* const master_ptr, const NetworkInfo* const info, const
 TEST_CASE("Heartbeats are sent", "[Heartbeat_basic]")
 {
   using namespace std::chrono_literals;
-  std::vector<Master> masters;
   const auto network_info = make_network(num_machines, maximum_connections(num_machines));
-  // Construct masters here so that they don't disconnect early
-  for (auto i = 0; i < num_machines; ++i)
-  {
-    masters.emplace_back(
-      static_cast<std::uint16_t>(base_port + i),
-      std::to_string(i),
-      heartbeat_interval
-    );
-  }
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {
-    threads.emplace_back(machine_task, &masters[i], &network_info, i);
-    std::this_thread::sleep_for(10ms);
+    threads.emplace_back(machine_task, &network_info, i);
   }
   for (auto&& thread : threads)
   {

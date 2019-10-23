@@ -27,7 +27,10 @@ void setup_network(const int index, Master& master)
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i)
   {
-    master.connect_to_server("127.0.0.1", base_port + i);
+    while (!master.connect_to_server("127.0.0.1", base_port + i))
+    {
+      std::this_thread::sleep_for(10ms);
+    }
   }
   while (master.number_of_neighbors() != num_machines - 1)
   {

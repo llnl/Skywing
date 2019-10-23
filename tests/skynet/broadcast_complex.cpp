@@ -48,14 +48,14 @@ void test_tags(Job& job, const Tags&... tags) noexcept
 {
   (test_tag(job, tags), ...);
 }
-
+            #include <iostream>
 // This wasn't working with a reference, so just use a pointer
-void machine_task(Master* const master_ptr, const NetworkInfo* const info, const int index)
+void machine_task(const NetworkInfo* const info, const int index)
 {
   using namespace std::chrono_literals;
-  auto& master = *master_ptr;
+  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   connect_network(*info, master, index, [](Master& m, const int i) {
-    m.connect_to_server("127.0.0.1", base_port + i);
+    return m.connect_to_server("127.0.0.1", base_port + i);
   });
   // Submit first and second job
   const std::array tags{
@@ -104,23 +104,18 @@ void machine_task(Master* const master_ptr, const NetworkInfo* const info, const
     );
   }
   master.run();
+  // Don't exit too early
+  std::this_thread::sleep_for(50ms);
 }
 
 TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
 {
   using namespace std::chrono_literals;
-  std::vector<Master> masters;
   const auto network_info = make_network(num_machines, num_connections);
-  // Construct masters here so that they don't disconnect early
-  for (auto i = 0; i < num_machines; ++i)
-  {
-    masters.emplace_back(static_cast<std::uint16_t>(base_port + i), std::to_string(i));
-  }
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {
-    threads.emplace_back(machine_task, &masters[i], &network_info, i);
-    std::this_thread::sleep_for(10ms);
+    threads.emplace_back(machine_task, &network_info, i);
   }
   for (auto&& thread : threads)
   {

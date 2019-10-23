@@ -217,14 +217,6 @@ namespace skynet
      */
     ~Master();
 
-    // Can't copy
-    Master(const Master&) = delete;
-    Master& operator=(const Master&) = delete;
-
-    // Movable
-    Master(Master&&) = default;
-    Master& operator=(Master&&) = default;
-
     /** \brief Connects to another instance at the specified address on
      * the specified port
      *
@@ -324,6 +316,9 @@ namespace skynet
 
     // The time to send a heartbeat if nothing has been heard in the time
     std::chrono::milliseconds heartbeat_interval_;
+
+    // Only allow one job access to the master at a time
+    std::mutex job_mut_;
   }; // class Master
 } // namespace skynet
 

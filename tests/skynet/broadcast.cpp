@@ -59,10 +59,9 @@ void setup_network(Master& master, const std::size_t index)
     {
       break;
     }
-    if (!master.connect_to_server("127.0.0.1", ports[machine]))
+    while (!master.connect_to_server("127.0.0.1", ports[machine]))
     {
-      std::cerr << index << " failed to connect to " << machine << "!\n";
-      std::terminate();
+      std::this_thread::sleep_for(10ms);
     }
   }
   // Wait until all machines have connected
@@ -73,9 +72,9 @@ void setup_network(Master& master, const std::size_t index)
 }
 
 // Reference wasn't working
-void machine_task(Master* const master_ptr, const std::size_t index)
+void machine_task(const std::size_t index)
 {
-  auto& master = *master_ptr;
+  Master master{ports[index], machine_names[index]};
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
   Job my_job{"job 0", master, [index](Job& the_job) {
@@ -103,16 +102,10 @@ void machine_task(Master* const master_ptr, const std::size_t index)
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")
 {
   using namespace std::chrono_literals;
-  // Ensure that the masters live until all threads exit
-  std::vector<Master> masters;
-  for (std::size_t i = 0; i < machine_counts.size(); ++i)
-  {
-    masters.emplace_back(ports[i], machine_names[i]);
-  }
   std::vector<std::thread> threads;
   for (std::size_t i = 0; i < machine_counts.size(); ++i)
   {
-    threads.emplace_back(machine_task, &masters[i], i);
+    threads.emplace_back(machine_task, i);
     std::this_thread::sleep_for(10ms);
   }
   for (auto&& thread : threads)

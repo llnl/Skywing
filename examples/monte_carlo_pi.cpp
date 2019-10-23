@@ -1,6 +1,7 @@
 #include "skynet/skynet.hpp"
 #include "utils.hpp"
 
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
@@ -10,7 +11,6 @@ constexpr std::uint16_t base_port = 15000;
 using DataTag = skynet::Tag<std::uint64_t>;
 
 void machine_task(
-  skynet::Master* const master_ptr,
   const skynet::NetworkInfo* const info,
   const int index,
   const int num_machines,
@@ -18,9 +18,12 @@ void machine_task(
 ) noexcept
 {
   // Init all of the connections
-  auto& master = *master_ptr;
+  skynet::Master master{
+    static_cast<std::uint16_t>(base_port + index),
+    std::to_string(index)
+  };
   skynet::connect_network(*info, master, index, [](skynet::Master& m, const int i) {
-    m.connect_to_server("127.0.0.1", base_port + i);
+    return m.connect_to_server("127.0.0.1", base_port + i);
   });
   // Estimate pi / 4 by counting the number of points that land within a quarter
   // of a circle on [0, 1] for both x and y
@@ -50,6 +53,8 @@ void machine_task(
     if (index != 0)
     {
       job.publish(DataTag{std::to_string(index)}, misses);
+      // Wait for a bit to allow other data to finish processing
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     else
     {
@@ -62,6 +67,7 @@ void machine_task(
         misses /
         (static_cast<double>(num_iterations) * num_machines);
       std::cout
+        << std::setprecision(std::numeric_limits<long double>::digits10 + 1)
         << "Estimate of pi / 4 is:\n"
         << "1 - " << misses << " / (" << num_iterations << " * " <<  num_machines << ")\n\n"
         << "Which is about:\n"
@@ -103,17 +109,10 @@ int main(const int argc, const char* const argv[])
     num_machines,
     skynet::maximum_connections(num_machines)
   );
-  // Construct masters here so that they don't disconnect early
-  std::vector<skynet::Master> masters;
-  for (auto i = 0; i < num_machines; ++i)
-  {
-    masters.emplace_back(static_cast<std::uint16_t>(base_port + i), std::to_string(i));
-  }
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {
-    threads.emplace_back(machine_task, &masters[i], &network_info, i, num_machines, num_iterations);
-    std::this_thread::sleep_for(10ms);
+    threads.emplace_back(machine_task, &network_info, i, num_machines, num_iterations);
   }
   for (auto&& thread : threads)
   {

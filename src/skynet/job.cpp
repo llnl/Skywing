@@ -42,8 +42,8 @@ namespace skynet
     const VersionID version
   ) noexcept
   {
-    auto buf_pair = bufs_.get();
-    auto& buffers = buf_pair.first;
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
     const auto loc = buffers.find(tag_id);
     // Not subscribed; don't do anything, but not an error
     if (loc == buffers.cend()) { return true; }
@@ -82,8 +82,8 @@ namespace skynet
     const VersionID version
   ) noexcept
   {
-    auto buf_pair = bufs_.get();
-    auto& buffers = buf_pair.first;
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
     auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
     update_version(version_needed, version);
     // Then check if there's been anything seen on the tag and return it if it's
@@ -101,8 +101,8 @@ namespace skynet
 
   bool Job::has_data_impl(const TagID& tag_id, const VersionID version) noexcept
   {
-    auto buf_pair = bufs_.get();
-    auto& buffers = buf_pair.first;
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
     const auto loc = buffers.find(tag_id);
     auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
     update_version(version_needed, version);
@@ -113,8 +113,8 @@ namespace skynet
 
   void Job::subscribe_impl(const TagID& tag_id, std::uint8_t expected_type) noexcept
   {
-    auto buf_pair = bufs_.get();
-    auto& buffers = buf_pair.first;
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
     // Already subscribed - hard error
     if (buffers.find(tag_id) != buffers.cend())
     {
@@ -136,8 +136,8 @@ namespace skynet
 
   void Job::unsubscribe_impl(const TagID& tag_id) noexcept
   {
-    auto buf_pair = bufs_.get();
-    auto& buffers = buf_pair.first;
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
     // Just remove any the expected types and data maps
     buffers.erase(tag_id);
   }
