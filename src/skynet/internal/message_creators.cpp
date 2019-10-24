@@ -134,4 +134,44 @@ namespace skynet::internal
     builder.initRoot<cpnpro::StatusMessage>().setHeartbeat();
     return finalize_message(builder);
   }
+
+  std::vector<std::byte> make_tag_publishers(
+    const std::vector<TagID>& tags,
+    const std::vector<std::vector<MachineID>>& machines
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initTagPublishers();
+    auto msg_tags = message.initMachines(tags.size());
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      msg_tags.set(i, tags[i]);
+    }
+    auto msg_machines = message.initTags(machines.size());
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      auto machine_to_set = msg_machines.init(i, machines[i].size());
+      for (std::size_t j = 0; j < tags[i].size(); ++j)
+      {
+        machine_to_set.set(j, machines[i][j]);
+      }
+    }
+    return finalize_message(builder);
+  }
+
+  /** \brief Create data for a request for producers of a tag
+   */
+  std::vector<std::byte> make_get_publishers(
+    const std::vector<TagID>& tags
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initGetPublishers();
+    auto msg_tags = message.initTags(tags.size());
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      msg_tags.set(i, tags[i]);
+    }
+    return finalize_message(builder);
+  }
 } // namespace skynet::internal

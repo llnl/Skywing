@@ -44,6 +44,23 @@ namespace skynet::internal
   /** \brief Create data for a heartbeat
    */
   std::vector<std::byte> make_heartbeat() noexcept;
+
+  /** \brief Create data for returning information on tag publishers
+   *
+   * TODO: This can be made more efficient by directly iterating over the map
+   * and just grabbing the information from there; not sure how to make it
+   * not horribly ugly though, so put it off for now.
+   */
+  std::vector<std::byte> make_tag_publishers(
+    const std::vector<TagID>& tags,
+    const std::vector<std::vector<MachineID>>& machines
+  ) noexcept;
+
+  /** \brief Create data for a request for producers of a tag
+   */
+  std::vector<std::byte> make_get_publishers(
+    const std::vector<TagID>& tags
+  ) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_CREATORS_HPP

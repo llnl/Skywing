@@ -16,9 +16,9 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 // TODO: Support other types of communicators; will probably just be a build
@@ -27,6 +27,9 @@
 
 namespace skynet
 {
+  // Forward declaration
+  class Master;
+
   namespace internal
   {
     // The default hearbeat interval
@@ -55,7 +58,8 @@ namespace skynet
         ByAccept,
         SocketCommunicator conn,
         const MachineID local_id,
-        const std::vector<MachineID>& local_neighbors
+        const std::vector<MachineID>& local_neighbors,
+        Master& master
       ) noexcept;
 
       /** \brief Attempt to construct an ExternalMaster using an existing connection
@@ -66,12 +70,13 @@ namespace skynet
         ByRequest,
         SocketCommunicator conn,
         const MachineID local_id,
-        const std::vector<MachineID>& local_neighbors
+        const std::vector<MachineID>& local_neighbors,
+        Master& master
       ) noexcept;
 
       /** \brief Handles any messages sent from the connection
        */
-      void get_and_handle_messages() noexcept;
+      void handle_messages() noexcept;
 
       /** \brief Sends a raw message to the other master
        *
@@ -100,8 +105,12 @@ namespace skynet
        */
       void send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept;
 
+      /** \brief Begins the search process for producers for a tag
+       */
+      void find_producers_for_tags(const std::vector<TagID>& tags) noexcept;
+
     private:
-      // Only allow private construction
+      // Only allow private construction from a socket
       explicit ExternalMaster(SocketCommunicator conn) noexcept;
 
       // Read some bytes from the connection, returning false if the read failed
@@ -154,8 +163,8 @@ namespace skynet
       // The neighbors that the external machine has
       std::vector<MachineID> neighbors_;
 
-      // Tags that are waiting for a response for which machine publishes them
-      std::unordered_set<std::string> pending_tags_;
+      // The owning master
+      Master* master_;
 
       // If the connection is dead or not
       bool dead_{false};
@@ -230,8 +239,16 @@ namespace skynet
      */
     void run() noexcept;
 
+    /** \brief Return a list of all produced tags
+     */
+    std::vector<std::string_view> produced_tags() const noexcept;
+
+    /** \brief Return the address of the master
+     */
+    std::string address() const noexcept;
+
     // Allow Job classes to broadcast and handle neighbors but nothing else
-    struct Accessor
+    struct JobAccessor
     {
     private:
       friend class Job;
@@ -256,7 +273,23 @@ namespace skynet
         std::unique_lock lock{m.job_mut_};
         return m.subscribe(tag_ids);
       }
-    }; // struct Accessor
+    }; // struct JobAccessor
+
+    // Allow ExternalMasters to report producers found for tags
+    struct ExternalMasterAccessor
+    {
+    private:
+      friend class internal::ExternalMaster;
+
+      static void handle_get_publishers(
+        Master& m,
+        const internal::GetPublishers& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        m.handle_get_publishers(msg, from);
+      }
+    }; // struct ExternalMasterAccessor
 
   private:
     /** \brief Listens for messages from neighbors and handles them if there
@@ -326,6 +359,16 @@ namespace skynet
      */
     bool subscribe(const std::vector<TagID>& tag_ids) noexcept;
 
+    /** \brief Handles the get_publishers message
+     */
+    void handle_get_publishers(
+      const internal::GetPublishers& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    // Removes any tags that have known publishers
+    std::vector<TagID> remove_tags_with_known_publishers(const GetPublishers& msg) const noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
@@ -341,7 +384,7 @@ namespace skynet
       // The last version heard for the tag
       VersionID last_version;
       // A list of known addresses that produce the tag
-      std::vector<std::string> producers;
+      std::vector<std::string> publishers;
       // The subscription to get the data from, if any
       std::optional<internal::Subscription> subscription;
     };
@@ -355,6 +398,12 @@ namespace skynet
 
     // Only allow one job access to the master at a time
     std::mutex job_mut_;
+
+    // List of machines that are waiting for information for producers of a certain tag
+    // Uses MachineID's instead of pointer in case the remote machine disconnects and
+    // the ExternalMaster is deleted between the time a request is started and a response
+    // is recieved
+    std::unordered_map<TagID, std::vector<MachineID>> send_publisher_information_to_;
   }; // class Master
 } // namespace skynet
 

@@ -86,7 +86,11 @@ namespace skynet
 
       // Work around to disallow construction outside of the master
       // A public constructor is needed due to it being emplaced into a map
-      struct AllowConstruction{};
+      struct AllowConstruction
+      {
+        // Explicit constructor so that it has to be named, but the name is private
+        explicit AllowConstruction() = default;
+      };
     };
 
     /** \brief Creates a job with the specified master and work
@@ -213,6 +217,10 @@ namespace skynet
     /** \brief Returns true if the job is finished, false if it is not
      */
     bool is_finished() const noexcept;
+
+    /** \brief Returns a list of the produced tags
+     */
+    const std::vector<TagID>& tags_produced() const noexcept;
 
   private:
     // Updates the version that's passed in and returns a copy of it

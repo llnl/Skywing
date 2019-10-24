@@ -20,6 +20,11 @@ namespace skynet
     return to_run_ == nullptr;
   }
 
+  const std::vector<TagID>& Job::tags_produced() const noexcept
+  {
+    return tags_produced_;
+  }
+
   VersionID Job::update_version(VersionID& to_update, const VersionID new_version) noexcept
   {
     to_update =
@@ -69,7 +74,7 @@ namespace skynet
     auto& last_version =
       last_published_version_.try_emplace(tag_id, tag_default_version).first->second;
     update_version(last_version, version);
-    Master::Accessor::broadcast(
+    Master::JobAccessor::broadcast(
       *master_,
       last_version,
       tag_id,
@@ -121,7 +126,7 @@ namespace skynet
     assert(tag_ids.size() == expected_types.size());
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    if (Master::Accessor::subscribe(*master_, tag_ids))
+    if (Master::JobAccessor::subscribe(*master_, tag_ids))
     {
       for (std::size_t i = 0; i < tag_ids.size(); ++i)
       {

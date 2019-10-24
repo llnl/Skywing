@@ -59,9 +59,10 @@ struct RemoveNeighbor {
   neighborID @0 : Text;
 }
 
+# For each tag, a list of machines known to publish on that tag
 struct TagPublishers {
-  machines @0 : List(Text);
-  tags     @1 : List(List(Text));
+  tags     @0 : List(Text);
+  machines @1 : List(List(Text));
 }
 
 struct GetPublishers {
