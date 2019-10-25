@@ -27,63 +27,70 @@ void machine_task(
   });
   // Estimate pi / 4 by counting the number of points that land within a quarter
   // of a circle on [0, 1] for both x and y
-  skynet::Job the_job(std::to_string(index), master, [&](skynet::Job& job) {
-    // Count misses rather than hits as they occur less frequently, so less
-    // chance of overflow
-    std::uint64_t misses = 0;
-    auto prng = skynet::make_prng();
-    for (auto i = 0; i < num_iterations; ++i)
-    {
-      std::uniform_real_distribution<double> dist{0, 1};
-      const auto x = dist(prng);
-      const auto y = dist(prng);
-      // If it's outside the circle
-      // The circle is centered around (0, 0) so don't need to subtract anything
-      // This would normally be
-      //   std::sqrt(x * x + y * y) > 1
-      // But can square both sides to remove the call to sqrt
-      if (x * x + y * y > 1)
+  master.submit_job(
+    std::to_string(index),
+    {std::to_string(index)},
+    [&](skynet::Job& job) {
+      // Subscribe to all of the tags (if machine 0)
+      if (index == 0)
       {
-        ++misses;
+        for (auto i = 1; i < num_machines; ++i)
+        {
+          while (!job.subscribe(DataTag{std::to_string(i)}))
+          {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          }
+        }
+      }
+      // Count misses rather than hits as they occur less frequently, so less
+      // chance of overflow
+      std::uint64_t misses = 0;
+      auto prng = skynet::make_prng();
+      for (auto i = 0; i < num_iterations; ++i)
+      {
+        std::uniform_real_distribution<double> dist{0, 1};
+        const auto x = dist(prng);
+        const auto y = dist(prng);
+        // If it's outside the circle
+        // The circle is centered around (0, 0) so don't need to subtract anything
+        // This would normally be
+        //   std::sqrt(x * x + y * y) > 1
+        // But can square both sides to remove the call to sqrt
+        if (x * x + y * y > 1)
+        {
+          ++misses;
+        }
+      }
+      // TODO: Change this to be a reduce when that's a thing
+      // Publish the data if a non-0 machine, otherwise read all the data
+      // and display a result
+      if (index != 0)
+      {
+        job.publish(DataTag{std::to_string(index)}, misses);
+        // Wait for a bit to allow other data to finish processing
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+      else
+      {
+        for (auto i = 1; i < num_machines; ++i)
+        {
+          misses += job.get_when_ready(DataTag{std::to_string(i)});
+        }
+        const double pi_over_4_estimate =
+          1.0 -
+          misses /
+          (static_cast<double>(num_iterations) * num_machines);
+        std::cout
+          << std::setprecision(std::numeric_limits<long double>::digits10 + 1)
+          << "Estimate of pi / 4 is:\n"
+          << "1 - " << misses << " / (" << num_iterations << " * " <<  num_machines << ")\n\n"
+          << "Which is about:\n"
+          << pi_over_4_estimate << "\n\n"
+          << "Or, as an estimate of pi:\n"
+          << 4 * pi_over_4_estimate << "\n\n";
       }
     }
-    // TODO: Change this to be a reduce when that's a thing
-    // Publish the data if a non-0 machine, otherwise read all the data
-    // and display a result
-    if (index != 0)
-    {
-      job.publish(DataTag{std::to_string(index)}, misses);
-      // Wait for a bit to allow other data to finish processing
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-    else
-    {
-      for (auto i = 1; i < num_machines; ++i)
-      {
-        misses += job.get_when_ready(DataTag{std::to_string(i)});
-      }
-      const double pi_over_4_estimate =
-        1.0 -
-        misses /
-        (static_cast<double>(num_iterations) * num_machines);
-      std::cout
-        << std::setprecision(std::numeric_limits<long double>::digits10 + 1)
-        << "Estimate of pi / 4 is:\n"
-        << "1 - " << misses << " / (" << num_iterations << " * " <<  num_machines << ")\n\n"
-        << "Which is about:\n"
-        << pi_over_4_estimate << "\n\n"
-        << "Or, as an estimate of pi:\n"
-        << 4 * pi_over_4_estimate << "\n\n";
-    }
-  });
-  // Subscribe to all of the tags (if machine 0)
-  if (index == 0)
-  {
-    for (auto i = 1; i < num_machines; ++i)
-    {
-      the_job.subscribe(DataTag{std::to_string(i)});
-    }
-  }
+  );
   master.run();
 }
 

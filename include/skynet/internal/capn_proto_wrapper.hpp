@@ -280,8 +280,15 @@ namespace skynet::internal
   class TagPublishers
   {
   public:
-    std::vector<std::string> machines() const noexcept { return detail::list_to_vector<MachineID>(r.getMachines()); }
-    std::vector<std::vector<std::string>> tags() const noexcept { return detail::list_to_vector<std::vector<TagID>>(r.getTags()); }
+    std::vector<TagID> tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
+    std::vector<std::vector<std::string>> addresses() const noexcept
+    {
+      return detail::list_to_vector<std::vector<std::string>>(r.getAddresses());
+    }
+    std::vector<TagID> locally_produced_tags() const noexcept
+    {
+      return detail::list_to_vector<TagID>(r.getLocallyProducedTags());
+    }
 
   private:
     cpnpro::TagPublishers::Reader r;

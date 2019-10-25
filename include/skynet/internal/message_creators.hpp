@@ -53,7 +53,8 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_tag_publishers(
     const std::vector<TagID>& tags,
-    const std::vector<std::vector<MachineID>>& machines
+    const std::vector<std::vector<std::string>>& addresses,
+    const std::vector<TagID>& locally_produced_tags
   ) noexcept;
 
   /** \brief Create data for a request for producers of a tag

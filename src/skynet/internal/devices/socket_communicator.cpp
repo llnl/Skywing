@@ -17,7 +17,7 @@ namespace
   constexpr int invalid_handle = -1;
 } // namespace {anonymous}
 
-namespace skynet { namespace internal
+namespace skynet::internal
 {
   SocketCommunicator::SocketCommunicator() noexcept
     : handle_{create_non_blocking()}
@@ -172,4 +172,9 @@ namespace skynet { namespace internal
     }
     return written == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
-} } // namespace skynet::internal
+
+  std::string SocketCommunicator::ip_address() const noexcept { return address_; }
+
+  std::uint16_t SocketCommunicator::port() const noexcept { return port_; }
+
+} // namespace skynet::internal

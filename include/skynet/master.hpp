@@ -16,9 +16,9 @@
 #include <cstring>
 #include <memory>
 #include <optional>
-#include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // TODO: Support other types of communicators; will probably just be a build
@@ -29,6 +29,10 @@ namespace skynet
 {
   // Forward declaration
   class Master;
+
+  // The port difference between the socket used from general communication by
+  // a master and the port used for publications
+  inline constexpr std::uint16_t publisher_port_offset = 100;
 
   namespace internal
   {
@@ -76,7 +80,7 @@ namespace skynet
 
       /** \brief Handles any messages sent from the connection
        */
-      void handle_messages() noexcept;
+      void get_and_handle_messages() noexcept;
 
       /** \brief Sends a raw message to the other master
        *
@@ -108,6 +112,10 @@ namespace skynet
       /** \brief Begins the search process for producers for a tag
        */
       void find_producers_for_tags(const std::vector<TagID>& tags) noexcept;
+
+      /** \brief The address of the publisher for the external master
+       */
+      std::string publisher_address() const noexcept;
 
     private:
       // Only allow private construction from a socket
@@ -165,6 +173,9 @@ namespace skynet
 
       // The owning master
       Master* master_;
+
+      // The tags that are pending responses
+      std::unordered_set<TagID> pending_tags_;
 
       // If the connection is dead or not
       bool dead_{false};
@@ -239,13 +250,9 @@ namespace skynet
      */
     void run() noexcept;
 
-    /** \brief Return a list of all produced tags
+    /** \brief Return the local address of the master, for subscribing to self
      */
-    std::vector<std::string_view> produced_tags() const noexcept;
-
-    /** \brief Return the address of the master
-     */
-    std::string address() const noexcept;
+    std::string local_address() const noexcept;
 
     // Allow Job classes to broadcast and handle neighbors but nothing else
     struct JobAccessor
@@ -284,10 +291,19 @@ namespace skynet
       static void handle_get_publishers(
         Master& m,
         const internal::GetPublishers& msg,
-        const internal::ExternalMaster& from
+        internal::ExternalMaster& from
       ) noexcept
       {
         m.handle_get_publishers(msg, from);
+      }
+
+      static void add_publishers_and_propagate(
+        Master& m,
+        const internal::TagPublishers& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        m.add_publishers_and_propagate(msg, from);
       }
     }; // struct ExternalMasterAccessor
 
@@ -363,11 +379,20 @@ namespace skynet
      */
     void handle_get_publishers(
       const internal::GetPublishers& msg,
-      const internal::ExternalMaster& from
+      internal::ExternalMaster& from
     ) noexcept;
 
     // Removes any tags that have known publishers
-    std::vector<TagID> remove_tags_with_known_publishers(const GetPublishers& msg) const noexcept;
+    std::vector<TagID> remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept;
+
+    // Adds the publishers and propagate the information is required
+    void add_publishers_and_propagate(
+      const internal::TagPublishers& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    // Produce a message containing the known publishers and tags
+    std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
@@ -384,9 +409,11 @@ namespace skynet
       // The last version heard for the tag
       VersionID last_version;
       // A list of known addresses that produce the tag
-      std::vector<std::string> publishers;
+      std::unordered_set<std::string> publishers;
       // The subscription to get the data from, if any
-      std::optional<internal::Subscription> subscription;
+      // This is a shared pointer because a single subscription may fill
+      // many tags
+      std::shared_ptr<internal::Subscription> subscription;
     };
     std::unordered_map<TagID, TagData> tag_data_;
 
@@ -403,7 +430,10 @@ namespace skynet
     // Uses MachineID's instead of pointer in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
     // is recieved
-    std::unordered_map<TagID, std::vector<MachineID>> send_publisher_information_to_;
+    std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
+
+    // The tags that this machine produces
+    std::unordered_set<TagID> produced_tags_;
   }; // class Master
 } // namespace skynet
 

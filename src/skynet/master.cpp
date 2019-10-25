@@ -2,6 +2,9 @@
 
 // TODO: Support other types of communicators
 
+#include <iomanip>
+#include <iostream>
+
 namespace skynet
 {
   namespace internal
@@ -50,7 +53,7 @@ namespace skynet
       );
     }
 
-    void ExternalMaster::handle_messages() noexcept
+    void ExternalMaster::get_and_handle_messages() noexcept
     {
       if (dead_)
       {
@@ -124,9 +127,9 @@ namespace skynet
       {
         // The tag is not pending, mark this as not needing to be propagated
         // and ask the neighbor for details
-        if (pending_tags_propagate_back_.find(tag_id) == pending_tags_propagate_back_.cend())
+        if (pending_tags_.find(tag_id) == pending_tags_.cend())
         {
-          pending_tags_propagate_back_.try_emplace(tag_id, false);
+          pending_tags_.emplace(tag_id);
           work_to_do = true;
         }
       }
@@ -134,6 +137,13 @@ namespace skynet
       {
         send_message(make_get_publishers(tags));
       }
+    }
+
+    std::string ExternalMaster::publisher_address() const noexcept
+    {
+      return conn_.ip_address() + ':' + std::to_string(
+        static_cast<std::uint16_t>(conn_.port() + publisher_port_offset)
+      );
     }
 
     ExternalMaster::ExternalMaster(SocketCommunicator conn) noexcept
@@ -290,24 +300,16 @@ namespace skynet
           return true;
         },
         [&](const TagPublishers& msg) {
-          // // Add this machine's information
-          // std::unordered_map<std::string, std::vector<std::string>> producers;
-          // auto machines = msg.machines();
-          // auto tags = msg.tags();
-          // const auto str_view_tags = master_->produced_tags();
-          // machines.push_back(master_->address());
-          // std::vector<std::string> local_tags;
-          // std::copy(
-          //   str_view_tags.cbegin(),
-          //   str_view_tags.cend(),
-          //   local_tags.begin()
-          // );
-          // tags.push_back(local_tags);
-          // // Propagate this back if need be
-          // // const auto loc =
-          // // Just report it to the master
-          // Master::ExternalMasterAccessor::report_tag_publishers(master_, std::move(producers));
-          // return true;
+          // Remove any produced tags that were marked as pending
+          for (const auto& tag_list : {msg.tags(), msg.locally_produced_tags()})
+          {
+            for (const auto& tag : tag_list)
+            {
+              pending_tags_.erase(tag);
+            }
+          }
+          Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
+          return true;
         },
         [&](const GetPublishers& msg) {
           Master::ExternalMasterAccessor::handle_get_publishers(*master_, msg, *this);
@@ -368,9 +370,9 @@ namespace skynet
       internal::ByRequest{},
       std::move(to_connect),
       id_,
-      make_neighbor_vector()),
+      make_neighbor_vector(),
       *this
-    ) {
+    )) {
       const auto new_id = new_neighbor->id();
       // This ID already exists; drop the connection
       if (neighbors_.find(new_id) != neighbors_.end())
@@ -394,8 +396,8 @@ namespace skynet
         std::move(*conn),
         id_,
         make_neighbor_vector(),
-        *this)
-      ) {
+        *this
+      )) {
         const auto new_id = new_neighbor->id();
         // This ID already exists; so drop the connection
         if (neighbors_.find(new_id) != neighbors_.end())
@@ -421,7 +423,6 @@ namespace skynet
     std::function<void(Job&)> to_run
   ) noexcept
   {
-    // TODO: Mark the tags produced by this job
     const auto res = jobs_.try_emplace(
       std::move(name),
       Job::Accessor::AllowConstruction{},
@@ -429,6 +430,22 @@ namespace skynet
       std::move(tags_produced),
       std::move(to_run)
     );
+    if (res.second)
+    {
+      // Mark the tags produced by this job
+      for (const auto& tag : res.first->second.tags_produced())
+      {
+        const auto [iter, inserted] = produced_tags_.insert(tag);
+        (void)iter;
+        if (!inserted)
+        {
+          // Two jobs on the same master can't produce the same job;
+          // fail loudly
+          std::cerr << "Two jobs are attempting to publish on the tag " << std::quoted(tag) << '\n';
+          std::terminate();
+        }
+      }
+    }
     return res.second;
   }
 
@@ -476,25 +493,9 @@ namespace skynet
     }
   }
 
-  std::vector<std::string_view> Master::produced_tags() const noexcept
+  std::string Master::local_address() const noexcept
   {
-    std::vector<std::string_view> to_ret;
-    for (const auto& job : jobs_)
-    {
-      const auto& job_tags = job.second.tags_produced();
-      std::transform(
-        job_tags.cbegin(),
-        job_tags.cend(),
-        std::back_inserter(to_ret),
-        [](const std::string& str) { return std::string_view{str}; }
-      );
-    }
-    return to_ret;
-  }
-
-  std::string Master::address() const noexcept
-  {
-    return server_socket_.ip_address() + ':' + std::to_string(server_socket_.port());
+    return "localhost:" + std::to_string(server_socket_.port());
   }
 
   /** \brief Listens for messages from neighbors and handles them if there
@@ -658,9 +659,15 @@ namespace skynet
 
   bool Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   {
-    std::vector<TagID> tag_to_find;
+    std::vector<TagID> tags_to_find;
     for (const auto tag_id : tag_ids)
     {
+      // If the tag is produced locally just subscribe to self
+      if (produced_tags_.find(tag_id) != produced_tags_.cend())
+      {
+        std::cout << "subscribed to self!\n";
+        continue;
+      }
       // Check if there is a list of known producers for the tag
       auto loc = tag_data_.find(tag_id);
       // Create the entry if required
@@ -685,49 +692,39 @@ namespace skynet
       if (!tag_data.publishers.empty())
       {
         // TODO: Subscription stuff
+        const auto& subscribe_address = *tag_data.publishers.begin();
+        std::cout << "subscribed to " << subscribe_address << "!\n";
+        tag_data.subscription = std::make_shared<internal::Subscription>();
       }
       else
       {
         // Couldn't do this subscription; need to look for a producer for the tag
-        tag_to_find.push_back(tag_id);
+        tags_to_find.push_back(tag_id);
       }
     }
     // Find producers for any tags that need it
-    if (!tag_to_find.empty())
+    if (!tags_to_find.empty())
     {
       for (auto& neighbor : neighbors_)
       {
-        neighbor.find_producers_for_tag(tag_id);
+        neighbor.second.find_producers_for_tags(tags_to_find);
       }
     }
-    // Nothing to find - succesfully subscribed
-    return tag_to_find.empty();
+    // Nothing to find - successfully subscribed
+    return tags_to_find.empty();
   }
 
   void Master::handle_get_publishers(
     const internal::GetPublishers& msg,
-    const internal::ExternalMaster& from
+    internal::ExternalMaster& from
   ) noexcept
   {
     // If all of the tag requirements are fulfilled then
     const auto remaining_tags = remove_tags_with_known_publishers(msg);
-    if (tags_left.empty())
+    if (remaining_tags.empty())
     {
-      // Have to transform the std::string_view tags into std::string ones
-      // std::vector<std::string> tags_to_send(local_tags.size());
-      // std::copy(
-      //   local_tags.cbegin(),
-      //   local_tags.cend(),
-      //   tags_to_send.begin()
-      // );
-      if (tags_left.empty())
-      {
-        // TODO: Send all information about the known tags back
-        // send_message(make_tag_publishers(
-        //   {master_->address()},
-        //   tags_to_send
-        // ));
-      }
+      // Send the information back now
+      from.send_message(make_known_tag_publisher_message());
     }
     else
     {
@@ -745,47 +742,128 @@ namespace skynet
     }
   }
 
-  // void Master::add_tag_producers(std::unordered_map<MachineID, std::vector<TagID>> publishers) noexcept
-  // {
-  //   auto tags = publishers.tags();
-  //   auto machines = publishers.machines();
-  //   for (auto&& [machine_name, produced_tags] : publishers)
-  //   {
-  //     for (auto&& tag_id : produced_tags)
-  //     {
-  //       // Find or create the tag
-  //       auto loc = tag_data_.find(tag_id);
-  //       if (loc == tag_data_.end())
-  //       {
-  //         loc = tag_data_.try_emplace(
-  //           std::move(tag_id),
-  //           TagData{
-  //             Job::tag_default_version,
-  //             {},
-  //             {}
-  //           }
-  //         ).first;
-  //       }
-  //       // Add it as a producer
-  //       loc->second.producers.push_back(machine_name);
-  //     }
-  //   }
-  // }
-
-  std::vector<TagID> Master::remove_tags_with_known_publishers(const GetPublishers& msg) const noexcept
+  std::vector<TagID> Master::remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept
   {
     auto tags_left = msg.tags();
+    // Remove tags that either have a known producer or are known locally
     tags_left.erase(
       std::remove_if(
         tags_left.begin(),
         tags_left.end(),
         [&](const TagID& id) {
-          const auto loc = TagData.find(id);
-          return loc == TagData.cend() ? false : !loc.second->publishers.empty();
+          const auto loc = tag_data_.find(id);
+          return loc == tag_data_.cend()
+            ? produced_tags_.find(id) != produced_tags_.cend()
+            : !loc->second.publishers.empty();
         }
       ),
       tags_left.end()
     );
     return tags_left;
+  }
+
+  void Master::add_publishers_and_propagate(
+      const internal::TagPublishers& msg,
+      const internal::ExternalMaster& from
+  ) noexcept
+  {
+    const auto tags = msg.tags();
+    const auto publishers_list = msg.addresses();
+    // These should always match sizes; just ignore the message if they don't
+    // TODO: Actually handle this
+    if (tags.size() != publishers_list.size())
+    {
+      return;
+    }
+    // Add the information to what is locally known
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      const auto& tag = tags[i];
+      const auto& publishers = publishers_list[i];
+      // Find or create the tag
+      auto loc = tag_data_.find(tag);
+      if (loc == tag_data_.end())
+      {
+        loc = tag_data_.try_emplace(
+          tag,
+          TagData{
+            Job::tag_default_version,
+            {},
+            {}
+          }
+        ).first;
+      }
+      // Add the publishers
+      for (const auto& publisher : publishers)
+      {
+        loc->second.publishers.insert(publisher);
+      }
+    }
+    // Add the tags that the external master produced
+    const auto external_tags = msg.locally_produced_tags();
+    for (const auto& tag : external_tags)
+    {
+      auto loc = tag_data_.find(tag);
+      if (loc == tag_data_.end())
+      {
+        loc = tag_data_.try_emplace(
+          tag,
+          TagData{
+            Job::tag_default_version,
+            {},
+            {}
+          }
+        ).first;
+      }
+      loc->second.publishers.insert(from.publisher_address());
+    }
+    // Propagate to any machines that need this information, marking them
+    // as no longer needing propagation as well
+    std::unordered_set<MachineID> machines_to_send_to;
+    for (const auto& tag : tags)
+    {
+      const auto loc = send_publisher_information_to_.find(tag);
+      if (loc != send_publisher_information_to_.cend())
+      {
+        machines_to_send_to.merge(loc->second);
+        send_publisher_information_to_.erase(loc);
+      }
+    }
+    if (!machines_to_send_to.empty())
+    {
+      std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
+      const auto to_send = internal::make_tag_publishers(
+        tags,
+        publishers_list,
+        local_tags
+      );
+      // Send to the machines if they are present
+      for (const auto& send_to : machines_to_send_to)
+      {
+        const auto loc = neighbors_.find(send_to);
+        if (loc != neighbors_.end())
+        {
+          loc->second.send_message(to_send);
+        }
+      }
+    }
+  }
+
+  std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
+  {
+    std::vector<TagID> tags;
+    std::vector<std::vector<std::string>> addresses;
+    for (const auto& [tag, data] : tag_data_)
+    {
+      // Only send data if there are known publishers
+      if (!data.publishers.empty())
+      {
+        tags.push_back(tag);
+        auto& back = addresses.emplace_back(data.publishers.size());
+        std::copy(data.publishers.cbegin(), data.publishers.cend(), back.begin());
+      }
+    }
+    std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
+    return internal::make_tag_publishers(tags, addresses, local_tags);
   }
 } // namespace skynet
