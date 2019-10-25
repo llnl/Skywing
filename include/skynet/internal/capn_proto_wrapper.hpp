@@ -199,14 +199,12 @@ namespace skynet::internal
   public:
     VersionID version() const noexcept { return r.getVersion(); }
     TagID tag_id() const noexcept { return r.getTagID(); }
-    MachineID origin() const noexcept { return r.getOrigin(); }
-    std::uint8_t hops_left_p1() const noexcept { return r.getHopsLeftP1(); }
-    PublishValue data() const noexcept { return PublishValue{r.getValue()}; }
+    PublishValue value() const noexcept { return PublishValue{r.getValue()}; }
 
   private:
     cpnpro::PublishData::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class PublishMessageHandler;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept
       : r{std::move(reader)}
       {}
@@ -432,6 +430,63 @@ namespace skynet::internal
       kj::NullArrayDisposer null_disposer;
       capnp::MallocMessageBuilder message;
       cpnpro::StatusMessage::Reader root;
+    };
+    std::unique_ptr<Impl> impl_ = std::make_unique<Impl>();
+  };
+
+  /** Class for converting raw bytes of a publish message into a usable format
+   */
+  class PublishMessageHandler
+  {
+  public:
+    /** \brief Construct a message handler from a raw set of bytes
+     */
+    static std::optional<PublishMessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept
+    {
+      ExceptionSuppressor suppressor;
+      // Read the message from the passed bytes
+      PublishMessageHandler to_ret;
+      kj::Array<const kj::byte> buffer{
+        reinterpret_cast<const kj::byte*>(data.data()),
+        data.size(),
+        to_ret.impl_->null_disposer
+      };
+      kj::ArrayInputStream in_s{buffer};
+      capnp::readMessageCopy(in_s, to_ret.impl_->message);
+      to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Publish>();
+      if (suppressor.failed())
+      {
+        return {};
+      }
+      else
+      {
+        return std::move(to_ret);
+      }
+    }
+
+    /** \brief Gets the published data, or if it was a shutdown message, no data
+     */
+    std::optional<PublishData> data() const noexcept
+    {
+      ExceptionSuppressor suppressor;
+      if (!impl_->root.isData()) { return {}; }
+      auto to_ret = PublishData{impl_->root.getData()};
+      if (suppressor.failed())
+      {
+        return {};
+      }
+      else
+      {
+        return std::move(to_ret);
+      }
+    }
+
+  private:
+    // PIMPL to allow moving
+    struct Impl {
+      kj::NullArrayDisposer null_disposer;
+      capnp::MallocMessageBuilder message;
+      cpnpro::Publish::Reader root;
     };
     std::unique_ptr<Impl> impl_ = std::make_unique<Impl>();
   };

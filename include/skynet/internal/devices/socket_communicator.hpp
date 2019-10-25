@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <vector>
 
 namespace skynet::internal
 {
@@ -108,12 +109,65 @@ namespace skynet::internal
     std::uint16_t port_;
   }; // class SocketCommunicator
 
-  /** \brief Class for recieving information from a publisher
+  /** \brief Read a message in chunks from a SocketCommunicator.
+   */
+  std::vector<std::byte> read_chunked(SocketCommunicator& conn, std::size_t num_bytes) noexcept;
+
+  /** \brief Subscription for recieving data from a publisher
    */
   class Subscription
   {
-    // Empty for now
+  public:
+    /** \brief Attempt to create a subscription to the specified address
+     */
+    static std::optional<Subscription> try_to_create(std::string_view address) noexcept;
+
+    /** \brief Recieve a message from the socket if one is available
+     *
+     * If there is no message to read (ConnectionError::would_block is returned)
+     * then the buffer is left in an unspecified state.
+     *
+     * \param buffer The buffer to write to
+     * \param size The size of the buffer / number of bytes to read
+     */
+    ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
+
+    /** \brief Read a message in chunks
+     */
+    std::vector<std::byte> read_chunked(const std::size_t num_bytes) noexcept;
+
+  private:
+    // Don't allow external construction
+    explicit Subscription() = default;
+
+    SocketCommunicator conn_;
   }; // class Subscription
+
+  /** \brief Publication channel
+   */
+  class PublicationChannel
+  {
+  public:
+    /** \brief Create a publication channel on the specified port
+     */
+    PublicationChannel(std::uint16_t port) noexcept;
+
+    /** \brief Accepts any pending subscriptions
+     */
+    void accept_subscriptions() noexcept;
+
+    /** \brief Sends a message on the socket
+     *
+     * \param message The message to send
+     * \param size The size of the message
+     */
+    void send_message(const std::byte* message, std::size_t size) noexcept;
+
+  private:
+    SocketCommunicator conn_;
+
+    std::vector<SocketCommunicator> subscriptions_;
+  };
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

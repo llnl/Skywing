@@ -60,11 +60,9 @@ namespace skynet
     return true;
   }
 
-  /** \brief Broadcasts a value on a tag to all nodes in the network
-   */
-  void Job::global_broadcast(
+  void Job::publish_impl(
     const TagID& tag_id,
-    PublishValueVariant to_send,
+    const PublishValueVariant& to_send,
     const VersionID version
   ) noexcept
   {
@@ -74,12 +72,11 @@ namespace skynet
     auto& last_version =
       last_published_version_.try_emplace(tag_id, tag_default_version).first->second;
     update_version(last_version, version);
-    Master::JobAccessor::broadcast(
+    Master::JobAccessor::publish(
       *master_,
       last_version,
       tag_id,
-      0,
-      std::move(to_send)
+      to_send
     );
   }
 

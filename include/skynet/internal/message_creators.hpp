@@ -13,9 +13,7 @@ namespace skynet::internal
   std::vector<std::byte> make_publish(
     const VersionID message_id,
     const TagID& tag_id,
-    const MachineID& origin,
-    const std::uint8_t hops_left_p1,
-    const PublishValueVariant& data
+    const PublishValueVariant& value
   ) noexcept;
 
   /** \brief Create data to signify that a publication channel is closing

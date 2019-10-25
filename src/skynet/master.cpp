@@ -169,44 +169,6 @@ namespace skynet
       return true;
     }
 
-    std::vector<std::byte> ExternalMaster::read_from_conn(const std::size_t count) noexcept
-    {
-      // Size of memory to allocate/read each step
-      constexpr std::size_t read_step_size     = 0x0'1000;
-      constexpr std::size_t allocate_step_size = read_step_size * 16;
-      // How often memory needs to be resized
-      constexpr std::size_t resize_every_n_steps = allocate_step_size / read_step_size;
-      // Ensure that the allocate size is evenly divisible by the read size
-      static_assert(allocate_step_size % read_step_size == 0);
-      static_assert(allocate_step_size >= read_step_size);
-      // To prevent overallocation of memory, don't allocate a ton of memory to start
-      std::vector<std::byte> read_bytes;
-      // The final bytes to read in the end
-      const int final_read_size = count % read_step_size;
-      // Read memory in 4KiB chunks
-      const int num_iters = count / read_step_size + (final_read_size == 0 ? 0 : 1);
-      for (int i = 0; i < num_iters; ++i)
-      {
-        if (i % resize_every_n_steps == 0)
-        {
-          // Allocate more memory
-          const std::size_t mem_left_to_read = count - read_bytes.size();
-          const std::size_t additional_size =
-            mem_left_to_read > allocate_step_size
-              ? allocate_step_size
-              : mem_left_to_read;
-          read_bytes.resize(read_bytes.size() + additional_size);
-        }
-        const std::size_t num_bytes_to_read = (i == num_iters - 1 ? final_read_size : read_step_size);
-        // Allocate more memory if needed
-        if (!read_from_conn(&read_bytes[i * read_step_size], num_bytes_to_read))
-        {
-          return {};
-        }
-      }
-      return read_bytes;
-    }
-
     std::optional<StatusMessageHandler> ExternalMaster::try_to_get_status_message() noexcept
     {
       std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
@@ -214,7 +176,7 @@ namespace skynet
       {
         const auto bytes_to_read = from_network_bytes(size_buffer);
         // Then read the actual message and parse it
-        if (const auto message_buffer = read_from_conn(bytes_to_read); !message_buffer.empty())
+        if (const auto message_buffer = read_chunked(conn_, bytes_to_read); !message_buffer.empty())
         {
           return StatusMessageHandler::try_to_create(message_buffer);
         }
@@ -340,6 +302,7 @@ namespace skynet
   ) noexcept
     : id_{id}
     , heartbeat_interval_{heartbeat_interval}
+    , pub_channel_{static_cast<std::uint16_t>(port + publisher_port_offset)}
   {
     server_socket_.set_to_listen(port);
   }
@@ -462,17 +425,25 @@ namespace skynet
       threads.push_back(Job::Accessor::run(job));
     }
     // Do processing while there are still jobs
-    while (!jobs_.empty()) {
+    while (!jobs_.empty())
+    {
       // Remove any finished jobs
-      for (auto iter = jobs_.cbegin(); iter != jobs_.cend(); ) {
-        if (iter->second.is_finished()) {
+      for (auto iter = jobs_.cbegin(); iter != jobs_.cend(); )
+      {
+        if (iter->second.is_finished())
+        {
           iter = jobs_.erase(iter);
         }
-        else {
+        else
+        {
           ++iter;
         }
       }
+      // Handle any subscription requests
+      // Do this OUTSIDE the mutex since it's not touching any data
+      pub_channel_.accept_subscriptions();
       {
+        read_data_from_subscriptions();
         // Ensure there's no data race with jobs
         std::unique_lock lock{job_mut_};
         // Handle any messages from neighbors
@@ -493,9 +464,11 @@ namespace skynet
     }
   }
 
-  std::string Master::local_address() const noexcept
+  std::string Master::local_publishing_address() const noexcept
   {
-    return "localhost:" + std::to_string(server_socket_.port());
+    return "localhost:" + std::to_string(
+      static_cast<std::uint16_t>(server_socket_.port() + publisher_port_offset)
+    );
   }
 
   /** \brief Listens for messages from neighbors and handles them if there
@@ -510,70 +483,15 @@ namespace skynet
     remove_dead_neighbors();
   }
 
-  /** \brief Broadcast a message to the entire network
-   *
-   * \param msg_id The message's id
-   * \param tag_id The id of the tag the message is for
-   * \param hops_p1 The number of hops left + 1
-   * \param data The data to broadcast
-   */
-  void Master::do_broadcast(
+  void Master::publish(
     const VersionID version,
     const TagID& tag_id,
-    const std::uint8_t hops_left_p1,
-    PublishValueVariant data
+    const PublishValueVariant& value
   ) noexcept
   {
-    // Prepend the message describing the data and send it to all neighbors
-    send_to_neighbors(internal::make_publish(version, tag_id, id_, hops_left_p1, std::move(data)));
+    const auto msg = internal::make_publish(version, tag_id, value);
+    pub_channel_.send_message(msg.data(), msg.size());
   }
-
-  // Does all processing that needs to be done when a message is recieved
-  // void Master::process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept
-  // {
-  //   assert(handle.category() == internal::MessageCategory::job);
-  //   const auto okay = handle.do_callback(
-  //     [&](const internal::Publish& msg) {
-  //       if (is_old_message(msg))
-  //       {
-  //         return true;
-  //       }
-  //       if (!add_data_to_queue(msg))
-  //       {
-  //         return false;
-  //       }
-  //       if (msg.hops_left_p1() != 1)
-  //       {
-  //         const auto hops_p1 = msg.hops_left_p1();
-  //         const auto to_send = internal::make_publish(
-  //           msg.version(),
-  //           msg.tag_id(),
-  //           msg.origin(),
-  //           hops_p1 == 0 ? 0 : hops_p1 - 1,
-  //           *msg.data().get_variant()
-  //         );
-  //         // Propagate the message to all neighbors but ones that are known to
-  //         // have already recieve it, so not the sender, the origin, or neighbors
-  //         // that the sender also has
-  //         send_to_neighbors_if(to_send, [&](const internal::ExternalMaster& m) {
-  //           return
-  //             m.id() != from.id() &&
-  //             m.id() != msg.origin() &&
-  //             !from.has_neighbor(m.id());
-  //         });
-  //       }
-  //       return true;
-  //     },
-  //     [](...) {
-  //       assert(false && "Invalid message type in Master::process_message");
-  //       return false;
-  //     }
-  //   );
-  //   if (!okay)
-  //   {
-  //     from.mark_as_dead();
-  //   }
-  // }
 
   // Adds data to the tag queue for a job from a message
   // Returns true if it was successful, false if something went wrong
@@ -582,32 +500,14 @@ namespace skynet
     for (auto& [name, job] : jobs_)
     {
       (void)name;
-      if (!Job::Accessor::process_data(job, msg.tag_id(), *msg.data().get_variant(), msg.version()))
+      const auto msg_var = msg.value().get_variant();
+      if (!msg_var) { return false; }
+      if (!Job::Accessor::process_data(job, msg.tag_id(), *msg_var, msg.version()))
       {
         return false;
       }
     }
     return true;
-  }
-
-  /** \brief Returns true if a message is old, false otherwise
-   */
-  bool Master::is_old_message(const internal::PublishData& msg) noexcept
-  {
-    // If the message can't be found it's always new
-    const auto loc = tag_data_.find(msg.tag_id());
-    if (loc == tag_data_.cend())
-    {
-      tag_data_.try_emplace(msg.tag_id(), TagData{msg.version(), {}, {}});
-      return false;
-    }
-    // Otherwise have to check if it's old
-    if (msg.version() <= loc->second.last_version)
-    {
-      return true;
-    }
-    loc->second.last_version = msg.version();
-    return false;
   }
 
   /** \brief Notify neighbors of a new new neighbor
@@ -662,44 +562,72 @@ namespace skynet
     std::vector<TagID> tags_to_find;
     for (const auto tag_id : tag_ids)
     {
+      // Check if already subscribed, skip if so
+      const bool already_subscribed = [this, &tag_id]() {
+        for (const auto& sub : subscriptions_)
+        {
+          auto& prod_tags = sub.produced_tags;
+          if (std::find(prod_tags.cbegin(), prod_tags.cend(), tag_id) != prod_tags.cend())
+          {
+            return true;
+          }
+        }
+        return false;
+      }();
+      if (already_subscribed) { continue; }
       // If the tag is produced locally just subscribe to self
       if (produced_tags_.find(tag_id) != produced_tags_.cend())
       {
-        std::cout << "subscribed to self!\n";
+        if (!try_to_subscribe(local_publishing_address(), {produced_tags_.cbegin(), produced_tags_.cend()}))
+        {
+          // Failed to subscribed to self; this should never happen
+          std::cerr
+            << std::quoted(id_) << " failed to subscribe to itself for tag" << std::quoted(tag_id) << "\n"
+            << "\tSomething has gone very wrong, perror output:\n\t";
+          std::perror(nullptr);
+          std::terminate();
+        }
         continue;
       }
       // Check if there is a list of known producers for the tag
-      auto loc = tag_data_.find(tag_id);
+      const auto loc = publishers_for_tag_.find(tag_id);
       // Create the entry if required
-      if (loc == tag_data_.end())
+      if (loc == publishers_for_tag_.end())
       {
-        loc = tag_data_.try_emplace(
-          tag_id,
-          TagData{
-            Job::tag_default_version,
-            {},
-            {}
-          }
-        ).first;
-      }
-      auto& tag_data = loc->second;
-      // If already subscribed then skip then just go to the next tag
-      if (tag_data.subscription)
-      {
-        continue;
-      }
-      // Now, if there are any known subscriptions, subscribe to them
-      if (!tag_data.publishers.empty())
-      {
-        // TODO: Subscription stuff
-        const auto& subscribe_address = *tag_data.publishers.begin();
-        std::cout << "subscribed to " << subscribe_address << "!\n";
-        tag_data.subscription = std::make_shared<internal::Subscription>();
+        publishers_for_tag_.try_emplace(tag_id);
+        tags_to_find.push_back(tag_id);
       }
       else
       {
-        // Couldn't do this subscription; need to look for a producer for the tag
-        tags_to_find.push_back(tag_id);
+        auto& publishers = loc->second;
+        // Now, if there are any known subscriptions, try to subscribe to them
+        if (!publishers.empty())
+        {
+          for (auto it = publishers.begin(); it != publishers.end(); )
+          {
+            const auto& subscribe_address = *it;
+            if (auto sub = internal::Subscription::try_to_create(subscribe_address))
+            {
+              subscriptions_.push_back(SubscriptionData{
+                std::move(*sub),
+                get_tags_for_publisher(subscribe_address)
+              });
+              break;
+            }
+            else
+            {
+              // Couldn't subscribe - remove this as a producer
+              it = publishers.erase(it);
+            }
+          }
+        }
+        // Check if the producers are still empty (can happen if all known publishers
+        // fail to be subscribed to)
+        if (publishers.empty())
+        {
+          // Couldn't do this subscription; need to look for a producer for the tag
+          tags_to_find.push_back(tag_id);
+        }
       }
     }
     // Find producers for any tags that need it
@@ -751,10 +679,10 @@ namespace skynet
         tags_left.begin(),
         tags_left.end(),
         [&](const TagID& id) {
-          const auto loc = tag_data_.find(id);
-          return loc == tag_data_.cend()
+          const auto loc = publishers_for_tag_.find(id);
+          return loc == publishers_for_tag_.cend()
             ? produced_tags_.find(id) != produced_tags_.cend()
-            : !loc->second.publishers.empty();
+            : !loc->second.empty();
         }
       ),
       tags_left.end()
@@ -763,8 +691,8 @@ namespace skynet
   }
 
   void Master::add_publishers_and_propagate(
-      const internal::TagPublishers& msg,
-      const internal::ExternalMaster& from
+    const internal::TagPublishers& msg,
+    const internal::ExternalMaster& from
   ) noexcept
   {
     const auto tags = msg.tags();
@@ -781,41 +709,32 @@ namespace skynet
       const auto& tag = tags[i];
       const auto& publishers = publishers_list[i];
       // Find or create the tag
-      auto loc = tag_data_.find(tag);
-      if (loc == tag_data_.end())
+      const auto loc = publishers_for_tag_.find(tag);
+      if (loc == publishers_for_tag_.end())
       {
-        loc = tag_data_.try_emplace(
-          tag,
-          TagData{
-            Job::tag_default_version,
-            {},
-            {}
-          }
-        ).first;
+        publishers_for_tag_.try_emplace(tag, publishers.cbegin(), publishers.cend());
       }
-      // Add the publishers
-      for (const auto& publisher : publishers)
+      else
       {
-        loc->second.publishers.insert(publisher);
+        loc->second.insert(publishers.cbegin(), publishers.cend());
       }
     }
     // Add the tags that the external master produced
     const auto external_tags = msg.locally_produced_tags();
     for (const auto& tag : external_tags)
     {
-      auto loc = tag_data_.find(tag);
-      if (loc == tag_data_.end())
+      const auto loc = publishers_for_tag_.find(tag);
+      if (loc == publishers_for_tag_.end())
       {
-        loc = tag_data_.try_emplace(
+        publishers_for_tag_.emplace(
           tag,
-          TagData{
-            Job::tag_default_version,
-            {},
-            {}
-          }
-        ).first;
+          std::initializer_list<std::string>{from.publisher_address()}
+        );
       }
-      loc->second.publishers.insert(from.publisher_address());
+      else
+      {
+        loc->second.insert(from.publisher_address());
+      }
     }
     // Propagate to any machines that need this information, marking them
     // as no longer needing propagation as well
@@ -832,11 +751,7 @@ namespace skynet
     if (!machines_to_send_to.empty())
     {
       std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
-      const auto to_send = internal::make_tag_publishers(
-        tags,
-        publishers_list,
-        local_tags
-      );
+      const auto to_send = internal::make_tag_publishers(tags, publishers_list, local_tags);
       // Send to the machines if they are present
       for (const auto& send_to : machines_to_send_to)
       {
@@ -853,17 +768,82 @@ namespace skynet
   {
     std::vector<TagID> tags;
     std::vector<std::vector<std::string>> addresses;
-    for (const auto& [tag, data] : tag_data_)
+    for (const auto& [tag, publishers] : publishers_for_tag_)
     {
-      // Only send data if there are known publishers
-      if (!data.publishers.empty())
+      if (!publishers.empty())
       {
         tags.push_back(tag);
-        auto& back = addresses.emplace_back(data.publishers.size());
-        std::copy(data.publishers.cbegin(), data.publishers.cend(), back.begin());
+        addresses.emplace_back(publishers.cbegin(), publishers.cend());
       }
     }
-    std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
+    const std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
     return internal::make_tag_publishers(tags, addresses, local_tags);
+  }
+
+  bool Master::try_to_subscribe(
+    const std::string_view address,
+    std::vector<std::string> remote_tags_produced
+  ) noexcept
+  {
+    if (auto sub = internal::Subscription::try_to_create(address))
+    {
+      subscriptions_.emplace_back(SubscriptionData{std::move(*sub), std::move(remote_tags_produced)});
+      return true;
+    }
+    return false;
+  }
+
+  void Master::read_data_from_subscriptions() noexcept
+  {
+    // TODO: Actually handle things when reading fails... which if it requires searching for
+    // another publisher could be very expensive, not really sure what else could be done though.
+    // Just ignore failures for now.
+    for (auto& [sub, tags] : subscriptions_)
+    {
+      (void)tags;
+      std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
+      // I... honestly don't know what to do about all of these if statements
+      // I guess that's what happens when many optionals are used
+      if (sub.read_message(size_buffer.data(), size_buffer.size()) == internal::ConnectionError::no_error)
+      {
+        const auto bytes_to_read = internal::from_network_bytes(size_buffer);
+        // Then read the actual message and parse it
+        if (const auto message_buffer = sub.read_chunked(bytes_to_read); !message_buffer.empty())
+        {
+          if (const auto msg = internal::PublishMessageHandler::try_to_create(message_buffer))
+          {
+            if (const auto data = msg->data())
+            {
+              if (const auto variant = data->value().get_variant())
+              {
+                for (auto& [job_id, job] : jobs_)
+                {
+                  (void)job_id;
+                  Job::Accessor::process_data(
+                    job,
+                    data->tag_id(),
+                    *variant,
+                    data->version()
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  std::vector<std::string> Master::get_tags_for_publisher(const std::string_view publisher_address) const noexcept
+  {
+    std::vector<std::string> tags_produced;
+    for (const auto& [tag, publishers] : publishers_for_tag_)
+    {
+      if (std::find(publishers.cbegin(), publishers.cend(), publisher_address) != publishers.cend())
+      {
+        tags_produced.push_back(tag);
+      }
+    }
+    return tags_produced;
   }
 } // namespace skynet

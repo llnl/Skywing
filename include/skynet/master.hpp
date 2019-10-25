@@ -252,7 +252,7 @@ namespace skynet
 
     /** \brief Return the local address of the master, for subscribing to self
      */
-    std::string local_address() const noexcept;
+    std::string local_publishing_address() const noexcept;
 
     // Allow Job classes to broadcast and handle neighbors but nothing else
     struct JobAccessor
@@ -260,16 +260,15 @@ namespace skynet
     private:
       friend class Job;
 
-      static void broadcast(
+      static void publish(
         Master& m,
         const VersionID version,
         const TagID& tag_id,
-        const std::uint32_t hops_left_p1,
-        PublishValueVariant data
+        const PublishValueVariant& value
       ) noexcept
       {
         std::unique_lock lock{m.job_mut_};
-        m.do_broadcast(version, tag_id, hops_left_p1, std::move(data));
+        m.publish(version, tag_id, value);
       }
 
       static bool subscribe(
@@ -315,28 +314,19 @@ namespace skynet
 
     /** \brief Broadcast a message to the entire network
      *
-     * \param msg_id The message's version
+     * \param version The message's version
      * \param tag_id The id of the tag the message is for
-     * \param hops_p1 The number of hops left + 1
-     * \param data The data to broadcast
+     * \param value The value to send
      */
-    void do_broadcast(
+    void publish(
       const VersionID version,
       const TagID& tag_id,
-      const std::uint8_t hops_left_p1,
-      PublishValueVariant data
+      const PublishValueVariant& value
     ) noexcept;
-
-    // Does all processing that needs to be done when a message is recieved
-    // void process_message(internal::MessageHandler& handle, internal::ExternalMaster& from) noexcept;
 
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
     bool add_data_to_queue(const internal::PublishData& msg) noexcept;
-
-    /** \brief Returns true if a message is old, false otherwise
-     */
-    bool is_old_message(const internal::PublishData& msg) noexcept;
 
     /** \brief Notify neighbors of a new new neighbor
      */
@@ -382,17 +372,32 @@ namespace skynet
       internal::ExternalMaster& from
     ) noexcept;
 
-    // Removes any tags that have known publishers
+    /** \brief Removes any tags that have known publishers
+     */
     std::vector<TagID> remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept;
 
-    // Adds the publishers and propagate the information is required
+    /** \brief Adds the publishers and propagate the information is required
+     */
     void add_publishers_and_propagate(
       const internal::TagPublishers& msg,
       const internal::ExternalMaster& from
     ) noexcept;
 
-    // Produce a message containing the known publishers and tags
+    /** \brief Produce a message containing the known publishers and tags
+     */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
+
+    /** \brief Attempt to subscribe on the passed address
+     */
+    bool try_to_subscribe(std::string_view address, std::vector<std::string> remote_tags_produced) noexcept;
+
+    /** \brief Reads data from any subscriptions
+     */
+    void read_data_from_subscriptions() noexcept;
+
+    /** \brief Returns the list of tags that a publisher is known to produce
+     */
+    std::vector<std::string> get_tags_for_publisher(std::string_view publisher_address) const noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
@@ -403,19 +408,16 @@ namespace skynet
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
-    // Information about each tag
-    struct TagData
+    // Subscriptions and the tags that they produce
+    struct SubscriptionData
     {
-      // The last version heard for the tag
-      VersionID last_version;
-      // A list of known addresses that produce the tag
-      std::unordered_set<std::string> publishers;
-      // The subscription to get the data from, if any
-      // This is a shared pointer because a single subscription may fill
-      // many tags
-      std::shared_ptr<internal::Subscription> subscription;
+      internal::Subscription subscription;
+      std::vector<TagID> produced_tags;
     };
-    std::unordered_map<TagID, TagData> tag_data_;
+    std::vector<SubscriptionData> subscriptions_;
+
+    // List of publishers that a known for each tag
+    std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
 
     // The id of this machine
     MachineID id_;
@@ -434,6 +436,9 @@ namespace skynet
 
     // The tags that this machine produces
     std::unordered_set<TagID> produced_tags_;
+
+    // The publication channel for this machine
+    internal::PublicationChannel pub_channel_;
   }; // class Master
 } // namespace skynet
 

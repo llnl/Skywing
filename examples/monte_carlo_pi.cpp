@@ -67,8 +67,6 @@ void machine_task(
       if (index != 0)
       {
         job.publish(DataTag{std::to_string(index)}, misses);
-        // Wait for a bit to allow other data to finish processing
-        std::this_thread::sleep_for(std::chrono::seconds(1));
       }
       else
       {

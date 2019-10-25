@@ -177,4 +177,108 @@ namespace skynet::internal
 
   std::uint16_t SocketCommunicator::port() const noexcept { return port_; }
 
+  std::vector<std::byte> read_chunked(SocketCommunicator& conn, const std::size_t num_bytes) noexcept
+  {
+    // Size of memory to allocate/read each step
+    constexpr std::size_t read_step_size     = 0x0'1000;
+    constexpr std::size_t allocate_step_size = read_step_size * 16;
+    // How often memory needs to be resized
+    constexpr std::size_t resize_every_n_steps = allocate_step_size / read_step_size;
+    // Ensure that the allocate size is evenly divisible by the read size
+    static_assert(allocate_step_size % read_step_size == 0);
+    static_assert(allocate_step_size >= read_step_size);
+    // To prevent overallocation of memory, don't allocate a ton of memory to start
+    std::vector<std::byte> read_bytes;
+    // The final bytes to read in the end
+    const int final_read_size = num_bytes % read_step_size;
+    // Read memory in 4KiB chunks
+    const int num_iters = num_bytes / read_step_size + (final_read_size == 0 ? 0 : 1);
+    for (int i = 0; i < num_iters; ++i)
+    {
+      if (i % resize_every_n_steps == 0)
+      {
+        // Allocate more memory
+        const std::size_t mem_left_to_read = num_bytes - read_bytes.size();
+        const std::size_t additional_size =
+          mem_left_to_read > allocate_step_size
+            ? allocate_step_size
+            : mem_left_to_read;
+        read_bytes.resize(read_bytes.size() + additional_size);
+      }
+      const std::size_t num_bytes_to_read = (i == num_iters - 1 ? final_read_size : read_step_size);
+      // Allocate more memory if needed
+      if (conn.read_message(&read_bytes[i * read_step_size], num_bytes_to_read) != ConnectionError::no_error)
+      {
+        return {};
+      }
+    }
+    return read_bytes;
+  }
+
+  std::optional<Subscription> Subscription::try_to_create(const std::string_view address) noexcept
+  {
+    // Split the address by the colon
+    const auto colon_loc = address.find(':');
+    if (colon_loc == std::string_view::npos) { return {}; }
+    const auto port_str = address.substr(colon_loc + 1);
+    // Try to parse the port
+    char* end;
+    const auto port = strtol(port_str.data(), &end, 10);
+    // Check that the entire string was parsed and that the port is valid
+    if (end != port_str.data() + port_str.size() || port < 0 || port > 0xFFFF) { return {}; }
+    // Try to connect to the publisher
+    // Need to make a std::string to ensure that it is null-terminated
+    const std::string address_str{address.begin(), address.begin() + colon_loc};
+    Subscription to_ret;
+    if (to_ret.conn_.connect_to_server(address_str.c_str(), port) != ConnectionError::no_error)
+    {
+      return {};
+    }
+    return std::move(to_ret);
+  }
+
+  ConnectionError Subscription::read_message(std::byte* const buffer, const std::size_t size) noexcept
+  {
+    return conn_.read_message(buffer, size);
+  }
+
+  std::vector<std::byte> Subscription::read_chunked(const std::size_t num_bytes) noexcept
+  {
+    return ::skynet::internal::read_chunked(conn_, num_bytes);
+  }
+
+  PublicationChannel::PublicationChannel(const std::uint16_t port) noexcept
+  {
+    if (conn_.set_to_listen(port) != ConnectionError::no_error)
+    {
+      std::perror("PublicationChannel::PublicationChannel");
+      std::exit(-1);
+    }
+  }
+
+  void PublicationChannel::accept_subscriptions() noexcept
+  {
+    while (auto new_sub = conn_.accept())
+    {
+      subscriptions_.push_back(std::move(*new_sub));
+    }
+  }
+
+  void PublicationChannel::send_message(const std::byte* const message, const std::size_t size) noexcept
+  {
+    for (std::size_t i = 0; i < subscriptions_.size(); ++i)
+    {
+      auto& sub = subscriptions_[i];
+      if (sub.send_message(message, size) != ConnectionError::no_error)
+      {
+        // Delete the subscription
+        using std::swap;
+        swap(sub, subscriptions_.back());
+        subscriptions_.pop_back();
+        // The size decreased, so must also reduce the loop iterator
+        --i;
+      }
+    }
+  }
+
 } // namespace skynet::internal

@@ -211,7 +211,7 @@ namespace skynet
       const VersionID version = tag_default_version
     ) noexcept
     {
-      global_broadcast(tag.id(), value, version);
+      publish_impl(tag.id(), value, version);
     }
 
     /** \brief Returns true if the job is finished, false if it is not
@@ -238,9 +238,9 @@ namespace skynet
 
     /** \brief Broadcasts a value on a tag to all nodes in the network
      */
-    void global_broadcast(
+    void publish_impl(
       const TagID& tag_id,
-      PublishValueVariant to_send,
+      const PublishValueVariant& to_send,
       VersionID version
     ) noexcept;
 

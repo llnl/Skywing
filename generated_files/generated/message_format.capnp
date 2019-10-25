@@ -33,10 +33,8 @@ struct PublishData {
     # TODO: Actually figure out how to use bytes?
     # bytes @22 : Data;
   }
-  version    @22 : UInt32;
-  tagID      @23 : Text;
-  origin     @24 : Text;
-  hopsLeftP1 @25 : UInt8;
+  version @22 : UInt32;
+  tagID   @23 : Text;
 }
 
 struct Publish {

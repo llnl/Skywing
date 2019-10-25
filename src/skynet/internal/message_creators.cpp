@@ -47,9 +47,7 @@ namespace skynet::internal
   std::vector<std::byte> make_publish(
     const VersionID version,
     const TagID& tag_id,
-    const MachineID& origin,
-    const std::uint8_t hops_left_p1,
-    const PublishValueVariant& data
+    const PublishValueVariant& value
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -57,15 +55,13 @@ namespace skynet::internal
     // Just set the data now
     message.setVersion(version);
     message.setTagID(tag_id);
-    message.setOrigin(origin);
-    message.setHopsLeftP1(hops_left_p1);
     auto publish_value = message.initValue();
     std::visit(
-      [&](const auto& value) {
-        using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-        detail::PublishValueHandler<ValueType>::set(publish_value, value);
+      [&](const auto& data) {
+        using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
+        detail::PublishValueHandler<ValueType>::set(publish_value, data);
       },
-      data
+      value
     );
     return finalize_message(builder);
   }
