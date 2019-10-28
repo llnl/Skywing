@@ -141,7 +141,7 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::send_message(const std::byte* const message, const std::size_t size) noexcept
   {
-    if (write(handle_, reinterpret_cast<const char*>(message), size) < 0)
+    if (send(handle_, message, size, MSG_NOSIGNAL) < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
@@ -280,6 +280,11 @@ namespace skynet::internal
         --i;
       }
     }
+  }
+
+  int PublicationChannel::num_subscriptions() const noexcept
+  {
+    return static_cast<int>(subscriptions_.size());
   }
 
 } // namespace skynet::internal

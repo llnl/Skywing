@@ -485,6 +485,11 @@ namespace skynet
     );
   }
 
+  int Master::num_subscribers() const noexcept
+  {
+    return pub_channel_.num_subscriptions();
+  }
+
   /** \brief Listens for messages from neighbors and handles them if there
    * are any.
    */
@@ -677,7 +682,13 @@ namespace skynet
     }
     else
     {
-      bool work_to_do = false;
+      // If there are no other neighbors, just answer right away so
+      // it doesn't stall
+      if (neighbors_.size() == 1)
+      {
+        from.send_message(make_known_tag_publisher_message());
+      }
+      bool ask_neighbors = false;
       // Mark the information as needing to be propagated
       for (const auto& tag : remaining_tags)
       {
@@ -685,11 +696,18 @@ namespace skynet
         auto [dummy2, inserted] = iter->second.emplace(from.id());
         (void)dummy1;
         (void)dummy2;
-        // If the insert failed, information for the tag is already going to be
-        // propagated, so only if it was successful is there work to do
-        if (inserted) { work_to_do = true; }
+        // If the insert worked, there are new tags to look for, so ask neighbors
+        // about them
+        // If there aren't any new tags, just respond with what is known for now
+        // as otherwise the entire system will deadlock when all of the wanted
+        // tags can't be found
+        if (inserted) { ask_neighbors = true; }
       }
-      if (work_to_do)
+      if (!ask_neighbors)
+      {
+        from.send_message(make_known_tag_publisher_message());
+      }
+      else
       {
         for (auto& neighbor : neighbors_)
         {

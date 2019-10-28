@@ -170,12 +170,27 @@ namespace skynet
       );
     }
 
+    /** \brief Subscribe to all tags passed into the vector.
+     *
+     * Returns true only if all of the passed tags could be subscribed to.
+     */
+    template<typename Tag>
+    bool subscribe(const std::vector<TagID>& tags) noexcept
+    {
+      using ValueType = typename Tag::ValueType;
+      std::vector<std::uint8_t> expected_types(
+        tags.size(),
+        internal::index_of<ValueType, PublishValueTypeList>
+      );
+      return subscribe_impl(tags, expected_types);
+    }
+
     /** \brief Subscribes to all of the passed tags.
      *
      * Returns true only if all of the passed tags could be subscribed to.
      */
     template<typename... SubTags>
-    bool subscribe(const SubTags&... tags) noexcept
+    std::enable_if_t<sizeof...(SubTags), bool> subscribe(const SubTags&... tags) noexcept
     {
       return subscribe_impl(
         {tags.id()...},

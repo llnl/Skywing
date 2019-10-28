@@ -153,6 +153,10 @@ namespace skynet::internal
      */
     void send_message(const std::byte* message, std::size_t size) noexcept;
 
+    /** \brief Returns the number of subscriptions that are present
+     */
+    int num_subscriptions() const noexcept;
+
   private:
     SocketCommunicator conn_;
 

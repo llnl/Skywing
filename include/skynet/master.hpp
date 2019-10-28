@@ -263,6 +263,10 @@ namespace skynet
      */
     std::string local_publishing_address() const noexcept;
 
+    /** \brief Returns the number of subscribers
+     */
+    int num_subscribers() const noexcept;
+
     // Allow Job classes to broadcast and handle neighbors but nothing else
     struct JobAccessor
     {

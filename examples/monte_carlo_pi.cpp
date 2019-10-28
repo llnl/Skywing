@@ -34,13 +34,14 @@ void machine_task(
       // Subscribe to all of the tags (if machine 0)
       if (index == 0)
       {
+        std::vector<skynet::TagID> subscribe_to;
         for (auto i = 1; i < num_machines; ++i)
         {
-          while (!job.subscribe(DataTag{std::to_string(i)}))
-          {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          }
-          // std::cerr << i << " OK\n";
+          subscribe_to.emplace_back(std::to_string(i));
+        }
+        while (!job.subscribe<DataTag>(subscribe_to))
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
       }
       // Count misses rather than hits as they occur less frequently, so less
@@ -67,8 +68,15 @@ void machine_task(
       // and display a result
       if (index != 0)
       {
+        // Wait until a subscription has happened
+        while (master.num_subscribers() == 0)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
         job.publish(DataTag{std::to_string(index)}, misses);
-        // std::cerr << std::to_string(index) + " finished\n";
+        // Sleep a bit in case the subscribe requests need to propagate through the
+        // network
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
       else
       {
@@ -112,10 +120,7 @@ int main(const int argc, const char* const argv[])
     return 1;
   }
   // Create a fully connected network
-  const auto network_info = skynet::make_network(
-    num_machines,
-    skynet::maximum_connections(num_machines)
-  );
+  const auto network_info = skynet::make_network(num_machines, 0);
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {
