@@ -4,12 +4,12 @@
 
 #include <thread>
 
+using namespace skynet;
+
 constexpr std::uint16_t server_port = 10000;
 constexpr std::uint16_t client_port = 20000;
-constexpr std::uint32_t server_id = 1;
-constexpr std::uint32_t client_id = 2;
-
-using namespace skynet;
+constexpr const char* server_id = "server";
+constexpr const char* client_id = "client";
 
 void server()
 {

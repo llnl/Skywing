@@ -20,14 +20,14 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * meson (https://mesonbuild.com/)
  * ninja (https://ninja-build.org/)
  * ns3 (see subprojects/ns3/build_ns3)
+ * Cap'n Proto (https://capnproto.org/)
  * Managed automatically:
    * Catch2
    * zmqcpp
 
 ## Build instructions
  * Get dependencies
-   * git submodule init
-   * git submodule update
+   * git submodule update --init --recursive
  * Create build files
    * meson <BUILD_DIRECTORY>
  * Build Skynet

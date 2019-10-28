@@ -4,9 +4,10 @@
 #include "skynet/job.hpp"
 
 #include <array>
-#include <cstdint>
-#include <thread>
 #include <chrono>
+#include <cstdint>
+#include <iostream>
+#include <thread>
 
 using namespace skynet;
 
@@ -21,6 +22,12 @@ using namespace skynet;
 
 // The number of connections each machine should have when fully connected
 constexpr std::array<int, 5> machine_counts{1, 2, 3, 3, 3};
+
+// The names of the machines
+constexpr std::array<const char*, 5> machine_names{"m0", "m1", "m2", "m3", "m4"};
+
+// The names of the tags
+constexpr std::array<const char*, 5> tag_names{"t0", "t1", "t2", "t3", "t4"};
 
 // The port each machine is on
 std::array<std::uint16_t, 5> ports{
@@ -40,9 +47,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
   std::array<int, 3>{ 1,  2,  3}
 };
 
-using SizeTTag = Tag<std::size_t>;
-
-using JobType = Job<SizeTTag>;
+using Uint64Tag = Tag<std::uint64_t>;
 
 void setup_network(Master& master, const std::size_t index)
 {
@@ -73,21 +78,21 @@ void machine_task(Master* const master_ptr, const std::size_t index)
   auto& master = *master_ptr;
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
-  auto& my_job = master.make_job<JobType>(0);
+  Job my_job{"job 0", master};
   // Subscribe to everything ahead of time
   for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
   {
-    my_job.subscribe(SizeTTag(send_index));
+    my_job.subscribe(Uint64Tag{tag_names[send_index]});
   }
   for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
   {
     if (index == send_index)
     {
-      my_job.publish(SizeTTag(send_index), send_index);
+      my_job.publish(Uint64Tag{tag_names[send_index]}, send_index);
     }
     else
     {
-      REQUIRE(my_job.get_when_ready(SizeTTag(send_index)) == send_index);
+      REQUIRE(my_job.get_when_ready(Uint64Tag{tag_names[send_index]}) == send_index);
     }
   }
 }
@@ -99,7 +104,7 @@ TEST_CASE("Broadcast works", "[Skynet_Broadcast]")
   std::vector<Master> masters;
   for (std::size_t i = 0; i < machine_counts.size(); ++i)
   {
-    masters.emplace_back(ports[i], static_cast<std::uint32_t>(i));
+    masters.emplace_back(ports[i], machine_names[i]);
   }
   std::vector<std::thread> threads;
   for (std::size_t i = 0; i < machine_counts.size(); ++i)

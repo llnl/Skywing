@@ -1,8 +1,9 @@
 # ['test_name', 'path/to/test/source']
 tests = [
   # ./
-  ['broadcast', 'broadcast.cpp'],
   ['broadcast_complex', 'broadcast_complex.cpp'],
+  ['broadcast_data_wrapper', 'broadcast_data_wrapper.cpp'],
+  ['broadcast', 'broadcast.cpp'],
   ['disconnect', 'disconnect.cpp'],
   ['master_conn', 'master_conn.cpp'],
 

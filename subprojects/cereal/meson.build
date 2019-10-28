@@ -1,5 +1,0 @@
-project('cereal', 'cpp', version : '1.2.2', license: 'BSD', default_options : ['cpp_std=c++14'])
-
-inc = include_directories('cereal/include')
-
-cereal_dep = declare_dependency(include_directories : inc)

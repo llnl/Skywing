@@ -5,18 +5,18 @@
 
 #include "utils.hpp"
 
-#include <vector>
-#include <thread>
-#include <random>
 #include <numeric>
+#include <random>
+#include <string>
+#include <thread>
+#include <vector>
 
 using namespace skynet;
 
 static constexpr std::uint16_t base_port = 5000;
 static constexpr int num_machines = 10;
 
-using IntTag = Tag<int>;
-using JobType = Job<IntTag>;
+using Int32Tag = Tag<std::int32_t>;
 
 void setup_network(const int index, Master& master)
 {
@@ -40,28 +40,29 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
 {
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), static_cast<MachineID>(index)};
+  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   setup_network(index, master);
-  auto& my_job = master.make_job<JobType>(0);
+  Job my_job{"Job 0", master};
   // Subscribe to all tags ahead of time
   for (std::size_t i = 0; i < disconnect_order.size(); ++i)
   {
-    my_job.subscribe(IntTag(i));
+    my_job.subscribe(Int32Tag{std::to_string(i)});
   }
   for (std::size_t i = 0; i < disconnect_order.size(); ++i)
   {
+    const Int32Tag tag{std::to_string(i)};
     const auto to_remove = disconnect_order[i];
     if (to_remove == index)
     {
       // broadcast and remove (the data doesn't really matter)
-      my_job.publish(IntTag(i), to_remove);
+      my_job.publish(tag, to_remove);
       // Leaving the loop will cause the master to destruct, automatically
       // disconnecting
       break;
     }
     else
     {
-      REQUIRE(my_job.get_when_ready(IntTag(i)) == to_remove);
+      REQUIRE(my_job.get_when_ready(tag) == to_remove);
     }
   }
   // Make sure the threads don't exit too soon
