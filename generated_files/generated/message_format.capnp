@@ -47,6 +47,7 @@ struct Publish {
 struct Greeting {
   from      @0 : Text;
   neighbors @1 : List(Text);
+  basePort  @2 : UInt16;
 }
 
 struct NewNeighbor {
@@ -59,7 +60,7 @@ struct RemoveNeighbor {
 
 # For each tag, a list of machines addresses known to publish on that tag
 # Additionally, a list of tags that are produced by the machine that sent the message
-struct TagPublishers {
+struct ReportPublishers {
   tags                @0 : List(Text);
   addresses           @1 : List(List(Text));
   locallyProducedTags @2 : List(Text);
@@ -71,12 +72,12 @@ struct GetPublishers {
 
 struct StatusMessage {
   union {
-    greeting       @0 : Greeting;
-    goodbye        @1 : Void;
-    newNeighbor    @2 : NewNeighbor;
-    removeNeighbor @3 : RemoveNeighbor;
-    heartbeat      @4 : Void;
-    tagPublishers  @5 : TagPublishers;
-    getPublishers  @6 : GetPublishers;
+    greeting         @0 : Greeting;
+    goodbye          @1 : Void;
+    newNeighbor      @2 : NewNeighbor;
+    removeNeighbor   @3 : RemoveNeighbor;
+    heartbeat        @4 : Void;
+    reportPublishers @5 : ReportPublishers;
+    getPublishers    @6 : GetPublishers;
   }
 }

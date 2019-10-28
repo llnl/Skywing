@@ -79,7 +79,8 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_greeting(
     const MachineID& from,
-    const std::vector<MachineID>& neighbors
+    const std::vector<MachineID>& neighbors,
+    const std::uint16_t base_port
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -90,6 +91,7 @@ namespace skynet::internal
     {
       to_set.set(i, neighbors[i]);
     }
+    message.setBasePort(base_port);
     return finalize_message(builder);
   }
 
@@ -131,14 +133,14 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  std::vector<std::byte> make_tag_publishers(
+  std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
     const std::vector<TagID>& locally_produced_tags
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::StatusMessage>().initTagPublishers();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initReportPublishers();
     auto msg_tags = message.initTags(tags.size());
     for (std::size_t i = 0; i < tags.size(); ++i)
     {
@@ -148,7 +150,7 @@ namespace skynet::internal
     for (std::size_t i = 0; i < tags.size(); ++i)
     {
       auto address_to_set = msg_addresses.init(i, addresses[i].size());
-      for (std::size_t j = 0; j < tags[i].size(); ++j)
+      for (std::size_t j = 0; j < addresses[i].size(); ++j)
       {
         address_to_set.set(j, addresses[i][j]);
       }

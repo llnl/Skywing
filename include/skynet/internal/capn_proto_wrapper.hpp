@@ -217,6 +217,7 @@ namespace skynet::internal
   public:
     MachineID from() const noexcept { return r.getFrom(); }
     std::vector<MachineID> neighbors() const noexcept { return detail::list_to_vector<MachineID>(r.getNeighbors()); }
+    std::uint16_t base_port() const noexcept { return r.getBasePort(); }
 
   private:
     cpnpro::Greeting::Reader r;
@@ -275,7 +276,7 @@ namespace skynet::internal
 
   /** \brief Class representing information on which machines produce what tags
    */
-  class TagPublishers
+  class ReportPublishers
   {
   public:
     std::vector<TagID> tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
@@ -289,10 +290,10 @@ namespace skynet::internal
     }
 
   private:
-    cpnpro::TagPublishers::Reader r;
+    cpnpro::ReportPublishers::Reader r;
 
     friend class StatusMessageHandler;
-    explicit TagPublishers(cpnpro::TagPublishers::Reader reader) noexcept
+    explicit ReportPublishers(cpnpro::ReportPublishers::Reader reader) noexcept
       : r{std::move(reader)}
       {}
   };
@@ -392,7 +393,7 @@ namespace skynet::internal
       NewNeighbor,
       RemoveNeighbor,
       Heartbeat,
-      TagPublishers,
+      ReportPublishers,
       GetPublishers
     >;
 
@@ -405,13 +406,13 @@ namespace skynet::internal
       // to signify that there's no data due to, e.g., malformed input
       const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
         switch(impl_->root.which()) {
-        case vals::GREETING:        return Greeting{impl_->root.getGreeting()};
-        case vals::GOODBYE:         return Goodbye{/* impl_->root.getGoodbye() */};
-        case vals::NEW_NEIGHBOR:    return NewNeighbor{impl_->root.getNewNeighbor()};
-        case vals::REMOVE_NEIGHBOR: return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
-        case vals::HEARTBEAT:       return Heartbeat{/* impl_->root.getHeartbeat() */};
-        case vals::TAG_PUBLISHERS:  return TagPublishers{impl_->root.getTagPublishers()};
-        case vals::GET_PUBLISHERS:  return GetPublishers{impl_->root.getGetPublishers()};
+        case vals::GREETING:          return Greeting{impl_->root.getGreeting()};
+        case vals::GOODBYE:           return Goodbye{/* impl_->root.getGoodbye() */};
+        case vals::NEW_NEIGHBOR:      return NewNeighbor{impl_->root.getNewNeighbor()};
+        case vals::REMOVE_NEIGHBOR:   return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+        case vals::HEARTBEAT:         return Heartbeat{/* impl_->root.getHeartbeat() */};
+        case vals::REPORT_PUBLISHERS: return ReportPublishers{impl_->root.getReportPublishers()};
+        case vals::GET_PUBLISHERS:    return GetPublishers{impl_->root.getGetPublishers()};
         }
         return {};
       }();

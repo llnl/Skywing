@@ -61,9 +61,10 @@ namespace skynet
       static std::optional<ExternalMaster> create(
         ByAccept,
         SocketCommunicator conn,
-        const MachineID local_id,
+        const MachineID& local_id,
         const std::vector<MachineID>& local_neighbors,
-        Master& master
+        Master& master,
+        std::uint16_t base_port
       ) noexcept;
 
       /** \brief Attempt to construct an ExternalMaster using an existing connection
@@ -73,9 +74,10 @@ namespace skynet
       static std::optional<ExternalMaster> create(
         ByRequest,
         SocketCommunicator conn,
-        const MachineID local_id,
+        const MachineID& local_id,
         const std::vector<MachineID>& local_neighbors,
-        Master& master
+        Master& master,
+        std::uint16_t base_port
       ) noexcept;
 
       /** \brief Handles any messages sent from the connection
@@ -109,9 +111,9 @@ namespace skynet
        */
       void send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept;
 
-      /** \brief Begins the search process for producers for a tag
+      /** \brief Begins the search process for publishers tags
        */
-      void find_producers_for_tags(const std::vector<TagID>& tags) noexcept;
+      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
 
       /** \brief The address of the publisher for the external master
        */
@@ -148,7 +150,11 @@ namespace skynet
       }
 
       // Send the greeting
-      bool send_greeting(const MachineID local_id, const std::vector<MachineID>& local_neighbors) noexcept;
+      bool send_greeting(
+        const MachineID& local_id,
+        const std::vector<MachineID>& local_neighbors,
+        std::uint16_t base_port
+      ) noexcept;
 
       // Wait until the greeting is sent
       bool wait_for_greeting() noexcept;
@@ -176,6 +182,9 @@ namespace skynet
 
       // The tags that are pending responses
       std::unordered_set<TagID> pending_tags_;
+
+      // The base port to use to connect to the remote machine
+      std::uint16_t base_port_;
 
       // If the connection is dead or not
       bool dead_{false};
@@ -298,7 +307,7 @@ namespace skynet
 
       static void add_publishers_and_propagate(
         Master& m,
-        const internal::TagPublishers& msg,
+        const internal::ReportPublishers& msg,
         const internal::ExternalMaster& from
       ) noexcept
       {
@@ -379,7 +388,7 @@ namespace skynet
     /** \brief Adds the publishers and propagate the information is required
      */
     void add_publishers_and_propagate(
-      const internal::TagPublishers& msg,
+      const internal::ReportPublishers& msg,
       const internal::ExternalMaster& from
     ) noexcept;
 
@@ -439,6 +448,9 @@ namespace skynet
 
     // The publication channel for this machine
     internal::PublicationChannel pub_channel_;
+
+    // The port used for communications
+    std::uint16_t comm_port_;
   }; // class Master
 } // namespace skynet
 

@@ -38,8 +38,9 @@ void machine_task(
         {
           while (!job.subscribe(DataTag{std::to_string(i)}))
           {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
           }
+          // std::cerr << i << " OK\n";
         }
       }
       // Count misses rather than hits as they occur less frequently, so less
@@ -67,6 +68,7 @@ void machine_task(
       if (index != 0)
       {
         job.publish(DataTag{std::to_string(index)}, misses);
+        // std::cerr << std::to_string(index) + " finished\n";
       }
       else
       {

@@ -31,8 +31,6 @@ namespace skynet::internal
 
   SocketCommunicator::SocketCommunicator(SocketCommunicator&& other) noexcept
     : handle_{other.handle_}
-    , address_{std::move(other.address_)}
-    , port_{other.port_}
   {
     other.handle_ = invalid_handle;
   }
@@ -43,8 +41,6 @@ namespace skynet::internal
     const auto new_handle = other.handle_;
     other.handle_ = invalid_handle;
     handle_ = new_handle;
-    address_ = std::move(other.address_);
-    port_ = other.port_;
     return *this;
   }
 
@@ -77,7 +73,11 @@ namespace skynet::internal
       std::exit(-1);
     }
 
-    return SocketCommunicator(WithRawHandle{}, raw_handle);
+    // Read the address
+    return SocketCommunicator(
+      WithRawHandle{},
+      raw_handle
+    );
   }
 
   ConnectionError SocketCommunicator::set_to_listen(const std::uint16_t port) noexcept
@@ -99,7 +99,6 @@ namespace skynet::internal
       // std::exit(-1);
       return ConnectionError::unrecoverable;
     }
-    port_ = port;
     return ConnectionError::no_error;
   }
 
@@ -137,8 +136,6 @@ namespace skynet::internal
         return ConnectionError::unrecoverable;
       }
     }
-    address_ = address;
-    port_ = port;
     return ConnectionError::no_error;
   }
 
@@ -173,9 +170,13 @@ namespace skynet::internal
     return written == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
 
-  std::string SocketCommunicator::ip_address() const noexcept { return address_; }
-
-  std::uint16_t SocketCommunicator::port() const noexcept { return port_; }
+  std::pair<std::string, std::uint16_t> SocketCommunicator::ip_address_and_port() const noexcept
+  {
+    sockaddr_in client_address;
+    socklen_t len = sizeof(client_address);
+    getsockname(handle_, reinterpret_cast<sockaddr*>(&client_address), &len);
+    return {inet_ntoa(client_address.sin_addr), client_address.sin_port};
+  }
 
   std::vector<std::byte> read_chunked(SocketCommunicator& conn, const std::size_t num_bytes) noexcept
   {

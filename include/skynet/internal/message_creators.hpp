@@ -24,7 +24,8 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_greeting(
     const MachineID& from,
-    const std::vector<MachineID>& neighbors
+    const std::vector<MachineID>& neighbors,
+    std::uint16_t base_port
   ) noexcept;
 
   /** \brief Create data for a goodbyte
@@ -49,7 +50,7 @@ namespace skynet::internal
    * and just grabbing the information from there; not sure how to make it
    * not horribly ugly though, so put it off for now.
    */
-  std::vector<std::byte> make_tag_publishers(
+  std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
     const std::vector<TagID>& locally_produced_tags
