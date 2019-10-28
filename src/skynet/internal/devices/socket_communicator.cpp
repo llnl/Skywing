@@ -15,6 +15,25 @@
 namespace
 {
   constexpr int invalid_handle = -1;
+
+  // Splits a "ip:port" address into its parts
+  // The string is empty if the input was invalid
+  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept
+  {
+    // Split the address by the colon
+    const auto colon_loc = address.find(':');
+    if (colon_loc == std::string_view::npos) { return {}; }
+    const auto port_str = address.substr(colon_loc + 1);
+    // Try to parse the port
+    char* end;
+    const auto port = strtol(port_str.data(), &end, 10);
+    // Check that the entire string was parsed and that the port is valid
+    if (end != port_str.data() + port_str.size() || port < 0 || port > 0xFFFF) { return {}; }
+    // Try to connect to the publisher
+    // Need to make a std::string to ensure that it is null-terminated
+    const std::string address_str{address.begin(), address.begin() + colon_loc};
+    return {port, address_str};
+  }
 } // namespace {anonymous}
 
 namespace skynet::internal
@@ -218,18 +237,8 @@ namespace skynet::internal
 
   std::optional<Subscription> Subscription::try_to_create(const std::string_view address) noexcept
   {
-    // Split the address by the colon
-    const auto colon_loc = address.find(':');
-    if (colon_loc == std::string_view::npos) { return {}; }
-    const auto port_str = address.substr(colon_loc + 1);
-    // Try to parse the port
-    char* end;
-    const auto port = strtol(port_str.data(), &end, 10);
-    // Check that the entire string was parsed and that the port is valid
-    if (end != port_str.data() + port_str.size() || port < 0 || port > 0xFFFF) { return {}; }
-    // Try to connect to the publisher
-    // Need to make a std::string to ensure that it is null-terminated
-    const std::string address_str{address.begin(), address.begin() + colon_loc};
+    const auto [port, address_str] = split_address(address);
+    if (address_str.empty()) { return {}; }
     Subscription to_ret;
     if (to_ret.conn_.connect_to_server(address_str.c_str(), port) != ConnectionError::no_error)
     {

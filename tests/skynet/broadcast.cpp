@@ -77,24 +77,34 @@ void machine_task(const std::size_t index)
   Master master{ports[index], machine_names[index]};
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
-  Job my_job{"job 0", master, [index](Job& the_job) {
+  master.submit_job("job 0", {tag_names[index]}, [&master, index](Job& the_job) {
+    // Subscribe to everything ahead of time
+    for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
+    {
+      if (index != send_index)
+      {
+        while (!the_job.subscribe(Uint64Tag{tag_names[send_index]}))
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+      }
+    }
+    while (master.num_subscribers() != machine_counts.size() - 1)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
       if (index == send_index)
       {
-        the_job.publish(Uint64Tag{tag_names[send_index]}, send_index);
+        the_job.publish(Uint64Tag{tag_names[index]}, index);
       }
       else
       {
         REQUIRE(the_job.get_when_ready(Uint64Tag{tag_names[send_index]}) == send_index);
       }
     }
-  }};
-  // Subscribe to everything ahead of time
-  for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
-  {
-    my_job.subscribe(Uint64Tag{tag_names[send_index]});
-  }
+  });
   // Start processing messages
   master.run();
 }
@@ -106,7 +116,6 @@ TEST_CASE("Broadcast works", "[Skynet_Broadcast]")
   for (std::size_t i = 0; i < machine_counts.size(); ++i)
   {
     threads.emplace_back(machine_task, i);
-    std::this_thread::sleep_for(10ms);
   }
   for (auto&& thread : threads)
   {

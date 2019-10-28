@@ -45,33 +45,46 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   setup_network(index, master);
-  Job the_job{"Job 0", master, [&](Job& my_job) {
+  const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
+  const Int32Tag publish_tag{std::to_string(publish_num)};
+  master.submit_job("Job 0", {publish_tag.id()}, [&](Job& my_job) {
+    std::vector<std::string> subscribe_to;
+    for (int i = 0; i < num_machines; ++i)
+    {
+      if (i != publish_num)
+      {
+        subscribe_to.push_back(std::to_string(i));
+      }
+    }
+    while (!my_job.subscribe<Int32Tag>(subscribe_to))
+    {
+      std::this_thread::sleep_for(10ms);
+    }
+    while (master.num_subscribers() != num_machines - 1)
+    {
+      std::this_thread::sleep_for(10ms);
+    }
     for (std::size_t i = 0; i < disconnect_order.size(); ++i)
     {
-      const Int32Tag tag{std::to_string(i)};
       const auto to_remove = disconnect_order[i];
       if (to_remove == index)
       {
         // broadcast and remove (the data doesn't really matter)
-        my_job.publish(tag, to_remove);
+        my_job.publish(publish_tag, to_remove);
         // Leaving the loop will cause the master to destruct, automatically
         // disconnecting
         break;
       }
       else
       {
-        REQUIRE(my_job.get_when_ready(tag) == to_remove);
+        const Int32Tag get_tag{std::to_string(disconnect_order[i])};
+        REQUIRE(my_job.get_when_ready(get_tag) == to_remove);
       }
     }
-  }};
-  // Subscribe to all tags ahead of time
-  for (std::size_t i = 0; i < disconnect_order.size(); ++i)
-  {
-    the_job.subscribe(Int32Tag{std::to_string(i)});
-  }
+  });
   master.run();
-  // Make sure the threads don't exit too soon
-  std::this_thread::sleep_for(1000ms);
+  // // Make sure the threads don't exit too soon
+  // std::this_thread::sleep_for(1000ms);
 }
 
 TEST_CASE("Disconnecting machines don't break commuincations.", "[Skynet_Disconnect]")

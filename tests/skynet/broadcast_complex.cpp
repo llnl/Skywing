@@ -15,7 +15,7 @@
 using namespace skynet;
 
 constexpr int num_machines = 50;
-constexpr int num_connections = num_machines * 3;
+constexpr int num_connections = num_machines * 2;
 constexpr std::uint16_t base_port = 30000;
 
 using Tag1 = Tag<std::int32_t>;
@@ -48,7 +48,7 @@ void test_tags(Job& job, const Tags&... tags) noexcept
 {
   (test_tag(job, tags), ...);
 }
-            #include <iostream>
+
 // This wasn't working with a reference, so just use a pointer
 void machine_task(const NetworkInfo* const info, const int index)
 {
@@ -64,7 +64,23 @@ void machine_task(const NetworkInfo* const info, const int index)
   };
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
-    return [&tags, &index, i](Job& job) {
+    return [&tags, &index, &master, i](Job& job) {
+      // This is amazingly ugly, but whatever
+      while(!(
+        (index == 0 ? true : job.subscribe(std::get<Tag1>(tags[i]))) &&
+        (index == 1 ? true : job.subscribe(std::get<Tag2>(tags[i]))) &&
+        (index == 2 ? true : job.subscribe(std::get<Tag3>(tags[i])))
+      ))
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      if (index < 3)
+      {
+        while (master.num_subscribers() != num_machines - 1)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+      }
       switch (index)
       {
       case 0:
@@ -88,24 +104,16 @@ void machine_task(const NetworkInfo* const info, const int index)
       }
     };
   };
-  std::array jobs{
-    Job{"job 1", master, make_job_task(0)},
-    Job{"job 2", master, make_job_task(1)}
+  const auto get_tags = [&](const int i) -> std::vector<std::string> {
+    const auto& tup = tags[i];
+    if      (index == 0) { return {std::get<0>(tup).id()}; }
+    else if (index == 1) { return {std::get<1>(tup).id()}; }
+    else if (index == 2) { return {std::get<2>(tup).id()}; }
+    else                 { return {};                      }
   };
-  // Just make sure the tags and jobs are the same size
-  static_assert(jobs.size() == tags.size());
-  // Subscribe to everything ahead of time
-  for (std::size_t i = 0; i < jobs.size(); ++i)
-  {
-    jobs[i].subscribe(
-      std::get<Tag1>(tags[i]),
-      std::get<Tag2>(tags[i]),
-      std::get<Tag3>(tags[i])
-    );
-  }
+  master.submit_job("job 1", get_tags(0), make_job_task(0));
+  master.submit_job("job 2", get_tags(1), make_job_task(1));
   master.run();
-  // Don't exit too early
-  std::this_thread::sleep_for(50ms);
 }
 
 TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")

@@ -604,16 +604,16 @@ namespace skynet
       // If the tag is produced locally just subscribe to self
       if (produced_tags_.find(tag_id) != produced_tags_.cend())
       {
-        if (!try_to_subscribe(local_publishing_address(), {produced_tags_.cbegin(), produced_tags_.cend()}))
-        {
-          // Failed to subscribed to self; this should never happen
-          std::cerr
-            << std::quoted(id_) << " failed to subscribe to itself for tag" << std::quoted(tag_id) << "\n"
-            << "\tSomething has gone very wrong, perror output:\n\t";
-          std::perror(nullptr);
-          std::terminate();
-        }
-        continue;
+        // Self-subscription is more complicated than I had thought, since it essentially requires either
+        // a seperate thread for accepting the request or "simulating" a connection to self
+        // So, for now, just prohibit it
+        // if (!try_to_subscribe(local_publishing_address(), {produced_tags_.cbegin(), produced_tags_.cend()}))
+        // {
+        std::cerr
+          << std::quoted(id_) << " tried to subscribe to itself for tag " << std::quoted(tag_id) << "\n";
+        std::terminate();
+        // }
+        // continue;
       }
       // Check if there is a list of known producers for the tag
       const auto loc = publishers_for_tag_.find(tag_id);

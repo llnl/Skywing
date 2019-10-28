@@ -108,9 +108,13 @@ namespace skynet
     auto [buffers, lock] = bufs_.get();
     (void)lock;
     const auto loc = buffers.find(tag_id);
-    auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
+    if (loc == buffers.cend())
+    {
+      return false;
+    }
+    auto version_needed = loc->second.last_fetched_version;
     update_version(version_needed, version);
-    return loc != buffers.cend() &&
+    return
       loc->second.stored_version != tag_default_version &&
       loc->second.stored_version >= version_needed;
   }

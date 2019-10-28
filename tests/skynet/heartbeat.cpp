@@ -28,10 +28,9 @@ void machine_task(const NetworkInfo* const info, const int index)
   connect_network(*info, master, index, [](Master& m, const int i) {
     return m.connect_to_server("127.0.0.1", base_port + i);
   });
-  // Just send heartbeats for a while, give it a dummy job
-  Job dummy{"dummy job", master, [](Job&) {
+  master.submit_job("dummy job", {}, [](Job&) {
     std::this_thread::sleep_for(heartbeat_interval * 10);
-  }};
+  });
   master.run();
 }
 
