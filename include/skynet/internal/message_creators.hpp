@@ -59,7 +59,8 @@ namespace skynet::internal
   /** \brief Create data for a request for producers of a tag
    */
   std::vector<std::byte> make_get_publishers(
-    const std::vector<TagID>& tags
+    const std::vector<TagID>& tags,
+    bool ignore_cache
   ) noexcept;
 } // namespace skynet::internal
 

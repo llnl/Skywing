@@ -122,7 +122,10 @@ namespace skynet
       }
     }
 
-    void ExternalMaster::find_publishers_for_tags(const std::vector<TagID>& tags) noexcept
+    void ExternalMaster::find_publishers_for_tags(
+      const std::vector<TagID>& tags,
+      const bool ignore_cache
+    ) noexcept
     {
       bool work_to_do = false;
       for (const auto& tag_id : tags)
@@ -137,7 +140,13 @@ namespace skynet
       }
       if (work_to_do)
       {
-        send_message(make_get_publishers(tags));
+        send_message(make_get_publishers(tags, ignore_cache));
+      }
+      else
+      {
+        // std::stringstream ss;
+        // ss << "Request to find publishers for " << tags[0] << " from " << master_->id() << " ignored locally by " << id_ << '\n';
+        // std::cerr << ss.str();
       }
     }
 
@@ -203,6 +212,9 @@ namespace skynet
     ) noexcept
     {
       send_message(make_greeting(local_id, local_neighbors, base_port));
+      // std::stringstream ss;
+      // ss << master_->id() << " sending greeting to " << conn_.ip_address_and_port().second << '\n';
+      // std::cerr << ss.str();
       return !dead_;
     }
 
@@ -211,7 +223,10 @@ namespace skynet
     {
       // Wait for the greeting
       // TODO: Probably want a time-out?
-      while (true)
+      // std::stringstream ss;
+      // ss << master_->id() << " waiting for greeting from " << conn_.ip_address_and_port().second << '\n';
+      // std::cerr << ss.str();
+      while (!dead_)
       {
         if (auto handle = try_to_get_status_message())
         {
@@ -220,6 +235,9 @@ namespace skynet
               neighbors_ = msg.neighbors();
               id_ = msg.from();
               base_port_ = msg.base_port();
+              // std::stringstream ss;
+              // ss << master_->id() << " got greeting from " << conn_.ip_address_and_port().second << '\n';
+              // std::cerr << ss.str();
               return true;
             },
             // Any other kind of message is an error
@@ -228,6 +246,7 @@ namespace skynet
         }
         std::this_thread::sleep_for(std::chrono::microseconds{10});
       }
+      return false;
     }
 
     // Handle status messages
@@ -335,8 +354,14 @@ namespace skynet
   bool Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
   {
     internal::SocketCommunicator to_connect;
+    // std::stringstream ss;
+    // ss << id_ << " connecting to " << port << '\n';
+    // std::cerr << ss.str();
     if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
     {
+      // std::stringstream ss;
+      // ss << id_ << " failed to connect to " << port << '\n';
+      // std::cerr << ss.str();
       // internal::on_error("Master::connect_to_server failed!");
       return false;
     }
@@ -347,17 +372,25 @@ namespace skynet
       make_neighbor_vector(),
       *this,
       comm_port_
-    )) {
+    ))
+    {
       const auto new_id = new_neighbor->id();
       // This ID already exists; drop the connection
       if (neighbors_.find(new_id) != neighbors_.end())
       {
+        // std::stringstream ss;
+        // ss << id_ << " rejected " << port << " due to already existing neighbor.\n";
+        // std::cerr << ss.str();
         return false;
       }
       notify_of_new_neighbor(new_id);
       neighbors_.emplace(new_id, std::move(*new_neighbor));
+      return true;
     }
-    return true;
+    else
+    {
+      return false;
+    }
   }
 
   /** \brief See if there are any pending connections and accept them if so
@@ -400,8 +433,9 @@ namespace skynet
   ) noexcept
   {
     const auto res = jobs_.try_emplace(
-      std::move(name),
+      name,
       Job::Accessor::AllowConstruction{},
+      name,
       *this,
       std::move(tags_produced),
       std::move(to_run)
@@ -451,13 +485,13 @@ namespace skynet
           ++iter;
         }
       }
-      // Handle any subscription requests
-      // Do this OUTSIDE the mutex since it's not touching any data
-      pub_channel_.accept_subscriptions();
       {
-        read_data_from_subscriptions();
         // Ensure there's no data race with jobs
         std::unique_lock lock{job_mut_};
+        // Handle any subscription requests
+        pub_channel_.accept_subscriptions();
+        // Read data from subscriptions
+        read_data_from_subscriptions();
         // Handle any messages from neighbors
         handle_neighbor_messages();
         // Send any heartbeat messages if needed
@@ -490,6 +524,11 @@ namespace skynet
     return pub_channel_.num_subscriptions();
   }
 
+  const std::string& Master::id() const noexcept
+  {
+    return id_;
+  }
+
   /** \brief Listens for messages from neighbors and handles them if there
    * are any.
    */
@@ -509,7 +548,11 @@ namespace skynet
   ) noexcept
   {
     const auto msg = internal::make_publish(version, tag_id, value);
+    std::stringstream ss;
+    // ss << id_ << " publishing on " << tag_id << " to " << num_subscribers() << " subscribers\n";
     pub_channel_.send_message(msg.data(), msg.size());
+    // ss << '\t' << id_ << " after publishing on " << tag_id << ", has " << num_subscribers() << " subscribers\n";
+    // std::cerr << ss.str();
   }
 
   // Adds data to the tag queue for a job from a message
@@ -585,7 +628,13 @@ namespace skynet
     //   std::copy(data.cbegin(), data.cend(), std::ostream_iterator<std::string>(std::cerr, " "));
     //   std::cerr << '\n';
     // }
+    // std::stringstream sstr;
+    // sstr << id_ << " looking for tags: ";
+    // for (const auto& tag : tag_ids) { sstr << tag << ", "; }
+    // sstr << '\n';
+    // std::cerr << sstr.str();
     std::vector<TagID> tags_to_find;
+    bool ignore_cache = false;
     for (const auto tag_id : tag_ids)
     {
       // Check if already subscribed, skip if so
@@ -606,6 +655,7 @@ namespace skynet
       {
         // Self-subscription is more complicated than I had thought, since it essentially requires either
         // a seperate thread for accepting the request or "simulating" a connection to self
+        // (This could also be solved with a non-blocking connect or similar probably)
         // So, for now, just prohibit it
         // if (!try_to_subscribe(local_publishing_address(), {produced_tags_.cbegin(), produced_tags_.cend()}))
         // {
@@ -620,6 +670,9 @@ namespace skynet
       // Create the entry if required
       if (loc == publishers_for_tag_.end())
       {
+        // std::stringstream ss;
+        // ss << id_ << " failed to find publishers in the cache for " << tag_id << '\n';
+        // std::cerr << ss.str();
         publishers_for_tag_.try_emplace(tag_id);
         tags_to_find.push_back(tag_id);
       }
@@ -642,15 +695,23 @@ namespace skynet
             }
             else
             {
+              // std::stringstream ss;
+              // ss << id_ << " failed to subscribe to " << subscribe_address << '\n';
+              // std::cerr << ss.str();
               // Couldn't subscribe - remove this as a producer
               it = publishers.erase(it);
             }
           }
         }
-        // Check if the producers are still empty (can happen if all known publishers
+        // Check if the producers are now empty (can happen if all known publishers
         // fail to be subscribed to)
         if (publishers.empty())
         {
+          // std::stringstream ss;
+          // ss << id_ << " looking for new publishers for " << tag_id << '\n';
+          // std::cerr << ss.str();
+          // Need to get original producers for tags now, so have to ignore caches
+          ignore_cache = true;
           // Couldn't do this subscription; need to look for a producer for the tag
           tags_to_find.push_back(tag_id);
         }
@@ -661,7 +722,7 @@ namespace skynet
     {
       for (auto& neighbor : neighbors_)
       {
-        neighbor.second.find_publishers_for_tags(tags_to_find);
+        neighbor.second.find_publishers_for_tags(tags_to_find, ignore_cache);
       }
     }
     // Nothing to find - successfully subscribed
@@ -673,6 +734,9 @@ namespace skynet
     internal::ExternalMaster& from
   ) noexcept
   {
+    // std::stringstream ss;
+    // ss << id_ << " recieved get_publishers from " << from.id() << '\n';
+    // std::cerr << ss.str();
     // If all of the tag requirements are fulfilled then
     const auto remaining_tags = remove_tags_with_known_publishers(msg);
     if (remaining_tags.empty())
@@ -682,6 +746,19 @@ namespace skynet
     }
     else
     {
+      // Mark all tags from the message in the cache so that they will be
+      // sent back so that the recieving end no longer thinks they are pending
+      // Also clear them if the cache is being ignored, as it is assumed that
+      // they are now invalid
+      for (const auto& tag : remaining_tags)
+      {
+        const auto& [iter, inserted] = publishers_for_tag_.try_emplace(tag);
+        (void)inserted;
+        if (msg.ignore_cache())
+        {
+          iter->second.clear();
+        }
+      }
       // If there are no other neighbors, just answer right away so
       // it doesn't stall
       if (neighbors_.size() == 1)
@@ -713,7 +790,7 @@ namespace skynet
         {
           if (&neighbor.second != &from)
           {
-            neighbor.second.find_publishers_for_tags(remaining_tags);
+            neighbor.second.find_publishers_for_tags(remaining_tags, false);
           }
         }
       }
@@ -751,13 +828,21 @@ namespace skynet
     // TODO: Actually handle this
     if (tags.size() != publishers_list.size())
     {
+      // std::stringstream ss;
+      // ss << id_ << " recieved tag/publisher list size mismatch from " << from.id() << '\n';
+      // std::cerr << ss.str();
       return;
     }
+    // std::stringstream ss;
+    // ss << id_ << " recieved ReportPublishers from " << from.id() << '\n';
     // Add the information to what is locally known
     for (std::size_t i = 0; i < tags.size(); ++i)
     {
       const auto& tag = tags[i];
       const auto& publishers = publishers_list[i];
+      // ss << '\t' << tag << ": ";
+      // for (const auto& p : publishers) { ss << p << ", "; }
+      // ss << '\n';
       // Find or create the tag
       const auto loc = publishers_for_tag_.find(tag);
       if (loc == publishers_for_tag_.end())
@@ -769,6 +854,13 @@ namespace skynet
         loc->second.insert(publishers.cbegin(), publishers.cend());
       }
     }
+    // ss << "\tlocal tags: ";
+    // for (const auto& tag : msg.locally_produced_tags())
+    // {
+    //   ss << tag << ", ";
+    // }
+    // ss << '\n';
+    // std::cerr << ss.str();
     // Add the tags that the external master produced
     const auto external_tags = msg.locally_produced_tags();
     for (const auto& tag : external_tags)
@@ -806,6 +898,8 @@ namespace skynet
       std::vector<std::vector<std::string>> addresses_to_send;
       for (const auto& [tag, addresses] : publishers_for_tag_)
       {
+        // Intentionally send tag data with no known publishers to mark that
+        // the recieving end should no longer wait for those tags to appear
         tags_to_send.push_back(tag);
         addresses_to_send.emplace_back(addresses.cbegin(), addresses.cend());
       }
@@ -875,6 +969,8 @@ namespace skynet
             {
               if (const auto variant = data->value().get_variant())
               {
+                // std::stringstream ss; ss << id_ << " read data for tag " << data->tag_id() << '\n';
+                // std::cerr << ss.str();
                 for (auto& [job_id, job] : jobs_)
                 {
                   (void)job_id;

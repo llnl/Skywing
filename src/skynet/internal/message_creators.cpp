@@ -166,7 +166,8 @@ namespace skynet::internal
   /** \brief Create data for a request for producers of a tag
    */
   std::vector<std::byte> make_get_publishers(
-    const std::vector<TagID>& tags
+    const std::vector<TagID>& tags,
+    const bool ignore_cache
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -176,6 +177,7 @@ namespace skynet::internal
     {
       msg_tags.set(i, tags[i]);
     }
+    message.setIgnoreCache(ignore_cache);
     return finalize_message(builder);
   }
 } // namespace skynet::internal

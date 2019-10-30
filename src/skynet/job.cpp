@@ -6,11 +6,13 @@ namespace skynet
 {
   Job::Job(
     Accessor::AllowConstruction,
+    const std::string& id,
     Master& master,
     std::vector<TagID> tags,
     std::function<void(Job&)> to_run
   ) noexcept
-    : master_{&master}
+    : id_{id}
+    , master_{&master}
     , to_run_{std::move(to_run)}
     , tags_produced_(std::move(tags))
   {}
@@ -51,9 +53,24 @@ namespace skynet
     (void)lock;
     const auto loc = buffers.find(tag_id);
     // Not subscribed; don't do anything, but not an error
-    if (loc == buffers.cend()) { return true; }
+    if (loc == buffers.cend())
+    {
+      // std::stringstream ss;
+      // ss << "\t" << master_->id() << "-" << id_ << " discarded " << tag_id << " due to not subscribed\n";
+      // std::cerr << ss.str();
+      return true;
+    }
     // If the type is wrong then something went wrong
-    if (data.index() != loc->second.expected_type) { return false; }
+    if (data.index() != loc->second.expected_type)
+    {
+      // std::stringstream ss;
+      // ss << "\t" << master_->id() << "-" << id_ << " discarded " << tag_id << " due to wrong index\n";
+      // std::cerr << ss.str();
+      return false;
+    }
+    // std::stringstream ss;
+    // ss << "\t" << master_->id() << "-" << id_ << " accepted " << tag_id << "\n";
+    // std::cerr << ss.str();
     // Otherwise just make it the current value
     loc->second.value = std::move(data);
     loc->second.stored_version = version;
@@ -117,6 +134,11 @@ namespace skynet
     return
       loc->second.stored_version != tag_default_version &&
       loc->second.stored_version >= version_needed;
+  }
+
+  const JobID& Job::id() const noexcept
+  {
+    return id_;
   }
 
   bool Job::subscribe_impl(

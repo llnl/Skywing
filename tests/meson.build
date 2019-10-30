@@ -19,5 +19,6 @@ foreach t : tests
     dependencies : [catch2_dep, skynet_dep, cppzmq_dep, zmq_dep],
     include_directories : include_directories('include')
   )
-  test(t[0], exe)
+  # Don't run in parallel so that port collisions don't have to be worried about
+  test(t[0], exe, is_parallel : false)
 endforeach

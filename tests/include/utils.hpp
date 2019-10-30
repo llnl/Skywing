@@ -9,8 +9,6 @@
 #include <random>
 #include <vector>
 
-        #include <iostream>
-
 namespace skynet
 {
   std::mt19937_64 make_prng() noexcept
@@ -56,8 +54,8 @@ namespace skynet
 
   // Create a random network with the specified number of machines and roughly
   // the number of connections.  The number of connections will generally exceed
-  // the given amount as a random path is done at the end to make the network
-  // fully connected
+  // the given amount as a random path is done at the end to make sure there are
+  // no "islands" in the graph
   NetworkInfo make_network(const int num_machines, const int num_connections)
   {
     assert(num_machines > 1);

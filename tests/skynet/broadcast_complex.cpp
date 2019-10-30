@@ -5,16 +5,19 @@
 
 #include "utils.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <random>
+#include <sstream>
 #include <thread>
 #include <tuple>
 #include <vector>
 
 using namespace skynet;
 
-constexpr int num_machines = 50;
+constexpr int num_machines = 5;
 constexpr int num_connections = num_machines * 2;
 constexpr std::uint16_t base_port = 30000;
 
@@ -46,6 +49,20 @@ void test_tag(Job& job, const Tag& tag) noexcept
 template<typename... Tags, typename Job>
 void test_tags(Job& job, const Tags&... tags) noexcept
 {
+  const auto start = std::chrono::steady_clock::now();
+  while (!(job.has_data(tags) && ...))
+  {
+    if (std::chrono::steady_clock::now() - start > std::chrono::seconds(20))
+    {
+      // std::stringstream ss;
+      // ss << id << '-' << job.id() << " has stalled, tag status: ";
+      // ((ss << job.has_data(tags)), ...);
+      // ss << '\n';
+      // std::cerr << ss.str();
+      std::this_thread::sleep_for(std::chrono::hours(200));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
   (test_tag(job, tags), ...);
 }
 
@@ -57,30 +74,67 @@ void machine_task(const NetworkInfo* const info, const int index)
   connect_network(*info, master, index, [](Master& m, const int i) {
     return m.connect_to_server("127.0.0.1", base_port + i);
   });
+  // std::stringstream sstr;
+  // sstr << index << " ready to go\n";
+  // std::cerr << sstr.str();
   // Submit first and second job
   const std::array tags{
-    std::make_tuple(Tag1{"job1tag1"}, Tag2{"job1tag2"}, Tag3{"job1tag3"}),
-    std::make_tuple(Tag1{"job2tag1"}, Tag2{"job2tag2"}, Tag3{"job2tag3"})
+    std::make_tuple(Tag1{"job0tag0"}, Tag2{"job0tag1"}, Tag3{"job0tag2"}),
+    std::make_tuple(Tag1{"job1tag0"}, Tag2{"job1tag1"}, Tag3{"job1tag2"})
   };
+  // For making sure all tasks are ready to go before starting
+  static std::atomic<int> ready_counter{0};
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
     return [&tags, &index, &master, i](Job& job) {
       // This is amazingly ugly, but whatever
-      while(!(
-        (index == 0 ? true : job.subscribe(std::get<Tag1>(tags[i]))) &&
-        (index == 1 ? true : job.subscribe(std::get<Tag2>(tags[i]))) &&
-        (index == 2 ? true : job.subscribe(std::get<Tag3>(tags[i])))
-      ))
+      const auto start_time = std::chrono::steady_clock::now();
+      std::array<bool, 3> values{false, false, false};
+      while(!(values[0] && values[1] && values[2]))
       {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        values = {
+          (index == 0 ? true : job.subscribe(std::get<Tag1>(tags[i]))),
+          (index == 1 ? true : job.subscribe(std::get<Tag2>(tags[i]))),
+          (index == 2 ? true : job.subscribe(std::get<Tag3>(tags[i])))
+        };
+        if (values[0] && values[1] && values[2]) { break; }
+        // std::cerr << std::to_string(index) + " - job" + std::to_string(i) + " still running\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (std::chrono::steady_clock::now() - start_time > std::chrono::seconds(2))
+        {
+          std::cerr
+            << std::to_string(index) + " job" + std::to_string(i) + " has stalled : "
+            + std::to_string(values[0]) + std::to_string(values[1]) + std::to_string(values[2]) + '\n';
+          std::this_thread::sleep_for(std::chrono::hours(200));
+        }
       }
+      // std::stringstream ss; ss << "index " << index << " job " << i << " - start\n"; std::cerr << ss.str();
       if (index < 3)
       {
-        while (master.num_subscribers() != num_machines - 1)
+        // auto last_num = -1;
+        while (master.num_subscribers() < num_machines - 1)
         {
+          // if (last_num != master.num_subscribers())
+          // {
+          //   last_num = master.num_subscribers();
+          //   std::stringstream sstr;
+          //   sstr << "index " << index << " job " << i << " has " << master.num_subscribers() << " subscribers\n";
+          //   std::cerr << sstr.str();
+          // }
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
       }
+      ++ready_counter;
+      while (ready_counter != num_machines * 2)
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      // Wait for a bit as there's a small chance that a job will publish before the subscription
+      // process completes
+      // TODO: This doesn't actually seem to be the problem... it is timing relate though, because
+      //       it pops up way more after the debug output statements were removed
+      //       Seems like subscribe might be returning false positives or something?
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
       switch (index)
       {
       case 0:
@@ -102,6 +156,7 @@ void machine_task(const NetworkInfo* const info, const int index)
         test_tags(job, std::get<Tag1>(tags[i]), std::get<Tag2>(tags[i]), std::get<Tag3>(tags[i]));
         break;
       }
+      // std::stringstream ss2; ss2 << "index " << index << " job " << i << " - end\n"; std::cerr << ss2.str();
     };
   };
   const auto get_tags = [&](const int i) -> std::vector<std::string> {
@@ -111,8 +166,8 @@ void machine_task(const NetworkInfo* const info, const int index)
     else if (index == 2) { return {std::get<2>(tup).id()}; }
     else                 { return {};                      }
   };
-  master.submit_job("job 1", get_tags(0), make_job_task(0));
-  master.submit_job("job 2", get_tags(1), make_job_task(1));
+  master.submit_job("job 0", get_tags(0), make_job_task(0));
+  master.submit_job("job 1", get_tags(1), make_job_task(1));
   master.run();
 }
 
@@ -120,6 +175,21 @@ TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
 {
   using namespace std::chrono_literals;
   const auto network_info = make_network(num_machines, num_connections);
+  // for (std::size_t i = 0; i < network_info.connect_to.size(); ++i)
+  // {
+  //   std::cerr << i << " -> [";
+  //   bool first = true;
+  //   for (const auto& conn : network_info.connect_to[i])
+  //   {
+  //     if (!first)
+  //     {
+  //       std::cerr << ", ";
+  //     }
+  //     std::cerr << conn;
+  //     first = false;
+  //   }
+  //   std::cerr << "] {" << network_info.num_connections[i] << "}\n";
+  // }
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)
   {

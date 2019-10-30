@@ -97,6 +97,7 @@ namespace skynet
      */
     Job(
       Accessor::AllowConstruction,
+      const std::string& id,
       Master& master,
       std::vector<TagID> tags,
       std::function<void(Job&)> to_run
@@ -237,6 +238,10 @@ namespace skynet
      */
     const std::vector<TagID>& tags_produced() const noexcept;
 
+    /** \brief Returns the job's id
+     */
+    const JobID& id() const noexcept;
+
   private:
     // Updates the version that's passed in and returns a copy of it
     // Do it like this instead of with a tag ID to prevent trying to double lock a mutex
@@ -267,6 +272,9 @@ namespace skynet
       const std::vector<std::uint8_t>& expected_types
     ) noexcept;
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
+
+    // The id of the job
+    JobID id_;
 
     // Group all of the related data to a tag ID in a single structure
     struct TagInfo {

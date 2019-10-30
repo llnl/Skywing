@@ -113,7 +113,7 @@ namespace skynet
 
       /** \brief Begins the search process for publishers tags
        */
-      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
+      void find_publishers_for_tags(const std::vector<TagID>& tags, bool ignore_cache) noexcept;
 
       /** \brief The address of the publisher for the external master
        */
@@ -266,6 +266,10 @@ namespace skynet
     /** \brief Returns the number of subscribers
      */
     int num_subscribers() const noexcept;
+
+    /** \brief Returns the id of the master
+     */
+    const std::string& id() const noexcept;
 
     // Allow Job classes to broadcast and handle neighbors but nothing else
     struct JobAccessor
