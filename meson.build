@@ -7,6 +7,11 @@ project('skynet', 'cpp',
   ]
 )
 
+add_project_arguments(
+  '-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_' + get_option('logging_level').to_upper(),
+  language : 'cpp'
+)
+
 use_ns3 = get_option('use_ns3')
 message('using ns3: ' + use_ns3.to_string())
 
@@ -19,6 +24,7 @@ endif
 zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
 cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
+spdlog_dep = subproject('spdlog').get_variable('spdlog_dep')
 
 capnproto_dep = dependency('capnp')
 
@@ -27,7 +33,7 @@ subdir('generated_files/generated')
 skynet_inc = include_directories('include', 'generated_files')
 skynet_internal_dep = declare_dependency(
   include_directories : skynet_inc,
-  dependencies : [thread_dep, capnproto_dep],
+  dependencies : [thread_dep, capnproto_dep, spdlog_dep],
   sources : [generated_sources]
 )
 
