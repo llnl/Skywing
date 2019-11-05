@@ -1,5 +1,6 @@
 #include "skynet/job.hpp"
 
+#include "skynet/internal/utility/logging.hpp"
 #include "skynet/master.hpp"
 
 namespace skynet
@@ -55,22 +56,39 @@ namespace skynet
     // Not subscribed; don't do anything, but not an error
     if (loc == buffers.cend())
     {
-      // std::stringstream ss;
-      // ss << "\t" << master_->id() << "-" << id_ << " discarded " << tag_id << " due to not subscribed\n";
-      // std::cerr << ss.str();
+      SKYNET_TRACE_LOG(
+        "{}, job {} discarded tag {}, version {}, data {}, due to not being subscribed",
+        master_->id(),
+        id_,
+        tag_id,
+        version,
+        data
+      );
       return true;
     }
     // If the type is wrong then something went wrong
     if (data.index() != loc->second.expected_type)
     {
-      // std::stringstream ss;
-      // ss << "\t" << master_->id() << "-" << id_ << " discarded " << tag_id << " due to wrong index\n";
-      // std::cerr << ss.str();
+      SKYNET_WARN_LOG(
+        "{}, job {} discarded tag {}, version {}, data {}, due to it having the wrong type index (expected {}, got {})",
+        master_->id(),
+        id_,
+        tag_id,
+        version,
+        data,
+        loc->second.expected_type,
+        data.index()
+      );
       return false;
     }
-    // std::stringstream ss;
-    // ss << "\t" << master_->id() << "-" << id_ << " accepted " << tag_id << "\n";
-    // std::cerr << ss.str();
+    SKYNET_TRACE_LOG(
+      "{}, job {} accepted tag {}, version {}, data {}",
+      master_->id(),
+      id_,
+      tag_id,
+      version,
+      data
+    );
     // Otherwise just make it the current value
     loc->second.value = std::move(data);
     loc->second.stored_version = version;
