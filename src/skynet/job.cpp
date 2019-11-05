@@ -114,7 +114,7 @@ namespace skynet
       loc->second.stored_version != tag_default_version &&
       loc->second.stored_version >= version_needed)
     {
-      loc->second.last_fetched_version = version_needed;
+      loc->second.last_fetched_version = loc->second.stored_version;
       return loc->second.value;
     }
     return {};
