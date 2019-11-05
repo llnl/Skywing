@@ -1,9 +1,14 @@
 #include "skynet/master.hpp"
 
+#include "spdlog/spdlog.h"
+      #include <iostream>
+      #include <iomanip>
+
 // TODO: Support other types of communicators
 
-#include <iomanip>
-#include <iostream>
+// Macro to wrap logging since I don't know if we're doing runtime or what and this
+// can easily be searched for or changed later on
+#define TRACE_LOG(...) SPDLOG_TRACE(__VA_ARGS__)
 
 namespace skynet
 {
@@ -488,6 +493,7 @@ namespace skynet
       {
         // Ensure there's no data race with jobs
         std::unique_lock lock{job_mut_};
+        accept_pending_connections();
         // Handle any subscription requests
         pub_channel_.accept_subscriptions();
         // Read data from subscriptions

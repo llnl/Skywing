@@ -68,6 +68,7 @@ void setup_network(Master& master, const std::size_t index)
   while (master.number_of_neighbors() != machine_counts[index])
   {
     master.accept_pending_connections();
+    std::this_thread::sleep_for(10ms);
   }
 }
 
