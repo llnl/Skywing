@@ -218,10 +218,9 @@ namespace skynet
     {
       send_message(make_greeting(local_id, local_neighbors, base_port));
       SKYNET_TRACE_LOG(
-        "{} sending greeting to {}:{}",
+        "{} sending greeting to {}",
         master_->id(),
-        conn_.ip_address_and_port().first,
-        conn_.ip_address_and_port().second
+        conn_.ip_address_and_port()
       );
       return !dead_;
     }
@@ -232,10 +231,9 @@ namespace skynet
       // Wait for the greeting
       // TODO: Probably want a time-out?
       SKYNET_TRACE_LOG(
-        "{} waiting for greeting from {}:{}",
+        "{} waiting for greeting from {}",
         master_->id(),
-        conn_.ip_address_and_port().first,
-        conn_.ip_address_and_port().second
+        conn_.ip_address_and_port()
       );
       while (!dead_)
       {
@@ -247,20 +245,18 @@ namespace skynet
               id_ = msg.from();
               base_port_ = msg.base_port();
               SKYNET_TRACE_LOG(
-                "{} got greeting from {}:{}",
+                "{} got greeting from {}",
                 master_->id(),
-                conn_.ip_address_and_port().first,
-                conn_.ip_address_and_port().second
+                conn_.ip_address_and_port()
               );
               return true;
             },
             // Any other kind of message is an error
             [&](...) {
               SKYNET_WARN_LOG(
-                "{} recieved a non-greeting from {}:{} during the handshake",
+                "{} recieved a non-greeting from {} during the handshake",
                 master_->id(),
-                conn_.ip_address_and_port().first,
-                conn_.ip_address_and_port().second
+                conn_.ip_address_and_port().first
               );
               return false;
             }
@@ -1018,9 +1014,21 @@ namespace skynet
       if (sub.read_message(size_buffer.data(), size_buffer.size()) == internal::ConnectionError::no_error)
       {
         const auto bytes_to_read = internal::from_network_bytes(size_buffer);
+        SKYNET_TRACE_LOG(
+          "{} recieved a publication of {} bytes from {}",
+          id_,
+          bytes_to_read,
+          sub.ip_address_and_port()
+        );
         // Then read the actual message and parse it
         if (const auto message_buffer = sub.read_chunked(bytes_to_read); !message_buffer.empty())
         {
+          SKYNET_TRACE_LOG(
+            "{} successfully read publication message of {} bytes from {}",
+            id_,
+            bytes_to_read,
+            sub.ip_address_and_port()
+          );
           if (const auto msg = internal::PublishMessageHandler::try_to_create(message_buffer))
           {
             if (const auto data = msg->data())

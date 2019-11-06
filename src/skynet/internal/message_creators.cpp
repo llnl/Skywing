@@ -3,6 +3,7 @@
 #include "skynet/internal/utility/network_conv.hpp"
 #include "skynet/internal/capn_proto_wrapper.hpp"
 #include "skynet/types.hpp"
+#include "publish_value_handler.hpp"
 
 #include "message_format.capnp.h"
 

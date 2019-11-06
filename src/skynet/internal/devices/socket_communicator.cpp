@@ -2,6 +2,8 @@
 
 #include "socket_wrappers.hpp"
 
+#include "skynet/internal/utility/logging.hpp"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -257,6 +259,11 @@ namespace skynet::internal
     return ::skynet::internal::read_chunked(conn_, num_bytes);
   }
 
+  std::pair<std::string, std::uint16_t> Subscription::ip_address_and_port() const noexcept
+  {
+    return conn_.ip_address_and_port();
+  }
+
   PublicationChannel::PublicationChannel(const std::uint16_t port) noexcept
   {
     if (conn_.set_to_listen(port) != ConnectionError::no_error)
@@ -281,6 +288,11 @@ namespace skynet::internal
       auto& sub = subscriptions_[i];
       if (sub.send_message(message, size) != ConnectionError::no_error)
       {
+        SKYNET_DEBUG_LOG(
+          "Message from {} failed to be send to {}",
+          conn_.ip_address_and_port(),
+          sub.ip_address_and_port()
+        );
         // Delete the subscription
         using std::swap;
         swap(sub, subscriptions_.back());

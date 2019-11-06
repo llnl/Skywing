@@ -14,10 +14,11 @@ skynet_lib = static_library('skynet',
   [
     'internal/devices/socket_communicator.cpp',
     'internal/utility/network_conv.cpp',
+    'internal/capn_proto_wrapper.cpp',
     'internal/message_creators.cpp',
     'job.cpp',
     'master.cpp'
   ] + platform_specific_sources,
   dependencies : [skynet_internal_dep],
-  include_directories : ['../include']
+  include_directories : include_directories('../include')
 )

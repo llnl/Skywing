@@ -5,7 +5,10 @@
 
 #include "skynet/types.hpp"
 
+#include <cstdint>
+#include <string>
 #include <type_traits>
+#include <utility>
 
 // Macro to wrap logging since I don't know if we're doing runtime or what and this
 // can easily be searched for or changed later on
@@ -60,6 +63,26 @@ struct fmt::formatter<skynet::PublishValueVariant>
     return std::visit([&](const auto& value) {
       return format_to(ctx.out(), "{}", value);
     }, data);
+  }
+};
+
+// This is returned as an address, port often enough that just allow direct
+// printing of it
+// Don't make it a general pair format, since most thing won't want to be
+// printed seperated by a colon
+template<>
+struct fmt::formatter<std::pair<std::string, std::uint16_t>>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) noexcept
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const std::pair<std::string, std::uint16_t>& data, FormatContext& ctx) noexcept
+  {
+    return format_to(ctx.out(), "{}:{}", data.first, data.second);
   }
 };
 

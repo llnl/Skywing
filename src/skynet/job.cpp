@@ -165,26 +165,30 @@ namespace skynet
   ) noexcept
   {
     assert(tag_ids.size() == expected_types.size());
-    auto [buffers, lock] = bufs_.get();
-    (void)lock;
-    // Always subscribe ahead of time, since the gap between the
-    // Job::subscribe calls can cause messages to get discarded once the
-    // connection is made but before it's marked as subscribed
-    for (std::size_t i = 0; i < tag_ids.size(); ++i)
+    // Put in seperate scope to release the buffer mutex before calling
+    // subscribe; not doing this can cause deadlocks
     {
-      const auto& tag_id = tag_ids[i];
-      const auto& expected_type = expected_types[i];
-      // Then add the expected type; marking the tag as watched
-      buffers.try_emplace(
-        tag_id,
-        TagInfo{
-          // Just need a dummy value here
-          std::int32_t{},
-          expected_type,
-          tag_default_version,
-          tag_default_version
-        }
-      );
+      auto [buffers, lock] = bufs_.get();
+      (void)lock;
+      // Always subscribe ahead of time, since the gap between the
+      // Job::subscribe calls can cause messages to get discarded once the
+      // connection is made but before it's marked as subscribed
+      for (std::size_t i = 0; i < tag_ids.size(); ++i)
+      {
+        const auto& tag_id = tag_ids[i];
+        const auto& expected_type = expected_types[i];
+        // Then add the expected type; marking the tag as watched
+        buffers.try_emplace(
+          tag_id,
+          TagInfo{
+            // Just need a dummy value here
+            std::int32_t{},
+            expected_type,
+            tag_default_version,
+            tag_default_version
+          }
+        );
+      }
     }
     return Master::JobAccessor::subscribe(*master_, tag_ids);
   }

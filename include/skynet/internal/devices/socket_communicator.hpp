@@ -126,6 +126,10 @@ namespace skynet::internal
      */
     std::vector<std::byte> read_chunked(const std::size_t num_bytes) noexcept;
 
+    /** \brief Returns the IP address and port of the socket
+     */
+    std::pair<std::string, std::uint16_t> ip_address_and_port() const noexcept;
+
   private:
     // Don't allow external construction
     explicit Subscription() = default;
