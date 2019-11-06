@@ -313,28 +313,22 @@ namespace skynet
           return true;
         },
         [&](const RemoveNeighbor& msg) {
-          const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor_id());
-          // Neighbor is lying; can't trust it anymore
-          if (loc == neighbors_.end() || *loc != msg.neighbor_id())
-          {
-            SKYNET_WARN_LOG(
-              "{} recieved remove neighbor from {} with id {}, but this neighbor was not present",
-              master_->id(),
-              id_,
-              msg.neighbor_id()
-            );
-            return false;
-          }
           SKYNET_TRACE_LOG(
             "{} recieved remove neighbor from {} with id {}",
             master_->id(),
             id_,
             msg.neighbor_id()
           );
-          // otherwise just remove it
-          using std::swap;
-          swap(*loc, neighbors_.back());
-          neighbors_.pop_back();
+          const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor_id());
+          // Neighbors that don't exist will often be reported if its a shared neighbor and
+          // it has already been removed due to the goodbye message
+          if (loc != neighbors_.end())
+          {
+            // otherwise just remove it
+            using std::swap;
+            swap(*loc, neighbors_.back());
+            neighbors_.pop_back();
+          }
           return true;
         },
         [this](const Heartbeat&) {
