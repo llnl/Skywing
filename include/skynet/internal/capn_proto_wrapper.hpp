@@ -135,7 +135,7 @@ namespace skynet::internal
   class GetPublishers
   {
   public:
-    std::vector<std::string> tags() const noexcept;
+    std::vector<TagID> tags() const noexcept;
     bool ignore_cache() const noexcept;
 
   private:
@@ -143,6 +143,21 @@ namespace skynet::internal
 
     friend class StatusMessageHandler;
     explicit GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept;
+  };
+
+  /** \brief Message for when a machine join a reduce group
+   */
+  class JoinReduceGroup
+  {
+  public:
+    TagID reduce_tag() const noexcept;
+    std::vector<TagID> produced_tags() const noexcept;
+
+  private:
+    cpnpro::JoinReduceGroup::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept;
   };
 
   /** \brief Class for converting the raw bytes of a message into a useable format
@@ -184,7 +199,8 @@ namespace skynet::internal
       RemoveNeighbor,
       Heartbeat,
       ReportPublishers,
-      GetPublishers
+      GetPublishers,
+      JoinReduceGroup
     >;
 
     // Process the stored message and return its internal type

@@ -155,6 +155,16 @@ namespace skynet::internal
   {}
 
   /////////////////////////////////////////////////////
+  // JoinReduceGroup
+  /////////////////////////////////////////////////////
+
+  TagID JoinReduceGroup::reduce_tag() const noexcept { return r.getReduceTag(); }
+  std::vector<TagID> JoinReduceGroup::produced_tags() const noexcept { return detail::list_to_vector<TagID>(r.getProducedTags()); }
+  JoinReduceGroup::JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
   // StatusMessageHandler
   /////////////////////////////////////////////////////
 
@@ -204,6 +214,7 @@ namespace skynet::internal
       case vals::HEARTBEAT:         return Heartbeat{/* impl_->root.getHeartbeat() */};
       case vals::REPORT_PUBLISHERS: return ReportPublishers{impl_->root.getReportPublishers()};
       case vals::GET_PUBLISHERS:    return GetPublishers{impl_->root.getGetPublishers()};
+      case vals::JOIN_REDUCE_GROUP: return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
       }
       return {};
     }();

@@ -28,15 +28,6 @@ namespace skynet
     return tags_produced_;
   }
 
-  VersionID Job::update_version(VersionID& to_update, const VersionID new_version) noexcept
-  {
-    to_update =
-      new_version == tag_default_version
-        ? to_update + 1
-        : new_version;
-    return to_update;
-  }
-
   /** \brief Processes the raw information sent from a job on another instance
    *
    * \param tag The id of the tag the data was sent with
@@ -90,8 +81,7 @@ namespace skynet
       data
     );
     // Otherwise just make it the current value
-    loc->second.value = std::move(data);
-    loc->second.stored_version = version;
+    loc->second.buffer.add(std::move(data), version);
     return true;
   }
 
@@ -105,8 +95,8 @@ namespace skynet
       && "Attempted to publish on a tag that was not declared for publishing!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
-      last_published_version_.try_emplace(tag_id, tag_default_version).first->second;
-    update_version(last_version, version);
+      last_published_version_.try_emplace(tag_id, internal::tag_default_version).first->second;
+    last_version = internal::detail::update_version(last_version, version);
     Master::JobAccessor::publish(
       *master_,
       last_version,
@@ -116,26 +106,16 @@ namespace skynet
   }
 
   // Implementation of public functions
-  std::optional<PublishValueVariant> Job::get_impl(
+  PublishValueVariant Job::get_impl(
     const TagID& tag_id,
     const VersionID version
   ) noexcept
   {
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    auto version_needed = buffers.find(tag_id)->second.last_fetched_version;
-    update_version(version_needed, version);
-    // Then check if there's been anything seen on the tag and return it if it's
-    // at least the required version
-    if (const auto loc = buffers.find(tag_id);
-      loc != buffers.cend() &&
-      loc->second.stored_version != tag_default_version &&
-      loc->second.stored_version >= version_needed)
-    {
-      loc->second.last_fetched_version = loc->second.stored_version;
-      return loc->second.value;
-    }
-    return {};
+    assert(buffers.find(tag_id) != buffers.cend());
+    assert(buffers.find(tag_id)->second.buffer.has_data(version));
+    return buffers.find(tag_id)->second.buffer.get();
   }
 
   bool Job::has_data_impl(const TagID& tag_id, const VersionID version) noexcept
@@ -147,11 +127,7 @@ namespace skynet
     {
       return false;
     }
-    auto version_needed = loc->second.last_fetched_version;
-    update_version(version_needed, version);
-    return
-      loc->second.stored_version != tag_default_version &&
-      loc->second.stored_version >= version_needed;
+    return loc->second.buffer.has_data(version);
   }
 
   const JobID& Job::id() const noexcept
@@ -182,10 +158,8 @@ namespace skynet
           tag_id,
           TagInfo{
             // Just need a dummy value here
-            std::int32_t{},
-            expected_type,
-            tag_default_version,
-            tag_default_version
+            {},
+            expected_type
           }
         );
       }
@@ -199,6 +173,15 @@ namespace skynet
   //   (void)lock;
   //   // Just remove any the expected types and data maps
   //   buffers.erase(tag_id);
+  // }
+
+  // bool Job::create_reduce_group_impl(
+  //   const TagID& new_tag_id,
+  //   const std::uint8_t expected_type,
+  //   const std::vector<TagID>& reduce_over_tags
+  // ) noexcept
+  // {
+  //   // TODO: Send request to master; will be similar to the subscribe stuff
   // }
 
 } // namespace skynet

@@ -3,6 +3,8 @@
 
 #include "skynet/internal/utility/mutex_guarded.hpp"
 #include "skynet/internal/utility/type_list.hpp"
+#include "skynet/internal/tag_buffer.hpp"
+#include "skynet/local_future.hpp"
 #include "skynet/types.hpp"
 
 #include <cassert>
@@ -16,12 +18,6 @@
 
 namespace skynet
 {
-  namespace internal
-  {
-    // The default poll frequency for Job::get_when_ready
-    inline static constexpr std::chrono::milliseconds default_poll_freq{1};
-  } // namespace internal
-
   //  A Job needs to be able to communicate with the Master so forward declare it
   class Master;
 
@@ -84,7 +80,7 @@ namespace skynet
         }};
       }
 
-      // Work around to disallow construction outside of the master
+      // Work around to disallow construction of Jobs outside of the master
       // A public constructor is needed due to it being emplaced into a map
       struct AllowConstruction
       {
@@ -103,87 +99,73 @@ namespace skynet
       std::function<void(Job&)> to_run
     ) noexcept;
 
-    /** \brief The value to pass to use default behavior for
-     * versions when publishing and subscribing.
-     */
-    inline static constexpr VersionID tag_default_version = -1;
-
-    /** \brief Gets the latest data on a tag (if any exists)
+    /** \brief Retrieves the specified version for the tag, or latest if no version
+     * is specified
+     *
+     * \return A LocalFuture for the value
      */
     template<typename GetTag>
-    std::optional<typename GetTag::ValueType> get(
+    auto get_future_for(
       const GetTag& tag,
-      const VersionID version = tag_default_version
+      const VersionID version = internal::tag_default_version
     ) noexcept
     {
-      if (const auto val = get_impl(tag.id(), version))
-      {
-        // Wrong types should never be put in the buffer
-        using ValueType = typename GetTag::ValueType;
-        assert(std::get_if<ValueType>(&*val) != nullptr);
-        return std::get<ValueType>(*val);
-      }
-      return {};
-    }
-
-    /** \brief Waits for data to be available on a certain tag and returns it
-     * when it is.
-     */
-    template<
-      typename GetTag,
-      typename Rep = decltype(internal::default_poll_freq)::rep,
-      typename Period = decltype(internal::default_poll_freq)::period
-    >
-    typename GetTag::ValueType get_when_ready(
-      const GetTag& tag,
-      const VersionID version = tag_default_version,
-      const std::chrono::duration<Rep, Period> poll_freq = internal::default_poll_freq
-    ) noexcept
-    {
-      while (!has_data(tag, version))
-      {
-        std::this_thread::sleep_for(poll_freq);
-      }
-      return *get(tag);
+      return internal::make_local_future<false>(
+        [this, tag, version]() {
+          return has_data(tag, version);
+        },
+        [this, tag, version]() {
+          using ValueType = typename GetTag::ValueType;
+          const auto variant = get_impl(tag.id(), version);
+          assert(std::get_if<ValueType>(&variant) != nullptr);
+          return *std::get_if<ValueType>(&variant);
+        }
+      );
     }
 
     /** \brief Checks if a tag buffer has data or not
      */
     template<typename GetTag>
-    bool has_data(const GetTag& tag, const VersionID version = tag_default_version) noexcept
+    bool has_data(const GetTag& tag, const VersionID version = internal::tag_default_version) noexcept
     {
       return has_data_impl(tag.id(), version);
     }
 
-    /** \brief Subscribes to the passed tag, does nothing if the tag is
-     * already subscribed to.
+    /** \brief Attempts to subscribe to the passed tag
      *
-     * Returns true if the tag could be subscribed to (there's a known producer for the tag)
-     * or false if it couldn't.
+     * \return A LocalFuture for when the tag is subscribed to
      */
     template<typename Tag>
-    bool subscribe(const Tag& tag) noexcept
+    auto subscribe(const Tag& tag) noexcept
     {
       using ValueType = typename Tag::ValueType;
-      return subscribe_impl(
-        {tag.id()},
-        {internal::index_of<ValueType, PublishValueTypeList>}
+      return internal::make_local_future<true>(
+        [tag, this]() {
+          return subscribe_impl(
+            {tag.id()},
+            {internal::index_of<ValueType, PublishValueTypeList>}
+          );
+        }
       );
     }
 
     /** \brief Subscribe to all tags passed into the vector.
      *
-     * Returns true only if all of the passed tags could be subscribed to.
+     * \return A LocalFuture for when the tags have been subscribed to
      */
     template<typename Tag>
-    bool subscribe(const std::vector<TagID>& tags) noexcept
+    auto subscribe(const std::vector<TagID>& tags) noexcept
     {
       using ValueType = typename Tag::ValueType;
-      std::vector<std::uint8_t> expected_types(
+      const std::vector<std::uint8_t> expected_types(
         tags.size(),
         internal::index_of<ValueType, PublishValueTypeList>
       );
-      return subscribe_impl(tags, expected_types);
+      return internal::make_local_future<true>(
+        [tags, expected_types, this]() {
+          return subscribe_impl(tags, expected_types);
+        }
+      );
     }
 
     /** \brief Subscribes to all of the passed tags.
@@ -193,11 +175,32 @@ namespace skynet
     template<typename... SubTags>
     std::enable_if_t<sizeof...(SubTags), bool> subscribe(const SubTags&... tags) noexcept
     {
-      return subscribe_impl(
-        {tags.id()...},
-        {internal::index_of<typename SubTags::ValueType, PublishValueTypeList>...}
+      const std::vector<std::string> tag_names{tags.id()...};
+      const std::vector<std::uint8_t> expected_types{
+        internal::index_of<typename SubTags::ValueType, PublishValueTypeList>...
+      };
+      return internal::make_local_future<true>(
+        [tag_names, expected_types, this]() {
+          return subscribe_impl(tag_names, expected_types);
+        }
       );
     }
+
+    /** \brief Create a reduce group over the specified tags
+     *
+     * Returns true if the creating the group finished, false otherwise
+     */
+    // template<typename ReduceTag, typename... ReduceOverTags>
+    // bool create_reduce_group(const ReduceTag& new_tag, const ReduceOverTags&... tags) noexcept
+    // {
+    //   constexpr auto expected_type =
+    //     internal::index_of<ReduceTag::ValueType>, PublishValueTypeList>;
+    //   static_assert(
+    //     ((expected_type == internal::index_of<typename ReduceOverTags::ValueType, PublishValueTypeList>) && ...),
+    //     "All tags in a reduce group must produce the same type!"
+    //   );
+    //   return create_reduce_group_impl(new_tag.id(), expected_type, {tags.id()...});
+    // }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
     //  * subscribed to the tag
@@ -224,7 +227,7 @@ namespace skynet
     void publish(
       const Tag& tag,
       const typename Tag::ValueType& value,
-      const VersionID version = tag_default_version
+      const VersionID version = internal::tag_default_version
     ) noexcept
     {
       publish_impl(tag.id(), value, version);
@@ -243,10 +246,6 @@ namespace skynet
     const JobID& id() const noexcept;
 
   private:
-    // Updates the version that's passed in and returns a copy of it
-    // Do it like this instead of with a tag ID to prevent trying to double lock a mutex
-    VersionID update_version(VersionID& to_update, const VersionID new_version) noexcept;
-
     /** \brief Processes the raw information sent from a job on another instance
      *
      * \param tag The id of the tag the data was sent with
@@ -265,30 +264,33 @@ namespace skynet
     ) noexcept;
 
     // Implementation of public functions
-    std::optional<PublishValueVariant> get_impl(const TagID& tag_id, VersionID version) noexcept;
+    /** \brief Gets data for the specified tag
+     *
+     * \pre Data exists on the tag
+     */
+    PublishValueVariant get_impl(const TagID& tag_id, VersionID version) noexcept;
     bool has_data_impl(const TagID& tag_id, VersionID version) noexcept;
     bool subscribe_impl(
       const std::vector<TagID>& tag_ids,
       const std::vector<std::uint8_t>& expected_types
     ) noexcept;
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
+    bool create_reduce_group_impl(
+      const TagID& new_tag_id,
+      std::uint8_t expected_type,
+      const std::vector<TagID>& reduce_over_tags
+    ) noexcept;
 
     // The id of the job
     JobID id_;
 
     // Group all of the related data to a tag ID in a single structure
-    struct TagInfo {
-      // The data for the tag
-      PublishValueVariant value;
-
+    struct TagInfo
+    {
+      // The buffer
+      internal::DiscardOldVersionTagBuffer<PublishValueVariant> buffer;
       // The expected type
       std::uint8_t expected_type;
-
-      // The last version retrieved
-      VersionID last_fetched_version;
-
-      // The version of the data that is currently stored
-      VersionID stored_version;
     };
     MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
 

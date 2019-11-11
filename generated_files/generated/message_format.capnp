@@ -71,6 +71,11 @@ struct GetPublishers {
   ignoreCache @1 : Bool;
 }
 
+struct JoinReduceGroup {
+  reduceTag    @0 : Text;
+  producedTags @1 : List(Text);
+}
+
 struct StatusMessage {
   union {
     greeting         @0 : Greeting;
@@ -80,5 +85,6 @@ struct StatusMessage {
     heartbeat        @4 : Void;
     reportPublishers @5 : ReportPublishers;
     getPublishers    @6 : GetPublishers;
+    joinReduceGroup  @7 : JoinReduceGroup;
   }
 }
