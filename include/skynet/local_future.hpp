@@ -17,7 +17,7 @@ namespace skynet
       constexpr void operator()() const noexcept {}
     }; // struct NoOpCallable
 
-    inline static constexpr std::chrono::microseconds default_poll_freq{10};
+    inline static constexpr std::chrono::microseconds default_poll_freq{10000};
   } // namespace skynet::internal
 
   /** \brief A class for "local" futures.  These futures live on the stack,
@@ -25,7 +25,7 @@ namespace skynet
    * where one function determines if a result is ready (and potentially
    * starts the work), and another that returns the result (if any).
    */
-  template<bool CallReadyDuringInit, typename ReadyCallable, typename GetCallable>
+  template<typename ReadyCallable, typename GetCallable>
   class LocalFuture : public ReadyCallable, public GetCallable
   {
   public:
@@ -39,12 +39,7 @@ namespace skynet
     ) noexcept
       : ReadyCallable(std::forward<ConReadyCallable>(r))
       , GetCallable(std::forward<ConGetCallable>(g))
-    {
-      if constexpr (CallReadyDuringInit)
-      {
-        ReadyCallable::operator()();
-      }
-    }
+    {}
 
     /** \brief Wait until the value is ready
      */
@@ -83,10 +78,10 @@ namespace skynet
   {
     /** Create a local future with the given Callables
      */
-    template<bool CallReadyDuringInit, typename ReadyCallable, typename GetCallable>
-    LocalFuture<CallReadyDuringInit, ReadyCallable, GetCallable> make_local_future(ReadyCallable&& r, GetCallable&& g) noexcept
+    template<typename ReadyCallable, typename GetCallable>
+    LocalFuture<ReadyCallable, GetCallable> make_local_future(ReadyCallable&& r, GetCallable&& g) noexcept
     {
-      return LocalFuture<CallReadyDuringInit, ReadyCallable, GetCallable>(
+      return LocalFuture<ReadyCallable, GetCallable>(
         std::forward<ReadyCallable>(r),
         std::forward<GetCallable>(g)
       );
@@ -94,10 +89,10 @@ namespace skynet
 
     /** Create a local future that has no get callable
      */
-    template<bool CallReadyDuringInit, typename ReadyCallable>
-    LocalFuture<CallReadyDuringInit, ReadyCallable, internal::NoOpCallable> make_local_future(ReadyCallable&& r) noexcept
+    template<typename ReadyCallable>
+    LocalFuture<ReadyCallable, internal::NoOpCallable> make_local_future(ReadyCallable&& r) noexcept
     {
-      return LocalFuture<CallReadyDuringInit, ReadyCallable, internal::NoOpCallable>(
+      return LocalFuture<ReadyCallable, internal::NoOpCallable>(
         std::forward<ReadyCallable>(r),
         internal::NoOpCallable{}
       );

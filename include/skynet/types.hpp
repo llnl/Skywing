@@ -3,6 +3,7 @@
 
 #include "skynet/internal/utility/type_list.hpp"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -53,6 +54,24 @@ namespace skynet
 
   /// Variant version of the above
   using PublishValueVariant = internal::ApplyTo<PublishValueTypeList, std::variant>;
+
+  namespace internal
+  {
+    /// Structure for reporting reduce group building
+    struct ReduceGroupNeighbors
+    {
+      // Having everything as an array is nice sometimes, but so is having named
+      // members
+      std::array<TagID, 3> tags;
+
+      const TagID& parent() const noexcept { return tags[0]; }
+      TagID& parent() noexcept { return tags[0]; }
+      const TagID& left_child() const noexcept { return tags[1]; }
+      TagID& left_child() noexcept { return tags[1]; }
+      const TagID& right_child() const noexcept { return tags[2]; }
+      TagID& right_child() noexcept { return tags[2]; }
+    };
+  } // namespace skynet::internal
 } // namespace skynet
 
 #endif // SKYNET_TYPES_HPP

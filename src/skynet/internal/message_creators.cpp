@@ -41,6 +41,25 @@ namespace skynet::internal
       std::memcpy(buffer_data.data(), &size_bytes, sizeof(size_bytes));
       return buffer_data;
     }
+
+    void set_publish_data(
+      cpnpro::PublishData::Builder to_set,
+      const VersionID version,
+      const TagID& tag_id,
+      const PublishValueVariant& value
+    ) noexcept
+    {
+      to_set.setVersion(version);
+      to_set.setTagID(tag_id);
+      auto publish_value = to_set.initValue();
+      std::visit(
+        [&](const auto& data) {
+          using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
+          detail::PublishValueHandler<ValueType>::set(publish_value, data);
+        },
+        value
+      );
+    }
   } // namespace {anonymous}
 
   /** \brief Create data for a publish
@@ -53,17 +72,7 @@ namespace skynet::internal
   {
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::Publish>().initData();
-    // Just set the data now
-    message.setVersion(version);
-    message.setTagID(tag_id);
-    auto publish_value = message.initValue();
-    std::visit(
-      [&](const auto& data) {
-        using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
-        detail::PublishValueHandler<ValueType>::set(publish_value, data);
-      },
-      value
-    );
+    set_publish_data(message, version, tag_id, value);
     return finalize_message(builder);
   }
 
@@ -137,7 +146,8 @@ namespace skynet::internal
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
-    const std::vector<TagID>& locally_produced_tags
+    const std::vector<TagID>& locally_produced_tags,
+    const bool is_for_reduce_group
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -161,6 +171,7 @@ namespace skynet::internal
     {
       msg_local_tags.set(i, locally_produced_tags[i]);
     }
+    message.setIsForReduceGroup(is_for_reduce_group);
     return finalize_message(builder);
   }
 
@@ -168,7 +179,8 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
-    const bool ignore_cache
+    const bool ignore_cache,
+    const bool is_for_reduce_group
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -179,6 +191,49 @@ namespace skynet::internal
       msg_tags.set(i, tags[i]);
     }
     message.setIgnoreCache(ignore_cache);
+    message.setIsForReduceGroup(is_for_reduce_group);
+    return finalize_message(builder);
+  }
+
+  std::vector<std::byte> make_join_reduce_group(
+    const TagID& reduce_tag,
+    const TagID& tag_produced
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initJoinReduceGroup();
+    message.setReduceTag(reduce_tag);
+    message.setTagProduced(tag_produced);
+    return finalize_message(builder);
+  }
+
+  std::vector<std::byte> make_submit_reduce_value(
+    const TagID& reduce_tag,
+    const VersionID version,
+    const TagID& tag_id,
+    const PublishValueVariant& value
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initSubmitReduceValue();
+    message.setReduceTag(reduce_tag);
+    auto publish_data = message.initData();
+    set_publish_data(publish_data, version, tag_id, value);
+    return finalize_message(builder);
+  }
+
+  std::vector<std::byte> make_report_reduce_value(
+    const TagID& reduce_tag,
+    const VersionID version,
+    const TagID& tag_id,
+    const PublishValueVariant& value
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initReportReduceValue();
+    message.setReduceTag(reduce_tag);
+    auto publish_data = message.initData();
+    set_publish_data(publish_data, version, tag_id, value);
     return finalize_message(builder);
   }
 } // namespace skynet::internal

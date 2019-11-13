@@ -33,11 +33,11 @@ namespace skynet::internal
     std::optional<PublishValueVariant> get_variant() const noexcept;
 
   private:
-    // Only allow PublishData to construct this
+    // Only allow classes that use this directly to construct it
     friend class PublishData;
-    explicit PublishValue(cpnpro::PublishData::Value::Reader reader) noexcept;
+    explicit PublishValue(cpnpro::PublishValue::Reader reader) noexcept;
 
-    cpnpro::PublishData::Value::Reader r;
+    cpnpro::PublishValue::Reader r;
   };
 
   /** \brief Class representing a publish message
@@ -53,6 +53,8 @@ namespace skynet::internal
     cpnpro::PublishData::Reader r;
 
     friend class PublishMessageHandler;
+    friend class SubmitReduceValue;
+    friend class ReportReduceValue;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
   };
 
@@ -122,6 +124,7 @@ namespace skynet::internal
     std::vector<TagID> tags() const noexcept;
     std::vector<std::vector<std::string>> addresses() const noexcept;
     std::vector<TagID> locally_produced_tags() const noexcept;
+    bool is_for_reduce_group() const noexcept;
 
   private:
     cpnpro::ReportPublishers::Reader r;
@@ -137,6 +140,7 @@ namespace skynet::internal
   public:
     std::vector<TagID> tags() const noexcept;
     bool ignore_cache() const noexcept;
+    bool is_for_reduce_group() const noexcept;
 
   private:
     cpnpro::GetPublishers::Reader r;
@@ -151,13 +155,43 @@ namespace skynet::internal
   {
   public:
     TagID reduce_tag() const noexcept;
-    std::vector<TagID> produced_tags() const noexcept;
+    TagID tag_produced() const noexcept;
 
   private:
     cpnpro::JoinReduceGroup::Reader r;
 
     friend class StatusMessageHandler;
     explicit JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept;
+  };
+
+  /** \brief Message for submitting a value for reduction to the parent
+   */
+  class SubmitReduceValue
+  {
+  public:
+    TagID reduce_tag() const noexcept;
+    PublishData data() const noexcept;
+
+  private:
+    cpnpro::SubmitReduceValue::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept;
+  };
+
+  /** \brief Message for reporting the result of a reduction to children
+   */
+  class ReportReduceValue
+  {
+  public:
+    TagID reduce_tag() const noexcept;
+    PublishData data() const noexcept;
+
+  private:
+    cpnpro::ReportReduceValue::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit ReportReduceValue(cpnpro::ReportReduceValue::Reader reader) noexcept;
   };
 
   /** \brief Class for converting the raw bytes of a message into a useable format
@@ -200,7 +234,9 @@ namespace skynet::internal
       Heartbeat,
       ReportPublishers,
       GetPublishers,
-      JoinReduceGroup
+      JoinReduceGroup,
+      SubmitReduceValue,
+      ReportReduceValue
     >;
 
     // Process the stored message and return its internal type

@@ -16,6 +16,7 @@ skynet_lib = static_library('skynet',
     'internal/utility/network_conv.cpp',
     'internal/capn_proto_wrapper.cpp',
     'internal/message_creators.cpp',
+    'internal/reduce_group.cpp',
     'job.cpp',
     'master.cpp'
   ] + platform_specific_sources,

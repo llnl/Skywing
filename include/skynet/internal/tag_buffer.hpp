@@ -96,7 +96,7 @@ namespace skynet::internal
       while (true)
       {
         assert(!buffer_.empty());
-        auto& [data, version] = std::move(buffer_.front());
+        auto [data, version] = std::move(buffer_.front());
         buffer_.erase(buffer_.begin());
         if (version >= detail::update_version(last_fetched_version_, required_version))
         {

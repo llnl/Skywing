@@ -50,7 +50,7 @@ namespace skynet::internal
   {
     using namespace detail;
     // This is gross and I hate it, but...
-    using vals = cpnpro::PublishData::Value::Which;
+    using vals = cpnpro::PublishValue::Which;
     switch (r.which())
     {
     case vals::D:     return pvh<double>::get(r);
@@ -79,7 +79,7 @@ namespace skynet::internal
     return {};
   }
 
-  PublishValue::PublishValue(cpnpro::PublishData::Value::Reader reader) noexcept
+  PublishValue::PublishValue(cpnpro::PublishValue::Reader reader) noexcept
     : r{std::move(reader)}
   {}
 
@@ -139,6 +139,7 @@ namespace skynet::internal
   {
     return detail::list_to_vector<TagID>(r.getLocallyProducedTags());
   }
+  bool ReportPublishers::is_for_reduce_group() const noexcept { return r.getIsForReduceGroup(); }
 
   ReportPublishers::ReportPublishers(cpnpro::ReportPublishers::Reader reader) noexcept
     : r{std::move(reader)}
@@ -150,6 +151,7 @@ namespace skynet::internal
 
   std::vector<std::string> GetPublishers::tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
   bool GetPublishers::ignore_cache() const noexcept { return r.getIgnoreCache(); }
+  bool GetPublishers::is_for_reduce_group() const noexcept { return r.getIsForReduceGroup(); }
   GetPublishers::GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept
     : r{std::move(reader)}
   {}
@@ -159,8 +161,28 @@ namespace skynet::internal
   /////////////////////////////////////////////////////
 
   TagID JoinReduceGroup::reduce_tag() const noexcept { return r.getReduceTag(); }
-  std::vector<TagID> JoinReduceGroup::produced_tags() const noexcept { return detail::list_to_vector<TagID>(r.getProducedTags()); }
+  TagID JoinReduceGroup::tag_produced() const noexcept { return r.getTagProduced(); }
   JoinReduceGroup::JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
+  // SubmitReduceValue
+  /////////////////////////////////////////////////////
+
+  TagID SubmitReduceValue::reduce_tag() const noexcept { return r.getReduceTag(); }
+  PublishData SubmitReduceValue::data() const noexcept { return PublishData{r.getData()}; }
+  SubmitReduceValue::SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
+  // ReportReduceValue
+  /////////////////////////////////////////////////////
+
+  TagID ReportReduceValue::reduce_tag() const noexcept { return r.getReduceTag(); }
+  PublishData ReportReduceValue::data() const noexcept { return PublishData{r.getData()}; }
+  ReportReduceValue::ReportReduceValue(cpnpro::ReportReduceValue::Reader reader) noexcept
     : r{std::move(reader)}
   {}
 
@@ -190,7 +212,7 @@ namespace skynet::internal
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode status message.");
+      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::try_to_create.");
       return {};
     }
     else
@@ -207,20 +229,22 @@ namespace skynet::internal
     // to signify that there's no data due to, e.g., malformed input
     const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
       switch(impl_->root.which()) {
-      case vals::GREETING:          return Greeting{impl_->root.getGreeting()};
-      case vals::GOODBYE:           return Goodbye{/* impl_->root.getGoodbye() */};
-      case vals::NEW_NEIGHBOR:      return NewNeighbor{impl_->root.getNewNeighbor()};
-      case vals::REMOVE_NEIGHBOR:   return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
-      case vals::HEARTBEAT:         return Heartbeat{/* impl_->root.getHeartbeat() */};
-      case vals::REPORT_PUBLISHERS: return ReportPublishers{impl_->root.getReportPublishers()};
-      case vals::GET_PUBLISHERS:    return GetPublishers{impl_->root.getGetPublishers()};
-      case vals::JOIN_REDUCE_GROUP: return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
+      case vals::GREETING:            return Greeting{impl_->root.getGreeting()};
+      case vals::GOODBYE:             return Goodbye{/* impl_->root.getGoodbye() */};
+      case vals::NEW_NEIGHBOR:        return NewNeighbor{impl_->root.getNewNeighbor()};
+      case vals::REMOVE_NEIGHBOR:     return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+      case vals::HEARTBEAT:           return Heartbeat{/* impl_->root.getHeartbeat() */};
+      case vals::REPORT_PUBLISHERS:   return ReportPublishers{impl_->root.getReportPublishers()};
+      case vals::GET_PUBLISHERS:      return GetPublishers{impl_->root.getGetPublishers()};
+      case vals::JOIN_REDUCE_GROUP:   return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
+      case vals::SUBMIT_REDUCE_VALUE: return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
+      case vals::REPORT_REDUCE_VALUE: return ReportReduceValue{impl_->root.getReportReduceValue()};
       }
       return {};
     }();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode publish message.");
+      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::extract_message.");
       return {};
     }
     else
@@ -255,6 +279,7 @@ namespace skynet::internal
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Publish>();
     if (suppressor.failed())
     {
+      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::try_to_create");
       return {};
     }
     else
@@ -270,6 +295,7 @@ namespace skynet::internal
     auto to_ret = PublishData{impl_->root.getData()};
     if (suppressor.failed())
     {
+      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::data");
       return {};
     }
     else

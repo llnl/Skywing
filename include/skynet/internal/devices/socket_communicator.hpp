@@ -65,6 +65,10 @@ namespace skynet::internal
      */
     ConnectionError connect_to_server(const char* address, std::uint16_t port) noexcept;
 
+    /** \brief Connects to a server given an address:port string
+     */
+    ConnectionError connect_to_server(std::string_view address) noexcept;
+
     /** \brief Sends a message on the socket
      *
      * \param message The message to send
@@ -102,6 +106,11 @@ namespace skynet::internal
   /** \brief Read a message in chunks from a SocketCommunicator.
    */
   std::vector<std::byte> read_chunked(SocketCommunicator& conn, std::size_t num_bytes) noexcept;
+
+  /** \brief Splits a "ip:port" address into its parts
+   * The string is empty if the input was invalid
+   */
+  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept;
 
   /** \brief Subscription for recieving data from a publisher
    */

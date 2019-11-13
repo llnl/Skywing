@@ -3,6 +3,7 @@
 
 #include "skynet/internal/utility/mutex_guarded.hpp"
 #include "skynet/internal/utility/type_list.hpp"
+#include "skynet/internal/reduce_group.hpp"
 #include "skynet/internal/tag_buffer.hpp"
 #include "skynet/local_future.hpp"
 #include "skynet/types.hpp"
@@ -36,13 +37,15 @@ namespace skynet
 
     /** \brief Construct a tag with an ID
      */
-    explicit constexpr Tag(const TagID id) noexcept
+    constexpr Tag(const TagID& id) noexcept
       : id_{id}
-    {}
+    {
+      assert(!id.empty());
+    }
 
     /** \brief Return the id of the tag
      */
-    constexpr TagID id() const noexcept { return id_; }
+    const TagID& id() const noexcept { return id_; }
 
   private:
     // The id of this tag
@@ -95,9 +98,21 @@ namespace skynet
       Accessor::AllowConstruction,
       const std::string& id,
       Master& master,
-      std::vector<TagID> tags,
       std::function<void(Job&)> to_run
     ) noexcept;
+
+    /** \brief Declare intent to publish on tags, this must be done before publishing
+     * on a tag
+     */
+    template<typename... Tags>
+    void declare_publication_intent(const Tags&... tags) noexcept
+    {
+      (tags_produced_.try_emplace(
+        tags.id(),
+        internal::index_of<typename Tags::ValueType, PublishValueTypeList>
+      ), ...);
+      report_tags({tags.id()...});
+    }
 
     /** \brief Retrieves the specified version for the tag, or latest if no version
      * is specified
@@ -110,7 +125,7 @@ namespace skynet
       const VersionID version = internal::tag_default_version
     ) noexcept
     {
-      return internal::make_local_future<false>(
+      return internal::make_local_future(
         [this, tag, version]() {
           return has_data(tag, version);
         },
@@ -139,13 +154,9 @@ namespace skynet
     auto subscribe(const Tag& tag) noexcept
     {
       using ValueType = typename Tag::ValueType;
-      return internal::make_local_future<true>(
-        [tag, this]() {
-          return subscribe_impl(
-            {tag.id()},
-            {internal::index_of<ValueType, PublishValueTypeList>}
-          );
-        }
+      init_subscribe({tag.id()}, {internal::index_of<ValueType, PublishValueTypeList>});
+      return internal::make_local_future(
+        [tag, this]() { return is_subscribe_finished({tag.id()}); }
       );
     }
 
@@ -161,46 +172,74 @@ namespace skynet
         tags.size(),
         internal::index_of<ValueType, PublishValueTypeList>
       );
-      return internal::make_local_future<true>(
-        [tags, expected_types, this]() {
-          return subscribe_impl(tags, expected_types);
-        }
+      init_subscribe(tags, expected_types);
+      return internal::make_local_future(
+        [tags, this]() { return is_subscribe_finished(tags); }
       );
     }
 
     /** \brief Subscribes to all of the passed tags.
      *
-     * Returns true only if all of the passed tags could be subscribed to.
+     * \return A LocalFuture for when the tags have been subscribed to
      */
     template<typename... SubTags>
     std::enable_if_t<sizeof...(SubTags), bool> subscribe(const SubTags&... tags) noexcept
     {
-      const std::vector<std::string> tag_names{tags.id()...};
+      const std::vector<std::string> tag_ids{tags.id()...};
       const std::vector<std::uint8_t> expected_types{
         internal::index_of<typename SubTags::ValueType, PublishValueTypeList>...
       };
-      return internal::make_local_future<true>(
-        [tag_names, expected_types, this]() {
-          return subscribe_impl(tag_names, expected_types);
+      init_subscribe(tag_ids, expected_types);
+      return internal::make_local_future(
+        [tag_ids, this]() {
+          return is_subscribe_finished(tag_ids);
+        }
+      );
+    }
+
+    /** \brief Create a reduce group over the specified tag names
+     */
+    template<typename ReduceTag>
+    auto create_reduce_group(
+      const ReduceTag& group_tag,
+      const ReduceTag& tag_produced_for_group,
+      const std::vector<TagID>& tags
+    ) noexcept
+    {
+      using ValueType = typename ReduceTag::ValueType;
+      constexpr auto expected_type =
+        internal::index_of<ValueType, PublishValueTypeList>;
+      const auto tags_to_find = create_reduce_group_init(tag_produced_for_group.id(), tags, expected_type);
+      return internal::make_local_future(
+        [group_tag, tag_produced_for_group, tags_to_find, this]() {
+          return is_reduce_group_created(group_tag.id(), tag_produced_for_group.id(), tags_to_find, expected_type);
+        },
+        [group_tag, this]() -> internal::ReduceGroup<ValueType>& {
+          return static_cast<internal::ReduceGroup<ValueType>&>(get_reduce_group(group_tag.id()));
         }
       );
     }
 
     /** \brief Create a reduce group over the specified tags
      *
-     * Returns true if the creating the group finished, false otherwise
+     * \return A LocalFuture for when the reduce group has been created
      */
-    // template<typename ReduceTag, typename... ReduceOverTags>
-    // bool create_reduce_group(const ReduceTag& new_tag, const ReduceOverTags&... tags) noexcept
-    // {
-    //   constexpr auto expected_type =
-    //     internal::index_of<ReduceTag::ValueType>, PublishValueTypeList>;
-    //   static_assert(
-    //     ((expected_type == internal::index_of<typename ReduceOverTags::ValueType, PublishValueTypeList>) && ...),
-    //     "All tags in a reduce group must produce the same type!"
-    //   );
-    //   return create_reduce_group_impl(new_tag.id(), expected_type, {tags.id()...});
-    // }
+    template<typename ReduceTag, typename... ReduceOverTags>
+    auto create_reduce_group(
+      const ReduceTag& group_tag,
+      const ReduceTag& tag_produced_for_group,
+      const ReduceOverTags&... tags
+    ) noexcept
+    {
+      constexpr auto expected_type =
+        internal::index_of<typename ReduceTag::ValueType, PublishValueTypeList>;
+      static_assert(
+        ((expected_type == internal::index_of<typename ReduceOverTags::ValueType, PublishValueTypeList>) && ...),
+        "All tags in a reduce group must produce the same type!"
+      );
+      const std::vector<std::string> tag_ids{tags.id()...};
+      return create_reduce_group(group_tag, tag_produced_for_group, tag_ids);
+    }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
     //  * subscribed to the tag
@@ -239,7 +278,7 @@ namespace skynet
 
     /** \brief Returns a list of the produced tags
      */
-    const std::vector<TagID>& tags_produced() const noexcept;
+    const std::unordered_map<TagID, std::uint8_t>& tags_produced() const noexcept;
 
     /** \brief Returns the job's id
      */
@@ -263,23 +302,43 @@ namespace skynet
       VersionID version
     ) noexcept;
 
-    // Implementation of public functions
     /** \brief Gets data for the specified tag
      *
      * \pre Data exists on the tag
      */
     PublishValueVariant get_impl(const TagID& tag_id, VersionID version) noexcept;
+
     bool has_data_impl(const TagID& tag_id, VersionID version) noexcept;
-    bool subscribe_impl(
+
+    void init_subscribe(
       const std::vector<TagID>& tag_ids,
       const std::vector<std::uint8_t>& expected_types
     ) noexcept;
+
+    bool is_subscribe_finished(const std::vector<TagID>& tag_ids) noexcept;
+
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
-    bool create_reduce_group_impl(
-      const TagID& new_tag_id,
-      std::uint8_t expected_type,
-      const std::vector<TagID>& reduce_over_tags
+
+    // Returns the tags that connections need to be made with
+    internal::ReduceGroupNeighbors create_reduce_group_init(
+      const TagID& tag_produced,
+      const std::vector<TagID>& reduce_over_tags,
+      std::uint8_t expected_type
     ) noexcept;
+
+    bool is_reduce_group_created(
+      const TagID& tag_produced,
+      const TagID& group_tag_id,
+      const internal::ReduceGroupNeighbors& tags_to_find,
+      std::uint8_t expected_type
+    ) noexcept;
+
+    // Report that new tags are going to be published on
+    // Requires a seperate function because it needs to talk with the master
+    void report_tags(const std::vector<TagID>& tags) noexcept;
+
+    // Gets a reduce group reference from the master
+    internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
 
     // The id of the job
     JobID id_;
@@ -294,6 +353,8 @@ namespace skynet
     };
     MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
 
+    // Similar to the above, but for
+
     // The last version published on each tag
     std::unordered_map<std::string, VersionID> last_published_version_;
 
@@ -303,8 +364,8 @@ namespace skynet
     // The function this job will run
     std::function<void(Job&)> to_run_;
 
-    // The list of tags this job produces
-    std::vector<TagID> tags_produced_;
+    // The list of tags this job produces and the expected types
+    std::unordered_map<TagID, std::uint8_t> tags_produced_;
   }; // Class Job
 } // namespace skynet
 

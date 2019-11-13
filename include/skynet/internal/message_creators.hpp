@@ -11,7 +11,7 @@ namespace skynet::internal
   /** \brief Create data for a publish
    */
   std::vector<std::byte> make_publish(
-    const VersionID message_id,
+    const VersionID version,
     const TagID& tag_id,
     const PublishValueVariant& value
   ) noexcept;
@@ -53,14 +53,42 @@ namespace skynet::internal
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
-    const std::vector<TagID>& locally_produced_tags
+    const std::vector<TagID>& locally_produced_tags,
+    bool is_for_reduce_group
   ) noexcept;
 
   /** \brief Create data for a request for producers of a tag
    */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
-    bool ignore_cache
+    bool ignore_cache,
+    bool is_for_reduce_group
+  ) noexcept;
+
+  /** \brief Create a message to join a reduce group
+   */
+  std::vector<std::byte> make_join_reduce_group(
+    const TagID& reduce_tag,
+    const TagID& tag_produced
+  ) noexcept;
+
+  /** \brief Create a message to submit a value for reduction, these are sent
+   * to the parents
+   */
+  std::vector<std::byte> make_submit_reduce_value(
+    const TagID& reduce_tag,
+    const VersionID version,
+    const TagID& tag_id,
+    const PublishValueVariant& value
+  ) noexcept;
+
+  /** \brief Create a message to report the result of a reduction to children nodes
+   */
+  std::vector<std::byte> make_report_reduce_value(
+    const TagID& reduce_tag,
+    const VersionID version,
+    const TagID& tag_id,
+    const PublishValueVariant& value
   ) noexcept;
 } // namespace skynet::internal
 

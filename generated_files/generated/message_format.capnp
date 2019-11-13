@@ -5,8 +5,8 @@
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("cpnpro");
 
-struct PublishData {
-  value : union {
+struct PublishValue {
+  union {
     # Cap'n Proto FORCES camelCase to be used for these...
     d     @0  : Float64;
     rD    @1  : List(Float64);
@@ -33,8 +33,12 @@ struct PublishData {
     # TODO: Actually figure out how to use bytes?
     # bytes @22 : Data;
   }
-  version @22 : UInt32;
-  tagID   @23 : Text;
+}
+
+struct PublishData {
+  value   @0 : PublishValue;
+  version @1 : UInt32;
+  tagID   @2 : Text;
 }
 
 struct Publish {
@@ -64,27 +68,41 @@ struct ReportPublishers {
   tags                @0 : List(Text);
   addresses           @1 : List(List(Text));
   locallyProducedTags @2 : List(Text);
+  isForReduceGroup    @3 : Bool;
 }
 
 struct GetPublishers {
-  tags        @0 : List(Text);
-  ignoreCache @1 : Bool;
+  tags             @0 : List(Text);
+  ignoreCache      @1 : Bool;
+  isForReduceGroup @2 : Bool;
 }
 
 struct JoinReduceGroup {
-  reduceTag    @0 : Text;
-  producedTags @1 : List(Text);
+  reduceTag   @0 : Text;
+  tagProduced @1 : Text;
+}
+
+struct SubmitReduceValue {
+  reduceTag  @0 : Text;
+  data       @1 : PublishData;
+}
+
+struct ReportReduceValue {
+  reduceTag @0 : Text;
+  data      @1 : PublishData;
 }
 
 struct StatusMessage {
   union {
-    greeting         @0 : Greeting;
-    goodbye          @1 : Void;
-    newNeighbor      @2 : NewNeighbor;
-    removeNeighbor   @3 : RemoveNeighbor;
-    heartbeat        @4 : Void;
-    reportPublishers @5 : ReportPublishers;
-    getPublishers    @6 : GetPublishers;
-    joinReduceGroup  @7 : JoinReduceGroup;
+    greeting          @0 : Greeting;
+    goodbye           @1 : Void;
+    newNeighbor       @2 : NewNeighbor;
+    removeNeighbor    @3 : RemoveNeighbor;
+    heartbeat         @4 : Void;
+    reportPublishers  @5 : ReportPublishers;
+    getPublishers     @6 : GetPublishers;
+    joinReduceGroup   @7 : JoinReduceGroup;
+    submitReduceValue @8 : SubmitReduceValue;
+    reportReduceValue @9 : ReportReduceValue;
   }
 }

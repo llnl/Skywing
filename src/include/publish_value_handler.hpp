@@ -1,6 +1,10 @@
 #ifndef SKYNET_SRC_PUBLISH_VALUE_HANDLER_HPP
 #define SKYNET_SRC_PUBLISH_VALUE_HANDLER_HPP
 
+#include "message_format.capnp.h"
+
+#include <vector>
+
 namespace skynet::internal::detail
 {
   // For recursing below, I feel like there's a better way of doing this, but I can't think of it.
@@ -35,24 +39,24 @@ namespace skynet::internal::detail
   #define SKYNET_MAKE_PUBLISH_VALUE_HANDLER(cpp_type, capn_suffix) \
     template<> struct PublishValueHandler<cpp_type> \
     { \
-      static std::optional<cpp_type> get(const cpnpro::PublishData::Value::Reader& r) noexcept \
+      static std::optional<cpp_type> get(const cpnpro::PublishValue::Reader& r) noexcept \
       { \
         if (!r.is##capn_suffix()) { return {}; } \
         return r.get##capn_suffix(); \
       } \
-      static void set(cpnpro::PublishData::Value::Builder& b, const cpp_type& value) noexcept \
+      static void set(cpnpro::PublishValue::Builder& b, const cpp_type& value) noexcept \
       { \
         b.set##capn_suffix(value); \
       } \
     }; \
     template<> struct PublishValueHandler<std::vector<cpp_type>> \
     { \
-      static std::optional<std::vector<cpp_type>> get(const cpnpro::PublishData::Value::Reader& r) noexcept \
+      static std::optional<std::vector<cpp_type>> get(const cpnpro::PublishValue::Reader& r) noexcept \
       { \
         if (!r.isR##capn_suffix()) { return {}; } \
         return list_to_vector<cpp_type>(r.getR##capn_suffix()); \
       } \
-      static void set(cpnpro::PublishData::Value::Builder& b, const std::vector<cpp_type>& values) noexcept \
+      static void set(cpnpro::PublishValue::Builder& b, const std::vector<cpp_type>& values) noexcept \
       { \
         auto serialized_data = b.initR##capn_suffix(values.size()); \
         for (std::size_t i = 0; i < values.size(); ++i) \
@@ -78,12 +82,12 @@ namespace skynet::internal::detail
   // String is a little bit different
   template<> struct PublishValueHandler<std::string>
   {
-    static std::optional<std::string> get(const cpnpro::PublishData::Value::Reader& r) noexcept
+    static std::optional<std::string> get(const cpnpro::PublishValue::Reader& r) noexcept
     {
       if (!r.isStr()) { return {}; }
       return r.getStr();
     }
-    static void set(cpnpro::PublishData::Value::Builder& b, const std::string& value) noexcept
+    static void set(cpnpro::PublishValue::Builder& b, const std::string& value) noexcept
     {
       b.setStr(value);
     }
@@ -91,13 +95,13 @@ namespace skynet::internal::detail
 
   template<> struct PublishValueHandler<std::vector<std::string>>
   {
-    static std::optional<std::vector<std::string>> get(const cpnpro::PublishData::Value::Reader& r) noexcept
+    static std::optional<std::vector<std::string>> get(const cpnpro::PublishValue::Reader& r) noexcept
     {
       if (!r.isRStr()) { return {}; }
       return list_to_vector<std::string>(r.getRStr());
     }
 
-    static void set(cpnpro::PublishData::Value::Builder& b, const std::vector<std::string>& values) noexcept
+    static void set(cpnpro::PublishValue::Builder& b, const std::vector<std::string>& values) noexcept
     {
       auto serialized_data = b.initRStr(values.size());
       for (std::size_t i = 0; i < values.size(); ++i)

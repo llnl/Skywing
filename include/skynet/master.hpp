@@ -5,6 +5,7 @@
 #include "skynet/internal/utility/network_conv.hpp"
 #include "skynet/internal/capn_proto_wrapper.hpp"
 #include "skynet/internal/message_creators.hpp"
+#include "skynet/internal/reduce_group.hpp"
 #include "skynet/job.hpp"
 #include "skynet/types.hpp"
 
@@ -105,7 +106,7 @@ namespace skynet
 
       /** \brief Returns true if the given neighbor is present, false otherwise
        */
-      bool has_neighbor(const MachineID id) const noexcept;
+      bool has_neighbor(const MachineID& id) const noexcept;
 
       /** \brief Sends a heartbeat if enough time has passed
        */
@@ -113,7 +114,15 @@ namespace skynet
 
       /** \brief Begins the search process for publishers tags
        */
-      void find_publishers_for_tags(const std::vector<TagID>& tags, bool ignore_cache) noexcept;
+      void find_publishers_for_tags(
+        const std::vector<TagID>& tags,
+        bool ignore_cache,
+        bool is_for_reduce_group
+      ) noexcept;
+
+      /** \brief The address for two-way communication with the external master
+       */
+      std::string two_way_address() const noexcept;
 
       /** \brief The address of the publisher for the external master
        */
@@ -124,11 +133,11 @@ namespace skynet
       explicit ExternalMaster(SocketCommunicator conn) noexcept;
 
       // Read some bytes from the connection, returning false if the read failed
-      bool read_from_conn(std::byte* const buffer, const std::size_t count) noexcept;
+      bool read_from_conn(std::byte* buffer, std::size_t count) noexcept;
 
       // Read some bytes from the connection, returning an empty vector if
       // the number of bytes couldn't be read
-      std::vector<std::byte> read_from_conn(const std::size_t count) noexcept;
+      std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
 
       // Attempt to get a StatusMessageHandler from the connection
       std::optional<StatusMessageHandler> try_to_get_status_message() noexcept;
@@ -236,6 +245,10 @@ namespace skynet
      */
     bool connect_to_server(const char* const address, const std::uint16_t port) noexcept;
 
+    /** \brief Connects to another instance with the address:port format
+     */
+    bool connect_to_server(std::string_view address) noexcept;
+
     /** \brief See if there are any pending connections and accept them if so
      */
     void accept_pending_connections() noexcept;
@@ -251,7 +264,6 @@ namespace skynet
      */
     bool submit_job(
       JobID name,
-      std::vector<TagID> tags_produced,
       std::function<void(Job&)> to_run
     ) noexcept;
 
@@ -271,7 +283,7 @@ namespace skynet
      */
     const std::string& id() const noexcept;
 
-    // Allow Job classes to broadcast and handle neighbors but nothing else
+    // Access for the Job class
     struct JobAccessor
     {
     private:
@@ -288,6 +300,15 @@ namespace skynet
         m.publish(version, tag_id, value);
       }
 
+      static void report_new_tags_produced(
+        Master& m,
+        const std::vector<TagID>& tags
+      ) noexcept
+      {
+        std::unique_lock{m.job_mut_};
+        m.report_new_tags_produced(tags);
+      }
+
       static bool subscribe(
         Master& m,
         const std::vector<TagID>& tag_ids
@@ -296,9 +317,30 @@ namespace skynet
         std::unique_lock lock{m.job_mut_};
         return m.subscribe(tag_ids);
       }
+
+      static bool create_reduce_group(
+        Master& m,
+        const TagID& group_id,
+        const TagID& tag_produced,
+        const internal::ReduceGroupNeighbors& tags_to_find,
+        const std::uint8_t expected_type
+      ) noexcept
+      {
+        std::unique_lock lock{m.job_mut_};
+        return m.create_reduce_group(group_id, tag_produced, tags_to_find, expected_type);
+      }
+
+      static internal::ReduceGroupBase& get_reduce_group(
+        Master& m,
+        const TagID& group_id
+      ) noexcept
+      {
+        std::unique_lock lock{m.job_mut_};
+        return m.get_reduce_group(group_id);
+      }
     }; // struct JobAccessor
 
-    // Allow ExternalMasters to report producers found for tags
+    // Accessor for the ExternalMaster class
     struct ExternalMasterAccessor
     {
     private:
@@ -321,9 +363,26 @@ namespace skynet
       {
         m.add_publishers_and_propagate(msg, from);
       }
+
+      static bool handle_join_reduce_group(
+        Master& m,
+        const internal::JoinReduceGroup& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_join_reduce_group(msg, from);
+      }
     }; // struct ExternalMasterAccessor
 
   private:
+    /** \brief Connects to a remote connection and returns an iterator to the new connection,
+     * or an end iterator if the connection failed
+     */
+    std::unordered_map<MachineID, internal::ExternalMaster>::iterator connect_impl(
+      const char* address,
+      std::uint16_t port
+    ) noexcept;
+
     /** \brief Listens for messages from neighbors and handles them if there
      * are any.
      */
@@ -402,7 +461,7 @@ namespace skynet
 
     /** \brief Produce a message containing the known publishers and tags
      */
-    std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
+    std::vector<std::byte> make_known_tag_publisher_message(bool is_for_reduce_group) const noexcept;
 
     /** \brief Attempt to subscribe on the passed address
      */
@@ -415,6 +474,32 @@ namespace skynet
     /** \brief Returns the list of tags that a publisher is known to produce
      */
     std::vector<std::string> get_tags_for_publisher(std::string_view publisher_address) const noexcept;
+
+    /** \brief Reports when new tags are being produced
+     */
+    void report_new_tags_produced(const std::vector<TagID>& tags) noexcept;
+
+    /** \brief Starts the process of creating a reduce group
+     */
+    bool create_reduce_group(
+      const TagID& group_id,
+      const TagID& tag_produced,
+      const internal::ReduceGroupNeighbors& tags_to_find,
+      std::uint8_t expected_type
+    ) noexcept;
+
+    /** \brief Handles a message that a child is joining a reduce group
+     */
+    bool handle_join_reduce_group(
+      const internal::JoinReduceGroup& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    /** \brief Returns a reference to a created reduce group
+     *
+     * \pre The reduce group exists
+     */
+    internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
@@ -433,8 +518,18 @@ namespace skynet
     };
     std::vector<SubscriptionData> subscriptions_;
 
-    // List of publishers that a known for each tag
+    // List of publishers that are known for each tag
     std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
+
+    // Information for reduce groups, holds the tags that each group has and
+    // ID for the machines that produce those tags for the group
+    struct ReduceGroupData
+    {
+      internal::ReduceGroupBase group;
+      std::vector<MachineID> parent_machines;
+      std::array<std::vector<MachineID>, 2> child_machines;
+    };
+    std::unordered_map<TagID, ReduceGroupData> reduce_tag_data_;
 
     // The id of this machine
     MachineID id_;
