@@ -49,4 +49,3 @@ if use_ns3
 endif
 
 subdir('tests')
-subdir('examples')

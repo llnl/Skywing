@@ -54,7 +54,7 @@ namespace skynet::internal
 
     friend class PublishMessageHandler;
     friend class SubmitReduceValue;
-    friend class ReportReduceValue;
+    friend class ReportReduceResult;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
   };
 
@@ -181,17 +181,17 @@ namespace skynet::internal
 
   /** \brief Message for reporting the result of a reduction to children
    */
-  class ReportReduceValue
+  class ReportReduceResult
   {
   public:
     TagID reduce_tag() const noexcept;
     PublishData data() const noexcept;
 
   private:
-    cpnpro::ReportReduceValue::Reader r;
+    cpnpro::ReportReduceResult::Reader r;
 
     friend class StatusMessageHandler;
-    explicit ReportReduceValue(cpnpro::ReportReduceValue::Reader reader) noexcept;
+    explicit ReportReduceResult(cpnpro::ReportReduceResult::Reader reader) noexcept;
   };
 
   /** \brief Class for converting the raw bytes of a message into a useable format
@@ -236,7 +236,7 @@ namespace skynet::internal
       GetPublishers,
       JoinReduceGroup,
       SubmitReduceValue,
-      ReportReduceValue
+      ReportReduceResult
     >;
 
     // Process the stored message and return its internal type

@@ -222,7 +222,7 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  std::vector<std::byte> make_report_reduce_value(
+  std::vector<std::byte> make_report_reduce_result(
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,
@@ -230,7 +230,7 @@ namespace skynet::internal
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::StatusMessage>().initReportReduceValue();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initReportReduceResult();
     message.setReduceTag(reduce_tag);
     auto publish_data = message.initData();
     set_publish_data(publish_data, version, tag_id, value);

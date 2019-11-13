@@ -1,14 +1,20 @@
 #include "skynet/internal/reduce_group.hpp"
 
+#include "skynet/master.hpp"
+
 namespace skynet::internal
 {
   ReduceGroupBase::ReduceGroupBase(
-    const std::uint8_t expected_type,
     const ReduceGroupNeighbors& tag_neighbors,
-    Master& master
+    Master& master,
+    const TagID& group_id,
+    const TagID& produced_tag,
+    const std::uint8_t expected_type
   ) noexcept
     : tag_neighbors_{tag_neighbors}
     , master_{&master}
+    , group_id_{group_id}
+    , produced_tag_{produced_tag}
     , expected_type_{expected_type}
   {}
 
@@ -43,7 +49,12 @@ namespace skynet::internal
 
   void ReduceGroupBase::send_value_to_parent(const PublishValueVariant& value_to_send, const VersionID version) noexcept
   {
-    (void)value_to_send;
-    (void)version;
+    Master::ReduceGroupAccessor::send_reduce_value_to_parent(
+      *master_,
+      group_id_,
+      version,
+      produced_tag_,
+      value_to_send
+    );
   }
 } // namespace skynet::internal

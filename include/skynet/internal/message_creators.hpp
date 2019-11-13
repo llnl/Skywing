@@ -84,7 +84,7 @@ namespace skynet::internal
 
   /** \brief Create a message to report the result of a reduction to children nodes
    */
-  std::vector<std::byte> make_report_reduce_value(
+  std::vector<std::byte> make_report_reduce_result(
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,

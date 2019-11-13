@@ -87,22 +87,22 @@ struct SubmitReduceValue {
   data       @1 : PublishData;
 }
 
-struct ReportReduceValue {
+struct ReportReduceResult {
   reduceTag @0 : Text;
   data      @1 : PublishData;
 }
 
 struct StatusMessage {
   union {
-    greeting          @0 : Greeting;
-    goodbye           @1 : Void;
-    newNeighbor       @2 : NewNeighbor;
-    removeNeighbor    @3 : RemoveNeighbor;
-    heartbeat         @4 : Void;
-    reportPublishers  @5 : ReportPublishers;
-    getPublishers     @6 : GetPublishers;
-    joinReduceGroup   @7 : JoinReduceGroup;
-    submitReduceValue @8 : SubmitReduceValue;
-    reportReduceValue @9 : ReportReduceValue;
+    greeting           @0 : Greeting;
+    goodbye            @1 : Void;
+    newNeighbor        @2 : NewNeighbor;
+    removeNeighbor     @3 : RemoveNeighbor;
+    heartbeat          @4 : Void;
+    reportPublishers   @5 : ReportPublishers;
+    getPublishers      @6 : GetPublishers;
+    joinReduceGroup    @7 : JoinReduceGroup;
+    submitReduceValue  @8 : SubmitReduceValue;
+    reportReduceResult @9 : ReportReduceResult;
   }
 }

@@ -372,7 +372,33 @@ namespace skynet
       {
         return m.handle_join_reduce_group(msg, from);
       }
+
+      static bool handle_submit_reduce_value(
+        Master& m,
+        const internal::SubmitReduceValue& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_submit_reduce_value(msg, from);
+      }
     }; // struct ExternalMasterAccessor
+
+    struct ReduceGroupAccessor
+    {
+    private:
+      friend class internal::ReduceGroupBase;
+
+      static void send_reduce_value_to_parent(
+        Master& m,
+        const TagID& group_id,
+        const VersionID version,
+        const TagID& produced_tag,
+        const PublishValueVariant& value
+      ) noexcept
+      {
+        m.send_reduce_value_to_parent(group_id, version, produced_tag, value);
+      }
+    }; // struct ReduceGroupAccessor
 
   private:
     /** \brief Connects to a remote connection and returns an iterator to the new connection,
@@ -500,6 +526,22 @@ namespace skynet
      * \pre The reduce group exists
      */
     internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
+
+    /** \brief Sends a value for a reduce to the corresponding parents
+     */
+    void send_reduce_value_to_parent(
+      const TagID& group_id,
+      const VersionID version,
+      const TagID& produced_tag,
+      const PublishValueVariant& value
+    ) noexcept;
+
+    /** \brief Handles a submit reduce value message
+     */
+    bool handle_submit_reduce_value(
+      const internal::SubmitReduceValue& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;

@@ -396,7 +396,7 @@ namespace skynet
             msg.reduce_tag(),
             msg.data().tag_id()
           );
-          return true;
+          return Master::ExternalMasterAccessor::handle_submit_reduce_value(*master_, msg, *this);
         },
         [](...) {
           // Anything else is a programming bug, this shouldn't be reached
@@ -1139,7 +1139,17 @@ namespace skynet
         report_new_tags_produced({tag_produced});
         const auto [iter, inserted] = reduce_tag_data_.try_emplace(
           group_id,
-          ReduceGroupData{internal::ReduceGroupBase{expected_type, tags_to_find, *this}, {}, {}}
+          ReduceGroupData{
+            internal::ReduceGroupBase{
+              tags_to_find,
+              *this,
+              group_id,
+              tag_produced,
+              expected_type
+            },
+            {},
+            {}
+          }
         );
         (void)inserted;
         return iter->second;
@@ -1328,4 +1338,69 @@ namespace skynet
     assert(loc != reduce_tag_data_.cend());
     return loc->second.group;
   }
+
+  void Master::send_reduce_value_to_parent(
+    const TagID& group_id,
+    const VersionID version,
+    const TagID& produced_tag,
+    const PublishValueVariant& value
+  ) noexcept
+  {
+    const auto loc = reduce_tag_data_.find(group_id);
+    assert(loc != reduce_tag_data_.cend());
+    auto& parent_machines = loc->second.parent_machines;
+    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
+    // TODO: Handle when parents run out
+    // Go through all of the parents, removing ones that don't exist
+    for(auto parent_iter = parent_machines.begin(); parent_iter != parent_machines.end(); )
+    {
+      const auto parent_loc = neighbors_.find(*parent_iter);
+      if (parent_loc == neighbors_.cend())
+      {
+        parent_iter = parent_machines.erase(parent_iter);
+      }
+      else
+      {
+        parent_loc->second.send_message(reduce_message);
+        ++parent_iter;
+      }
+    }
+  }
+
+  // TODO: Handle when running out of children
+  // ALSO: Logging for when errors occur
+  bool Master::handle_submit_reduce_value(
+    const internal::SubmitReduceValue& msg,
+    const internal::ExternalMaster& from
+  ) noexcept
+  {
+    // Make sure the group exists
+    const auto group_loc = reduce_tag_data_.find(msg.reduce_tag());
+    if (group_loc == reduce_tag_data_.cend())
+    {
+      SKYNET_WARN_LOG(
+        "{} rejected submit reduce value from {} for reduce group {} for tag {} as the reduce group does not exist",
+        id_,
+        from.id(),
+        msg.reduce_tag(),
+        msg.data().tag_id()
+      );
+      return false;
+    }
+    const auto& data = msg.data();
+    const auto var_opt = data.value().get_variant();
+    if (!var_opt)
+    {
+      SKYNET_WARN_LOG(
+        "{} rejected submit reduce value from {} for reduce group {} for tag {} as the value could not be extracted",
+        id_,
+        from.id(),
+        msg.reduce_tag(),
+        msg.data().tag_id()
+      );
+      return false;
+    }
+    return group_loc->second.group.add_data(data.tag_id(), *var_opt, data.version());
+  }
+
 } // namespace skynet

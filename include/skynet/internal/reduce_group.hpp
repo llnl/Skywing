@@ -15,14 +15,19 @@ namespace skynet
 
 namespace skynet::internal
 {
-  // TODO: Move into seperate .cpp
+  // TODO: Better control exposure of these things and such, since client code currently
+  // sees this object
+  // Can probably just have a function that takes one of these to do the reduce rather than
+  // having the reduce object returned to the client.
   class ReduceGroupBase
   {
   public:
     explicit ReduceGroupBase(
-      const std::uint8_t expected_type,
       const ReduceGroupNeighbors& tag_neighbors,
-      Master& master
+      Master& master,
+      const TagID& group_id,
+      const TagID& produced_tag,
+      const std::uint8_t expected_type
     ) noexcept;
 
     // Adds data to the corresponding buffer, returning false if an error occurred
@@ -41,6 +46,8 @@ namespace skynet::internal
     std::array<DataBuffer, 3> data_buffers_;
     ReduceGroupNeighbors tag_neighbors_;
     Master* master_;
+    TagID group_id_;
+    TagID produced_tag_;
     std::uint8_t expected_type_;
   }; // class ReduceGroupBase
 
