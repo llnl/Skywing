@@ -71,6 +71,27 @@ namespace skynet
       const TagID& right_child() const noexcept { return tags[2]; }
       TagID& right_child() noexcept { return tags[2]; }
     };
+
+    // Marker prepended to mark tags as publish tags
+    constexpr char publish_tag_marker = 'p';
+
+    // Marker prepended to mark tags as begin for reduce groups
+    constexpr char reduce_value_marker = 'r';
+
+    // Marker preprended to mark tags as reduce group tags
+    constexpr char reduce_group_marker = 'g';
+
+    // Checks if a tag name is bad
+    inline bool tag_name_okay(const std::string& tag) noexcept
+    {
+      return
+        !tag.empty() &&
+        (
+          tag[0] == publish_tag_marker ||
+          tag[0] == reduce_value_marker ||
+          tag[0] == reduce_group_marker
+        );
+    }
   } // namespace skynet::internal
 } // namespace skynet
 

@@ -124,7 +124,6 @@ namespace skynet::internal
     std::vector<TagID> tags() const noexcept;
     std::vector<std::vector<std::string>> addresses() const noexcept;
     std::vector<TagID> locally_produced_tags() const noexcept;
-    bool is_for_reduce_group() const noexcept;
 
   private:
     cpnpro::ReportPublishers::Reader r;
@@ -140,7 +139,6 @@ namespace skynet::internal
   public:
     std::vector<TagID> tags() const noexcept;
     bool ignore_cache() const noexcept;
-    bool is_for_reduce_group() const noexcept;
 
   private:
     cpnpro::GetPublishers::Reader r;

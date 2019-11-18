@@ -53,16 +53,14 @@ namespace skynet::internal
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
-    const std::vector<TagID>& locally_produced_tags,
-    bool is_for_reduce_group
+    const std::vector<TagID>& locally_produced_tags
   ) noexcept;
 
   /** \brief Create data for a request for producers of a tag
    */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
-    bool ignore_cache,
-    bool is_for_reduce_group
+    bool ignore_cache
   ) noexcept;
 
   /** \brief Create a message to join a reduce group

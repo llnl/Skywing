@@ -116,8 +116,7 @@ namespace skynet
        */
       void find_publishers_for_tags(
         const std::vector<TagID>& tags,
-        bool ignore_cache,
-        bool is_for_reduce_group
+        bool ignore_cache
       ) noexcept;
 
       /** \brief The address for two-way communication with the external master
@@ -300,13 +299,13 @@ namespace skynet
         m.publish(version, tag_id, value);
       }
 
-      static void report_new_tags_produced(
+      static void report_new_publish_tags(
         Master& m,
         const std::vector<TagID>& tags
       ) noexcept
       {
         std::unique_lock{m.job_mut_};
-        m.report_new_tags_produced(tags);
+        m.report_new_publish_tags(tags);
       }
 
       static bool subscribe(
@@ -487,7 +486,7 @@ namespace skynet
 
     /** \brief Produce a message containing the known publishers and tags
      */
-    std::vector<std::byte> make_known_tag_publisher_message(bool is_for_reduce_group) const noexcept;
+    std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
 
     /** \brief Attempt to subscribe on the passed address
      */
@@ -503,7 +502,7 @@ namespace skynet
 
     /** \brief Reports when new tags are being produced
      */
-    void report_new_tags_produced(const std::vector<TagID>& tags) noexcept;
+    void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
 
     /** \brief Starts the process of creating a reduce group
      */

@@ -68,7 +68,6 @@ struct ReportPublishers {
   tags                @0 : List(Text);
   addresses           @1 : List(List(Text));
   locallyProducedTags @2 : List(Text);
-  isForReduceGroup    @3 : Bool;
 }
 
 struct GetPublishers {

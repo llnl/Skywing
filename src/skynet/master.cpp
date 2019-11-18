@@ -126,8 +126,7 @@ namespace skynet
 
     void ExternalMaster::find_publishers_for_tags(
       const std::vector<TagID>& tags,
-      const bool ignore_cache,
-      const bool is_for_reduce_group
+      const bool ignore_cache
     ) noexcept
     {
       bool work_to_do = false;
@@ -143,7 +142,7 @@ namespace skynet
       }
       if (work_to_do)
       {
-        send_message(make_get_publishers(tags, ignore_cache, is_for_reduce_group));
+        send_message(make_get_publishers(tags, ignore_cache));
       }
       else
       {
@@ -362,6 +361,10 @@ namespace skynet
           {
             for (const auto& tag : tag_list)
             {
+              if (!tag_name_okay(tag))
+              {
+                return false;
+              }
               pending_tags_.erase(tag);
             }
           }
@@ -375,6 +378,13 @@ namespace skynet
             id_,
             msg.tags()
           );
+          for (const auto& tag : msg.tags())
+          {
+            if (!tag_name_okay(tag))
+            {
+              return false;
+            }
+          }
           Master::ExternalMasterAccessor::handle_get_publishers(*master_, msg, *this);
           return true;
         },
@@ -386,6 +396,10 @@ namespace skynet
             msg.reduce_tag(),
             msg.tag_produced()
           );
+          if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.tag_produced()))
+          {
+            return false;
+          }
           return Master::ExternalMasterAccessor::handle_join_reduce_group(*master_, msg, *this);
         },
         [&](const SubmitReduceValue& msg) {
@@ -396,6 +410,10 @@ namespace skynet
             msg.reduce_tag(),
             msg.data().tag_id()
           );
+          if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id()))
+          {
+            return false;
+          }
           return Master::ExternalMasterAccessor::handle_submit_reduce_value(*master_, msg, *this);
         },
         [](...) {
@@ -810,7 +828,7 @@ namespace skynet
       SKYNET_TRACE_LOG("{} looking for new publishers for tags {}", id_, tags_to_find);
       for (auto& neighbor : neighbors_)
       {
-        neighbor.second.find_publishers_for_tags(tags_to_find, ignore_cache, false);
+        neighbor.second.find_publishers_for_tags(tags_to_find, ignore_cache);
       }
     }
     // Nothing to find - successfully subscribed
@@ -827,7 +845,7 @@ namespace skynet
     if (remaining_tags.empty())
     {
       // Send the information back now
-      from.send_message(make_known_tag_publisher_message(msg.is_for_reduce_group()));
+      from.send_message(make_known_tag_publisher_message());
     }
     else
     {
@@ -848,7 +866,7 @@ namespace skynet
       // it doesn't stall
       if (neighbors_.size() == 1)
       {
-        from.send_message(make_known_tag_publisher_message(msg.is_for_reduce_group()));
+        from.send_message(make_known_tag_publisher_message());
       }
       bool ask_neighbors = false;
       // Mark the information as needing to be propagated
@@ -867,7 +885,7 @@ namespace skynet
       }
       if (!ask_neighbors)
       {
-        from.send_message(make_known_tag_publisher_message(msg.is_for_reduce_group()));
+        from.send_message(make_known_tag_publisher_message());
       }
       else
       {
@@ -875,7 +893,7 @@ namespace skynet
         {
           if (&neighbor.second != &from)
           {
-            neighbor.second.find_publishers_for_tags(remaining_tags, false, msg.is_for_reduce_group());
+            neighbor.second.find_publishers_for_tags(remaining_tags, false);
           }
         }
       }
@@ -937,9 +955,9 @@ namespace skynet
     for (const auto& tag : external_tags)
     {
       const auto loc = publishers_for_tag_.find(tag);
-      const auto address = msg.is_for_reduce_group()
-        ? from.two_way_address()
-        : from.publisher_address();
+      const auto address = tag[0] == internal::publish_tag_marker
+        ? from.publisher_address()
+        : from.two_way_address();
       if (loc == publishers_for_tag_.end())
       {
         publishers_for_tag_.emplace(
@@ -981,8 +999,7 @@ namespace skynet
       const auto to_send = internal::make_report_publishers(
         tags_to_send,
         addresses_to_send,
-        local_tags,
-        msg.is_for_reduce_group()
+        local_tags
       );
       // Send to the machines if they are present
       for (const auto& send_to : machines_to_send_to)
@@ -996,7 +1013,7 @@ namespace skynet
     }
   }
 
-  std::vector<std::byte> Master::make_known_tag_publisher_message(const bool is_for_reduce_group) const noexcept
+  std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
   {
     std::vector<TagID> tags;
     std::vector<std::vector<std::string>> addresses;
@@ -1009,7 +1026,7 @@ namespace skynet
       }
     }
     const std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
-    return internal::make_report_publishers(tags, addresses, local_tags, is_for_reduce_group);
+    return internal::make_report_publishers(tags, addresses, local_tags);
   }
 
   bool Master::try_to_subscribe(
@@ -1098,7 +1115,7 @@ namespace skynet
     return tags_produced;
   }
 
-  void Master::report_new_tags_produced(const std::vector<TagID>& tags) noexcept
+  void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   {
     SKYNET_TRACE_LOG("{} adding tags produced: {}", id_, tags);
     // Mark the tags produced by this job
@@ -1109,7 +1126,7 @@ namespace skynet
       if (!inserted)
       {
         // Two jobs on the same master can't produce the same job; fail loudly
-        std::cerr << "The tag " << std::quoted(tag) << " was announced for publication more than once!\n";
+        std::cerr << "The tag " << std::quoted(tag) << " was reported for publication more than once!\n";
         std::terminate();
       }
     }
@@ -1136,7 +1153,14 @@ namespace skynet
       const auto loc = reduce_tag_data_.find(group_id);
       if (loc == reduce_tag_data_.cend())
       {
-        report_new_tags_produced({tag_produced});
+        const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
+        (void)tag_iter;
+        if (!tag_inserted)
+        {
+          std::cerr
+            << "The tag " << std::quoted(tag_produced) << " was attempted to be produced for more than one reduce group!\n";
+          std::terminate();
+        }
         const auto [iter, inserted] = reduce_tag_data_.try_emplace(
           group_id,
           ReduceGroupData{
@@ -1259,7 +1283,7 @@ namespace skynet
         );
         for (auto& neighbor : neighbors_)
         {
-          neighbor.second.find_publishers_for_tags({parent_tag}, ignore_cache, true);
+          neighbor.second.find_publishers_for_tags({parent_tag}, ignore_cache);
         }
         // Haven't found a parent; search still isn't done
         return false;

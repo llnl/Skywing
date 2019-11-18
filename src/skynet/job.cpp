@@ -28,6 +28,22 @@ namespace skynet
     return tags_produced_;
   }
 
+  void Job::declare_publication_intent(const std::vector<internal::PublishTagBase>& tags) noexcept
+  {
+    for (const auto& tag : tags)
+    {
+      tags_produced_.try_emplace(tag.id(), tag.expected_type());
+    }
+    std::vector<TagID> tag_ids(tags.size());
+    std::transform(
+      tags.cbegin(),
+      tags.cend(),
+      tag_ids.begin(),
+      [&](const internal::PublishTagBase& t) { return t.id(); }
+    );
+    Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
+  }
+
   /** \brief Processes the raw information sent from a job on another instance
    *
    * \param tag The id of the tag the data was sent with
@@ -86,48 +102,48 @@ namespace skynet
   }
 
   void Job::publish_impl(
-    const TagID& tag_id,
+    const internal::PublishTagBase& tag,
     const PublishValueVariant& to_send,
     const VersionID version
   ) noexcept
   {
-    assert(tags_produced_.find(tag_id) != tags_produced_.cend()
+    assert(tags_produced_.find(tag.id()) != tags_produced_.cend()
       && "Attempted to publish on a tag that was not declared for publishing!");
-    assert(tags_produced_.find(tag_id)->second == to_send.index()
+    assert(tags_produced_.find(tag.id())->second == to_send.index()
       && "Attempted to publish the wrong type on a tag!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
-      last_published_version_.try_emplace(tag_id, internal::tag_default_version).first->second;
+      last_published_version_.try_emplace(tag.id(), internal::tag_default_version).first->second;
     last_version = internal::detail::updated_version(last_version, version);
     Master::JobAccessor::publish(
       *master_,
       last_version,
-      tag_id,
+      tag.id(),
       to_send
     );
   }
 
   // Implementation of public functions
   PublishValueVariant Job::get_impl(
-    const TagID& tag_id,
+    const internal::PublishTagBase& tag,
     const VersionID version
   ) noexcept
   {
     auto [buffers, lock] = bufs_.get();
     (void)lock;
     assert(
-      buffers.find(tag_id) != buffers.cend() &&
-      buffers.find(tag_id)->second.buffer.has_data(version) &&
+      buffers.find(tag.id()) != buffers.cend() &&
+      buffers.find(tag.id())->second.buffer.has_data(version) &&
       "Attempted to get data for a tag that had no data or was not subscribed to!"
     );
-    return buffers.find(tag_id)->second.buffer.get();
+    return buffers.find(tag.id())->second.buffer.get();
   }
 
-  bool Job::has_data_impl(const TagID& tag_id, const VersionID version) noexcept
+  bool Job::has_data(const internal::PublishTagBase& tag, const VersionID version) noexcept
   {
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    const auto loc = buffers.find(tag_id);
+    const auto loc = buffers.find(tag.id());
     if (loc == buffers.cend())
     {
       return false;
@@ -141,34 +157,37 @@ namespace skynet
   }
 
   void Job::init_subscribe(
-    const std::vector<TagID>& tag_ids,
-    const std::vector<std::uint8_t>& expected_types
+    const std::vector<internal::PublishTagBase>& tags
   ) noexcept
   {
-    assert(tag_ids.size() == expected_types.size());
     auto [buffers, lock] = bufs_.get();
     (void)lock;
     // Always subscribe ahead of time, since the gap between the
     // Job::subscribe calls can cause messages to get discarded once the
     // connection is made but before it's marked as subscribed
-    for (std::size_t i = 0; i < tag_ids.size(); ++i)
+    for (const auto& tag : tags)
     {
-      const auto& tag_id = tag_ids[i];
-      const auto& expected_type = expected_types[i];
       // Then add the expected type; marking the tag as watched
       buffers.try_emplace(
-        tag_id,
+        tag.id(),
         TagInfo{
           // Just need a dummy value here
           {},
-          expected_type
+          tag.expected_type()
         }
       );
     }
   }
 
-  bool Job::is_subscribe_finished(const std::vector<TagID>& tag_ids) noexcept
+  bool Job::is_subscribe_finished(const std::vector<internal::PublishTagBase>& tags) noexcept
   {
+    std::vector<TagID> tag_ids(tags.size());
+    std::transform(
+      tags.cbegin(),
+      tags.cend(),
+      tag_ids.begin(),
+      [](const internal::PublishTagBase& t) { return t.id(); }
+    );
     return Master::JobAccessor::subscribe(*master_, tag_ids);
   }
 
@@ -231,11 +250,6 @@ namespace skynet
   ) noexcept
   {
     return Master::JobAccessor::create_reduce_group(*master_, tag_produced, group_tag_id, tags_to_find, expected_type);
-  }
-
-  void Job::report_tags(const std::vector<TagID>& tags) noexcept
-  {
-    Master::JobAccessor::report_new_tags_produced(*master_, tags);
   }
 
   internal::ReduceGroupBase& Job::get_reduce_group(const TagID& group_id) noexcept

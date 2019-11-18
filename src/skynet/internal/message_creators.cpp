@@ -146,8 +146,7 @@ namespace skynet::internal
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
-    const std::vector<TagID>& locally_produced_tags,
-    const bool is_for_reduce_group
+    const std::vector<TagID>& locally_produced_tags
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -171,7 +170,6 @@ namespace skynet::internal
     {
       msg_local_tags.set(i, locally_produced_tags[i]);
     }
-    message.setIsForReduceGroup(is_for_reduce_group);
     return finalize_message(builder);
   }
 
@@ -179,8 +177,7 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
-    const bool ignore_cache,
-    const bool is_for_reduce_group
+    const bool ignore_cache
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -191,7 +188,6 @@ namespace skynet::internal
       msg_tags.set(i, tags[i]);
     }
     message.setIgnoreCache(ignore_cache);
-    message.setIsForReduceGroup(is_for_reduce_group);
     return finalize_message(builder);
   }
 

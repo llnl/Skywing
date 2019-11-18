@@ -139,7 +139,6 @@ namespace skynet::internal
   {
     return detail::list_to_vector<TagID>(r.getLocallyProducedTags());
   }
-  bool ReportPublishers::is_for_reduce_group() const noexcept { return r.getIsForReduceGroup(); }
 
   ReportPublishers::ReportPublishers(cpnpro::ReportPublishers::Reader reader) noexcept
     : r{std::move(reader)}
@@ -151,7 +150,6 @@ namespace skynet::internal
 
   std::vector<std::string> GetPublishers::tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
   bool GetPublishers::ignore_cache() const noexcept { return r.getIgnoreCache(); }
-  bool GetPublishers::is_for_reduce_group() const noexcept { return r.getIsForReduceGroup(); }
   GetPublishers::GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept
     : r{std::move(reader)}
   {}

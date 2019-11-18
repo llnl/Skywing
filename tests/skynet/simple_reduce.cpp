@@ -1,6 +1,5 @@
 #include <catch2/catch.hpp>
 
-
 #include "skynet/skynet.hpp"
 
 #include "utils.hpp"
@@ -15,17 +14,17 @@ constexpr int num_machines = 5;
 constexpr int num_connections = 1;
 constexpr std::uint16_t base_port = 25000;
 
-using TagType = Tag<std::int32_t>;
+using ValueTag = ReduceValueTag<std::int32_t>;
 
-const std::array<TagType, num_machines> tags{
-  TagType{"Tag 0"},
-  TagType{"Tag 1"},
-  TagType{"Tag 2"},
-  TagType{"Tag 3"},
-  TagType{"Tag 4"}
+const std::array<ValueTag, num_machines> tags{
+  ValueTag{"Tag 0"},
+  ValueTag{"Tag 1"},
+  ValueTag{"Tag 2"},
+  ValueTag{"Tag 3"},
+  ValueTag{"Tag 4"}
 };
 
-const TagType reduce_tag{"reduce op"};
+const ReduceGroupTag<std::int32_t> reduce_tag{"reduce op"};
 
 template<typename Group, typename Callable>
 void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, const std::int32_t expected_value)
@@ -53,9 +52,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   });
   master.submit_job("job", [&](Job& the_job) {
     // Create the reduce group
-    std::vector<std::string> tag_ids(tags.size());
-    std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& tag) { return tag.id(); });
-    auto fut = the_job.create_reduce_group(reduce_tag, tags[index], tag_ids);
+    auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto group = fut.get();
 
     // Do a few reduce operations on the group

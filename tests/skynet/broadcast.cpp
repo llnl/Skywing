@@ -47,7 +47,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
   std::array<int, 3>{ 1,  2,  3}
 };
 
-using Uint64Tag = Tag<std::uint64_t>;
+using Uint64Tag = PublishTag<std::uint64_t>;
 
 void setup_network(Master& master, const std::size_t index)
 {
@@ -78,16 +78,14 @@ void machine_task(const std::size_t index)
   Master master{ports[index], machine_names[index]};
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
-  master.submit_job("job 0", {tag_names[index]}, [&master, index](Job& the_job) {
+  master.submit_job("job 0", [&master, index](Job& the_job) {
+    the_job.declare_publication_intent({Uint64Tag{tag_names[index]}});
     // Subscribe to everything ahead of time
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
       if (index != send_index)
       {
-        while (!the_job.subscribe(Uint64Tag{tag_names[send_index]}))
-        {
-          std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
+        the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait();
       }
     }
     while (master.num_subscribers() != machine_counts.size() - 1)
@@ -102,7 +100,7 @@ void machine_task(const std::size_t index)
       }
       else
       {
-        REQUIRE(the_job.get_when_ready(Uint64Tag{tag_names[send_index]}) == send_index);
+        REQUIRE(the_job.get_future_for(Uint64Tag{tag_names[send_index]}).get() == send_index);
       }
     }
   });
