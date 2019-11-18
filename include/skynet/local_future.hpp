@@ -17,7 +17,7 @@ namespace skynet
       constexpr void operator()() const noexcept {}
     }; // struct NoOpCallable
 
-    inline static constexpr std::chrono::microseconds default_poll_freq{10000};
+    inline static constexpr std::chrono::microseconds default_poll_freq{100};
   } // namespace skynet::internal
 
   /** \brief A class for "local" futures.  These futures live on the stack,

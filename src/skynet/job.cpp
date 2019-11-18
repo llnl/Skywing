@@ -98,7 +98,7 @@ namespace skynet
     // Find / create the last version and obtain a reference to it
     auto& last_version =
       last_published_version_.try_emplace(tag_id, internal::tag_default_version).first->second;
-    last_version = internal::detail::update_version(last_version, version);
+    last_version = internal::detail::updated_version(last_version, version);
     Master::JobAccessor::publish(
       *master_,
       last_version,
@@ -211,6 +211,15 @@ namespace skynet
         tags_to_find.tags[write_index] = bin_tree[child_index];
       }
     }
+    SKYNET_TRACE_LOG(
+      "{}, job {}, created reduce a reduce group; produced tag is \"{}\", parent tag is \"{}\", child tags are \"{}\", \"{}\"",
+      master_->id(),
+      id_,
+      tag_produced,
+      tags_to_find.parent(),
+      tags_to_find.left_child(),
+      tags_to_find.right_child()
+    );
     return tags_to_find;
   }
 

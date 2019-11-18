@@ -214,8 +214,8 @@ namespace skynet
         [group_tag, tag_produced_for_group, tags_to_find, this]() {
           return is_reduce_group_created(group_tag.id(), tag_produced_for_group.id(), tags_to_find, expected_type);
         },
-        [group_tag, this]() -> internal::ReduceGroup<ValueType>& {
-          return static_cast<internal::ReduceGroup<ValueType>&>(get_reduce_group(group_tag.id()));
+        [group_tag, this]() -> internal::ReduceGroup<ValueType> {
+          return internal::ReduceGroup<ValueType>{get_reduce_group(group_tag.id())};
         }
       );
     }

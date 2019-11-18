@@ -1,0 +1,89 @@
+#include <catch2/catch.hpp>
+
+
+#include "skynet/skynet.hpp"
+
+#include "utils.hpp"
+
+#include <array>
+#include <atomic>
+#include <functional>
+
+using namespace skynet;
+
+constexpr int num_machines = 5;
+constexpr int num_connections = 1;
+constexpr std::uint16_t base_port = 25000;
+
+using TagType = Tag<std::int32_t>;
+
+const std::array<TagType, num_machines> tags{
+  TagType{"Tag 0"},
+  TagType{"Tag 1"},
+  TagType{"Tag 2"},
+  TagType{"Tag 3"},
+  TagType{"Tag 4"}
+};
+
+const TagType reduce_tag{"reduce op"};
+
+template<typename Group, typename Callable>
+void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, const std::int32_t expected_value)
+{
+  const auto result = group.reduce(value, reduce_op);
+  if (group.returns_value_on_reduce())
+  {
+    REQUIRE(result);
+    REQUIRE(*result == expected_value);
+  }
+  else
+  {
+    REQUIRE_FALSE(result);
+  }
+}
+
+// This wasn't working with a reference, so just use a pointer
+void machine_task(const NetworkInfo* const info, const int index)
+{
+  static std::atomic<int> counter{0};
+  using namespace std::chrono_literals;
+  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  connect_network(*info, master, index, [](Master& m, const int i) {
+    return m.connect_to_server("127.0.0.1", base_port + i);
+  });
+  master.submit_job("job", [&](Job& the_job) {
+    // Create the reduce group
+    std::vector<std::string> tag_ids(tags.size());
+    std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& tag) { return tag.id(); });
+    auto fut = the_job.create_reduce_group(reduce_tag, tags[index], tag_ids);
+    auto group = fut.get();
+
+    // Do a few reduce operations on the group
+    using i32 = std::int32_t;
+    test_reduce(group, index, std::plus<>{}, 10);
+    test_reduce(group, index, [](i32 a, i32 b) { return std::max(a, b); }, 4);
+    test_reduce(group, index, [](i32 a, i32 b) { return std::min(a, b); }, 0);
+    test_reduce(group, index + 1, std::multiplies<>{}, 1 * 2 * 3 * 4 * 5);
+
+    ++counter;
+    while (counter != num_machines)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    }
+  });
+  master.run();
+}
+
+TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
+{
+  const auto network_info = make_network(num_machines, num_connections);
+  std::vector<std::thread> threads;
+  for (auto i = 0; i < num_machines; ++i)
+  {
+    threads.emplace_back(machine_task, &network_info, i);
+  }
+  for (auto&& thread : threads)
+  {
+    thread.join();
+  }
+}

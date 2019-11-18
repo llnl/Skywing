@@ -1,5 +1,6 @@
 #include "skynet/internal/reduce_group.hpp"
 
+#include "skynet/internal/utility/logging.hpp"
 #include "skynet/master.hpp"
 
 namespace skynet::internal
@@ -23,16 +24,37 @@ namespace skynet::internal
   {
     if (value.index() != expected_type_)
     {
+      SKYNET_WARN_LOG(
+        "{} rejected data for reduce group {} for tag {} version {} due to wrong type",
+        master_->id(),
+        group_id_,
+        tag,
+        version
+      );
       return false;
     }
     for (std::size_t i = 0; i < data_buffers_.size(); ++i)
     {
       if (tag == tag_neighbors_.tags[i])
       {
+        SKYNET_TRACE_LOG(
+          "{} added data for reduce group {} for tag {} version {}",
+          master_->id(),
+          group_id_,
+          tag,
+          version
+        );
         data_buffers_[i].add(std::move(value), version);
         return true;
       }
     }
+    SKYNET_WARN_LOG(
+      "{} rejected data for reduce group {} for tag {} version {} due to not matching any buffer",
+      master_->id(),
+      group_id_,
+      tag,
+      version
+    );
     return false;
   }
 

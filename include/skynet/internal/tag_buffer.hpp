@@ -17,7 +17,7 @@ namespace skynet::internal
 
   namespace detail
   {
-    constexpr VersionID update_version(const VersionID to_update, const VersionID new_version) noexcept
+    constexpr VersionID updated_version(const VersionID to_update, const VersionID new_version) noexcept
     {
       return
         new_version == tag_default_version
@@ -37,7 +37,7 @@ namespace skynet::internal
       {
         return
           stored_version_ != tag_default_version &&
-          stored_version_ >= update_version(last_fetched_version_, required_version);
+          stored_version_ >= updated_version(last_fetched_version_, required_version);
       }
 
       VersionID stored_version_ = tag_default_version;
@@ -98,7 +98,7 @@ namespace skynet::internal
         assert(!buffer_.empty());
         auto [data, version] = std::move(buffer_.front());
         buffer_.erase(buffer_.begin());
-        if (version >= detail::update_version(last_fetched_version_, required_version))
+        if (version >= detail::updated_version(last_fetched_version_, required_version))
         {
           last_fetched_version_ = version;
           return std::move(data);
@@ -112,7 +112,7 @@ namespace skynet::internal
     bool has_data(const VersionID required_version = tag_default_version) const noexcept
     {
       return !buffer_.empty() &&
-        buffer_.back().second >= detail::update_version(last_fetched_version_, required_version);
+        buffer_.back().second >= detail::updated_version(last_fetched_version_, required_version);
     }
 
     /** Adds data to the buffer if the version is newer than the last version

@@ -41,20 +41,28 @@ namespace skynet::internal
     // Sends a value to the parent
     void send_value_to_parent(const PublishValueVariant& value_to_send, VersionID version) noexcept;
 
-  protected:
+  private:
     using DataBuffer = FifoTagBuffer<PublishValueVariant>;
     std::array<DataBuffer, 3> data_buffers_;
     ReduceGroupNeighbors tag_neighbors_;
     Master* master_;
     TagID group_id_;
     TagID produced_tag_;
+    VersionID last_sent_version_ = tag_default_version;
     std::uint8_t expected_type_;
+
+    template<typename T>
+    friend class ReduceGroup;
   }; // class ReduceGroupBase
 
   template<typename T>
-  class ReduceGroup : public ReduceGroupBase
+  class ReduceGroup
   {
   public:
+    ReduceGroup(ReduceGroupBase& base) noexcept
+      : base_{base}
+    {}
+
     // TODO: This is currently blocking, going to end up changing the interfaces and such later,
     // so fix this when that's done
     template<typename Callable>
@@ -64,42 +72,56 @@ namespace skynet::internal
       VersionID version = tag_default_version
     ) noexcept
     {
-      // Three different options - 2 children, left child only, no children
-      if (this->tag_neighbors_.left_child().empty())
-      {
-        // no children, just propagate value to parent
-        send_value_to_parent(value, version);
-        return {};
-      }
-      // Either one or two children, left child is always present
-      auto left_fut = make_local_future(
-        [&]() { return this->data_buffers_[1].has_data(version); },
-        [&]() { return std::get<T>(this->data_buffers_[1].get(version)); }
-      );
-      if (this->tag_neighbors_.right_child().empty())
-      {
-        // One child, just apply op with value and propagate value to parent
-        send_value_to_parent(reduce_op(left_fut.get(), value), version);
-        return {};
-      }
-      // Both children
-      auto right_fut = make_local_future(
-        [&]() { return this->data_buffers_[2].has_data(version); },
-        [&]() { return std::get<T>(this->data_buffers_[2].get(version)); }
-      );
-      // Do op(op(left, value), right) so order of evaluation is always the same
-      // Also if there are no parents then this will have the final reduce value
-      const auto reduce_value = reduce_op(reduce_op(left_fut.get(), value), right_fut.get());
-      if (this->returns_value_on_reduce())
-      {
+      base_.last_sent_version_ = detail::updated_version(base_.last_sent_version_, version);
+      const T reduce_result = [&]() {
+        // Three different options - 2 children, left child only, no children
+        if (base_.tag_neighbors_.left_child().empty())
+        {
+          // no children, just propagate value to parent
+          base_.send_value_to_parent(value, base_.last_sent_version_);
+          return value;
+        }
+        // Either one or two children, left child is always present
+        auto left_fut = make_local_future(
+          [&]() { return base_.data_buffers_[1].has_data(base_.last_sent_version_); },
+          [&]() { return std::get<T>(base_.data_buffers_[1].get(base_.last_sent_version_)); }
+        );
+        if (base_.tag_neighbors_.right_child().empty())
+        {
+          // One child, just apply op with value and propagate value to parent
+          const auto reduce_value = reduce_op(left_fut.get(), value);
+          base_.send_value_to_parent(reduce_value, base_.last_sent_version_);
+          return reduce_value;
+        }
+        // Both children
+        auto right_fut = make_local_future(
+          [&]() { return base_.data_buffers_[2].has_data(base_.last_sent_version_); },
+          [&]() { return std::get<T>(base_.data_buffers_[2].get(base_.last_sent_version_)); }
+        );
+        // Do op(op(left, value), right) so order of evaluation is always the same
+        // Also if there are no parents then this will have the final reduce value
+        const auto reduce_value = reduce_op(reduce_op(left_fut.get(), value), right_fut.get());
+        base_.send_value_to_parent(reduce_value, base_.last_sent_version_);
         return reduce_value;
+      }();
+      // Return the result if applicable
+      if (base_.returns_value_on_reduce())
+      {
+        return reduce_result;
       }
       else
       {
-        send_value_to_parent(reduce_value, version);
         return {};
       }
     }
+
+    bool returns_value_on_reduce() const noexcept
+    {
+      return base_.returns_value_on_reduce();
+    }
+
+  private:
+    ReduceGroupBase& base_;
   }; // class ReduceGroup
 } // namespace skynet::internal
 
