@@ -6,6 +6,9 @@
 #include "skynet/types.hpp"
 
 #include <cassert>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <optional>
 
 namespace skynet
@@ -17,6 +20,9 @@ namespace skynet
 {
   template<typename T>
   class ReduceGroup;
+
+  template<typename T, typename Callable>
+  class SendReduceFuture;
 
   namespace internal
   {
@@ -43,10 +49,10 @@ namespace skynet
 
       const ReduceGroupNeighbors& tag_neighbors() const noexcept;
 
+    private:
       // Sends a value to the parent
       void send_value_to_parent(const PublishValueVariant& value_to_send, VersionID version) noexcept;
 
-    private:
       using DataBuffer = FifoTagBuffer<PublishValueVariant>;
       std::array<DataBuffer, 3> data_buffers_;
       ReduceGroupNeighbors tag_neighbors_;
@@ -54,12 +60,168 @@ namespace skynet
       TagID group_id_;
       TagID produced_tag_;
       VersionID last_sent_version_ = tag_default_version;
+      std::mutex buffer_mutex_;
+      std::condition_variable data_added_to_buffers_;
       std::uint8_t expected_type_;
 
       template<typename T>
       friend class ::skynet::ReduceGroup;
+
+      template<typename T, typename Callable>
+      friend class ::skynet::SendReduceFuture;
     }; // class ReduceGroupBase
   } // namespace skynet::internal
+
+  // TODO: Could make this use type-erasure (std::function) instead of a template
+  //       parameter for the callable, which would allow storing it in a container and such
+  //       at the cost of some efficiency.  Not sure which approach is better.
+  //       (Could also add an implicit conversion to a different type of future that uses
+  //       type erasure or something.)
+  template<typename T, typename Callable>
+  class SendReduceFuture : public Callable
+  {
+  public:
+    T get() noexcept
+    {
+      std::unique_lock<std::mutex> lock{base_.buffer_mutex_};
+      if (!send_is_ready_no_lock())
+      {
+        base_.data_added_to_buffers_.wait(lock, [this]() { return send_is_ready_no_lock(); });
+      }
+      return do_reduce();
+    }
+
+    template<class Rep, class Period>
+    std::optional<T> wait_for_then_get_if_ready(const std::chrono::duration<Rep, Period>& wait_time) noexcept
+    {
+      std::unique_lock<std::mutex> lock{base_.buffer_mutex_};
+      if (send_is_ready_no_lock())
+      {
+        return do_reduce();
+      }
+      else if (base_.data_added_to_buffers_.wait_for(lock, wait_time, [this]() { return send_is_ready_no_lock(); }))
+      {
+        return do_reduce();
+      }
+      else
+      {
+        return {};
+      }
+    }
+
+    template<class Rep, class Period>
+    std::optional<T> wait_until_then_get_if_ready(const std::chrono::duration<Rep, Period>& end_time) noexcept
+    {
+      std::unique_lock<std::mutex> lock{base_.buffer_mutex_};
+      if (send_is_ready_no_lock())
+      {
+        return do_reduce();
+      }
+      else if (base_.data_added_to_buffers_.wait_until(lock, end_time, [this]() { return send_is_ready_no_lock(); }))
+      {
+        return do_reduce();
+      }
+      else
+      {
+        return {};
+      }
+    }
+
+    bool send_is_ready() noexcept
+    {
+      std::unique_lock<std::mutex> lock{base_.buffer_mutex_};
+      return send_is_ready_no_lock();
+    }
+
+  private:
+    template<typename U>
+    friend class ReduceGroup;
+
+    // T is always an optional type, so extract out the base type
+    using ValueType = typename T::value_type;
+
+    SendReduceFuture(
+      Callable c,
+      internal::ReduceGroupBase& base,
+      VersionID required_version,
+      ValueType value,
+      bool is_all_reduce
+    ) noexcept
+      : Callable(c)
+      , base_{base}
+      , required_version_{required_version}
+      , value_{value}
+      , is_all_reduce_{is_all_reduce}
+    {}
+
+    bool send_is_ready_no_lock() noexcept
+    {
+      // Either no children, left child only, or both children
+      // If left child is empty there are no children; always ready
+      if (base_.tag_neighbors_.left_child().empty())
+      {
+        return true;
+      }
+      else if (base_.tag_neighbors_.right_child().empty())
+      {
+        // Left child only
+        return base_.data_buffers_[1].has_data(required_version_);
+      }
+      else
+      {
+        // Both children
+        return
+          base_.data_buffers_[1].has_data(required_version_) &&
+          base_.data_buffers_[2].has_data(required_version_);
+      }
+    }
+
+    T do_reduce() noexcept
+    {
+      // The base type is an optional, strip that type while working in here
+      const ValueType reduce_result = [&]() {
+        // Three different options - 2 children, left child only, no children
+        if (base_.tag_neighbors_.left_child().empty())
+        {
+          // no children, just propagate value to parent
+          return value_;
+        }
+        // Either one or two children, left child is always present
+        const auto left_val = std::get<ValueType>(base_.data_buffers_[1].get(base_.last_sent_version_));
+        if (base_.tag_neighbors_.right_child().empty())
+        {
+          // One child, just apply op with value and propagate value to parent
+          const auto reduce_value = Callable::operator()(left_val, value_);
+          return reduce_value;
+        }
+        // Both children
+        const auto right_val = std::get<ValueType>(base_.data_buffers_[2].get(base_.last_sent_version_));
+        // Do op(op(left, value), right) so order of evaluation is always the same
+        // Also if there are no parents then this will have the final reduce value
+        const auto reduce_value = Callable::operator()(
+          Callable::operator()(left_val, value_),
+          right_val
+        );
+        return reduce_value;
+      }();
+      base_.send_value_to_parent(reduce_result, base_.last_sent_version_);
+      // Return the result if applicable
+      if (base_.returns_value_on_reduce())
+      {
+        // TODO: Send result to children if it's an all reduce operation
+        return reduce_result;
+      }
+      else
+      {
+        return {};
+      }
+    }
+
+    internal::ReduceGroupBase& base_;
+    VersionID required_version_;
+    ValueType value_;
+    bool is_all_reduce_;
+  };
 
   template<typename T>
   class ReduceGroup
@@ -69,56 +231,14 @@ namespace skynet
       : base_{base}
     {}
 
-    // TODO: This is currently blocking, going to end up changing the interfaces and such later,
-    // so fix this when that's done
     template<typename Callable>
-    std::optional<T> reduce(
+    auto reduce(
       const T& value,
       Callable reduce_op,
       VersionID version = internal::tag_default_version
     ) noexcept
     {
-      base_.last_sent_version_ = internal::detail::updated_version(base_.last_sent_version_, version);
-      const T reduce_result = [&]() {
-        // Three different options - 2 children, left child only, no children
-        if (base_.tag_neighbors_.left_child().empty())
-        {
-          // no children, just propagate value to parent
-          base_.send_value_to_parent(value, base_.last_sent_version_);
-          return value;
-        }
-        // Either one or two children, left child is always present
-        auto left_fut = internal::make_local_future(
-          [&]() { return base_.data_buffers_[1].has_data(base_.last_sent_version_); },
-          [&]() { return std::get<T>(base_.data_buffers_[1].get(base_.last_sent_version_)); }
-        );
-        if (base_.tag_neighbors_.right_child().empty())
-        {
-          // One child, just apply op with value and propagate value to parent
-          const auto reduce_value = reduce_op(left_fut.get(), value);
-          base_.send_value_to_parent(reduce_value, base_.last_sent_version_);
-          return reduce_value;
-        }
-        // Both children
-        auto right_fut = internal::make_local_future(
-          [&]() { return base_.data_buffers_[2].has_data(base_.last_sent_version_); },
-          [&]() { return std::get<T>(base_.data_buffers_[2].get(base_.last_sent_version_)); }
-        );
-        // Do op(op(left, value), right) so order of evaluation is always the same
-        // Also if there are no parents then this will have the final reduce value
-        const auto reduce_value = reduce_op(reduce_op(left_fut.get(), value), right_fut.get());
-        base_.send_value_to_parent(reduce_value, base_.last_sent_version_);
-        return reduce_value;
-      }();
-      // Return the result if applicable
-      if (base_.returns_value_on_reduce())
-      {
-        return reduce_result;
-      }
-      else
-      {
-        return {};
-      }
+      return SendReduceFuture<std::optional<T>, Callable>{std::move(reduce_op), base_, version, value, false};
     }
 
     bool returns_value_on_reduce() const noexcept

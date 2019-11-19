@@ -1163,17 +1163,11 @@ namespace skynet
         }
         const auto [iter, inserted] = reduce_tag_data_.try_emplace(
           group_id,
-          ReduceGroupData{
-            internal::ReduceGroupBase{
-              tags_to_find,
-              *this,
-              group_id,
-              tag_produced,
-              expected_type
-            },
-            {},
-            {}
-          }
+          tags_to_find,
+          *this,
+          group_id,
+          tag_produced,
+          expected_type
         );
         (void)inserted;
         return iter->second;

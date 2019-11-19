@@ -566,6 +566,20 @@ namespace skynet
     // ID for the machines that produce those tags for the group
     struct ReduceGroupData
     {
+      // Need a constructor since ReduceGroups aren't movable so they need to
+      // be constructed in place
+      // This could be forwarded or something, but there doesn't seem to be a strong
+      // motivating reason to do so
+      ReduceGroupData(
+        const internal::ReduceGroupNeighbors& tag_neighbors,
+        Master& master,
+        const TagID& group_id,
+        const TagID& produced_tag,
+        const std::uint8_t expected_type
+      ) noexcept
+        : group{tag_neighbors, master, group_id, produced_tag, expected_type}
+      {}
+
       internal::ReduceGroupBase group;
       std::vector<MachineID> parent_machines;
       std::array<std::vector<MachineID>, 2> child_machines;

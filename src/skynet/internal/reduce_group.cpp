@@ -44,7 +44,11 @@ namespace skynet::internal
           tag,
           version
         );
-        data_buffers_[i].add(std::move(value), version);
+        {
+          std::unique_lock<std::mutex> lock{buffer_mutex_};
+          data_buffers_[i].add(std::move(value), version);
+        }
+        data_added_to_buffers_.notify_all();
         return true;
       }
     }
