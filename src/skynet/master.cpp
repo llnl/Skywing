@@ -1398,6 +1398,8 @@ namespace skynet
     const internal::ExternalMaster& from
   ) noexcept
   {
+    // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
+    (void)from;
     // Make sure the group exists
     const auto group_loc = reduce_tag_data_.find(msg.reduce_tag());
     if (group_loc == reduce_tag_data_.cend())
