@@ -17,7 +17,7 @@
 
 using namespace skynet;
 
-constexpr int num_machines = 5;
+constexpr int num_machines = 30;
 constexpr int num_connections = num_machines * 2;
 constexpr std::uint16_t base_port = 30000;
 

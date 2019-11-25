@@ -29,7 +29,7 @@ const ReduceGroupTag<std::int32_t> reduce_tag{"reduce op"};
 template<typename Group, typename Callable>
 void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, const std::int32_t expected_value)
 {
-  const auto result = group.reduce(value, reduce_op);
+  const auto result = group.reduce(value, reduce_op).get();
   if (group.returns_value_on_reduce())
   {
     REQUIRE(result);

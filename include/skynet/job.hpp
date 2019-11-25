@@ -3,6 +3,8 @@
 
 #include "skynet/internal/utility/mutex_guarded.hpp"
 #include "skynet/internal/utility/type_list.hpp"
+#include "skynet/internal/future.hpp"
+#include "skynet/internal/master_future_callables.hpp"
 #include "skynet/internal/reduce_group.hpp"
 #include "skynet/internal/tag_buffer.hpp"
 #include "skynet/local_future.hpp"
@@ -186,9 +188,8 @@ namespace skynet
     auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
     {
       init_subscribe(tags);
-      return internal::make_local_future(
-        [tags, this]() { return is_subscribe_finished(tags); }
-      );
+      return get_subscribe_future(tags);
+      // return Master::JobAccessor::subscribe(*master_, tags);
     }
 
     /** \brief Attempts to subscribe to the passed tag
@@ -311,7 +312,8 @@ namespace skynet
       const std::vector<internal::PublishTagBase>& tags
     ) noexcept;
 
-    bool is_subscribe_finished(const std::vector<internal::PublishTagBase>& tags) noexcept;
+    auto get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
+      -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 

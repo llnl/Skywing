@@ -15,15 +15,19 @@ namespace skynet::internal
    */
   inline static constexpr VersionID tag_default_version = -1;
 
+  /** \brief Determine the updated version that needs to be looked for based on an old
+   * version and a new passed in version.
+   */
+  constexpr VersionID updated_version(const VersionID to_update, const VersionID new_version) noexcept
+  {
+    return
+      new_version == tag_default_version
+        ? to_update + 1
+        : new_version;
+  }
+
   namespace detail
   {
-    constexpr VersionID updated_version(const VersionID to_update, const VersionID new_version) noexcept
-    {
-      return
-        new_version == tag_default_version
-          ? to_update + 1
-          : new_version;
-    }
 
     // This information is the same for all instances of DiscardOldVersionTagBuffer,
     // so take it out of the template and into a normal structure
@@ -98,7 +102,7 @@ namespace skynet::internal
         assert(!buffer_.empty());
         auto [data, version] = std::move(buffer_.front());
         buffer_.erase(buffer_.begin());
-        if (version >= detail::updated_version(last_fetched_version_, required_version))
+        if (version >= updated_version(last_fetched_version_, required_version))
         {
           last_fetched_version_ = version;
           return std::move(data);
@@ -112,7 +116,7 @@ namespace skynet::internal
     bool has_data(const VersionID required_version = tag_default_version) const noexcept
     {
       return !buffer_.empty() &&
-        buffer_.back().second >= detail::updated_version(last_fetched_version_, required_version);
+        buffer_.back().second >= updated_version(last_fetched_version_, required_version);
     }
 
     /** Adds data to the buffer if the version is newer than the last version

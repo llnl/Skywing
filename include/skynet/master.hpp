@@ -4,6 +4,7 @@
 #include "skynet/internal/devices/socket_communicator.hpp"
 #include "skynet/internal/utility/network_conv.hpp"
 #include "skynet/internal/capn_proto_wrapper.hpp"
+#include "skynet/internal/master_future_callables.hpp"
 #include "skynet/internal/message_creators.hpp"
 #include "skynet/internal/reduce_group.hpp"
 #include "skynet/job.hpp"
@@ -13,6 +14,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -188,11 +190,14 @@ namespace skynet
       // The owning master
       Master* master_;
 
-      // The tags that are pending responses
-      std::unordered_set<TagID> pending_tags_;
-
       // The base port to use to connect to the remote machine
       std::uint16_t base_port_;
+
+      // The number of pending get publishers requests
+      std::uint16_t pending_get_publishers_count_ = 0;
+
+      // If the next request for tags should ignore the cache or not
+      bool ignore_cache_on_next_request_ = false;
 
       // If the connection is dead or not
       bool dead_{false};
@@ -308,7 +313,7 @@ namespace skynet
         m.report_new_publish_tags(tags);
       }
 
-      static bool subscribe(
+      static auto subscribe(
         Master& m,
         const std::vector<TagID>& tag_ids
       ) noexcept
@@ -354,13 +359,13 @@ namespace skynet
         m.handle_get_publishers(msg, from);
       }
 
-      static void add_publishers_and_propagate(
+      static auto add_publishers_and_propagate(
         Master& m,
         const internal::ReportPublishers& msg,
         const internal::ExternalMaster& from
       ) noexcept
       {
-        m.add_publishers_and_propagate(msg, from);
+        return m.add_publishers_and_propagate(msg, from);
       }
 
       static bool handle_join_reduce_group(
@@ -380,6 +385,11 @@ namespace skynet
       {
         return m.handle_submit_reduce_value(msg, from);
       }
+
+      static const std::vector<TagID>& get_pending_tags(Master& m) noexcept
+      {
+        return m.get_pending_tags();
+      }
     }; // struct ExternalMasterAccessor
 
     struct ReduceGroupAccessor
@@ -398,6 +408,17 @@ namespace skynet
         m.send_reduce_value_to_parent(group_id, version, produced_tag, value);
       }
     }; // struct ReduceGroupAccessor
+
+    struct FutureAccessor
+    {
+    private:
+      friend class internal::MasterSubscribeIsDone;
+
+      static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
+      {
+        return m.subscribe_is_done(tags);
+      }
+    }; // struct FutureAccessor
 
   private:
     /** \brief Connects to a remote connection and returns an iterator to the new connection,
@@ -459,12 +480,13 @@ namespace skynet
      */
     void send_to_neighbors(const std::vector<std::byte>& to_send) noexcept;
 
-    /** \brief Subscribes to the passed tags, returning true if successful.
-     *
-     * If the machines that produce the specified tags are not known, then the
-     * process of getting that information is started in a non-blocking fashion.
+    // Auxillary function to help with subscribe function
+    bool subscribe_is_done(const std::vector<TagID>& required_tags) noexcept;
+
+    /** \brief Subscribes to the passed tags.
      */
-    bool subscribe(const std::vector<TagID>& tag_ids) noexcept;
+    auto subscribe(const std::vector<TagID>& tag_ids) noexcept
+      -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     /** \brief Handles the get_publishers message
      */
@@ -478,8 +500,10 @@ namespace skynet
     std::vector<TagID> remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept;
 
     /** \brief Adds the publishers and propagate the information is required
+     *
+     * Returns a bool indicating if the next request for publishers should ignore the cache
      */
-    void add_publishers_and_propagate(
+    bool add_publishers_and_propagate(
       const internal::ReportPublishers& msg,
       const internal::ExternalMaster& from
     ) noexcept;
@@ -542,6 +566,18 @@ namespace skynet
       const internal::ExternalMaster& from
     ) noexcept;
 
+    /** \brief Returns tags that are still pending.
+     */
+    const std::vector<TagID>& get_pending_tags() noexcept;
+
+    // TODO: The return value/type for this feels really weird; probably want
+    // to change it to use a enum class or something at some point?
+    /** \brief Attempt to create connections for any pending tags.
+     *
+     * Returns true if the the cache needs to be ignored for the next request.
+     */
+    bool try_connections_for_pending_tags() noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
@@ -561,6 +597,9 @@ namespace skynet
 
     // List of publishers that are known for each tag
     std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
+
+    // A list of tags that still need to have publishers found
+    std::vector<std::string> pending_tags_;
 
     // Information for reduce groups, holds the tags that each group has and
     // ID for the machines that produce those tags for the group
@@ -609,6 +648,9 @@ namespace skynet
 
     // The port used for communications
     std::uint16_t comm_port_;
+
+    // Notification for when new tag related links are created
+    std::condition_variable new_tag_connections_cv_;
   }; // class Master
 } // namespace skynet
 

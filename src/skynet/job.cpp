@@ -114,7 +114,7 @@ namespace skynet
     // Find / create the last version and obtain a reference to it
     auto& last_version =
       last_published_version_.try_emplace(tag.id(), internal::tag_default_version).first->second;
-    last_version = internal::detail::updated_version(last_version, version);
+    last_version = internal::updated_version(last_version, version);
     Master::JobAccessor::publish(
       *master_,
       last_version,
@@ -179,7 +179,8 @@ namespace skynet
     }
   }
 
-  bool Job::is_subscribe_finished(const std::vector<internal::PublishTagBase>& tags) noexcept
+  auto Job::get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
+    -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     std::vector<TagID> tag_ids(tags.size());
     std::transform(

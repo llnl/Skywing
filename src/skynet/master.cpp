@@ -4,8 +4,9 @@
 
 // TODO: Support other types of communicators
 
-#include <iostream>
 #include <iomanip>
+#include <iostream>
+#include <limits>
 
 namespace skynet
 {
@@ -129,30 +130,8 @@ namespace skynet
       const bool ignore_cache
     ) noexcept
     {
-      bool work_to_do = false;
-      for (const auto& tag_id : tags)
-      {
-        // The tag is not pending, mark this as not needing to be propagated
-        // and ask the neighbor for details
-        if (pending_tags_.find(tag_id) == pending_tags_.cend())
-        {
-          pending_tags_.emplace(tag_id);
-          work_to_do = true;
-        }
-      }
-      if (work_to_do)
-      {
-        send_message(make_get_publishers(tags, ignore_cache));
-      }
-      else
-      {
-        SKYNET_TRACE_LOG(
-          "Request to find publishers for {} from {} ignored locally by {}",
-          tags,
-          master_->id(),
-          id_
-        );
-      }
+      ++pending_get_publishers_count_;
+      send_message(make_get_publishers(tags, ignore_cache));
     }
 
     std::string ExternalMaster::two_way_address() const noexcept
@@ -349,6 +328,7 @@ namespace skynet
           return true;
         },
         [&](const ReportPublishers& msg) {
+          --pending_get_publishers_count_;
           SKYNET_TRACE_LOG(
             "{} recieved report publishers from {} with remote tags {} and local tags {}",
             master_->id(),
@@ -356,7 +336,7 @@ namespace skynet
             msg.tags(),
             msg.locally_produced_tags()
           );
-          // Remove any produced tags that were marked as pending
+          // Make sure all of the tag names are okay
           for (const auto& tag_list : {msg.tags(), msg.locally_produced_tags()})
           {
             for (const auto& tag : tag_list)
@@ -365,10 +345,28 @@ namespace skynet
               {
                 return false;
               }
-              pending_tags_.erase(tag);
             }
           }
-          Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
+          const bool ignore_cache =
+            Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
+          // Don't overwrite needing to ignore the cache with not needing to ignore it
+          if (ignore_cache)
+          {
+            ignore_cache_on_next_request_ = true;
+          }
+          // If there are no pending requests and tags to find, send another request
+          const auto& remaining_tags =
+            Master::ExternalMasterAccessor::get_pending_tags(*master_);
+          if (pending_get_publishers_count_ == 0 && !remaining_tags.empty())
+          {
+            SKYNET_TRACE_LOG("{} still looking for tags {} from {}",
+              master_->id(),
+              remaining_tags,
+              id_
+            );
+            find_publishers_for_tags(remaining_tags, ignore_cache_on_next_request_);
+            ignore_cache_on_next_request_ = false;
+          }
           return true;
         },
         [&](const GetPublishers& msg) {
@@ -382,6 +380,12 @@ namespace skynet
           {
             if (!tag_name_okay(tag))
             {
+              SKYNET_WARN_LOG(
+                "{} discarded connection with {} due to bad tag name {}",
+                master_->id(),
+                id_,
+                tag
+              );
               return false;
             }
           }
@@ -499,7 +503,13 @@ namespace skynet
         }
         SKYNET_TRACE_LOG("{} accepted connection from {}", id_, new_neighbor->id());
         notify_of_new_neighbor(new_id);
-        neighbors_.emplace(new_id, std::move(*new_neighbor));
+        const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
+        assert(inserted);
+        // Send request for any pending tags
+        if (!pending_tags_.empty())
+        {
+          iter->second.find_publishers_for_tags(pending_tags_, false);
+        }
       }
     }
   }
@@ -635,6 +645,11 @@ namespace skynet
       notify_of_new_neighbor(new_id);
       const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
       assert(inserted);
+      // Send request for any pending tags
+      if (!pending_tags_.empty())
+      {
+        iter->second.find_publishers_for_tags(pending_tags_, false);
+      }
       return iter;
     }
     else
@@ -738,11 +753,26 @@ namespace skynet
     send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });
   }
 
-  bool Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
+  bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) noexcept
+  {
+    // TODO: This is probably kind of slow, use maybe an unordered map or something
+    // if this becomes an issue
+    std::unordered_set<std::string> remaining_tags(required_tags.cbegin(), required_tags.cend());
+    for (const auto& subscription : subscriptions_)
+    {
+      for (const auto& tag : subscription.produced_tags)
+      {
+        remaining_tags.erase(tag);
+      }
+    }
+    return remaining_tags.empty();
+  }
+
+  auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
+    -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     SKYNET_TRACE_LOG("{} looking for subscription information for {}", id_, tag_ids);
-    std::vector<TagID> tags_to_find;
-    bool ignore_cache = false;
+    std::vector<TagID> tags_to_search_for;
     for (const auto& tag_id : tag_ids)
     {
       // Check if already subscribed, skip if so
@@ -777,62 +807,24 @@ namespace skynet
         // }
         // continue;
       }
-      // Check if there is a list of known producers for the tag
-      const auto loc = publishers_for_tag_.find(tag_id);
-      // Create the entry if required
-      if (loc == publishers_for_tag_.cend())
-      {
-        SKYNET_TRACE_LOG("{} failed to find publishers in the cache for {}", id_, tag_id);
-        publishers_for_tag_.try_emplace(tag_id);
-        tags_to_find.push_back(tag_id);
-      }
-      else
-      {
-        auto& publishers = loc->second;
-        // Now, if there are any known subscriptions, try to subscribe to them
-        if (!publishers.empty())
-        {
-          for (auto it = publishers.begin(); it != publishers.end(); )
-          {
-            const auto& subscribe_address = *it;
-            if (auto sub = internal::Subscription::try_to_create(subscribe_address))
-            {
-              subscriptions_.push_back(SubscriptionData{
-                std::move(*sub),
-                get_tags_for_publisher(subscribe_address)
-              });
-              break;
-            }
-            else
-            {
-              SKYNET_TRACE_LOG("{} failed to subscribe to {} for tag {}", id_, subscribe_address, tag_id);
-              // Couldn't subscribe - remove this as a producer
-              it = publishers.erase(it);
-            }
-          }
-        }
-        // Check if the producers are now empty (can happen if all known publishers
-        // fail to be subscribed to)
-        if (publishers.empty())
-        {
-          // Need to get original producers for tags now, so have to ignore caches
-          ignore_cache = true;
-          // Couldn't do this subscription; need to look for a producer for the tag
-          tags_to_find.push_back(tag_id);
-        }
-      }
+      // Otherwise, mark the tag as pending
+      pending_tags_.push_back(tag_id);
+      tags_to_search_for.push_back(tag_id);
     }
-    // Find producers for any tags that need it
-    if (!tags_to_find.empty())
+    if (!tags_to_search_for.empty())
     {
-      SKYNET_TRACE_LOG("{} looking for new publishers for tags {}", id_, tags_to_find);
+      SKYNET_TRACE_LOG("{} looking for new publishers for tags {}", id_, tags_to_search_for);
       for (auto& neighbor : neighbors_)
       {
-        neighbor.second.find_publishers_for_tags(tags_to_find, ignore_cache);
+        // Presume that the cache is okay
+        neighbor.second.find_publishers_for_tags(tags_to_search_for, false);
       }
     }
-    // Nothing to find - successfully subscribed
-    return tags_to_find.empty();
+    return internal::make_future(
+      job_mut_,
+      new_tag_connections_cv_,
+      internal::MasterSubscribeIsDone{*this, tag_ids}
+    );
   }
 
   void Master::handle_get_publishers(
@@ -867,6 +859,7 @@ namespace skynet
       if (neighbors_.size() == 1)
       {
         from.send_message(make_known_tag_publisher_message());
+        return;
       }
       bool ask_neighbors = false;
       // Mark the information as needing to be propagated
@@ -885,10 +878,22 @@ namespace skynet
       }
       if (!ask_neighbors)
       {
+        SKYNET_TRACE_LOG(
+          "{} returning early for request for tags {} from {} to avoid potential deadlock",
+          id_,
+          msg.tags(),
+          from.id()
+        );
         from.send_message(make_known_tag_publisher_message());
       }
       else
       {
+        SKYNET_TRACE_LOG(
+          "{} asking neighbors for tags {} for {}",
+          id_,
+          msg.tags(),
+          from.id()
+        );
         for (auto& neighbor : neighbors_)
         {
           if (&neighbor.second != &from)
@@ -920,7 +925,7 @@ namespace skynet
     return tags_left;
   }
 
-  void Master::add_publishers_and_propagate(
+  bool Master::add_publishers_and_propagate(
     const internal::ReportPublishers& msg,
     const internal::ExternalMaster& from
   ) noexcept
@@ -932,7 +937,7 @@ namespace skynet
     if (tags.size() != publishers_list.size())
     {
       SKYNET_WARN_LOG("{} recieved tag/publisher list size mismatch from {}", id_, from.id());
-      return;
+      return false;
     }
     // Add the information to what is locally known
     for (std::size_t i = 0; i < tags.size(); ++i)
@@ -990,10 +995,12 @@ namespace skynet
       std::vector<std::vector<std::string>> addresses_to_send;
       for (const auto& [tag, addresses] : publishers_for_tag_)
       {
-        // Intentionally send tag data with no known publishers to mark that
-        // the recieving end should no longer wait for those tags to appear
-        tags_to_send.push_back(tag);
-        addresses_to_send.emplace_back(addresses.cbegin(), addresses.cend());
+        // Don't send data for tags that don't have any known publishers
+        if (!addresses.empty())
+        {
+          tags_to_send.push_back(tag);
+          addresses_to_send.emplace_back(addresses.cbegin(), addresses.cend());
+        }
       }
       const std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
       const auto to_send = internal::make_report_publishers(
@@ -1011,6 +1018,7 @@ namespace skynet
         }
       }
     }
+    return try_connections_for_pending_tags();
   }
 
   std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
@@ -1423,4 +1431,64 @@ namespace skynet
     return group_loc->second.group.add_data(data.tag_id(), *var_opt, data.version());
   }
 
+  const std::vector<TagID>& Master::get_pending_tags() noexcept
+  {
+    return pending_tags_;
+  }
+
+  bool Master::try_connections_for_pending_tags() noexcept
+  {
+    bool ignore_cache = false;
+    bool new_connections_made = false;
+    for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
+    {
+      const auto& tag_id = *iter;
+      // Check if there is a list of known producers for the tag
+      const auto loc = publishers_for_tag_.find(tag_id);
+      // Create the entry if it exists
+      if (loc != publishers_for_tag_.cend())
+      {
+        auto& publishers = loc->second;
+        // Now, if there are any known subscriptions, try to subscribe to them
+        if (!publishers.empty())
+        {
+          for (auto pub_iter = publishers.begin(); pub_iter != publishers.end(); )
+          {
+            const auto& subscribe_address = *pub_iter;
+            if (auto sub = internal::Subscription::try_to_create(subscribe_address))
+            {
+              subscriptions_.push_back(SubscriptionData{
+                std::move(*sub),
+                get_tags_for_publisher(subscribe_address)
+              });
+              // Managed to subscribe; remove the pending tag
+              using std::swap;
+              swap(*iter, pending_tags_.back());
+              pending_tags_.pop_back();
+              --iter;
+              new_connections_made = true;
+              break;
+            }
+            else
+            {
+              SKYNET_TRACE_LOG("{} failed to subscribe to {} for tag {}", id_, subscribe_address, tag_id);
+              // Couldn't subscribe - remove this as a producer
+              pub_iter = publishers.erase(pub_iter);
+            }
+          }
+        }
+        // Check if the producers are now empty (happens if all subscription attempts failed)
+        if (publishers.empty())
+        {
+          // Need to get original producers for tags now, so have to ignore caches
+          ignore_cache = true;
+        }
+      }
+    }
+    if (new_connections_made)
+    {
+      new_tag_connections_cv_.notify_all();
+    }
+    return ignore_cache;
+  }
 } // namespace skynet
