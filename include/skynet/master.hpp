@@ -662,6 +662,11 @@ namespace skynet
 
     // Notification for when reduce group related connections are made
     std::condition_variable reduce_group_cv_;
+
+    // Bools seperate for if notifications should be raised so that
+    // the CV's can use notifications while the mutex is released
+    bool notify_new_subscriptions_ = false;
+    bool notify_reduce_group_ = false;
   }; // class Master
 } // namespace skynet
 

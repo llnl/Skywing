@@ -595,8 +595,22 @@ namespace skynet
           neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
         }
       }
+      // Mutex has been released - notify CV's if requested
+      std::array<std::pair<bool&, std::condition_variable&>, 2> cv_array{
+        std::pair<bool&, std::condition_variable&>{notify_new_subscriptions_, new_subscription_cv_},
+        std::pair<bool&, std::condition_variable&>{notify_reduce_group_, reduce_group_cv_}
+      };
+      for (auto& [notify, cv] : cv_array)
+      {
+        if (notify)
+        {
+          cv.notify_all();
+          notify = false;
+        }
+      }
       // Wait a bit for other messages
-      std::this_thread::sleep_for(100000us);
+      std::this_thread::yield();
+      std::this_thread::sleep_for(100us);
     }
     // Join all of the threads now
     for (auto& thread : threads)
@@ -1308,7 +1322,7 @@ namespace skynet
         {
           // otherwise just add it and mark this as a success
           existing_conns.push_back(from.id());
-          reduce_group_cv_.notify_all();
+          notify_reduce_group_ = true;
           return true;
         }
       }
@@ -1405,8 +1419,6 @@ namespace skynet
   bool Master::try_connections_for_pending_tags() noexcept
   {
     bool ignore_cache = false;
-    bool new_subscriptions_made = false;
-    bool new_reduce_conns_made = false;
     for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
     {
       const auto& tag_id = *iter;
@@ -1436,7 +1448,7 @@ namespace skynet
                 swap(*iter, pending_tags_.back());
                 pending_tags_.pop_back();
                 --iter;
-                new_subscriptions_made = true;
+                notify_new_subscriptions_ = true;
                 break;
               }
               else
@@ -1515,7 +1527,7 @@ namespace skynet
                 const auto& tag_produced = reduce_data.group.produced_tag();
                 server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
                 reduce_data.parent_machines.push_back(server_iter->second.id());
-                new_reduce_conns_made = true;
+                notify_reduce_group_ = true;
                 // Managed to create a connection; remove the pending tag
                 using std::swap;
                 swap(*iter, pending_tags_.back());
@@ -1543,14 +1555,6 @@ namespace skynet
           ignore_cache = true;
         }
       }
-    }
-    if (new_subscriptions_made)
-    {
-      new_subscription_cv_.notify_all();
-    }
-    if (new_reduce_conns_made)
-    {
-      reduce_group_cv_.notify_all();
     }
     return ignore_cache;
   }
