@@ -57,47 +57,51 @@ namespace skynet
     const VersionID version
   ) noexcept
   {
-    auto [buffers, lock] = bufs_.get();
-    (void)lock;
-    const auto loc = buffers.find(tag_id);
-    // Not subscribed; don't do anything, but not an error
-    if (loc == buffers.cend())
     {
+      auto [buffers, lock] = bufs_.get();
+      (void)lock;
+      const auto loc = buffers.find(tag_id);
+      // Not subscribed; don't do anything, but not an error
+      if (loc == buffers.cend())
+      {
+        SKYNET_TRACE_LOG(
+          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
+          master_->id(),
+          id_,
+          tag_id,
+          version,
+          data
+        );
+        return true;
+      }
+      // If the type is wrong then something went wrong
+      if (data.index() != loc->second.expected_type)
+      {
+        SKYNET_WARN_LOG(
+          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index (expected {}, got {})",
+          master_->id(),
+          id_,
+          tag_id,
+          version,
+          data,
+          loc->second.expected_type,
+          data.index()
+        );
+        return false;
+      }
       SKYNET_TRACE_LOG(
-        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
+        "{}, job {} accepted tag {}, version {}, data {}",
         master_->id(),
         id_,
         tag_id,
         version,
         data
       );
-      return true;
+      // Otherwise just make it the current value
+      loc->second.buffer.add(std::move(data), version);
     }
-    // If the type is wrong then something went wrong
-    if (data.index() != loc->second.expected_type)
-    {
-      SKYNET_WARN_LOG(
-        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index (expected {}, got {})",
-        master_->id(),
-        id_,
-        tag_id,
-        version,
-        data,
-        loc->second.expected_type,
-        data.index()
-      );
-      return false;
-    }
-    SKYNET_TRACE_LOG(
-      "{}, job {} accepted tag {}, version {}, data {}",
-      master_->id(),
-      id_,
-      tag_id,
-      version,
-      data
-    );
-    // Otherwise just make it the current value
-    loc->second.buffer.add(std::move(data), version);
+    // Notify after making sure to release the mutex
+    data_added_to_buffer_cv_.notify_all();
     return true;
   }
 
@@ -124,13 +128,12 @@ namespace skynet
   }
 
   // Implementation of public functions
-  PublishValueVariant Job::get_impl(
+  PublishValueVariant Job::get_impl_no_lock(
     const internal::PublishTagBase& tag,
     const VersionID version
   ) noexcept
   {
-    auto [buffers, lock] = bufs_.get();
-    (void)lock;
+    auto& buffers = bufs_.unsafe_get();
     assert(
       buffers.find(tag.id()) != buffers.cend() &&
       buffers.find(tag.id())->second.buffer.has_data(version) &&
@@ -141,8 +144,13 @@ namespace skynet
 
   bool Job::has_data(const internal::PublishTagBase& tag, const VersionID version) noexcept
   {
-    auto [buffers, lock] = bufs_.get();
-    (void)lock;
+    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    return has_data_no_lock(tag, version);
+  }
+
+  bool Job::has_data_no_lock(const internal::PublishTagBase& tag, const VersionID version) noexcept
+  {
+    auto& buffers = bufs_.unsafe_get();
     const auto loc = buffers.find(tag.id());
     if (loc == buffers.cend())
     {

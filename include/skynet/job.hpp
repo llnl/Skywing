@@ -7,7 +7,6 @@
 #include "skynet/internal/master_future_callables.hpp"
 #include "skynet/internal/reduce_group.hpp"
 #include "skynet/internal/tag_buffer.hpp"
-#include "skynet/local_future.hpp"
 #include "skynet/types.hpp"
 
 #include <cassert>
@@ -162,12 +161,14 @@ namespace skynet
       const VersionID version = internal::tag_default_version
     ) noexcept
     {
-      return internal::make_local_future(
+      return internal::make_future(
+        bufs_.mutex(),
+        data_added_to_buffer_cv_,
         [this, tag, version]() {
-          return has_data(tag, version);
+          return has_data_no_lock(tag, version);
         },
         [this, tag, version]() {
-          const auto variant = get_impl(tag, version);
+          const auto variant = get_impl_no_lock(tag, version);
           assert(std::get_if<ValueType>(&variant) != nullptr);
           return *std::get_if<ValueType>(&variant);
         }
@@ -178,7 +179,7 @@ namespace skynet
      */
     bool has_data(
       const internal::PublishTagBase& tag,
-      const VersionID version = internal::tag_default_version
+      VersionID version = internal::tag_default_version
     ) noexcept;
 
     /** \brief Subscribe to all tags passed into the vector.
@@ -266,7 +267,7 @@ namespace skynet
     void publish(
       const PublishTag<T>& tag,
       const T& value,
-      const VersionID version = internal::tag_default_version
+      VersionID version = internal::tag_default_version
     ) noexcept
     {
       publish_impl(tag, value, version);
@@ -285,6 +286,10 @@ namespace skynet
     const JobID& id() const noexcept;
 
   private:
+    /** \brief Checks if a buffer has data without locking
+     */
+    bool has_data_no_lock(const internal::PublishTagBase& tag, VersionID version) noexcept;
+
     /** \brief Processes the raw information sent from a job on another instance
      *
      * \param tag The id of the tag the data was sent with
@@ -297,12 +302,12 @@ namespace skynet
     void publish_impl(
       const internal::PublishTagBase& tag,
       const PublishValueVariant& to_send,
-      const VersionID version
+      VersionID version
     ) noexcept;
 
-    PublishValueVariant get_impl(
+    PublishValueVariant get_impl_no_lock(
       const internal::PublishTagBase& tag,
-      const VersionID version
+      VersionID version
     ) noexcept;
 
     void init_subscribe(
@@ -355,6 +360,9 @@ namespace skynet
 
     // The list of tags this job produces and the expected types
     std::unordered_map<TagID, std::uint8_t> tags_produced_;
+
+    // Condition variable when data is added to buffers
+    std::condition_variable data_added_to_buffer_cv_;
   }; // Class Job
 } // namespace skynet
 

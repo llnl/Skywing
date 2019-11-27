@@ -17,9 +17,7 @@ public:
   template<typename... Args>
   constexpr explicit MutexGuarded(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
     : value_{std::forward<Args>(args)...}
-  {
-    ;
-  }
+  {}
 
   /** \brief Returns the object, locking if it is not available
    */
@@ -33,15 +31,25 @@ public:
    */
   std::pair<T*, std::unique_lock<std::mutex>> try_get() noexcept
   {
-    if (mutex_.try_lock()) {
+    if (mutex_.try_lock())
+    {
       // Lock worked
       return {&value_, {mutex_, std::adopt_lock}};
     }
-    else {
+    else
+    {
       // Lock failed
       return {nullptr, {}};
     }
   }
+
+  /** \brief Returns a reference to the mutex
+   */
+  std::mutex& mutex() noexcept { return mutex_; }
+
+  /** \brief Returns a reference to the contained value without using the mutex.
+   */
+  T& unsafe_get() noexcept { return value_; }
 
 private:
   T value_;
