@@ -25,7 +25,7 @@ namespace skynet::internal
     if (value.index() != expected_type_)
     {
       SKYNET_WARN_LOG(
-        "{} rejected data for reduce group {} for tag {} version {} due to wrong type",
+        "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to wrong type",
         master_->id(),
         group_id_,
         tag,
@@ -38,7 +38,7 @@ namespace skynet::internal
       if (tag == tag_neighbors_.tags[i])
       {
         SKYNET_TRACE_LOG(
-          "{} added data for reduce group {} for tag {} version {}",
+          "\"{}\" added data for reduce group \"{}\" for tag \"{}\" version {}",
           master_->id(),
           group_id_,
           tag,
@@ -53,7 +53,7 @@ namespace skynet::internal
       }
     }
     SKYNET_WARN_LOG(
-      "{} rejected data for reduce group {} for tag {} version {} due to not matching any buffer",
+      "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to not matching any buffer",
       master_->id(),
       group_id_,
       tag,
@@ -71,6 +71,11 @@ namespace skynet::internal
   const ReduceGroupNeighbors& ReduceGroupBase::tag_neighbors() const noexcept
   {
     return tag_neighbors_;
+  }
+
+  const TagID& ReduceGroupBase::produced_tag() const noexcept
+  {
+    return produced_tag_;
   }
 
   void ReduceGroupBase::send_value_to_parent(const PublishValueVariant& value_to_send, const VersionID version) noexcept

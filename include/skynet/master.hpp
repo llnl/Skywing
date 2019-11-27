@@ -193,9 +193,6 @@ namespace skynet
       // The base port to use to connect to the remote machine
       std::uint16_t base_port_;
 
-      // The number of pending get publishers requests
-      std::uint16_t pending_get_publishers_count_ = 0;
-
       // If the next request for tags should ignore the cache or not
       bool ignore_cache_on_next_request_ = false;
 
@@ -322,7 +319,7 @@ namespace skynet
         return m.subscribe(tag_ids);
       }
 
-      static bool create_reduce_group(
+      static auto create_reduce_group(
         Master& m,
         const TagID& group_id,
         const TagID& tag_produced,
@@ -332,15 +329,6 @@ namespace skynet
       {
         std::unique_lock lock{m.job_mut_};
         return m.create_reduce_group(group_id, tag_produced, tags_to_find, expected_type);
-      }
-
-      static internal::ReduceGroupBase& get_reduce_group(
-        Master& m,
-        const TagID& group_id
-      ) noexcept
-      {
-        std::unique_lock lock{m.job_mut_};
-        return m.get_reduce_group(group_id);
       }
     }; // struct JobAccessor
 
@@ -413,10 +401,22 @@ namespace skynet
     {
     private:
       friend class internal::MasterSubscribeIsDone;
+      friend class internal::MasterReduceGroupIsCreated;
+      friend class internal::MasterGetReduceGroup;
 
       static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
       {
         return m.subscribe_is_done(tags);
+      }
+
+      static bool reduce_group_is_created(Master& m, const TagID& group_id) noexcept
+      {
+        return m.reduce_group_is_created(group_id);
+      }
+
+      static internal::ReduceGroupBase& get_reduce_group(Master& m, const TagID& group_id) noexcept
+      {
+        return m.get_reduce_group(group_id);
       }
     }; // struct FutureAccessor
 
@@ -530,12 +530,20 @@ namespace skynet
 
     /** \brief Starts the process of creating a reduce group
      */
-    bool create_reduce_group(
+    auto create_reduce_group(
       const TagID& group_id,
       const TagID& tag_produced,
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
-    ) noexcept;
+    ) noexcept
+      -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+
+    /** \brief Returns true if the specified reduce group has been successfully created.
+     *
+     * "Success" in this case means that a connection with a parent and both children
+     * has been established; there is no way to determine if the entire tree has been established.
+     */
+    bool reduce_group_is_created(const TagID& group_id) noexcept;
 
     /** \brief Handles a message that a child is joining a reduce group
      */
@@ -649,8 +657,11 @@ namespace skynet
     // The port used for communications
     std::uint16_t comm_port_;
 
-    // Notification for when new tag related links are created
-    std::condition_variable new_tag_connections_cv_;
+    // Notification for when new subscriptions are created
+    std::condition_variable new_subscription_cv_;
+
+    // Notification for when reduce group related connections are made
+    std::condition_variable reduce_group_cv_;
   }; // class Master
 } // namespace skynet
 

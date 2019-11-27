@@ -183,7 +183,7 @@ namespace skynet
 
     /** \brief Subscribe to all tags passed into the vector.
      *
-     * \return A LocalFuture for when the tags have been subscribed to
+     * \return A future for when the tags have been subscribed to
      */
     auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
     {
@@ -194,7 +194,7 @@ namespace skynet
 
     /** \brief Attempts to subscribe to the passed tag
      *
-     * \return A LocalFuture for when the tag is subscribed to
+     * \return A future for when the tag is subscribed to
      */
     auto subscribe(const internal::PublishTagBase& tag) noexcept
     {
@@ -213,19 +213,16 @@ namespace skynet
       std::vector<TagID> tag_ids(tags.size());
       std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& t) { return t.id(); });
       const auto tags_to_find = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_type());
-      return internal::make_local_future(
-        [group_tag, tag_produced_for_group, tags_to_find, this]() {
-          return is_reduce_group_created(group_tag.id(), tag_produced_for_group.id(), tags_to_find, group_tag.expected_type());
-        },
-        [group_tag, this]() -> ReduceGroup<ValueType> {
-          return ReduceGroup<ValueType>{get_reduce_group(group_tag.id())};
+      return create_reduce_group_future(group_tag.id(), tag_produced_for_group.id(), tags_to_find, group_tag.expected_type())
+        .adjust_get_function([](internal::ReduceGroupBase& group) {
+          return ReduceGroup<ValueType>(group);
         }
       );
     }
 
     /** \brief Create a reduce group over the specified tags
      *
-     * \return A LocalFuture for when the reduce group has been created
+     * \return A future for when the reduce group has been created
      */
     // template<typename ReduceTag, typename... ReduceOverTags>
     // auto create_reduce_group(
@@ -324,15 +321,13 @@ namespace skynet
       std::uint8_t expected_type
     ) noexcept;
 
-    bool is_reduce_group_created(
+    auto create_reduce_group_future(
+      const TagID& group_id,
       const TagID& tag_produced,
-      const TagID& group_tag_id,
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
-    ) noexcept;
-
-    // Gets a reduce group reference from the master
-    internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
+    ) noexcept
+      -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     // The id of the job
     JobID id_;

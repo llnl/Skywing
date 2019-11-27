@@ -11,8 +11,11 @@
 namespace skynet
 {
   class Master;
+
   namespace internal
   {
+    class ReduceGroupBase;
+
     class MasterSubscribeIsDone
     {
     public:
@@ -23,6 +26,31 @@ namespace skynet
       Master* master_;
       const std::vector<TagID> tags_;
     }; // class MasterSubscribeIsDone
+
+    class MasterReduceGroupIsCreated
+    {
+    public:
+      MasterReduceGroupIsCreated(
+        Master& master,
+        const TagID& group_id
+      ) noexcept;
+      bool operator()() const noexcept;
+
+    private:
+      Master* master_;
+      TagID group_id_;
+    }; // class MasterReduceGroupIsCreated
+
+    class MasterGetReduceGroup
+    {
+    public:
+      MasterGetReduceGroup(Master& master, const TagID& group_id) noexcept;
+      ReduceGroupBase& operator()() const noexcept;
+
+    private:
+      Master* master_;
+      TagID group_id_;
+    }; // class MasterGetReduceGroup
   } // namespace skynet::internal
 } // namespace skynet
 

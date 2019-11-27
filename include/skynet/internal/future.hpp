@@ -65,6 +65,21 @@ namespace skynet::internal
       return is_ready_no_lock();
     }
 
+    // For transforming the get type
+    template<typename AdjustCallable>
+    auto adjust_get_function(AdjustCallable adjust) const noexcept
+    {
+      const auto adj_lambda = [adjust = std::move(adjust), getter = static_cast<const GetValueCallable&>(*this)]() {
+        return adjust(getter());
+      };
+      return Future<decltype(adj_lambda()), IsReadyCallable, decltype(adj_lambda)>{
+        mutex_,
+        cv_,
+        static_cast<const IsReadyCallable&>(*this),
+        adj_lambda
+      };
+    }
+
   private:
     bool is_ready_no_lock() noexcept
     {

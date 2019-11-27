@@ -42,6 +42,8 @@ namespace skynet
 
       const ReduceGroupNeighbors& tag_neighbors() const noexcept;
 
+      const TagID& produced_tag() const noexcept;
+
     private:
       // Sends a value to the parent
       void send_value_to_parent(const PublishValueVariant& value_to_send, VersionID version) noexcept;
@@ -118,6 +120,7 @@ namespace skynet
     std::optional<ProdType> do_reduce(const ProdType& value, ReduceCallable reduce_op, const VersionID version) noexcept
     {
       const auto required_version = internal::updated_version(base_.last_sent_version_, version);
+      base_.last_sent_version_ = required_version;
       // The base type is an optional, strip that type while working in here
       const ProdType reduce_result = [&]() -> ProdType {
         // Three different options - 2 children, left child only, no children

@@ -64,7 +64,7 @@ namespace skynet
     if (loc == buffers.cend())
     {
       SKYNET_TRACE_LOG(
-        "{}, job {} discarded tag {}, version {}, data {}, due to not being subscribed",
+        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
         master_->id(),
         id_,
         tag_id,
@@ -77,7 +77,7 @@ namespace skynet
     if (data.index() != loc->second.expected_type)
     {
       SKYNET_WARN_LOG(
-        "{}, job {} discarded tag {}, version {}, data {}, due to it having the wrong type index (expected {}, got {})",
+        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index (expected {}, got {})",
         master_->id(),
         id_,
         tag_id,
@@ -232,7 +232,7 @@ namespace skynet
       }
     }
     SKYNET_TRACE_LOG(
-      "{}, job {}, created reduce a reduce group; produced tag is \"{}\", parent tag is \"{}\", child tags are \"{}\", \"{}\"",
+      "\"{}\", job \"{}\", created a reduce group; produced tag is \"{}\", parent tag is \"{}\", child tags are \"{}\", \"{}\"",
       master_->id(),
       id_,
       tag_produced,
@@ -243,19 +243,20 @@ namespace skynet
     return tags_to_find;
   }
 
-  bool Job::is_reduce_group_created(
+  auto Job::create_reduce_group_future(
+    const TagID& group_id,
     const TagID& tag_produced,
-    const TagID& group_tag_id,
     const internal::ReduceGroupNeighbors& tags_to_find,
-    const std::uint8_t expected_type
+    std::uint8_t expected_type
   ) noexcept
+    -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
-    return Master::JobAccessor::create_reduce_group(*master_, tag_produced, group_tag_id, tags_to_find, expected_type);
+    return Master::JobAccessor::create_reduce_group(
+      *master_,
+      group_id,
+      tag_produced,
+      tags_to_find,
+      expected_type
+    );
   }
-
-  internal::ReduceGroupBase& Job::get_reduce_group(const TagID& group_id) noexcept
-  {
-    return Master::JobAccessor::get_reduce_group(*master_, group_id);
-  }
-
 } // namespace skynet

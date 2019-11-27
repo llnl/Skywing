@@ -130,7 +130,12 @@ namespace skynet
       const bool ignore_cache
     ) noexcept
     {
-      ++pending_get_publishers_count_;
+      SKYNET_TRACE_LOG(
+        "\"{}\" asking \"{}\" for tags {}",
+        master_->id(),
+        id_,
+        tags
+      );
       send_message(make_get_publishers(tags, ignore_cache));
     }
 
@@ -204,7 +209,7 @@ namespace skynet
     {
       send_message(make_greeting(local_id, local_neighbors, base_port));
       SKYNET_TRACE_LOG(
-        "{} sending greeting to {}",
+        "\"{}\" sending greeting to {}",
         master_->id(),
         conn_.ip_address_and_port()
       );
@@ -217,7 +222,7 @@ namespace skynet
       // Wait for the greeting
       // TODO: Probably want a time-out?
       SKYNET_TRACE_LOG(
-        "{} waiting for greeting from {}",
+        "\"{}\" waiting for greeting from {}",
         master_->id(),
         conn_.ip_address_and_port()
       );
@@ -231,7 +236,7 @@ namespace skynet
               id_ = msg.from();
               base_port_ = msg.base_port();
               SKYNET_TRACE_LOG(
-                "{} got greeting from {}",
+                "\"{}\" got greeting from {}",
                 master_->id(),
                 conn_.ip_address_and_port()
               );
@@ -240,7 +245,7 @@ namespace skynet
             // Any other kind of message is an error
             [&](...) {
               SKYNET_WARN_LOG(
-                "{} recieved a non-greeting from {} during the handshake",
+                "\"{}\" recieved a non-greeting from {} during the handshake",
                 master_->id(),
                 conn_.ip_address_and_port().first
               );
@@ -260,7 +265,7 @@ namespace skynet
         [&](const Greeting&) {
           // shouldn't be seeing a greeting here
           SKYNET_WARN_LOG(
-            "{} recieved an unexpected greeting from {}",
+            "\"{}\" recieved an unexpected greeting from \"{}\"",
             master_->id(),
             id_
           );
@@ -268,7 +273,7 @@ namespace skynet
         },
         [&](const Goodbye&) {
           SKYNET_TRACE_LOG(
-            "{} recieved goodbye from {}",
+            "\"{}\" recieved goodbye from \"{}\"",
             master_->id(),
             id_
           );
@@ -281,7 +286,7 @@ namespace skynet
           if (loc != neighbors_.cend() && *loc == msg.neighbor_id())
           {
             SKYNET_WARN_LOG(
-              "{} recieved new nighbor from {} with id {}, but it was already present",
+              "\"{}\" recieved new nighbor from \"{}\" with id \"{}\", but it was already present",
               master_->id(),
               id_,
               msg.neighbor_id()
@@ -289,7 +294,7 @@ namespace skynet
             return false;
           }
           SKYNET_TRACE_LOG(
-            "{} recieved new neighbor from {} with id {}",
+            "\"{}\" recieved new neighbor from \"{}\" with id \"{}\"",
             master_->id(),
             id_,
             msg.neighbor_id()
@@ -300,7 +305,7 @@ namespace skynet
         },
         [&](const RemoveNeighbor& msg) {
           SKYNET_TRACE_LOG(
-            "{} recieved remove neighbor from {} with id {}",
+            "\"{}\" recieved remove neighbor from \"{}\" with id \"{}\"",
             master_->id(),
             id_,
             msg.neighbor_id()
@@ -321,16 +326,15 @@ namespace skynet
           // Nothing to do; this is just to acknowledge it exists
           // (Last heard time was already updated)
           SKYNET_TRACE_LOG(
-            "{} recieved heartbeat from {}",
+            "\"{}\" recieved heartbeat from \"{}\"",
             master_->id(),
             id_
           );
           return true;
         },
         [&](const ReportPublishers& msg) {
-          --pending_get_publishers_count_;
           SKYNET_TRACE_LOG(
-            "{} recieved report publishers from {} with remote tags {} and local tags {}",
+            "\"{}\" recieved report publishers from \"{}\" with remote tags \"{}\" and local tags \"{}\"",
             master_->id(),
             id_,
             msg.tags(),
@@ -343,6 +347,12 @@ namespace skynet
             {
               if (!tag_name_okay(tag))
               {
+                SKYNET_WARN_LOG(
+                  "\"{}\" dropping connection with \"{}\" due to bad tag \"{}\" in report.",
+                  master_->id(),
+                  id_,
+                  tag
+                );
                 return false;
               }
             }
@@ -354,12 +364,15 @@ namespace skynet
           {
             ignore_cache_on_next_request_ = true;
           }
-          // If there are no pending requests and tags to find, send another request
+          // If there are still tags to find, send another request
+          // TODO: Probably only want to have one active request at a time to reduce network traffic
+          // Previous idea was to keep track of the number of requests sent / answers to those requests,
+          // but multiple requests sent can result in a single answer, so a boolean approach seems best
           const auto& remaining_tags =
             Master::ExternalMasterAccessor::get_pending_tags(*master_);
-          if (pending_get_publishers_count_ == 0 && !remaining_tags.empty())
+          if (!remaining_tags.empty())
           {
-            SKYNET_TRACE_LOG("{} still looking for tags {} from {}",
+            SKYNET_TRACE_LOG("\"{}\" still looking for tags {} from \"{}\"",
               master_->id(),
               remaining_tags,
               id_
@@ -367,11 +380,18 @@ namespace skynet
             find_publishers_for_tags(remaining_tags, ignore_cache_on_next_request_);
             ignore_cache_on_next_request_ = false;
           }
+          else
+          {
+            SKYNET_TRACE_LOG("\"{}\" has no remaining tags to ask from \"{}\"",
+              master_->id(),
+              id_
+            );
+          }
           return true;
         },
         [&](const GetPublishers& msg) {
           SKYNET_TRACE_LOG(
-            "{} recieved get publishers from {} requesting tags {}",
+            "\"{}\" recieved get publishers from \"{}\" requesting tags {}",
             master_->id(),
             id_,
             msg.tags()
@@ -381,7 +401,7 @@ namespace skynet
             if (!tag_name_okay(tag))
             {
               SKYNET_WARN_LOG(
-                "{} discarded connection with {} due to bad tag name {}",
+                "\"{}\" discarded connection with \"{}\" due to bad tag name \"{}\"",
                 master_->id(),
                 id_,
                 tag
@@ -394,7 +414,7 @@ namespace skynet
         },
         [&](const JoinReduceGroup& msg) {
           SKYNET_TRACE_LOG(
-            "{} recieved join reduce group from {} for group {}, producing tag {}",
+            "\"{}\" recieved join reduce group from \"{}\" for group \"{}\", producing tag \"{}\"",
             master_->id(),
             id_,
             msg.reduce_tag(),
@@ -408,7 +428,7 @@ namespace skynet
         },
         [&](const SubmitReduceValue& msg) {
           SKYNET_TRACE_LOG(
-            "{} recieved submit reduce value from {} for group {}, tag {}",
+            "\"{}\" recieved submit reduce value from \"{}\" for group \"{}\", tag \"{}\"",
             master_->id(),
             id_,
             msg.reduce_tag(),
@@ -495,13 +515,13 @@ namespace skynet
         if (neighbors_.find(new_id) != neighbors_.end())
         {
           SKYNET_WARN_LOG(
-            "{} rejected connection due to the id already being used",
+            "\"{}\" rejected connection due to the id already being used",
             id_,
             new_neighbor->id()
           );
           continue;
         }
-        SKYNET_TRACE_LOG("{} accepted connection from {}", id_, new_neighbor->id());
+        SKYNET_TRACE_LOG("\"{}\" accepted connection from \"{}\"", id_, new_neighbor->id());
         notify_of_new_neighbor(new_id);
         const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
         assert(inserted);
@@ -567,20 +587,16 @@ namespace skynet
         // Ensure there's no data race with jobs
         std::unique_lock lock{job_mut_};
         accept_pending_connections();
-        // Handle any subscription requests
         pub_channel_.accept_subscriptions();
-        // Read data from subscriptions
         read_data_from_subscriptions();
-        // Handle any messages from neighbors
         handle_neighbor_messages();
-        // Send any heartbeat messages if needed
         for (auto&& neighbor : neighbors_)
         {
           neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
         }
       }
       // Wait a bit for other messages
-      std::this_thread::sleep_for(100us);
+      std::this_thread::sleep_for(100000us);
     }
     // Join all of the threads now
     for (auto& thread : threads)
@@ -611,12 +627,12 @@ namespace skynet
   auto Master::connect_impl(const char* address, std::uint16_t port) noexcept -> decltype(neighbors_)::iterator
   {
     internal::SocketCommunicator to_connect;
-    SKYNET_TRACE_LOG("{} attempting to connect to {}:{}", id_, address, port);
+    SKYNET_TRACE_LOG("\"{}\" attempting to connect to {}:{}", id_, address, port);
     if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
     {
       // Failing to connect to a server is normal enough that the logging level
       // here should probably be trace or debug at the most
-      SKYNET_TRACE_LOG("{} failed to connect to {}:{}", id_, address, port);
+      SKYNET_TRACE_LOG("\"{}\" failed to connect to {}:{}", id_, address, port);
       // internal::on_error("Master::connect_to_server failed!");
       return neighbors_.end();
     }
@@ -634,7 +650,7 @@ namespace skynet
       if (neighbors_.find(new_id) != neighbors_.end())
       {
         SKYNET_WARN_LOG(
-          "{} rejected {}:{} due to a neighbor already using the id {}",
+          "\"{}\" rejected {}:{} due to a neighbor already using the id \"{}\"",
           id_,
           address,
           port,
@@ -679,7 +695,7 @@ namespace skynet
     const auto msg = internal::make_publish(version, tag_id, value);
     std::stringstream ss;
     SKYNET_TRACE_LOG(
-      "{} publishing on tag {}, version {}, data {} to {} subscribers",
+      "\"{}\" publishing on tag \"{}\", version \"{}\", data {} to {} subscribers",
       id_,
       tag_id,
       version,
@@ -771,7 +787,7 @@ namespace skynet
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
     -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
-    SKYNET_TRACE_LOG("{} looking for subscription information for {}", id_, tag_ids);
+    SKYNET_TRACE_LOG("\"{}\" looking for subscription information for {}", id_, tag_ids);
     std::vector<TagID> tags_to_search_for;
     for (const auto& tag_id : tag_ids)
     {
@@ -789,7 +805,7 @@ namespace skynet
       }();
       if (already_subscribed)
       {
-        SKYNET_TRACE_LOG("{} already subscribed for tag {}", id_, tag_id);
+        SKYNET_TRACE_LOG("\"{}\" already subscribed for tag \"{}\"", id_, tag_id);
         continue;
       }
       // If the tag is produced locally just subscribe to self
@@ -813,7 +829,7 @@ namespace skynet
     }
     if (!tags_to_search_for.empty())
     {
-      SKYNET_TRACE_LOG("{} looking for new publishers for tags {}", id_, tags_to_search_for);
+      SKYNET_TRACE_LOG("\"{}\" looking for new publishers for tags {}", id_, tags_to_search_for);
       for (auto& neighbor : neighbors_)
       {
         // Presume that the cache is okay
@@ -822,7 +838,7 @@ namespace skynet
     }
     return internal::make_future(
       job_mut_,
-      new_tag_connections_cv_,
+      new_subscription_cv_,
       internal::MasterSubscribeIsDone{*this, tag_ids}
     );
   }
@@ -836,6 +852,12 @@ namespace skynet
     const auto remaining_tags = remove_tags_with_known_publishers(msg);
     if (remaining_tags.empty())
     {
+      SKYNET_TRACE_LOG(
+        "\"{}\" sending \"{}\" publisher information for {}, all tags have been fulfilled",
+        id_,
+        from.id(),
+        msg.tags()
+      );
       // Send the information back now
       from.send_message(make_known_tag_publisher_message());
     }
@@ -858,6 +880,22 @@ namespace skynet
       // it doesn't stall
       if (neighbors_.size() == 1)
       {
+        SKYNET_TRACE_LOG(
+          "\"{}\" sending \"{}\" publisher information for {}, no neighbors to ask",
+          id_,
+          from.id(),
+          [&]() {
+            std::vector<TagID> known_tags;
+            for (const auto& [tag, publishers] : publishers_for_tag_)
+            {
+              if (!publishers.empty())
+              {
+                known_tags.push_back(tag);
+              }
+            }
+            return known_tags;
+          }()
+        );
         from.send_message(make_known_tag_publisher_message());
         return;
       }
@@ -879,7 +917,7 @@ namespace skynet
       if (!ask_neighbors)
       {
         SKYNET_TRACE_LOG(
-          "{} returning early for request for tags {} from {} to avoid potential deadlock",
+          "\"{}\" returning early for request for tags {} from \"{}\" to avoid potential deadlock",
           id_,
           msg.tags(),
           from.id()
@@ -889,7 +927,7 @@ namespace skynet
       else
       {
         SKYNET_TRACE_LOG(
-          "{} asking neighbors for tags {} for {}",
+          "\"{}\" asking neighbors for tags {} for \"{}\"",
           id_,
           msg.tags(),
           from.id()
@@ -936,7 +974,7 @@ namespace skynet
     // TODO: Actually handle this
     if (tags.size() != publishers_list.size())
     {
-      SKYNET_WARN_LOG("{} recieved tag/publisher list size mismatch from {}", id_, from.id());
+      SKYNET_WARN_LOG("\"{}\" recieved tag/publisher list size mismatch from \"{}\"", id_, from.id());
       return false;
     }
     // Add the information to what is locally known
@@ -1014,6 +1052,13 @@ namespace skynet
         const auto loc = neighbors_.find(send_to);
         if (loc != neighbors_.end())
         {
+          SKYNET_TRACE_LOG(
+            "\"{}\" propagating back to \"{}\" for remote tags {} and local tags {}",
+            id_,
+            send_to,
+            tags_to_send,
+            local_tags
+          );
           loc->second.send_message(to_send);
         }
       }
@@ -1065,7 +1110,7 @@ namespace skynet
       {
         const auto bytes_to_read = internal::from_network_bytes(size_buffer);
         SKYNET_TRACE_LOG(
-          "{} recieved a publication of {} bytes from {}",
+          "\"{}\" recieved a publication of {} bytes from \"{}\"",
           id_,
           bytes_to_read,
           sub.ip_address_and_port()
@@ -1074,7 +1119,7 @@ namespace skynet
         if (const auto message_buffer = sub.read_chunked(bytes_to_read); !message_buffer.empty())
         {
           SKYNET_TRACE_LOG(
-            "{} successfully read publication message of {} bytes from {}",
+            "\"{}\" successfully read publication message of {} bytes from \"{}\"",
             id_,
             bytes_to_read,
             sub.ip_address_and_port()
@@ -1088,7 +1133,7 @@ namespace skynet
                 for (auto& [job_id, job] : jobs_)
                 {
                   SKYNET_TRACE_LOG(
-                    "{} recieved data on tag {}, version {}, data: {}",
+                    "\"{}\" recieved data on tag \"{}\", version {}, data: {}",
                     id_,
                     data->tag_id(),
                     data->version(),
@@ -1125,7 +1170,7 @@ namespace skynet
 
   void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   {
-    SKYNET_TRACE_LOG("{} adding tags produced: {}", id_, tags);
+    SKYNET_TRACE_LOG("\"{}\" adding tags produced: {}", id_, tags);
     // Mark the tags produced by this job
     for (const auto& tag : tags)
     {
@@ -1140,156 +1185,69 @@ namespace skynet
     }
   }
 
-  bool Master::create_reduce_group(
+  auto Master::create_reduce_group(
     const TagID& group_id,
     const TagID& tag_produced,
     const internal::ReduceGroupNeighbors& tags_to_find,
     const std::uint8_t expected_type
   ) noexcept
+    -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
-    // TODO: It feels like a lot of this can be combined with subscribe into a single function
-    // SKYNET_TRACE_LOG(
-    //   "{} creating reduce group {}, parent tag is \"{}\", child tags are \"{}\", \"{}\"",
-    //   id_,
-    //   group_id,
-    //   tags_to_find.parent(),
-    //   tags_to_find.left_child(),
-    //   tags_to_find.right_child()
-    // );
-    // Create an entry for the group if required
-    ReduceGroupData& reduce_data = [&]() -> ReduceGroupData& {
-      const auto loc = reduce_tag_data_.find(group_id);
-      if (loc == reduce_tag_data_.cend())
+    // Create an entry for the group
+    const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
+    (void)tag_iter;
+    if (!tag_inserted)
+    {
+      std::cerr
+        << "The tag " << std::quoted(tag_produced) << " was attempted to be produced for more than one reduce group!\n";
+      std::terminate();
+    }
+    const auto [iter, inserted] = reduce_tag_data_.try_emplace(
+      group_id,
+      tags_to_find,
+      *this,
+      group_id,
+      tag_produced,
+      expected_type
+    );
+    if (!inserted)
+    {
+      std::cerr
+        << "The reduce group " << std::quoted(group_id) << " was attempted to be created twice!\n";
+      std::terminate();
+    }
+    const auto& parent_tag = iter->second.group.tag_neighbors().parent();
+    if (!parent_tag.empty())
+    {
+      pending_tags_.push_back(parent_tag);
+      for (auto& neighbor : neighbors_)
       {
-        const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
-        (void)tag_iter;
-        if (!tag_inserted)
-        {
-          std::cerr
-            << "The tag " << std::quoted(tag_produced) << " was attempted to be produced for more than one reduce group!\n";
-          std::terminate();
-        }
-        const auto [iter, inserted] = reduce_tag_data_.try_emplace(
-          group_id,
-          tags_to_find,
-          *this,
-          group_id,
-          tag_produced,
-          expected_type
-        );
-        (void)inserted;
-        return iter->second;
+        neighbor.second.find_publishers_for_tags({parent_tag}, false);
       }
-      else
-      {
-        return loc->second;
-      }
-    }();
-    const auto& parent_tag = tags_to_find.parent();
-    // Only look for parent if one exists and a connection doesn't already exist
+    }
+    return internal::make_future(
+      job_mut_,
+      reduce_group_cv_,
+      internal::MasterReduceGroupIsCreated{*this, group_id},
+      internal::MasterGetReduceGroup{*this, group_id}
+    );
+  }
+
+  bool Master::reduce_group_is_created(const TagID& group_id) noexcept
+  {
+    // See if the parent has a connection
+    const auto group_iter = reduce_tag_data_.find(group_id);
+    assert(group_iter != reduce_tag_data_.cend());
+    const auto& reduce_data = group_iter->second;
+    const auto& parent_tag = reduce_data.group.tag_neighbors().parent();
     if (!parent_tag.empty() && reduce_data.parent_machines.empty())
     {
-      bool ignore_cache = false;
-      // Otherwise check the cache for if there's a producer
-      const auto loc = publishers_for_tag_.find(parent_tag);
-      if (loc == publishers_for_tag_.cend())
-      {
-        SKYNET_TRACE_LOG(
-          "{} for reduce group {} failed to find publishers in the cache for {}",
-          id_,
-          group_id,
-          parent_tag
-        );
-        publishers_for_tag_.try_emplace(parent_tag);
-      }
-      else
-      {
-        auto& publishers = loc->second;
-        // Try to create connections with the machine
-        if (!publishers.empty())
-        {
-          for (auto it = publishers.begin(); it != publishers.end(); )
-          {
-            const auto& subscribe_address = *it;
-            // Check if there is already a connection present, and just add the
-            // ID if so
-            // TODO: If this is a bottleneck, keep a mapping of the ip addresses to
-            // the machine names as well
-            const decltype(neighbors_)::iterator conn_iter = [&]() {
-              for (auto neighbor_iter = neighbors_.begin(); neighbor_iter != neighbors_.end(); ++neighbor_iter)
-              {
-                const auto& neighbor = *neighbor_iter;
-                if (subscribe_address == neighbor.second.two_way_address())
-                {
-                  return neighbor_iter;
-                }
-              }
-              return neighbors_.end();
-            }();
-            if (conn_iter != neighbors_.cend())
-            {
-              SKYNET_TRACE_LOG(
-                "{} already has connection to {} ({}) for tag {} for reduce group {}",
-                id_,
-                conn_iter->second.id(),
-                subscribe_address,
-                parent_tag,
-                group_id
-              );
-              // TODO: Combine this with the below, clean up this function in general
-              conn_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
-              reduce_data.parent_machines.push_back(conn_iter->second.id());
-              break;
-            }
-            const auto [port, addr] = internal::split_address(subscribe_address);
-            if (auto server_iter = connect_impl(addr.c_str(), port); server_iter != neighbors_.end())
-            {
-              SKYNET_TRACE_LOG(
-                "{} connected to {} ({}) for tag {} for reduce group {}",
-                id_,
-                server_iter->second.id(),
-                subscribe_address,
-                parent_tag,
-                group_id
-              );
-              server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
-              reduce_data.parent_machines.push_back(server_iter->second.id());
-              break;
-            }
-            else
-            {
-              SKYNET_TRACE_LOG(
-                "{} failed to connect to {} for tag {} for reduce group {}",
-                id_,
-                subscribe_address,
-                parent_tag,
-                group_id
-              );
-              it = publishers.erase(it);
-            }
-          }
-        }
-        // If all of the attempted connections failed need to ignore cache
-        if (publishers.empty())
-        {
-          ignore_cache = true;
-        }
-      }
-      if (loc == publishers_for_tag_.cend() || loc->second.empty())
-      {
-        SKYNET_TRACE_LOG(
-          "{} looking for publishers for tag {} for reduce group {}",
-          id_,
-          parent_tag,
-          group_id
-        );
-        for (auto& neighbor : neighbors_)
-        {
-          neighbor.second.find_publishers_for_tags({parent_tag}, ignore_cache);
-        }
-        // Haven't found a parent; search still isn't done
-        return false;
-      }
+      SKYNET_TRACE_LOG(
+        "\"{}\" - reduce group \"{}\" is not yet created as there is no parent connection",
+        id_,
+        group_id
+      );
+      return false;
     }
     // Check that the children have joined the group
     for (std::size_t i = 0; i < reduce_data.child_machines.size(); ++i)
@@ -1297,10 +1255,16 @@ namespace skynet
       // Ignore empty tags
       if (!reduce_data.group.tag_neighbors().tags[i + 1].empty() && reduce_data.child_machines[i].empty())
       {
+        SKYNET_TRACE_LOG(
+          "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
+          id_,
+          group_id,
+          i == 0 ? "left" : "right"
+        );
         return false;
       }
     }
-    // All children have joined - ready to go
+    SKYNET_TRACE_LOG("\"{}\" - reduce group \"{}\" is ready", id_, group_id);
     return true;
   }
 
@@ -1330,7 +1294,7 @@ namespace skynet
         if (tag_loc != existing_conns.cend())
         {
           SKYNET_WARN_LOG(
-            "{} recieved join group from {} for tag {} for reduce group {}, but it already existed in the group.",
+            "\"{}\" recieved join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but it already existed in the group.",
             id_,
             from.id(),
             msg.tag_produced(),
@@ -1344,12 +1308,13 @@ namespace skynet
         {
           // otherwise just add it and mark this as a success
           existing_conns.push_back(from.id());
+          reduce_group_cv_.notify_all();
           return true;
         }
       }
     }
     SKYNET_WARN_LOG(
-      "{} recieved join group from {} for tag {} for reduce group {}, but such a group does not exist.",
+      "\"{}\" recieved join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but such a group does not exist.",
       id_,
       from.id(),
       msg.tag_produced(),
@@ -1375,6 +1340,8 @@ namespace skynet
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
     auto& parent_machines = loc->second.parent_machines;
+    // TODO: Change this from an assert to actually handling the situation
+    assert(loc->second.group.tag_neighbors().parent().empty() || !parent_machines.empty());
     const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
     // TODO: Handle when parents run out
     // Go through all of the parents, removing ones that don't exist
@@ -1394,7 +1361,6 @@ namespace skynet
   }
 
   // TODO: Handle when running out of children
-  // ALSO: Logging for when errors occur
   bool Master::handle_submit_reduce_value(
     const internal::SubmitReduceValue& msg,
     const internal::ExternalMaster& from
@@ -1407,7 +1373,7 @@ namespace skynet
     if (group_loc == reduce_tag_data_.cend())
     {
       SKYNET_WARN_LOG(
-        "{} rejected submit reduce value from {} for reduce group {} for tag {} as the reduce group does not exist",
+        "\"{}\" rejected submit reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the reduce group does not exist",
         id_,
         from.id(),
         msg.reduce_tag(),
@@ -1420,7 +1386,7 @@ namespace skynet
     if (!var_opt)
     {
       SKYNET_WARN_LOG(
-        "{} rejected submit reduce value from {} for reduce group {} for tag {} as the value could not be extracted",
+        "\"{}\" rejected submit reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the value could not be extracted",
         id_,
         from.id(),
         msg.reduce_tag(),
@@ -1439,7 +1405,8 @@ namespace skynet
   bool Master::try_connections_for_pending_tags() noexcept
   {
     bool ignore_cache = false;
-    bool new_connections_made = false;
+    bool new_subscriptions_made = false;
+    bool new_reduce_conns_made = false;
     for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
     {
       const auto& tag_id = *iter;
@@ -1454,26 +1421,118 @@ namespace skynet
         {
           for (auto pub_iter = publishers.begin(); pub_iter != publishers.end(); )
           {
+            // Sub/pub connections
             const auto& subscribe_address = *pub_iter;
-            if (auto sub = internal::Subscription::try_to_create(subscribe_address))
+            if (tag_id[0] == internal::publish_tag_marker)
             {
-              subscriptions_.push_back(SubscriptionData{
-                std::move(*sub),
-                get_tags_for_publisher(subscribe_address)
-              });
-              // Managed to subscribe; remove the pending tag
-              using std::swap;
-              swap(*iter, pending_tags_.back());
-              pending_tags_.pop_back();
-              --iter;
-              new_connections_made = true;
-              break;
+              if (auto sub = internal::Subscription::try_to_create(subscribe_address))
+              {
+                subscriptions_.push_back(SubscriptionData{
+                  std::move(*sub),
+                  get_tags_for_publisher(subscribe_address)
+                });
+                // Managed to subscribe; remove the pending tag
+                using std::swap;
+                swap(*iter, pending_tags_.back());
+                pending_tags_.pop_back();
+                --iter;
+                new_subscriptions_made = true;
+                break;
+              }
+              else
+              {
+                SKYNET_TRACE_LOG("\"{}\" failed to subscribe to \"{}\" for tag \"{}\"", id_, subscribe_address, tag_id);
+                // Couldn't subscribe - remove this as a producer
+                pub_iter = publishers.erase(pub_iter);
+              }
             }
             else
             {
-              SKYNET_TRACE_LOG("{} failed to subscribe to {} for tag {}", id_, subscribe_address, tag_id);
-              // Couldn't subscribe - remove this as a producer
-              pub_iter = publishers.erase(pub_iter);
+              // Reduce group connections
+              // First find the group that the tag the parent is for.
+              // If there's no matching tag then just ignore it
+              // TODO: Keep a look-up map if this becomes a performance issue
+              auto& [group_id, reduce_data] = [&]() -> std::pair<const TagID, ReduceGroupData>& {
+                for (auto& data_pair : reduce_tag_data_)
+                {
+                  const auto& group_data = data_pair.second;
+                  if (group_data.group.tag_neighbors().parent() == tag_id)
+                  {
+                    return data_pair;
+                  }
+                }
+                assert(false && "No group matching the produced tag found?");
+                return *reduce_tag_data_.begin();
+              }();
+              const decltype(neighbors_)::iterator server_iter = [&]() {
+                // Check if there is already a connection present, and just add the
+                // ID if so
+                // TODO: If this is a bottleneck, keep a mapping of the ip addresses to
+                // the machine names as well
+                const decltype(neighbors_)::iterator conn_iter = [&]() {
+                  for (auto neighbor_iter = neighbors_.begin(); neighbor_iter != neighbors_.end(); ++neighbor_iter)
+                  {
+                    const auto& neighbor = *neighbor_iter;
+                    if (subscribe_address == neighbor.second.two_way_address())
+                    {
+                      return neighbor_iter;
+                    }
+                  }
+                  return neighbors_.end();
+                }();
+                if (conn_iter != neighbors_.cend())
+                {
+                  SKYNET_TRACE_LOG(
+                    "\"{}\" already has connection to \"{}\" ({}) for tag \"{}\" for reduce groups",
+                    id_,
+                    conn_iter->second.id(),
+                    subscribe_address,
+                    tag_id
+                  );
+                  return conn_iter;
+                }
+                else
+                {
+                  const auto [port, addr] = internal::split_address(subscribe_address);
+                  SKYNET_TRACE_LOG(
+                    "\"{}\" attempting to connect to {}:{} for tag \"{}\" for reduce group",
+                    id_,
+                    addr,
+                    port,
+                    tag_id
+                  );
+                  return connect_impl(addr.c_str(), port);
+                }
+              }();
+              if (server_iter != neighbors_.cend())
+              {
+                SKYNET_TRACE_LOG(
+                  "\"{}\" using \"{}\" for tag \"{}\" for reduce group",
+                  id_,
+                  server_iter->first,
+                  tag_id
+                );
+                const auto& tag_produced = reduce_data.group.produced_tag();
+                server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
+                reduce_data.parent_machines.push_back(server_iter->second.id());
+                new_reduce_conns_made = true;
+                // Managed to create a connection; remove the pending tag
+                using std::swap;
+                swap(*iter, pending_tags_.back());
+                pending_tags_.pop_back();
+                --iter;
+                break;
+              }
+              else
+              {
+                SKYNET_TRACE_LOG(
+                  "\"{}\" failed to connect to \"{}\" for tag \"{}\" for reduce groups",
+                  id_,
+                  subscribe_address,
+                  tag_id
+                );
+                pub_iter = publishers.erase(pub_iter);
+              }
             }
           }
         }
@@ -1485,9 +1544,13 @@ namespace skynet
         }
       }
     }
-    if (new_connections_made)
+    if (new_subscriptions_made)
     {
-      new_tag_connections_cv_.notify_all();
+      new_subscription_cv_.notify_all();
+    }
+    if (new_reduce_conns_made)
+    {
+      reduce_group_cv_.notify_all();
     }
     return ignore_cache;
   }

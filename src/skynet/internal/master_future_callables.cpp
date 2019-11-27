@@ -13,4 +13,27 @@ namespace skynet::internal
   {
     return Master::FutureAccessor::subscribe_is_done(*master_, tags_);
   }
+
+  MasterReduceGroupIsCreated::MasterReduceGroupIsCreated(
+    Master& master,
+    const TagID& group_id
+  ) noexcept
+    : master_{&master}
+    , group_id_{group_id}
+  {}
+
+  bool MasterReduceGroupIsCreated::operator()() const noexcept
+  {
+    return Master::FutureAccessor::reduce_group_is_created(*master_, group_id_);
+  }
+
+  MasterGetReduceGroup::MasterGetReduceGroup(Master& master, const TagID& group_id) noexcept
+    : master_{&master}
+    , group_id_{group_id}
+  {}
+
+  ReduceGroupBase& MasterGetReduceGroup::operator()() const noexcept
+  {
+    return Master::FutureAccessor::get_reduce_group(*master_, group_id_);
+  }
 } // namespace skynet::internal
