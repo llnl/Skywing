@@ -14,7 +14,7 @@
 
 constexpr int num_machines = 5;
 constexpr std::chrono::milliseconds heartbeat_interval{100};
-constexpr std::uint16_t base_port = 60000;
+constexpr std::uint16_t base_port = 30000;
 
 using namespace skynet;
 
@@ -28,7 +28,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   connect_network(*info, master, index, [](Master& m, const int i) {
     return m.connect_to_server("127.0.0.1", base_port + i);
   });
-  master.submit_job("dummy job", {}, [](Job&) {
+  master.submit_job("dummy job", [](Job&) {
     std::this_thread::sleep_for(heartbeat_interval * 10);
   });
   master.run();

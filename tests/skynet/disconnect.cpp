@@ -16,7 +16,7 @@ using namespace skynet;
 static constexpr std::uint16_t base_port = 5000;
 static constexpr int num_machines = 10;
 
-using Int32Tag = Tag<std::int32_t>;
+using Int32Tag = PublishTag<std::int32_t>;
 
 void setup_network(const int index, Master& master)
 {
@@ -47,18 +47,15 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   setup_network(index, master);
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
-  master.submit_job("Job 0", {publish_tag.id()}, [&](Job& my_job) {
+  master.submit_job("Job 0", [&](Job& my_job) {
+    my_job.declare_publication_intent({publish_tag});
     std::vector<std::string> subscribe_to;
     for (int i = 0; i < num_machines; ++i)
     {
       if (i != publish_num)
       {
-        subscribe_to.push_back(std::to_string(i));
+        my_job.subscribe({Int32Tag{std::to_string(i)}}).wait();
       }
-    }
-    while (!my_job.subscribe<Int32Tag>(subscribe_to))
-    {
-      std::this_thread::sleep_for(10ms);
     }
     while (master.num_subscribers() != num_machines - 1)
     {
@@ -78,7 +75,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       else
       {
         const Int32Tag get_tag{std::to_string(disconnect_order[i])};
-        REQUIRE(my_job.get_when_ready(get_tag) == to_remove);
+        REQUIRE(my_job.get_future_for(get_tag).get() == to_remove);
       }
     }
   });
