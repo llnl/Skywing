@@ -440,6 +440,20 @@ namespace skynet
           }
           return Master::ExternalMasterAccessor::handle_submit_reduce_value(*master_, msg, *this);
         },
+        [&](const ReportReduceResult& msg) {
+          SKYNET_TRACE_LOG(
+            "\"{}\" recieved report reduce value from \"{}\" for group \"{}\", tag \"{}\"",
+            master_->id(),
+            id_,
+            msg.reduce_tag(),
+            msg.data().tag_id()
+          );
+          if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id()))
+          {
+            return false;
+          }
+          return Master::ExternalMasterAccessor::handle_report_reduce_result(*master_, msg, *this);
+        },
         [](...) {
           // Anything else is a programming bug, this shouldn't be reached
           assert(false && "Missing message type in ExternalMaster::handle_message");
@@ -1359,7 +1373,7 @@ namespace skynet
     const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
     // TODO: Handle when parents run out
     // Go through all of the parents, removing ones that don't exist
-    for(auto parent_iter = parent_machines.begin(); parent_iter != parent_machines.end(); )
+    for (auto parent_iter = parent_machines.begin(); parent_iter != parent_machines.end(); )
     {
       const auto parent_loc = neighbors_.find(*parent_iter);
       if (parent_loc == neighbors_.cend())
@@ -1374,41 +1388,87 @@ namespace skynet
     }
   }
 
+  void Master::send_reduce_value_to_children(
+    const TagID& group_id,
+    const VersionID version,
+    const TagID& produced_tag,
+    const PublishValueVariant& value
+  ) noexcept
+  {
+    const auto loc = reduce_tag_data_.find(group_id);
+    assert(loc != reduce_tag_data_.cend());
+    auto child_machines = loc->second.child_machines;
+    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
+    // TODO: Handle children running out
+    for (auto& children : child_machines)
+    {
+      for (auto child_iter = children.begin(); child_iter != children.end(); )
+      {
+        const auto child_loc = neighbors_.find(*child_iter);
+        if (child_loc == neighbors_.cend())
+        {
+          child_iter = children.erase(child_iter);
+        }
+        else
+        {
+          child_loc->second.send_message(reduce_message);
+          ++child_iter;
+        }
+      }
+    }
+  }
+
   // TODO: Handle when running out of children
   bool Master::handle_submit_reduce_value(
     const internal::SubmitReduceValue& msg,
     const internal::ExternalMaster& from
   ) noexcept
   {
+    return handle_reduce_value(msg.reduce_tag(), msg.data(), from);
+  }
+
+  bool Master::handle_report_reduce_result(
+    const internal::ReportReduceResult& msg,
+    const internal::ExternalMaster& from
+  ) noexcept
+  {
+    return handle_reduce_value(msg.reduce_tag(), msg.data(), from);
+  }
+
+  bool Master::handle_reduce_value(
+    const TagID& reduce_group_id,
+    const internal::PublishData& value,
+    const internal::ExternalMaster& from
+  ) noexcept
+  {
     // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
     (void)from;
     // Make sure the group exists
-    const auto group_loc = reduce_tag_data_.find(msg.reduce_tag());
+    const auto group_loc = reduce_tag_data_.find(reduce_group_id);
     if (group_loc == reduce_tag_data_.cend())
     {
       SKYNET_WARN_LOG(
-        "\"{}\" rejected submit reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the reduce group does not exist",
+        "\"{}\" rejected reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the reduce group does not exist",
         id_,
         from.id(),
-        msg.reduce_tag(),
-        msg.data().tag_id()
+        reduce_group_id,
+        value.tag_id()
       );
       return false;
     }
-    const auto& data = msg.data();
-    const auto var_opt = data.value().get_variant();
+    const auto var_opt = value.value().get_variant();
     if (!var_opt)
     {
       SKYNET_WARN_LOG(
-        "\"{}\" rejected submit reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the value could not be extracted",
+        "\"{}\" rejected reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the value could not be extracted",
         id_,
         from.id(),
-        msg.reduce_tag(),
-        msg.data().tag_id()
+        reduce_group_id,
+        value.tag_id()
       );
       return false;
     }
-    return group_loc->second.group.add_data(data.tag_id(), *var_opt, data.version());
+    return group_loc->second.group.add_data(value.tag_id(), *var_opt, value.version());
   }
 
   const std::vector<TagID>& Master::get_pending_tags() noexcept

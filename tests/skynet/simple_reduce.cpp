@@ -29,6 +29,7 @@ const ReduceGroupTag<std::int32_t> reduce_tag{"reduce op"};
 template<typename Group, typename Callable>
 void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, const std::int32_t expected_value)
 {
+  // Normal reduce
   const auto result = group.reduce(value, reduce_op).get();
   if (group.returns_value_on_reduce())
   {
@@ -39,6 +40,11 @@ void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, con
   {
     REQUIRE_FALSE(result);
   }
+  // Allreduce
+  auto allreduce_futures = group.allreduce(value, reduce_op);
+  // Wait for the value to be ready / propagated
+  allreduce_futures.first.get();
+  REQUIRE(allreduce_futures.second.get() == expected_value);
 }
 
 // This wasn't working with a reference, so just use a pointer

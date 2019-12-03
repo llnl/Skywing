@@ -9,6 +9,8 @@
 #include <iostream>
 #include <thread>
 
+                    #include "skynet/internal/utility/logging.hpp"
+
 using namespace skynet;
 
 // Emulate multiple machines with multiple threads at this point

@@ -46,7 +46,7 @@ namespace skynet::internal
         );
         {
           std::unique_lock<std::mutex> lock{buffer_mutex_};
-          data_buffers_[i].add(std::move(value), version);
+          add_data_index(i, std::move(value), version);
         }
         data_added_to_buffers_cv_.notify_all();
         return true;
@@ -60,6 +60,12 @@ namespace skynet::internal
       version
     );
     return false;
+  }
+
+  void ReduceGroupBase::add_data_index(std::size_t index, PublishValueVariant value, const VersionID version) noexcept
+  {
+    assert(index < 3);
+    data_buffers_[index].add(std::move(value), version);
   }
 
   // Returns true if this handle to the group returns a value on reduce
@@ -81,6 +87,18 @@ namespace skynet::internal
   void ReduceGroupBase::send_value_to_parent(const PublishValueVariant& value_to_send, const VersionID version) noexcept
   {
     Master::ReduceGroupAccessor::send_reduce_value_to_parent(
+      *master_,
+      group_id_,
+      version,
+      produced_tag_,
+      value_to_send
+    );
+  }
+
+
+  void ReduceGroupBase::send_value_to_children(const PublishValueVariant& value_to_send, VersionID version) noexcept
+  {
+    Master::ReduceGroupAccessor::send_reduce_value_to_children(
       *master_,
       group_id_,
       version,

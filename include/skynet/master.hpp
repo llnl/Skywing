@@ -374,6 +374,15 @@ namespace skynet
         return m.handle_submit_reduce_value(msg, from);
       }
 
+      static bool handle_report_reduce_result(
+        Master& m,
+        const internal::ReportReduceResult& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_report_reduce_result(msg, from);
+      }
+
       static const std::vector<TagID>& get_pending_tags(Master& m) noexcept
       {
         return m.get_pending_tags();
@@ -394,6 +403,17 @@ namespace skynet
       ) noexcept
       {
         m.send_reduce_value_to_parent(group_id, version, produced_tag, value);
+      }
+
+      static void send_reduce_value_to_children(
+        Master& m,
+        const TagID& group_id,
+        const VersionID version,
+        const TagID& produced_tag,
+        const PublishValueVariant& value
+      ) noexcept
+      {
+        m.send_reduce_value_to_children(group_id, version, produced_tag, value);
       }
     }; // struct ReduceGroupAccessor
 
@@ -567,10 +587,32 @@ namespace skynet
       const PublishValueVariant& value
     ) noexcept;
 
+    void send_reduce_value_to_children(
+      const TagID& group_id,
+      const VersionID version,
+      const TagID& produced_tag,
+      const PublishValueVariant& value
+    ) noexcept;
+
     /** \brief Handles a submit reduce value message
      */
     bool handle_submit_reduce_value(
       const internal::SubmitReduceValue& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    /** \brief Processes a finished reduce value
+     */
+    bool handle_report_reduce_result(
+      const internal::ReportReduceResult& msg,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    /** \brief Implementation of the two above functions
+     */
+    bool handle_reduce_value(
+      const TagID& reduce_group_id,
+      const internal::PublishData& value,
       const internal::ExternalMaster& from
     ) noexcept;
 
