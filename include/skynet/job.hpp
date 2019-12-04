@@ -122,9 +122,16 @@ namespace skynet
       {
         return std::thread{[&j]() {
           j.to_run_(j);
+          // Re-use the buffer mutex here
+          std::lock_guard lock{j.bufs_.mutex()};
           // Signify that the work is done
           j.to_run_ = nullptr;
         }};
+      }
+
+      static std::mutex& get_mutex(Job& j) noexcept
+      {
+        return j.bufs_.mutex();
       }
 
       // Work around to disallow construction of Jobs outside of the master

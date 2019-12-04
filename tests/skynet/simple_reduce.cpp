@@ -29,22 +29,25 @@ const ReduceGroupTag<std::int32_t> reduce_tag{"reduce op"};
 template<typename Group, typename Callable>
 void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, const std::int32_t expected_value)
 {
+  static std::mutex catch_mutex;
   // Normal reduce
-  const auto result = group.reduce(value, reduce_op).get();
-  if (group.returns_value_on_reduce())
-  {
-    REQUIRE(result);
-    REQUIRE(*result == expected_value);
-  }
-  else
-  {
-    REQUIRE_FALSE(result);
-  }
+  const auto first_result = group.reduce(value, reduce_op).get();
   // Allreduce
   auto allreduce_futures = group.allreduce(value, reduce_op);
   // Wait for the value to be ready / propagated
   allreduce_futures.first.get();
-  REQUIRE(allreduce_futures.second.get() == expected_value);
+  const auto second_result = allreduce_futures.second.get();
+  std::lock_guard g{catch_mutex};
+  if (group.returns_value_on_reduce())
+  {
+    REQUIRE(first_result);
+    REQUIRE(*first_result == expected_value);
+  }
+  else
+  {
+    REQUIRE_FALSE(first_result);
+  }
+  REQUIRE(second_result == expected_value);
 }
 
 // This wasn't working with a reference, so just use a pointer

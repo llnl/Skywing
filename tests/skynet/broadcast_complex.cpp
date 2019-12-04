@@ -39,10 +39,14 @@ struct ExpectedTagValue<Tag2> { static constexpr auto value() { return tag2_valu
 template<>
 struct ExpectedTagValue<Tag3> { static constexpr auto value() { return tag3_value; } };
 
+std::mutex catch_mutex;
+
 // Tests if a specified tag holds the correct value
 template<typename Job, typename Tag>
 void test_tag(Job& job, const Tag& tag) noexcept
 {
+  // Catch2's macros are not thread safe
+  std::lock_guard g{catch_mutex};
   REQUIRE(job.get_future_for(tag).get() == ExpectedTagValue<Tag>::value());
 }
 // Tests if the specified tags hold the correct value
@@ -54,6 +58,7 @@ void test_tags(Job& job, const Tags&... tags) noexcept
   {
     if (std::chrono::steady_clock::now() - start > std::chrono::seconds(20))
     {
+      std::cerr << job.id() << " has stalled: " << (std::to_string((int)job.has_data(tags)) + ...) << '\n';
       std::this_thread::sleep_for(std::chrono::hours(200));
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));

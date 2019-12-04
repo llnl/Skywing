@@ -136,7 +136,14 @@ namespace skynet
         id_,
         tags
       );
-      send_message(make_get_publishers(tags, ignore_cache));
+      if (!pending_tag_request_)
+      {
+        send_message(make_get_publishers(tags, ignore_cache));
+        pending_tag_request_ = true;
+      }
+      // Always update these when new requests come in;
+      backoff_counter_ = 0;
+      request_tags_time_ = calc_next_request_time();
     }
 
     std::string ExternalMaster::two_way_address() const noexcept
@@ -154,6 +161,18 @@ namespace skynet
         static_cast<std::uint16_t>(base_port_ + publisher_port_offset)
       );
       return str;
+    }
+
+    void ExternalMaster::ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept
+    {
+      assert(!tags.empty());
+      if (std::chrono::steady_clock::now() > request_tags_time_)
+      {
+        send_message(make_get_publishers(tags, ignore_cache_on_next_request_));
+        ignore_cache_on_next_request_ = false;
+        ++backoff_counter_;
+        request_tags_time_ = calc_next_request_time();
+      }
     }
 
     ExternalMaster::ExternalMaster(SocketCommunicator conn) noexcept
@@ -364,29 +383,9 @@ namespace skynet
           {
             ignore_cache_on_next_request_ = true;
           }
-          // If there are still tags to find, send another request
-          // TODO: Probably only want to have one active request at a time to reduce network traffic
-          // Previous idea was to keep track of the number of requests sent / answers to those requests,
-          // but multiple requests sent can result in a single answer, so a boolean approach seems best
-          const auto& remaining_tags =
-            Master::ExternalMasterAccessor::get_pending_tags(*master_);
-          if (!remaining_tags.empty())
-          {
-            SKYNET_TRACE_LOG("\"{}\" still looking for tags {} from \"{}\"",
-              master_->id(),
-              remaining_tags,
-              id_
-            );
-            find_publishers_for_tags(remaining_tags, ignore_cache_on_next_request_);
-            ignore_cache_on_next_request_ = false;
-          }
-          else
-          {
-            SKYNET_TRACE_LOG("\"{}\" has no remaining tags to ask from \"{}\"",
-              master_->id(),
-              id_
-            );
-          }
+          // Mark there as not being a request out there and update the time to send out
+          pending_tag_request_ = false;
+          request_tags_time_ = calc_next_request_time();
           return true;
         },
         [&](const GetPublishers& msg) {
@@ -465,6 +464,18 @@ namespace skynet
       {
         dead_ = true;
       }
+    }
+
+    std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() const noexcept
+    {
+      using namespace std::chrono_literals;
+      static constexpr std::array backoff_times{
+        5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms
+      };
+      const auto add_time = backoff_counter_ > backoff_times.size()
+        ? backoff_times.back()
+        : backoff_times[backoff_counter_];
+      return std::chrono::steady_clock::now() + add_time;
     }
   } // namespace internal
 
@@ -586,10 +597,13 @@ namespace skynet
     while (!jobs_.empty())
     {
       // Remove any finished jobs
-      for (auto iter = jobs_.cbegin(); iter != jobs_.cend(); )
+      for (auto iter = jobs_.begin(); iter != jobs_.end(); )
       {
-        if (iter->second.is_finished())
+        std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
+        if (lock.owns_lock() && iter->second.is_finished())
         {
+          // Need to free before deallocation
+          lock.unlock();
           iter = jobs_.erase(iter);
         }
         else
@@ -599,7 +613,7 @@ namespace skynet
       }
       {
         // Ensure there's no data race with jobs
-        std::unique_lock lock{job_mut_};
+        std::lock_guard lock{job_mut_};
         accept_pending_connections();
         pub_channel_.accept_subscriptions();
         read_data_from_subscriptions();
@@ -607,6 +621,10 @@ namespace skynet
         for (auto&& neighbor : neighbors_)
         {
           neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
+          if (!pending_tags_.empty())
+          {
+            neighbor.second.ask_for_pending_tags_if_past_time(pending_tags_);
+          }
         }
       }
       // Mutex has been released - notify CV's if requested
@@ -644,6 +662,7 @@ namespace skynet
 
   int Master::num_subscribers() const noexcept
   {
+    std::lock_guard lock{job_mut_};
     return pub_channel_.num_subscriptions();
   }
 
@@ -721,14 +740,13 @@ namespace skynet
   ) noexcept
   {
     const auto msg = internal::make_publish(version, tag_id, value);
-    std::stringstream ss;
     SKYNET_TRACE_LOG(
       "\"{}\" publishing on tag \"{}\", version \"{}\", data {} to {} subscribers",
       id_,
       tag_id,
       version,
       value,
-      num_subscribers()
+      pub_channel_.num_subscriptions()
     );
     pub_channel_.send_message(msg.data(), msg.size());
   }
@@ -1469,11 +1487,6 @@ namespace skynet
       return false;
     }
     return group_loc->second.group.add_data(value.tag_id(), *var_opt, value.version());
-  }
-
-  const std::vector<TagID>& Master::get_pending_tags() noexcept
-  {
-    return pending_tags_;
   }
 
   bool Master::try_connections_for_pending_tags() noexcept

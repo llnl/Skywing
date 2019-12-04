@@ -45,7 +45,7 @@ namespace skynet::internal
           version
         );
         {
-          std::unique_lock<std::mutex> lock{buffer_mutex_};
+          std::lock_guard<std::mutex> lock{buffer_mutex_};
           add_data_index(i, std::move(value), version);
         }
         data_added_to_buffers_cv_.notify_all();

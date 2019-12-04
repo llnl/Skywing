@@ -30,17 +30,21 @@ namespace skynet
 
   void Job::declare_publication_intent(const std::vector<internal::PublishTagBase>& tags) noexcept
   {
-    for (const auto& tag : tags)
-    {
-      tags_produced_.try_emplace(tag.id(), tag.expected_type());
-    }
-    std::vector<TagID> tag_ids(tags.size());
-    std::transform(
-      tags.cbegin(),
-      tags.cend(),
-      tag_ids.begin(),
-      [&](const internal::PublishTagBase& t) { return t.id(); }
-    );
+    const std::vector<TagID> tag_ids = [&]() {
+      std::lock_guard g{bufs_.mutex()};
+      for (const auto& tag : tags)
+      {
+        tags_produced_.try_emplace(tag.id(), tag.expected_type());
+      }
+      std::vector<TagID> tag_ids(tags.size());
+      std::transform(
+        tags.cbegin(),
+        tags.cend(),
+        tag_ids.begin(),
+        [&](const internal::PublishTagBase& t) { return t.id(); }
+      );
+      return tag_ids;
+    }();
     Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
   }
 
@@ -144,7 +148,7 @@ namespace skynet
 
   bool Job::has_data(const internal::PublishTagBase& tag, const VersionID version) noexcept
   {
-    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    std::lock_guard<std::mutex> lock{bufs_.mutex()};
     return has_data_no_lock(tag, version);
   }
 

@@ -61,13 +61,12 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     {
       std::this_thread::sleep_for(10ms);
     }
+    my_job.publish(publish_tag, index);
     for (std::size_t i = 0; i < disconnect_order.size(); ++i)
     {
       const auto to_remove = disconnect_order[i];
       if (to_remove == index)
       {
-        // broadcast and remove (the data doesn't really matter)
-        my_job.publish(publish_tag, to_remove);
         // Leaving the loop will cause the master to destruct, automatically
         // disconnecting
         break;
@@ -75,6 +74,8 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       else
       {
         const Int32Tag get_tag{std::to_string(disconnect_order[i])};
+        static std::mutex m;
+        std::lock_guard g{m};
         REQUIRE(my_job.get_future_for(get_tag).get() == to_remove);
       }
     }

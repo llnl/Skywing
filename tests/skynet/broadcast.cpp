@@ -92,14 +92,14 @@ void machine_task(const std::size_t index)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    the_job.publish(Uint64Tag{tag_names[index]}, index);
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
-      if (index == send_index)
+      if (index != send_index)
       {
-        the_job.publish(Uint64Tag{tag_names[index]}, index);
-      }
-      else
-      {
+        // Ensure thread safety
+        static std::mutex m;
+        std::lock_guard g{m};
         REQUIRE(the_job.get_future_for(Uint64Tag{tag_names[send_index]}).get() == send_index);
       }
     }

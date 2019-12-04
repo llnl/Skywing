@@ -129,6 +129,10 @@ namespace skynet
        */
       std::string publisher_address() const noexcept;
 
+      /** \brief Send a request for any pending tags if required
+       */
+      void ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept;
+
     private:
       // Only allow private construction from a socket
       explicit ExternalMaster(SocketCommunicator conn) noexcept;
@@ -172,6 +176,9 @@ namespace skynet
       // Handle status messages
       void handle_message(StatusMessageHandler& handle) noexcept;
 
+      // Calculate the next time tags should be requested
+      std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
+
       // For talking with the external master
       SocketCommunicator conn_;
 
@@ -190,14 +197,23 @@ namespace skynet
       // The owning master
       Master* master_;
 
+      // The time that will be waited until requesting tags again
+      std::chrono::steady_clock::time_point request_tags_time_;
+
       // The base port to use to connect to the remote machine
       std::uint16_t base_port_;
+
+      // The number of times requests have been unfulfilled
+      std::uint8_t backoff_counter_ = 0;
 
       // If the next request for tags should ignore the cache or not
       bool ignore_cache_on_next_request_ = false;
 
       // If the connection is dead or not
-      bool dead_{false};
+      bool dead_ = false;
+
+      // If there is a request out for tags or not
+      bool pending_tag_request_ = false;
     }; // class ExternalMaster
   } // namespace internal
 
@@ -297,7 +313,7 @@ namespace skynet
         const PublishValueVariant& value
       ) noexcept
       {
-        std::unique_lock lock{m.job_mut_};
+        std::lock_guard lock{m.job_mut_};
         m.publish(version, tag_id, value);
       }
 
@@ -306,7 +322,7 @@ namespace skynet
         const std::vector<TagID>& tags
       ) noexcept
       {
-        std::unique_lock{m.job_mut_};
+        std::lock_guard lock{m.job_mut_};
         m.report_new_publish_tags(tags);
       }
 
@@ -315,7 +331,7 @@ namespace skynet
         const std::vector<TagID>& tag_ids
       ) noexcept
       {
-        std::unique_lock lock{m.job_mut_};
+        std::lock_guard lock{m.job_mut_};
         return m.subscribe(tag_ids);
       }
 
@@ -327,7 +343,7 @@ namespace skynet
         const std::uint8_t expected_type
       ) noexcept
       {
-        std::unique_lock lock{m.job_mut_};
+        std::lock_guard lock{m.job_mut_};
         return m.create_reduce_group(group_id, tag_produced, tags_to_find, expected_type);
       }
     }; // struct JobAccessor
@@ -381,11 +397,6 @@ namespace skynet
       ) noexcept
       {
         return m.handle_report_reduce_result(msg, from);
-      }
-
-      static const std::vector<TagID>& get_pending_tags(Master& m) noexcept
-      {
-        return m.get_pending_tags();
       }
     }; // struct ExternalMasterAccessor
 
@@ -616,10 +627,6 @@ namespace skynet
       const internal::ExternalMaster& from
     ) noexcept;
 
-    /** \brief Returns tags that are still pending.
-     */
-    const std::vector<TagID>& get_pending_tags() noexcept;
-
     // TODO: The return value/type for this feels really weird; probably want
     // to change it to use a enum class or something at some point?
     /** \brief Attempt to create connections for any pending tags.
@@ -682,7 +689,7 @@ namespace skynet
     std::chrono::milliseconds heartbeat_interval_;
 
     // Only allow one job access to the master at a time
-    std::mutex job_mut_;
+    mutable std::mutex job_mut_;
 
     // List of machines that are waiting for information for producers of a certain tag
     // Uses MachineID's instead of pointer in case the remote machine disconnects and

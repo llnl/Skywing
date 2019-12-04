@@ -61,7 +61,7 @@ namespace skynet::internal
 
     bool is_ready() noexcept
     {
-      std::unique_lock<std::mutex> lock{mutex_};
+      std::lock_guard<std::mutex> lock{mutex_};
       return is_ready_no_lock();
     }
 
