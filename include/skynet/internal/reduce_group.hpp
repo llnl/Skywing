@@ -8,8 +8,10 @@
 #include <cassert>
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <optional>
+#include <type_traits>
 
 namespace skynet
 {
@@ -54,7 +56,18 @@ namespace skynet
       // Adds data without locking and using an index
       void add_data_index(std::size_t index, PublishValueVariant value, const VersionID version) noexcept;
 
+      // Process any pending reduce operations, removing them if finished
+      void process_pending_reduce_ops() noexcept;
+
       using DataBuffer = FifoTagBuffer<PublishValueVariant>;
+      struct PendingReduce
+      {
+        VersionID required_version;
+        PublishValueVariant value;
+        std::function<PublishValueVariant(PublishValueVariant, PublishValueVariant)> operation;
+        bool is_all_reduce;
+      };
+      std::vector<PendingReduce> pending_reduces_;
       std::array<DataBuffer, 3> data_buffers_;
       ReduceGroupNeighbors tag_neighbors_;
       Master* master_;
@@ -88,9 +101,6 @@ namespace skynet
       return reduce_impl<false>(value, std::move(reduce_op), version);
     }
 
-    /** \brief Returns two futures; the first indicates that the value is ready to send,
-     * the second indicates that the final value has arrived.
-     */
     template<typename Callable>
     auto allreduce(
       const T& value,
@@ -98,20 +108,7 @@ namespace skynet
       VersionID version = internal::tag_default_version
     ) noexcept
     {
-      return std::make_pair(
-        reduce_impl<true>(value, reduce_op, version),
-        internal::make_future(
-          base_.buffer_mutex_,
-          base_.data_added_to_buffers_cv_,
-          [this, version]() { return allreduce_value_is_ready(version); },
-          [this, version]() {
-            const auto value = base_.data_buffers_[0].get(version);
-            assert(std::get_if<T>(&value));
-            base_.send_value_to_children(value, version);
-            return *std::get_if<T>(&value);
-          }
-        )
-      );
+      return reduce_impl<true>(value, std::move(reduce_op), version);
     }
 
     bool returns_value_on_reduce() const noexcept
@@ -128,93 +125,47 @@ namespace skynet
       VersionID version = internal::tag_default_version
     ) noexcept
     {
+      std::lock_guard lock{base_.buffer_mutex_};
+      const auto required_version = internal::updated_version(base_.last_sent_version_, version);
+      base_.pending_reduces_.push_back({
+        required_version,
+        value,
+        [reduce_op](PublishValueVariant lhs, PublishValueVariant rhs) -> PublishValueVariant {
+          assert(std::get_if<T>(&lhs));
+          assert(std::get_if<T>(&rhs));
+          return reduce_op(*std::get_if<T>(&lhs), *std::get_if<T>(&rhs));
+        },
+        IsAllReduce
+      });
+      base_.process_pending_reduce_ops();
       return internal::make_future(
         base_.buffer_mutex_,
         base_.data_added_to_buffers_cv_,
-        [this, version]() { return reduce_is_ready(version); },
-        [this, value, version, reduce_op=std::move(reduce_op)]() {
-          return do_reduce<IsAllReduce>(value, std::move(reduce_op), version);
+        [this, required_version]() noexcept {
+          if constexpr (IsAllReduce)
+          {
+            return base_.data_buffers_[0].has_data(required_version);
+          }
+          else
+          {
+            return
+              base_.last_sent_version_ != internal::tag_default_version &&
+              base_.last_sent_version_ >= required_version;
+          }
+        },
+        [this, required_version]() noexcept -> std::conditional_t<IsAllReduce, T, std::optional<T>> {
+          if (IsAllReduce || returns_value_on_reduce())
+          {
+            const auto value = base_.data_buffers_[0].get(required_version);
+            assert(std::get_if<T>(&value));
+            return *std::get_if<T>(&value);
+          }
+          else if constexpr(!IsAllReduce)
+          {
+            return {};
+          }
         }
       );
-    }
-
-    bool reduce_is_ready(const VersionID version) noexcept
-    {
-      const auto required_version = internal::updated_version(base_.last_sent_version_, version);
-      if (base_.tag_neighbors_.left_child().empty())
-      {
-        return true;
-      }
-      else if (base_.tag_neighbors_.right_child().empty())
-      {
-        // Left child only
-        return base_.data_buffers_[1].has_data(required_version);
-      }
-      else
-      {
-        // Both children
-        return
-          base_.data_buffers_[1].has_data(required_version) &&
-          base_.data_buffers_[2].has_data(required_version);
-      }
-    }
-
-    bool allreduce_value_is_ready(const VersionID version) noexcept
-    {
-      return base_.data_buffers_[0].has_data(version);
-    }
-
-    template<bool IsAllReduce, typename ProdType, typename ReduceCallable>
-    std::conditional_t<IsAllReduce, void, std::optional<ProdType>> do_reduce(
-      const ProdType& value,
-      ReduceCallable reduce_op,
-      const VersionID version
-    ) noexcept
-    {
-      const auto required_version = internal::updated_version(base_.last_sent_version_, version);
-      base_.last_sent_version_ = required_version;
-      // The base type is an optional, strip that type while working in here
-      const ProdType reduce_result = [&]() -> ProdType {
-        // Three different options - 2 children, left child only, no children
-        if (base_.tag_neighbors_.left_child().empty())
-        {
-          // no children, just propagate value to parent
-          return value;
-        }
-        // Either one or two children, left child is always present
-        const auto left_val = std::get<ProdType>(base_.data_buffers_[1].get(required_version));
-        if (base_.tag_neighbors_.right_child().empty())
-        {
-          // One child, just apply op with value and propagate value to parent
-          const auto reduce_value = reduce_op(left_val, value);
-          return reduce_value;
-        }
-        // Both children
-        const auto right_val = std::get<ProdType>(base_.data_buffers_[2].get(required_version));
-        // Do op(op(left, value), right) so order of evaluation is always the same
-        // Also if there are no parents then this will have the final reduce value
-        const auto reduce_value = reduce_op(reduce_op(left_val, value), right_val);
-        return reduce_value;
-      }();
-      base_.send_value_to_parent(reduce_result, required_version);
-      // Return the result if applicable
-      if (base_.returns_value_on_reduce())
-      {
-        // Store the value in the parent buffer if it's an allreduce to indicate
-        // that the value is ready
-        if constexpr (IsAllReduce)
-        {
-          base_.add_data_index(0, reduce_result, required_version);
-        }
-        else
-        {
-          return reduce_result;
-        }
-      }
-      else if constexpr (!IsAllReduce)
-      {
-        return {};
-      }
     }
 
     internal::ReduceGroupBase& base_;

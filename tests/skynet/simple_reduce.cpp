@@ -33,10 +33,8 @@ void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, con
   // Normal reduce
   const auto first_result = group.reduce(value, reduce_op).get();
   // Allreduce
-  auto allreduce_futures = group.allreduce(value, reduce_op);
+  auto second_result = group.allreduce(value, reduce_op).get();
   // Wait for the value to be ready / propagated
-  allreduce_futures.first.get();
-  const auto second_result = allreduce_futures.second.get();
   std::lock_guard g{catch_mutex};
   if (group.returns_value_on_reduce())
   {

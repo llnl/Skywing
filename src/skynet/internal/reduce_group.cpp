@@ -47,6 +47,7 @@ namespace skynet::internal
         {
           std::lock_guard<std::mutex> lock{buffer_mutex_};
           add_data_index(i, std::move(value), version);
+          process_pending_reduce_ops();
         }
         data_added_to_buffers_cv_.notify_all();
         return true;
@@ -62,9 +63,15 @@ namespace skynet::internal
     return false;
   }
 
-  void ReduceGroupBase::add_data_index(std::size_t index, PublishValueVariant value, const VersionID version) noexcept
+  void ReduceGroupBase::add_data_index(const std::size_t index, PublishValueVariant value, const VersionID version) noexcept
   {
     assert(index < 3);
+    // If the result was added to the parent buffer then it is the result of a reduce
+    // and should be propagated to the children
+    if (index == 0)
+    {
+      send_value_to_children(value, version);
+    }
     data_buffers_[index].add(std::move(value), version);
   }
 
@@ -72,6 +79,70 @@ namespace skynet::internal
   bool ReduceGroupBase::returns_value_on_reduce() const noexcept
   {
     return tag_neighbors_.parent().empty();
+  }
+
+  void ReduceGroupBase::process_pending_reduce_ops() noexcept
+  {
+    const auto reduce_is_ready = [&](const VersionID required_version) noexcept{
+      if (tag_neighbors_.left_child().empty())
+      {
+        return true;
+      }
+      else if (tag_neighbors_.right_child().empty())
+      {
+        // Left child only
+        return data_buffers_[1].has_data(required_version);
+      }
+      else
+      {
+        // Both children
+        return
+          data_buffers_[1].has_data(required_version) &&
+          data_buffers_[2].has_data(required_version);
+      }
+    };
+    // Process the reductions in order, until one fails to complete
+    for (auto iter = pending_reduces_.begin(); iter != pending_reduces_.end(); iter = pending_reduces_.erase(iter))
+    {
+      if (!reduce_is_ready(iter->required_version))
+      {
+        return;
+      }
+      last_sent_version_ = iter->required_version;
+      const PublishValueVariant reduce_result = [&]() -> PublishValueVariant {
+        // Three different options - 2 children, left child only, no children
+        if (tag_neighbors_.left_child().empty())
+        {
+          // no children, just propagate value to parent
+          return iter->value;
+        }
+        // Either one or two children, left child is always present
+        const auto left_val = data_buffers_[1].get(iter->required_version);
+        if (tag_neighbors_.right_child().empty())
+        {
+          // One child, just apply op with value and propagate value to parent
+          const auto reduce_value = iter->operation(left_val, iter->value);
+          return reduce_value;
+        }
+        // Both children
+        const auto right_val = data_buffers_[2].get(iter->required_version);
+        // Do op(op(left, value), right) so order of evaluation is always the same
+        // Also if there are no parents then this will have the final reduce value
+        const auto reduce_value = iter->operation(iter->operation(left_val, iter->value), right_val);
+        return reduce_value;
+      }();
+      // Put the result in the buffer so the result can be retrieved if this is the root
+      // Otherwise, send the result to the parent
+      if (returns_value_on_reduce())
+      {
+        add_data_index(0, reduce_result, iter->required_version);
+        send_value_to_children(reduce_result, iter->required_version);
+      }
+      else
+      {
+        send_value_to_parent(reduce_result, iter->required_version);
+      }
+    }
   }
 
   const ReduceGroupNeighbors& ReduceGroupBase::tag_neighbors() const noexcept

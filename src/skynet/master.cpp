@@ -300,26 +300,21 @@ namespace skynet
           return true;
         },
         [&](const NewNeighbor& msg) {
+          // Don't error if the neighbor is already present (as was previously
+          // done) as if a machine disconnects and then re-connects it can send a
+          // NewNeighbor message with a repeated ID
           const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id());
-          // Already present -> connection is bad
-          if (loc != neighbors_.cend() && *loc == msg.neighbor_id())
-          {
-            SKYNET_WARN_LOG(
-              "\"{}\" recieved new nighbor from \"{}\" with id \"{}\", but it was already present",
-              master_->id(),
-              id_,
-              msg.neighbor_id()
-            );
-            return false;
-          }
           SKYNET_TRACE_LOG(
             "\"{}\" recieved new neighbor from \"{}\" with id \"{}\"",
             master_->id(),
             id_,
             msg.neighbor_id()
           );
-          // Otherwise just insert it
-          neighbors_.insert(loc, msg.neighbor_id());
+          // Insert it if it isn't already present
+          if (loc == neighbors_.cend() || *loc != msg.neighbor_id())
+          {
+            neighbors_.insert(loc, msg.neighbor_id());
+          }
           return true;
         },
         [&](const RemoveNeighbor& msg) {
@@ -596,6 +591,7 @@ namespace skynet
     // Do processing while there are still jobs
     while (!jobs_.empty())
     {
+      const auto end_sleep_time = std::chrono::steady_clock::now() + 100us;
       // Remove any finished jobs
       for (auto iter = jobs_.begin(); iter != jobs_.end(); )
       {
@@ -641,8 +637,7 @@ namespace skynet
         }
       }
       // Wait a bit for other messages
-      std::this_thread::yield();
-      std::this_thread::sleep_for(100us);
+      std::this_thread::sleep_until(end_sleep_time);
     }
     // Join all of the threads now
     for (auto& thread : threads)

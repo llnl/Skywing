@@ -41,35 +41,9 @@ const std::vector<I32ValueTag> reduce_group_tags{
   I32ValueTag{"tag5"}
 };
 
-int main(const int argc, const char* const argv[])
+// All of the Skynet specific code is located in this function.
+void simulate_machine(const int machine_number)
 {
-  // Error checking for the number of arguments
-  if (argc != 2)
-  {
-    std::cerr << "Usage:\n" << argv[0] << " machine_index\n";
-    return 1;
-  }
-  // Parse the machine number that was passed in
-  // Do this in a lambda so that if there's an exception a dummy value can be
-  // returned which will always trigger an error
-  const int machine_number = [&]() {
-    try
-    {
-      return std::stoi(argv[1]);
-    }
-    catch (...)
-    {
-      return -1;
-    }
-  }();
-  // Make sure that the machine number is valid, outputting an error message if not
-  if (machine_number < 0 || machine_number >= static_cast<int>(node_ports.size()))
-  {
-    std::cerr
-      << "Invalid machine_index of " << std::quoted(argv[1]) << ".\n"
-      << "Must be an integer between 0 and " << node_ports.size() - 1 << '\n';
-    return -1;
-  }
   // Create a Skynet Master; the Master is responsible for handling communication
   // and other such supporting tasks in the background
   skynet::Master master{
@@ -80,9 +54,9 @@ int main(const int argc, const char* const argv[])
   };
   // Skynet currently has no way of automatically scanning for new machines while running
   // It will accept any connection requests made to it, however, and the only requirement
-  // for it to function is that all nodes have paths to other nodes, so just have each
-  // instance connect to the higher numbered one, or for the highest numbered one, just
-  // advance to the job so the connection can be accepted
+  // for it to function is that all nodes have paths to other nodes. To accomplish this,
+  // have each instance connect to the higher numbered one, or for the highest numbered
+  // one, just advance to the job so the connection can be accepted
   if (machine_number != node_ports.size() - 1)
   {
     while (!master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]))
@@ -94,7 +68,7 @@ int main(const int argc, const char* const argv[])
   // duplicated on other instances.  Jobs run on seperate threads than the master and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
-  // be copyable and the signature should be compatible with void(skynet::Job&)
+  // be copyable and the signature must be compatible with void(skynet::Job&)
   master.submit_job("job", [&](skynet::Job& job) {
     // Initiate the work to create a group that can perform reductions
     // As creating this group is an expensive operation with a lot of communication,
@@ -125,31 +99,18 @@ int main(const int argc, const char* const argv[])
     std::ranlux48 prng{std::random_device{}()};
     const auto min_value = static_cast<int>(random_dist.min() * node_names.size());
     const auto max_value = static_cast<int>(random_dist.max() * node_names.size());
-    std::cout << "Reduce results should be in the range [" << min_value << ", " << max_value << "]\n";
     while (true)
     {
       const auto random_value = random_dist(prng);
       // Initiate the allreduce operation, the second parameter is a callable to
       // use, it can be anything that can be called that takes two parameters of
       // the proper type (in this case, std::int32_t) and returns the same type
-      // Allreduce returns two futures, rather than one, each will be described
-      // below
-      auto [send_ready, value_ready] = reduce_group.allreduce(random_value, std::plus<>{});
-      // The first future indicates that the value is ready to be sent to the parent node -
-      // the reduce operation is implemented as a binary tree, so this indicates that
-      // the two child values have been recieved and the operation is ready to be
-      // sent
-      // TODO: Even though this returns void, get() still needs to be called on it
-      // This is kind of unintuitive, but considering it's the low-level interface
-      // and can be wrapped into something nicer, that's maybe not a problem?
-      // If the actual computation is moved to the Master thread, rather than job
-      // threads, then this will no longer be an issue as a single future should be
-      // able to be used
-      send_ready.get();
-      // The second future indicates that the final result of the reduction operation
-      // is ready to be retrieved; so just retrieve the value.  The first future must
-      // be finished first in order for this one to finish as
-      const auto result = value_ready.get();
+      // Note that the reduce operation is run on the thread that handles
+      // communication, and as such, should be limited to simple calculations
+      auto future = reduce_group.allreduce(random_value, std::plus<>{});
+      // The future indicates that the final result of the reduction operation
+      // is ready to be retrieved; so just retrieve the value.
+      const auto result = future.get();
       const auto cur_time = std::time(nullptr);
       // The result should never fall outside of the specified range, but do a sanity
       // check just in case
@@ -168,10 +129,44 @@ int main(const int argc, const char* const argv[])
           << " !!! Out of range value " << result << " !!!\n";
         std::exit(1);
       }
-      // Sleep for a random duration
-      std::uniform_int_distribution<int> sleep_dist{10, 1000};
-      std::this_thread::sleep_for(std::chrono::milliseconds{sleep_dist(prng)});
+      // Sleep so there aren't tons of lines of output
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   });
+  // Start running the master, this will start all submitted jobs and continue
+  // running until all jobs are finished, at which point it will return
   master.run();
+}
+
+int main(const int argc, const char* const argv[])
+{
+  // Error checking for the number of arguments
+  if (argc != 2)
+  {
+    std::cerr << "Usage:\n" << argv[0] << " machine_index\n";
+    return 1;
+  }
+  // Parse the machine number that was passed in
+  // Do this in a lambda so that if there's an exception a dummy value can be
+  // returned which will always trigger an error
+  const int machine_number = [&]() {
+    try
+    {
+      return std::stoi(argv[1]);
+    }
+    catch (...)
+    {
+      return -1;
+    }
+  }();
+  // Make sure that the machine number is valid, outputting an error message if not
+  if (machine_number < 0 || machine_number >= static_cast<int>(node_ports.size()))
+  {
+    std::cerr
+      << "Invalid machine_index of " << std::quoted(argv[1]) << ".\n"
+      << "Must be an integer between 0 and " << node_ports.size() - 1 << '\n';
+    return -1;
+  }
+  // Continuously run the machine until the user kills the process
+  simulate_machine(machine_number);
 }
