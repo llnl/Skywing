@@ -136,7 +136,6 @@ namespace skynet::internal
       if (returns_value_on_reduce())
       {
         add_data_index(0, reduce_result, iter->required_version);
-        send_value_to_children(reduce_result, iter->required_version);
       }
       else
       {

@@ -95,9 +95,7 @@ namespace skynet::internal
     struct WithRawHandle{};
 
     // Construct a socket using a pre-exising handle
-    SocketCommunicator(WithRawHandle, const int handle) noexcept
-      : handle_{handle}
-    {}
+    SocketCommunicator(WithRawHandle, const int handle) noexcept;
 
     // The handle to the raw socket
     int handle_;

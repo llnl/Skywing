@@ -4,6 +4,7 @@
 #include "skynet/internal/utility/type_list.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -49,7 +50,8 @@ namespace skynet
     std::uint64_t,
     std::vector<std::uint64_t>,
     std::string,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<std::byte>
   >;
 
   /// Variant version of the above

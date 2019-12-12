@@ -3,6 +3,8 @@
 
 #include "message_format.capnp.h"
 
+#include <cstddef>
+#include <cstring>
 #include <vector>
 
 namespace skynet::internal::detail
@@ -108,6 +110,26 @@ namespace skynet::internal::detail
       {
         serialized_data.set(i, values[i]);
       }
+    }
+  };
+
+  // Bytes are different as well
+  template<> struct PublishValueHandler<std::vector<std::byte>>
+  {
+    static std::optional<std::vector<std::byte>> get(const cpnpro::PublishValue::Reader& r) noexcept
+    {
+      if (!r.isBytes()) { return {}; }
+      const auto bytes = r.getBytes();
+      return std::vector<std::byte>{
+        reinterpret_cast<const std::byte*>(bytes.begin()),
+        reinterpret_cast<const std::byte*>(bytes.end())
+      };
+    }
+
+    static void set(cpnpro::PublishValue::Builder& b, const std::vector<std::byte>& values) noexcept
+    {
+      auto serialized_data = b.initBytes(values.size());
+      std::memcpy(serialized_data.begin(), values.data(), values.size());
     }
   };
 } // namespace skynet::internal::detail

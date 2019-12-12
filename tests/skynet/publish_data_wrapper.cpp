@@ -26,9 +26,11 @@ bool roundtrip_value(const T& val)
 TEST_CASE("Cap'n Proto Wrappers Work", "[Skynet_CapnProto_Wrappers]")
 {
   using namespace std::string_literals;
+
   REQUIRE(roundtrip_value(std::int16_t{10}));
   REQUIRE(roundtrip_value(10.0));
   REQUIRE(roundtrip_value(std::vector<std::int8_t>{1, 2, 3}));
   REQUIRE(roundtrip_value("test a string"s));
   REQUIRE(roundtrip_value(std::vector<std::string>{"str1", "str2"}));
+  REQUIRE(roundtrip_value(std::vector<std::byte>{std::byte{0x10}, std::byte{0x80}, std::byte{0x7F}}));
 }

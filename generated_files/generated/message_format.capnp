@@ -30,8 +30,7 @@ struct PublishValue {
     rU64  @19 : List(UInt64);
     str   @20 : Text;
     rStr  @21 : List(Text);
-    # TODO: Actually figure out how to use bytes?
-    # bytes @22 : Data;
+    bytes @22 : Data;
   }
 }
 

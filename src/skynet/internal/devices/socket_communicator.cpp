@@ -190,6 +190,10 @@ namespace skynet::internal
     return {inet_ntoa(client_address.sin_addr), client_address.sin_port};
   }
 
+  SocketCommunicator::SocketCommunicator(WithRawHandle, const int handle) noexcept
+    : handle_{handle}
+  {}
+
   std::vector<std::byte> read_chunked(SocketCommunicator& conn, const std::size_t num_bytes) noexcept
   {
     // Size of memory to allocate/read each step

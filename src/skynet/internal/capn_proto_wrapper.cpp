@@ -75,6 +75,7 @@ namespace skynet::internal
     case vals::R_U16: return pvh_v<std::uint16_t>::get(r);
     case vals::R_U32: return pvh_v<std::uint32_t>::get(r);
     case vals::R_U64: return pvh_v<std::uint64_t>::get(r);
+    case vals::BYTES: return pvh_v<std::byte>::get(r);
     }
     return {};
   }
