@@ -488,7 +488,11 @@ namespace skynet
     , pub_channel_{static_cast<std::uint16_t>(port + publisher_port_offset)}
     , comm_port_{port}
   {
-    server_socket_.set_to_listen(port);
+    if (server_socket_.set_to_listen(port) != internal::ConnectionError::no_error)
+    {
+      std::cerr << "Master::Master failed to set port to listening!\n";
+      std::exit(1);
+    }
   }
 
   /** \brief Destructor; tells all neighbors that the device is dead

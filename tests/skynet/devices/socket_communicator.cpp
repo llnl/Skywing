@@ -16,7 +16,7 @@ constexpr int value_to_send = 3871;
 void server()
 {
   SocketCommunicator conn;
-  conn.set_to_listen(port);
+  REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
   // Wait for the client to connect
   SocketCommunicator with_client = [&]() {
     while (true)
@@ -45,7 +45,7 @@ void client()
   REQUIRE(conn.connect_to_server("127.0.0.1", port) == ConnectionError::no_error);
   std::array<std::byte, sizeof(int)> int_buffer;
   std::memcpy(int_buffer.data(), &value_to_send, sizeof(int));
-  conn.send_message(int_buffer.data(), int_buffer.size());
+  REQUIRE(conn.send_message(int_buffer.data(), int_buffer.size()) == ConnectionError::no_error);
 }
 
 TEST_CASE("Communicating between sockets works", "[Skynet_SocketCommunicator]")
