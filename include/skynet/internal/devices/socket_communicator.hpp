@@ -12,7 +12,7 @@ namespace skynet::internal
 {
   /** \brief Enum returned from communication functions for connection status
    */
-  enum class ConnectionError
+  enum class [[nodiscard]] ConnectionError
   {
     /// The call has fully succeeded, no more work needs to be done
     no_error,
@@ -56,25 +56,25 @@ namespace skynet::internal
      *
      * \param port The port to listen for connections on
      */
-    [[nodiscard]] ConnectionError set_to_listen(std::uint16_t port) noexcept;
+    ConnectionError set_to_listen(std::uint16_t port) noexcept;
 
     /** \brief Connects to a server
      *
      * \param address The address to connect to
      * \param port The port to connect on
      */
-    [[nodiscard]] ConnectionError connect_to_server(const char* address, std::uint16_t port) noexcept;
+    ConnectionError connect_to_server(const char* address, std::uint16_t port) noexcept;
 
     /** \brief Connects to a server given an address:port string
      */
-    [[nodiscard]] ConnectionError connect_to_server(std::string_view address) noexcept;
+    ConnectionError connect_to_server(std::string_view address) noexcept;
 
     /** \brief Sends a message on the socket
      *
      * \param message The message to send
      * \param size The size of the message
      */
-    [[nodiscard]] ConnectionError send_message(const std::byte* message, std::size_t size) noexcept;
+    ConnectionError send_message(const std::byte* message, std::size_t size) noexcept;
 
     /** \brief Recieve a message from the socket if one is available
      *
@@ -84,7 +84,7 @@ namespace skynet::internal
      * \param buffer The buffer to write to
      * \param size The size of the buffer / number of bytes to read
      */
-    [[nodiscard]] ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
+    ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
 
     /** \brief Returns the IP address and port of the socket
      */
@@ -127,7 +127,7 @@ namespace skynet::internal
      * \param buffer The buffer to write to
      * \param size The size of the buffer / number of bytes to read
      */
-    [[nodiscard]] ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
+    ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
 
     /** \brief Read a message in chunks
      */
