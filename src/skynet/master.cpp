@@ -467,7 +467,7 @@ namespace skynet
       static constexpr std::array backoff_times{
         5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms
       };
-      const auto add_time = backoff_counter_ > backoff_times.size()
+      const auto add_time = backoff_counter_ >= backoff_times.size()
         ? backoff_times.back()
         : backoff_times[backoff_counter_];
       return std::chrono::steady_clock::now() + add_time;
