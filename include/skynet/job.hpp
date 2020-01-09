@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <numeric>
 #include <optional>
 #include <thread>
 #include <unordered_map>
@@ -134,6 +135,11 @@ namespace skynet
         return j.bufs_.mutex();
       }
 
+      static void report_dead_tag(Job& j, const TagID& tag) noexcept
+      {
+        j.mark_tag_as_dead(tag);
+      }
+
       // Work around to disallow construction of Jobs outside of the master
       // A public constructor is needed due to it being emplaced into a map
       struct AllowConstruction
@@ -160,7 +166,7 @@ namespace skynet
     /** \brief Retrieves the specified version for the tag, or latest if no version
      * is specified
      *
-     * \return A LocalFuture for the value
+     * \return A Future for the value
      */
     template<typename ValueType>
     auto get_future_for(
@@ -168,16 +174,36 @@ namespace skynet
       const VersionID version = internal::tag_default_version
     ) noexcept
     {
+      // Can just capture the reference to the value as it
+      // will never get invalidated except when the element is deleted
+      // due to being in an unordered_map
+      auto& buffers = bufs_.unsafe_get();
+      const auto tag_iter = buffers.find(tag.id());
+      assert(tag_iter != buffers.cend());
+      auto& tag_info = tag_iter->second;
+      const auto tag_conn_id = tag_info.connection_id;
       return internal::make_future(
         bufs_.mutex(),
-        data_added_to_buffer_cv_,
-        [this, tag, version]() {
-          return has_data_no_lock(tag, version);
+        data_buffer_modified_cv_,
+        [this, &tag_info, tag_conn_id, version]() {
+          return tag_info.buffer.has_data(version)
+            || tag_info.error_occurred != TagInfo::Error::no_error
+            || tag_info.connection_id != tag_conn_id;
         },
-        [this, tag, version]() {
-          const auto variant = get_impl_no_lock(tag, version);
-          assert(std::get_if<ValueType>(&variant) != nullptr);
-          return *std::get_if<ValueType>(&variant);
+        [this, &tag_info, tag_conn_id, version]() mutable -> std::optional<ValueType> {
+          // Don't check tag_info.error_occurred because the connection could have
+          // errored between storing the value in the buffer and then retrieving it
+          if (tag_info.buffer.has_data(version)
+            && tag_info.connection_id == tag_conn_id)
+          {
+            const auto variant = tag_info.buffer.get();
+            assert(std::get_if<ValueType>(&variant) != nullptr);
+            return *std::get_if<ValueType>(&variant);
+          }
+          else
+          {
+            return {};
+          }
         }
       );
     }
@@ -191,13 +217,29 @@ namespace skynet
 
     /** \brief Subscribe to all tags passed into the vector.
      *
+     * \pre The tags are not currently subscribed to
      * \return A future for when the tags have been subscribed to
      */
     auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
     {
-      init_subscribe(tags);
+      // Check if any tags are subscribed to
+      // (Not seperated out of the assert so that it's only in debug mode)
+      // TODO: Make this std::terminate or something instead?
+      assert("Tag attempted to be subscribed to twice!" && (
+        [&]() {
+          const auto [buffers, lock] = bufs_.get();
+          (void)lock;
+          return std::accumulate(
+            tags.cbegin(),
+            tags.cend(),
+            true,
+            [&](const bool missing, const internal::PublishTagBase& tag) {
+              return missing && buffers.find(tag.id()) == buffers.cend();
+          });
+        }()
+      ));
+      init_or_update_subscribe(tags);
       return get_subscribe_future(tags);
-      // return Master::JobAccessor::subscribe(*master_, tags);
     }
 
     /** \brief Attempts to subscribe to the passed tag
@@ -227,27 +269,6 @@ namespace skynet
         }
       );
     }
-
-    /** \brief Create a reduce group over the specified tags
-     *
-     * \return A future for when the reduce group has been created
-     */
-    // template<typename ReduceTag, typename... ReduceOverTags>
-    // auto create_reduce_group(
-    //   const ReduceTag& group_tag,
-    //   const ReduceTag& tag_produced_for_group,
-    //   const ReduceOverTags&... tags
-    // ) noexcept
-    // {
-    //   constexpr auto expected_type =
-    //     internal::index_of<typename ReduceTag::ValueType, PublishValueTypeList>;
-    //   static_assert(
-    //     ((expected_type == internal::index_of<typename ReduceOverTags::ValueType, PublishValueTypeList>) && ...),
-    //     "All tags in a reduce group must produce the same type!"
-    //   );
-    //   const std::vector<std::string> tag_ids{tags.id()...};
-    //   return create_reduce_group(group_tag, tag_produced_for_group, tag_ids);
-    // }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
     //  * subscribed to the tag
@@ -292,6 +313,39 @@ namespace skynet
      */
     const JobID& id() const noexcept;
 
+    /** \brief Returns if the specified tag has a corresponding connection
+     */
+    template<typename T>
+    bool tag_has_active_publisher(const T& tag) const noexcept
+    {
+      return tag_has_active_publisher_impl(tag.id());
+    }
+
+    /** \brief Rebuilds connections for any missing tags
+     *
+     * \return A future for when the tags are re-connected
+     */
+    auto rebuild_missing_tag_connections() noexcept
+    {
+      // init_or_update_subscribe obtains a lock, so might as well just
+      // init this in a lambda (since it can then be const)
+      const std::vector<internal::PublishTagBase> tags = [&]() {
+        const auto [buffers, lock] = bufs_.get();
+        (void)lock;
+        std::vector<internal::PublishTagBase> tags;
+        for (const auto& tag_pair : buffers)
+        {
+          // The expected type here doesn't matter
+          // Also have to remove the first letter as it identifies the type of
+          // tag, but it will just get added again later
+          tags.emplace_back(tag_pair.first.substr(1), 0);
+        }
+        return tags;
+      }();
+      init_or_update_subscribe(tags);
+      return get_subscribe_future(tags);
+    }
+
   private:
     /** \brief Checks if a buffer has data without locking
      */
@@ -306,18 +360,19 @@ namespace skynet
      */
     bool process_data(const TagID& tag_id, PublishValueVariant data, VersionID version) noexcept;
 
+    /** \brief Marks a tag as dead due to connection issues
+     *
+     * \param tag The id of the tag to mark as dead
+     */
+    void mark_tag_as_dead(const TagID& tag_id) noexcept;
+
     void publish_impl(
       const internal::PublishTagBase& tag,
       const PublishValueVariant& to_send,
       VersionID version
     ) noexcept;
 
-    PublishValueVariant get_impl_no_lock(
-      const internal::PublishTagBase& tag,
-      VersionID version
-    ) noexcept;
-
-    void init_subscribe(
+    void init_or_update_subscribe(
       const std::vector<internal::PublishTagBase>& tags
     ) noexcept;
 
@@ -341,20 +396,33 @@ namespace skynet
     ) noexcept
       -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
+    bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
+
     // The id of the job
     JobID id_;
 
     // Group all of the related data to a tag ID in a single structure
     struct TagInfo
     {
+      // For potential future use
+      // Currently just used as a "is broken" flag essentially
+      enum struct Error
+      {
+        no_error,
+        incorrect_type,
+        disconnected
+      };
       // The buffer
       internal::DiscardOldVersionTagBuffer<PublishValueVariant> buffer;
+      // ID for the connection so if a subscription is broken then reformed
+      // they can be differentiated
+      std::uint16_t connection_id;
       // The expected type
       std::uint8_t expected_type;
+      // The error (if any)
+      Error error_occurred;
     };
     MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
-
-    // Similar to the above, but for
 
     // The last version published on each tag
     std::unordered_map<std::string, VersionID> last_published_version_;
@@ -368,8 +436,8 @@ namespace skynet
     // The list of tags this job produces and the expected types
     std::unordered_map<TagID, std::uint8_t> tags_produced_;
 
-    // Condition variable when data is added to buffers
-    std::condition_variable data_added_to_buffer_cv_;
+    // Condition variable when data is added to buffers or an error occurs
+    std::condition_variable data_buffer_modified_cv_;
   }; // Class Job
 } // namespace skynet
 

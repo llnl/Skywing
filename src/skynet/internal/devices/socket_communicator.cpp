@@ -168,8 +168,8 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::read_message(std::byte* const buffer, const std::size_t size) noexcept
   {
-    const auto written = read(handle_, reinterpret_cast<char*>(buffer), size);
-    if (written < 0)
+    const auto read_bytes = read(handle_, reinterpret_cast<char*>(buffer), size);
+    if (read_bytes < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
@@ -179,7 +179,7 @@ namespace skynet::internal
       // std::exit(-1);
       return ConnectionError::unrecoverable;
     }
-    return written == 0 ? ConnectionError::closed : ConnectionError::no_error;
+    return read_bytes == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
 
   std::pair<std::string, std::uint16_t> SocketCommunicator::ip_address_and_port() const noexcept
@@ -261,7 +261,12 @@ namespace skynet::internal
 
   ConnectionError Subscription::read_message(std::byte* const buffer, const std::size_t size) noexcept
   {
-    return conn_.read_message(buffer, size);
+    const auto error = conn_.read_message(buffer, size);
+    if (error != ConnectionError::no_error && error != ConnectionError::would_block)
+    {
+      is_disconnected_ = true;
+    }
+    return error;
   }
 
   std::vector<std::byte> Subscription::read_chunked(const std::size_t num_bytes) noexcept
@@ -272,6 +277,11 @@ namespace skynet::internal
   std::pair<std::string, std::uint16_t> Subscription::ip_address_and_port() const noexcept
   {
     return conn_.ip_address_and_port();
+  }
+
+  bool Subscription::is_disconnected() const noexcept
+  {
+    return is_disconnected_;
   }
 
   PublicationChannel::PublicationChannel(const std::uint16_t port) noexcept

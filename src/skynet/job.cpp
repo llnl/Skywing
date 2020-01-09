@@ -48,13 +48,6 @@ namespace skynet
     Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
   }
 
-  /** \brief Processes the raw information sent from a job on another instance
-   *
-   * \param tag The id of the tag the data was sent with
-   * \param data The data sent on the tag
-   * \param version The version of the data
-   * \return True if processing went fine, false if there was an error
-   */
   bool Job::process_data(
     const TagID& tag_id,
     PublishValueVariant data,
@@ -91,10 +84,12 @@ namespace skynet
           loc->second.expected_type,
           data.index()
         );
+        loc->second.error_occurred = TagInfo::Error::incorrect_type;
+        data_buffer_modified_cv_.notify_all();
         return false;
       }
       SKYNET_TRACE_LOG(
-        "{}, job {} accepted tag {}, version {}, data {}",
+        "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}",
         master_->id(),
         id_,
         tag_id,
@@ -105,8 +100,27 @@ namespace skynet
       loc->second.buffer.add(std::move(data), version);
     }
     // Notify after making sure to release the mutex
-    data_added_to_buffer_cv_.notify_all();
+    data_buffer_modified_cv_.notify_all();
     return true;
+  }
+
+  void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
+  {
+    SKYNET_TRACE_LOG("\"{}\" tag \"{}\" marked as dead.", id_, tag_id);
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    const auto tag_loc = buffers.find(tag_id);
+    if (tag_loc == buffers.cend())
+    {
+      return;
+    }
+    auto& tag_info = tag_loc->second;
+    tag_info.error_occurred = TagInfo::Error::disconnected;
+    ++tag_info.connection_id;
+    // TODO: Allow passing multiple tags so the cv is notified a bunch
+    // of times if there are many tags?  Errors are expected to be rare
+    // so maybe this isn't a problem
+    data_buffer_modified_cv_.notify_all();
   }
 
   void Job::publish_impl(
@@ -131,21 +145,7 @@ namespace skynet
     );
   }
 
-  // Implementation of public functions
-  PublishValueVariant Job::get_impl_no_lock(
-    const internal::PublishTagBase& tag,
-    const VersionID version
-  ) noexcept
-  {
-    auto& buffers = bufs_.unsafe_get();
-    assert(
-      buffers.find(tag.id()) != buffers.cend() &&
-      buffers.find(tag.id())->second.buffer.has_data(version) &&
-      "Attempted to get data for a tag that had no data or was not subscribed to!"
-    );
-    return buffers.find(tag.id())->second.buffer.get();
-  }
-
+  // Private implementation of public functions
   bool Job::has_data(const internal::PublishTagBase& tag, const VersionID version) noexcept
   {
     std::lock_guard<std::mutex> lock{bufs_.mutex()};
@@ -168,7 +168,7 @@ namespace skynet
     return id_;
   }
 
-  void Job::init_subscribe(
+  void Job::init_or_update_subscribe(
     const std::vector<internal::PublishTagBase>& tags
   ) noexcept
   {
@@ -180,14 +180,23 @@ namespace skynet
     for (const auto& tag : tags)
     {
       // Then add the expected type; marking the tag as watched
-      buffers.try_emplace(
+      const auto [iter, inserted] = buffers.try_emplace(
         tag.id(),
         TagInfo{
           // Just need a dummy value here
           {},
-          tag.expected_type()
+          0,
+          tag.expected_type(),
+          TagInfo::Error::no_error
         }
       );
+      // Already exists - update the connection id and reset the buffer
+      if (!inserted)
+      {
+        ++iter->second.connection_id;
+        // Reset it to a default constructed buffer
+        iter->second.buffer = decltype(iter->second.buffer){};
+      }
     }
   }
 
@@ -270,5 +279,17 @@ namespace skynet
       tags_to_find,
       expected_type
     );
+  }
+
+  bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept
+  {
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    const auto iter = buffers.find(tag_id);
+    if (iter == buffers.cend())
+    {
+      return false;
+    }
+    return iter->second.error_occurred == TagInfo::Error::no_error;
   }
 } // namespace skynet

@@ -137,11 +137,16 @@ namespace skynet::internal
      */
     std::pair<std::string, std::uint16_t> ip_address_and_port() const noexcept;
 
+    /** \brief Returns if the subscription has been disconnected
+     */
+    bool is_disconnected() const noexcept;
+
   private:
     // Don't allow external construction
     explicit Subscription() = default;
 
     SocketCommunicator conn_;
+    bool is_disconnected_ = false;
   }; // class Subscription
 
   /** \brief Publication channel

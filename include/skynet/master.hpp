@@ -489,6 +489,10 @@ namespace skynet
      */
     void remove_dead_neighbors() noexcept;
 
+    /** \brief Removes all dead subscriptions
+     */
+    void remove_dead_subscriptions() noexcept;
+
     /** \brief Returns a vector of all the neighboring ID's
      */
     std::vector<MachineID> make_neighbor_vector() const noexcept;
@@ -692,7 +696,7 @@ namespace skynet
     mutable std::mutex job_mut_;
 
     // List of machines that are waiting for information for producers of a certain tag
-    // Uses MachineID's instead of pointer in case the remote machine disconnects and
+    // Uses MachineID's instead of pointers in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
     // is recieved
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;

@@ -26,6 +26,11 @@ public:
     return {value_, std::unique_lock{mutex_}};
   }
 
+  std::pair<const T&, std::unique_lock<std::mutex>> get() const noexcept
+  {
+    return {value_, std::unique_lock{mutex_}};
+  }
+
   /** \brief Trys to lock the object, returns nullptr for the object
    * if it failed to do so
    */
@@ -43,6 +48,18 @@ public:
     }
   }
 
+  std::pair<const T*, std::unique_lock<std::mutex>> try_get() const noexcept
+  {
+    if (mutex_.try_lock())
+    {
+      return {&value_, {mutex_, std::adopt_lock}};
+    }
+    else
+    {
+      return {nullptr, {}};
+    }
+  }
+
   /** \brief Returns a reference to the mutex
    */
   std::mutex& mutex() noexcept { return mutex_; }
@@ -50,10 +67,11 @@ public:
   /** \brief Returns a reference to the contained value without using the mutex.
    */
   T& unsafe_get() noexcept { return value_; }
+  const T& unsafe_get() const noexcept { return value_; }
 
 private:
   T value_;
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
 };
 
 #endif // SKYNET_INTERNAL_UTILITY_MUTEX_GUARDED_HPP

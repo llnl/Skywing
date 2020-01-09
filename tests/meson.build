@@ -8,6 +8,7 @@ tests = [
   ['master_conn', 'master_conn.cpp'],
   ['publish_data_wrapper', 'publish_data_wrapper.cpp'],
   ['simple_reduce', 'simple_reduce.cpp'],
+  ['broken_subscribes', 'broken_subscribes.cpp'],
 
   # devices/
   ['socket_communicator', 'devices/socket_communicator.cpp']

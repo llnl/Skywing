@@ -325,7 +325,7 @@ namespace skynet
             msg.neighbor_id()
           );
           const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor_id());
-          // Neighbors that don't exist will often be reported if its a shared neighbor and
+          // Neighbors that don't exist will often be reported if it's a shared neighbor and
           // it has already been removed due to the goodbye message
           if (loc != neighbors_.end())
           {
@@ -602,7 +602,7 @@ namespace skynet
         std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
         if (lock.owns_lock() && iter->second.is_finished())
         {
-          // Need to free before deallocation
+          // Need to unlock before deallocation
           lock.unlock();
           iter = jobs_.erase(iter);
         }
@@ -618,6 +618,8 @@ namespace skynet
         pub_channel_.accept_subscriptions();
         read_data_from_subscriptions();
         handle_neighbor_messages();
+        remove_dead_neighbors();
+        remove_dead_subscriptions();
         for (auto&& neighbor : neighbors_)
         {
           neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
@@ -720,16 +722,12 @@ namespace skynet
     }
   }
 
-  /** \brief Listens for messages from neighbors and handles them if there
-   * are any.
-   */
   void Master::handle_neighbor_messages() noexcept
   {
     for (auto&& neighbor : neighbors_)
     {
       neighbor.second.get_and_handle_messages();
     }
-    remove_dead_neighbors();
   }
 
   void Master::publish(
@@ -767,21 +765,18 @@ namespace skynet
     return true;
   }
 
-  /** \brief Notify neighbors of a new new neighbor
-   */
   void Master::notify_of_new_neighbor(const MachineID id) noexcept
   {
     send_to_neighbors(internal::make_new_neighbor(id));
   }
 
-  /** \brief Removes all dead neighbors
-   */
   void Master::remove_dead_neighbors() noexcept
   {
     for (auto it = neighbors_.begin(); it != neighbors_.end(); /* nothing */)
     {
       if (it->second.is_dead())
       {
+        // TODO: Tell reduce groups when this happens
         send_to_neighbors(internal::make_remove_neighbor(it->first));
         it = neighbors_.erase(it);
       }
@@ -792,8 +787,31 @@ namespace skynet
     }
   }
 
-  /** \brief Returns a vector of all the neighboring ID's
-   */
+  void Master::remove_dead_subscriptions() noexcept
+  {
+    // for (auto& [sub_handle, produced_tags] : subscriptions_)
+    for (auto iter = subscriptions_.begin(); iter != subscriptions_.cend();)
+    {
+      const auto& [sub_handle, produced_tags] = *iter;
+      if (sub_handle.is_disconnected())
+      {
+        for (auto& [name, job] : jobs_)
+        {
+          (void)name;
+          for (const auto& tag : produced_tags)
+          {
+            Job::Accessor::report_dead_tag(job, tag);
+          }
+        }
+        iter = subscriptions_.erase(iter);
+      }
+      else
+      {
+        ++iter;
+      }
+    }
+  }
+
   std::vector<MachineID> Master::make_neighbor_vector() const noexcept
   {
     std::vector<MachineID> to_ret(neighbors_.size());
@@ -821,10 +839,17 @@ namespace skynet
     std::unordered_set<std::string> remaining_tags(required_tags.cbegin(), required_tags.cend());
     for (const auto& subscription : subscriptions_)
     {
-      for (const auto& tag : subscription.produced_tags)
+      if (!subscription.subscription.is_disconnected())
       {
-        remaining_tags.erase(tag);
+        for (const auto& tag : subscription.produced_tags)
+        {
+          remaining_tags.erase(tag);
+        }
       }
+    }
+    if (remaining_tags.empty())
+    {
+      SKYNET_TRACE_LOG("\"{}\" subscription for tags {} finished.", id_, required_tags);
     }
     return remaining_tags.empty();
   }
@@ -840,10 +865,13 @@ namespace skynet
       const bool already_subscribed = [this, &tag_id]() {
         for (const auto& sub : subscriptions_)
         {
-          auto& prod_tags = sub.produced_tags;
-          if (std::find(prod_tags.cbegin(), prod_tags.cend(), tag_id) != prod_tags.cend())
+          if (!sub.subscription.is_disconnected())
           {
-            return true;
+            auto& prod_tags = sub.produced_tags;
+            if (std::find(prod_tags.cbegin(), prod_tags.cend(), tag_id) != prod_tags.cend())
+            {
+              return true;
+            }
           }
         }
         return false;
@@ -1536,7 +1564,7 @@ namespace skynet
               // First find the group that the tag the parent is for.
               // If there's no matching tag then just ignore it
               // TODO: Keep a look-up map if this becomes a performance issue
-              auto& [group_id, reduce_data] = [&]() -> std::pair<const TagID, ReduceGroupData>& {
+              auto& [group_id, reduce_data] = [&]() -> decltype(reduce_tag_data_)::reference {
                 for (auto& data_pair : reduce_tag_data_)
                 {
                   const auto& group_data = data_pair.second;
