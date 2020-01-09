@@ -10,21 +10,7 @@
 
 namespace skynet::internal
 {
-  /** \brief The value to pass to use default behavior for
-   * versions when publishing and subscribing.
-   */
-  inline static constexpr VersionID tag_default_version = -1;
-
-  /** \brief Determine the updated version that needs to be looked for based on an old
-   * version and a new passed in version.
-   */
-  constexpr VersionID updated_version(const VersionID to_update, const VersionID new_version) noexcept
-  {
-    return
-      new_version == tag_default_version
-        ? to_update + 1
-        : new_version;
-  }
+  inline static constexpr VersionID tag_no_data = -1;
 
   namespace detail
   {
@@ -37,15 +23,14 @@ namespace skynet::internal
       /** Returns true if data is present for the specified version, false if
        * it is not available.
        */
-      bool has_data(const VersionID required_version = tag_default_version) const noexcept
+      bool has_data() const noexcept
       {
-        return
-          stored_version_ != tag_default_version &&
-          stored_version_ >= updated_version(last_fetched_version_, required_version);
+        return stored_version_ != tag_no_data
+          && stored_version_ >= last_fetched_version_ + 1;
       }
 
-      VersionID stored_version_ = tag_default_version;
-      VersionID last_fetched_version_ = tag_default_version;
+      VersionID stored_version_ = tag_no_data;
+      VersionID last_fetched_version_ = tag_no_data;
     }; // class DiscardOldVersionTagBufferBase
   } // namespace skynet::internal::detail
 
@@ -73,7 +58,7 @@ namespace skynet::internal
      */
     void add(T value, const VersionID version) noexcept
     {
-      if (version > this->stored_version_ || this->stored_version_ == tag_default_version)
+      if (version > this->stored_version_ || this->stored_version_ == tag_no_data)
       {
         this->stored_version_ = version;
         value_ = std::move(value);
@@ -95,14 +80,14 @@ namespace skynet::internal
      *
      * \pre Data can be retrieved for the specified version
      */
-    T get(const VersionID required_version = tag_default_version) noexcept
+    T get(const VersionID required_version) noexcept
     {
       while (true)
       {
         assert(!buffer_.empty());
         auto [data, version] = std::move(buffer_.front());
         buffer_.erase(buffer_.begin());
-        if (version >= updated_version(last_fetched_version_, required_version))
+        if (version >= required_version)
         {
           last_fetched_version_ = version;
           return std::move(data);
@@ -110,20 +95,19 @@ namespace skynet::internal
       }
     }
 
-    /** Returns true if data can be retrieved for the specified version, false
-     * if it is not available.
+    /** Returns true if data can be retrieved
      */
-    bool has_data(const VersionID required_version = tag_default_version) const noexcept
+    bool has_data(const VersionID required_version) const noexcept
     {
       return !buffer_.empty() &&
-        buffer_.back().second >= updated_version(last_fetched_version_, required_version);
+        buffer_.back().second >= required_version;
     }
 
     /** Adds data to the buffer if the version is newer than the last version
      */
     void add(T value, const VersionID version) noexcept
     {
-      if (version > last_stored_version_ || last_stored_version_ == tag_default_version)
+      if (version > last_stored_version_ || last_stored_version_ == tag_no_data)
       {
         buffer_.emplace_back(std::move(value), version);
       }
@@ -131,8 +115,8 @@ namespace skynet::internal
 
   private:
     std::vector<std::pair<T, VersionID>> buffer_;
-    VersionID last_stored_version_ = tag_default_version;
-    VersionID last_fetched_version_ = tag_default_version;
+    VersionID last_stored_version_ = tag_no_data;
+    VersionID last_fetched_version_ = tag_no_data;
   };
 } // namespace skynet::internal
 

@@ -73,7 +73,7 @@ namespace skynet
       Master* master_;
       TagID group_id_;
       TagID produced_tag_;
-      VersionID last_sent_version_ = tag_default_version;
+      VersionID last_sent_version_ = tag_no_data;
       std::mutex buffer_mutex_;
       std::condition_variable data_added_to_buffers_cv_;
       std::uint8_t expected_type_;
@@ -94,21 +94,19 @@ namespace skynet
     template<typename Callable>
     auto reduce(
       const T& value,
-      Callable reduce_op,
-      VersionID version = internal::tag_default_version
+      Callable reduce_op
     ) noexcept
     {
-      return reduce_impl<false>(value, std::move(reduce_op), version);
+      return reduce_impl<false>(value, std::move(reduce_op));
     }
 
     template<typename Callable>
     auto allreduce(
       const T& value,
-      Callable reduce_op,
-      VersionID version = internal::tag_default_version
+      Callable reduce_op
     ) noexcept
     {
-      return reduce_impl<true>(value, std::move(reduce_op), version);
+      return reduce_impl<true>(value, std::move(reduce_op));
     }
 
     bool returns_value_on_reduce() const noexcept
@@ -121,12 +119,11 @@ namespace skynet
     template<bool IsAllReduce, typename Callable>
     auto reduce_impl(
       const T& value,
-      Callable reduce_op,
-      VersionID version = internal::tag_default_version
+      Callable reduce_op
     ) noexcept
     {
       std::lock_guard lock{base_.buffer_mutex_};
-      const auto required_version = internal::updated_version(base_.last_sent_version_, version);
+      const auto required_version = base_.last_sent_version_ + 1;
       base_.pending_reduces_.push_back({
         required_version,
         value,
@@ -149,7 +146,7 @@ namespace skynet
           else
           {
             return
-              base_.last_sent_version_ != internal::tag_default_version &&
+              base_.last_sent_version_ != internal::tag_no_data &&
               base_.last_sent_version_ >= required_version;
           }
         },

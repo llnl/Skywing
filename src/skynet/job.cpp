@@ -125,8 +125,7 @@ namespace skynet
 
   void Job::publish_impl(
     const internal::PublishTagBase& tag,
-    const PublishValueVariant& to_send,
-    const VersionID version
+    const PublishValueVariant& to_send
   ) noexcept
   {
     assert(tags_produced_.find(tag.id()) != tags_produced_.cend()
@@ -135,8 +134,8 @@ namespace skynet
       && "Attempted to publish the wrong type on a tag!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
-      last_published_version_.try_emplace(tag.id(), internal::tag_default_version).first->second;
-    last_version = internal::updated_version(last_version, version);
+      last_published_version_.try_emplace(tag.id(), internal::tag_no_data).first->second;
+    last_version = last_version + 1;
     Master::JobAccessor::publish(
       *master_,
       last_version,
@@ -146,13 +145,13 @@ namespace skynet
   }
 
   // Private implementation of public functions
-  bool Job::has_data(const internal::PublishTagBase& tag, const VersionID version) noexcept
+  bool Job::has_data(const internal::PublishTagBase& tag) noexcept
   {
     std::lock_guard<std::mutex> lock{bufs_.mutex()};
-    return has_data_no_lock(tag, version);
+    return has_data_no_lock(tag);
   }
 
-  bool Job::has_data_no_lock(const internal::PublishTagBase& tag, const VersionID version) noexcept
+  bool Job::has_data_no_lock(const internal::PublishTagBase& tag) noexcept
   {
     auto& buffers = bufs_.unsafe_get();
     const auto loc = buffers.find(tag.id());
@@ -160,7 +159,7 @@ namespace skynet
     {
       return false;
     }
-    return loc->second.buffer.has_data(version);
+    return loc->second.buffer.has_data();
   }
 
   const JobID& Job::id() const noexcept

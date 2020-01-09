@@ -170,8 +170,7 @@ namespace skynet
      */
     template<typename ValueType>
     auto get_future_for(
-      const PublishTag<ValueType>& tag,
-      const VersionID version = internal::tag_default_version
+      const PublishTag<ValueType>& tag
     ) noexcept
     {
       // Can just capture the reference to the value as it
@@ -185,15 +184,15 @@ namespace skynet
       return internal::make_future(
         bufs_.mutex(),
         data_buffer_modified_cv_,
-        [this, &tag_info, tag_conn_id, version]() {
-          return tag_info.buffer.has_data(version)
+        [this, &tag_info, tag_conn_id]() {
+          return tag_info.buffer.has_data()
             || tag_info.error_occurred != TagInfo::Error::no_error
             || tag_info.connection_id != tag_conn_id;
         },
-        [this, &tag_info, tag_conn_id, version]() mutable -> std::optional<ValueType> {
+        [this, &tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
           // Don't check tag_info.error_occurred because the connection could have
           // errored between storing the value in the buffer and then retrieving it
-          if (tag_info.buffer.has_data(version)
+          if (tag_info.buffer.has_data()
             && tag_info.connection_id == tag_conn_id)
           {
             const auto variant = tag_info.buffer.get();
@@ -211,8 +210,7 @@ namespace skynet
     /** \brief Checks if a tag buffer has data or not
      */
     bool has_data(
-      const internal::PublishTagBase& tag,
-      VersionID version = internal::tag_default_version
+      const internal::PublishTagBase& tag
     ) noexcept;
 
     /** \brief Subscribe to all tags passed into the vector.
@@ -294,11 +292,10 @@ namespace skynet
     template<typename T>
     void publish(
       const PublishTag<T>& tag,
-      const T& value,
-      VersionID version = internal::tag_default_version
+      const T& value
     ) noexcept
     {
-      publish_impl(tag, value, version);
+      publish_impl(tag, value);
     }
 
     /** \brief Returns true if the job is finished, false if it is not
@@ -349,7 +346,7 @@ namespace skynet
   private:
     /** \brief Checks if a buffer has data without locking
      */
-    bool has_data_no_lock(const internal::PublishTagBase& tag, VersionID version) noexcept;
+    bool has_data_no_lock(const internal::PublishTagBase& tag) noexcept;
 
     /** \brief Processes the raw information sent from a job on another instance
      *
@@ -368,8 +365,7 @@ namespace skynet
 
     void publish_impl(
       const internal::PublishTagBase& tag,
-      const PublishValueVariant& to_send,
-      VersionID version
+      const PublishValueVariant& to_send
     ) noexcept;
 
     void init_or_update_subscribe(
