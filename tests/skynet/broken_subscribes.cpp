@@ -11,7 +11,7 @@ constexpr std::uint16_t subscriber_port = 20000;
 constexpr const char* publisher_id = "publisher";
 constexpr const char* subscriber_id = "subscriber";
 
-constexpr int num_values_to_publish = 10;
+constexpr int num_values_to_publish = 5;
 constexpr std::int64_t value_to_publish = 10;
 
 using Int64Tag = PublishTag<std::int64_t>;
@@ -21,6 +21,7 @@ std::mutex catch_mutex;
 int values_published = 0;
 // For knowing that the subscriber has completed subscribing
 int subscriptions_finished = 0;
+int values_retrieved = 0;
 
 void publish_once(int publish_number)
 {
@@ -42,6 +43,10 @@ void publish_once(int publish_number)
     // Wait a bit for the subscription to finish
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     job.publish(value_tag, value_to_publish);
+    while (values_retrieved <= publish_number)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
   });
   master.run();
 }
@@ -55,15 +60,16 @@ void subscriber()
     {
       if (subscriptions_finished != 0)
       {
+        // wait a bit so the publisher can disconnect
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         job.rebuild_missing_tag_connections().wait();
       }
       // Get value from the publisher
       ++subscriptions_finished;
-      // wait a bit so the message can arrive
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
       const auto value = job.get_future_for(value_tag).get();
       REQUIRE(value);
       REQUIRE(*value == value_to_publish);
+      ++values_retrieved;
       // Trying to get another value will always error as the publishing
       // thread will exit (then rejoin)
       const auto failed_value = job.get_future_for(value_tag).get();

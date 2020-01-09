@@ -189,12 +189,13 @@ namespace skynet
           TagInfo::Error::no_error
         }
       );
-      // Already exists - update the connection id and reset the buffer
+      // Already exists - update the connection id and reset the buffer / error
       if (!inserted)
       {
         ++iter->second.connection_id;
         // Reset it to a default constructed buffer
         iter->second.buffer = decltype(iter->second.buffer){};
+        iter->second.error_occurred = TagInfo::Error::no_error;
       }
     }
   }
