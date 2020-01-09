@@ -630,9 +630,10 @@ namespace skynet
         }
       }
       // Mutex has been released - notify CV's if requested
-      std::array<std::pair<bool&, std::condition_variable&>, 2> cv_array{
-        std::pair<bool&, std::condition_variable&>{notify_new_subscriptions_, new_subscription_cv_},
-        std::pair<bool&, std::condition_variable&>{notify_reduce_group_, reduce_group_cv_}
+      using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
+      std::array<cv_ref_pair, 2> cv_array{
+        cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
+        cv_ref_pair{notify_reduce_group_, reduce_group_cv_}
       };
       for (auto& [notify, cv] : cv_array)
       {

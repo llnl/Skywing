@@ -47,7 +47,9 @@ void test_tag(Job& job, const Tag& tag) noexcept
 {
   // Catch2's macros are not thread safe
   std::lock_guard g{catch_mutex};
-  REQUIRE(job.get_future_for(tag).get() == ExpectedTagValue<Tag>::value());
+  const auto opt_value = job.get_future_for(tag).get();
+  REQUIRE(opt_value);
+  REQUIRE(*opt_value == ExpectedTagValue<Tag>::value());
 }
 // Tests if the specified tags hold the correct value
 template<typename... Tags, typename Job>
