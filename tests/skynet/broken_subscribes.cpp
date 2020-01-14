@@ -25,6 +25,9 @@ int values_retrieved = 0;
 
 void publish_once(int publish_number)
 {
+  // Wait to start to allow the subscriber to notice that the publisher has
+  // disconnected so it won't discard this connection for re-using the id
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
   Master master{publisher_port, publisher_id};
   // TODO: I don't think this can be called from the job thread safely
   // Maybe add a queue to master for pending connections to make and a way
