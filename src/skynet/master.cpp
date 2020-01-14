@@ -1,5 +1,6 @@
 #include "skynet/master.hpp"
 
+#include "skynet/internal/utility/algorithms.hpp"
 #include "skynet/internal/utility/logging.hpp"
 
 // TODO: Support other types of communicators
@@ -1096,7 +1097,7 @@ namespace skynet
       const auto loc = send_publisher_information_to_.find(tag);
       if (loc != send_publisher_information_to_.cend())
       {
-        machines_to_send_to.merge(loc->second);
+        internal::merge_associative_containers(machines_to_send_to, loc->second);
         send_publisher_information_to_.erase(loc);
       }
     }
