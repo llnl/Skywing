@@ -186,6 +186,18 @@ namespace skynet::internal
   {}
 
   /////////////////////////////////////////////////////
+  // ReportReduceDisconnection
+  /////////////////////////////////////////////////////
+
+  TagID ReportReduceDisconnection::reduce_tag() const noexcept { return r.getReduceTag(); }
+  MachineID ReportReduceDisconnection::initiating_machine() const noexcept { return r.getInitiatingMachine(); }
+  ReductionDisconnectID ReportReduceDisconnection::id() const noexcept { return r.getId(); }
+
+  ReportReduceDisconnection::ReportReduceDisconnection(cpnpro::ReportReduceDisconnection::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
   // StatusMessageHandler
   /////////////////////////////////////////////////////
 
@@ -228,16 +240,17 @@ namespace skynet::internal
     // to signify that there's no data due to, e.g., malformed input
     const std::optional<MessageVariant> to_ret = [&]() -> std::optional<MessageVariant> {
       switch(impl_->root.which()) {
-      case vals::GREETING:             return Greeting{impl_->root.getGreeting()};
-      case vals::GOODBYE:              return Goodbye{/* impl_->root.getGoodbye() */};
-      case vals::NEW_NEIGHBOR:         return NewNeighbor{impl_->root.getNewNeighbor()};
-      case vals::REMOVE_NEIGHBOR:      return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
-      case vals::HEARTBEAT:            return Heartbeat{/* impl_->root.getHeartbeat() */};
-      case vals::REPORT_PUBLISHERS:    return ReportPublishers{impl_->root.getReportPublishers()};
-      case vals::GET_PUBLISHERS:       return GetPublishers{impl_->root.getGetPublishers()};
-      case vals::JOIN_REDUCE_GROUP:    return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
-      case vals::SUBMIT_REDUCE_VALUE:  return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
-      case vals::REPORT_REDUCE_RESULT: return ReportReduceResult{impl_->root.getReportReduceResult()};
+      case vals::GREETING:                    return Greeting{impl_->root.getGreeting()};
+      case vals::GOODBYE:                     return Goodbye{/* impl_->root.getGoodbye() */};
+      case vals::NEW_NEIGHBOR:                return NewNeighbor{impl_->root.getNewNeighbor()};
+      case vals::REMOVE_NEIGHBOR:             return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
+      case vals::HEARTBEAT:                   return Heartbeat{/* impl_->root.getHeartbeat() */};
+      case vals::REPORT_PUBLISHERS:           return ReportPublishers{impl_->root.getReportPublishers()};
+      case vals::GET_PUBLISHERS:              return GetPublishers{impl_->root.getGetPublishers()};
+      case vals::JOIN_REDUCE_GROUP:           return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
+      case vals::SUBMIT_REDUCE_VALUE:         return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
+      case vals::REPORT_REDUCE_RESULT:        return ReportReduceResult{impl_->root.getReportReduceResult()};
+      case vals::REPORT_REDUCE_DISCONNECTION: return ReportReduceDisconnection{impl_->root.getReportReduceDisconnection()};
       }
       return {};
     }();

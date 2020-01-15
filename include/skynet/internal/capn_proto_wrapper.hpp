@@ -192,6 +192,22 @@ namespace skynet::internal
     explicit ReportReduceResult(cpnpro::ReportReduceResult::Reader reader) noexcept;
   };
 
+  /** \breif Message for reporting that a machine disconnected
+   */
+  class ReportReduceDisconnection
+  {
+  public:
+    TagID reduce_tag() const noexcept;
+    MachineID initiating_machine() const noexcept;
+    ReductionDisconnectID id() const noexcept;
+
+  private:
+    cpnpro::ReportReduceDisconnection::Reader r;
+
+    friend class StatusMessageHandler;
+    explicit ReportReduceDisconnection(cpnpro::ReportReduceDisconnection::Reader reader) noexcept;
+  };
+
   /** \brief Class for converting the raw bytes of a message into a useable format
    */
   class StatusMessageHandler
@@ -234,7 +250,8 @@ namespace skynet::internal
       GetPublishers,
       JoinReduceGroup,
       SubmitReduceValue,
-      ReportReduceResult
+      ReportReduceResult,
+      ReportReduceDisconnection
     >;
 
     // Process the stored message and return its internal type

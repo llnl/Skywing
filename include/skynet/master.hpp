@@ -398,6 +398,15 @@ namespace skynet
       {
         return m.handle_report_reduce_result(msg, from);
       }
+
+      static bool handle_report_reduce_disconnection(
+        Master& m,
+        const internal::ReportReduceDisconnection& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_report_reduce_disconnection(msg, from);
+      }
     }; // struct ExternalMasterAccessor
 
     struct ReduceGroupAccessor
@@ -628,6 +637,13 @@ namespace skynet
     bool handle_reduce_value(
       const TagID& reduce_group_id,
       const internal::PublishData& value,
+      const internal::ExternalMaster& from
+    ) noexcept;
+
+    /** \brief Handle a reduce disconnect notification
+     */
+    bool handle_report_reduce_disconnection(
+      const internal::ReportReduceDisconnection& msg,
       const internal::ExternalMaster& from
     ) noexcept;
 

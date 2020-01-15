@@ -110,7 +110,7 @@ void simulate_machine(const int machine_number)
       auto future = reduce_group.allreduce(random_value, std::plus<>{});
       // The future indicates that the final result of the reduction operation
       // is ready to be retrieved; so just retrieve the value.
-      const auto result = future.get();
+      const auto result = future.get().value();
       const auto cur_time = std::time(nullptr);
       // The result should never fall outside of the specified range, but do a sanity
       // check just in case

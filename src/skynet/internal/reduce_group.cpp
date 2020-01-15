@@ -63,6 +63,35 @@ namespace skynet::internal
     return false;
   }
 
+  void ReduceGroupBase::report_cancellation(const MachineID& initiating_machine, ReductionDisconnectID id) noexcept
+  {
+    const bool should_act_on = [&]() {
+      const auto iter = last_heard_disconnect.find(initiating_machine);
+      if (iter == last_heard_disconnect.cend())
+      {
+        last_heard_disconnect.try_emplace(iter, initiating_machine, id);
+        return true;
+      }
+      else if (iter->second == id)
+      {
+        return false;
+      }
+      else
+      {
+        iter->second = id;
+        return true;
+      }
+    }();
+    if (!should_act_on)
+    {
+      return;
+    }
+    // Mark all futures invalid until rebuilding happens
+    is_valid = false;
+    ++conn_counter;
+    // TODO: Send to children & parent
+  }
+
   void ReduceGroupBase::add_data_index(const std::size_t index, PublishValueVariant value, const VersionID version) noexcept
   {
     assert(index < 3);
@@ -83,7 +112,7 @@ namespace skynet::internal
 
   void ReduceGroupBase::process_pending_reduce_ops() noexcept
   {
-    const auto reduce_is_ready = [&](const VersionID required_version) noexcept{
+    const auto reduce_is_ready = [&](const VersionID required_version) noexcept {
       if (tag_neighbors_.left_child().empty())
       {
         return true;
@@ -104,6 +133,10 @@ namespace skynet::internal
     // Process the reductions in order, until one fails to complete
     for (auto iter = pending_reduces_.begin(); iter != pending_reduces_.end(); iter = pending_reduces_.erase(iter))
     {
+      if (!is_valid)
+      {
+        continue;
+      }
       if (!reduce_is_ready(iter->required_version))
       {
         return;

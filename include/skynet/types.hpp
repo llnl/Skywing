@@ -27,6 +27,9 @@ namespace skynet
   /// The type used for communicating message sizes over the network
   using NetworkSizeType = std::uint32_t;
 
+  /// The type used for disconnection notifications in reduce groups
+  using ReductionDisconnectID = std::uint64_t;
+
   /// A typelist of all the types that can be published
   using PublishValueTypeList = internal::TypeList<
     float,
@@ -56,6 +59,74 @@ namespace skynet
 
   /// Variant version of the above
   using PublishValueVariant = internal::ApplyTo<PublishValueTypeList, std::variant>;
+
+  /// A type indicating that a reduce did not produce a result intentionally
+  /// (i.e., that it is not the root of the reduce tree)
+  struct ReduceNoValue{};
+
+  /// A type indicating that a reduce failed due to a disconnection
+  struct ReduceDisconnection{};
+
+  /** \brief The return result for a normal reduce operation.
+   *
+   * As a reduce operation can either not produce a value because it isn't
+   * the root or not produce a value because of a connection error, can't
+   * just return an optional.
+   */
+  template<typename T>
+  class ReduceResult
+  {
+  public:
+    constexpr ReduceResult(ReduceNoValue) noexcept
+      : var_{ReduceNoValue{}}
+    {}
+    constexpr ReduceResult(ReduceDisconnection) noexcept
+      : var_{ReduceDisconnection{}}
+    {}
+    constexpr ReduceResult(T value) noexcept
+      : var_{std::move(value)}
+    {}
+
+    /** \brief Returns true if an error occurred
+     */
+    constexpr bool error_occurred() const noexcept
+    {
+      return std::holds_alternative<ReduceDisconnection>(var_);
+    }
+
+    /** \brief Returns true if the variant holds a value
+     */
+    constexpr bool has_value() const noexcept
+    {
+      return std::holds_alternative<T>(var_);
+    }
+
+    /** \brief Returns the value held
+     *
+     * \pre obj.has_value() == true
+     */
+    constexpr const T& value() const & noexcept
+    {
+      assert(has_value());
+      return *std::get_if<T>(&var_);
+    }
+    constexpr T value() && noexcept
+    {
+      assert(has_value());
+      return *std::get_if<T>(&var_);
+    }
+    constexpr const T& operator*() const & noexcept
+    {
+      return value();
+    }
+    constexpr T operator*() && noexcept
+    {
+      return value();
+    }
+
+  private:
+    std::variant<ReduceNoValue, ReduceDisconnection, T> var_;
+  };
 
   namespace internal
   {

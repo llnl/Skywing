@@ -33,19 +33,21 @@ void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, con
   // Normal reduce
   const auto first_result = group.reduce(value, reduce_op).get();
   // Allreduce
-  auto second_result = group.allreduce(value, reduce_op).get();
+  const auto second_result = group.allreduce(value, reduce_op).get();
   // Wait for the value to be ready / propagated
   std::lock_guard g{catch_mutex};
   if (group.returns_value_on_reduce())
   {
-    REQUIRE(first_result);
+    REQUIRE(first_result.has_value());
     REQUIRE(*first_result == expected_value);
   }
   else
   {
-    REQUIRE_FALSE(first_result);
+    REQUIRE_FALSE(first_result.has_value());
+    REQUIRE_FALSE(first_result.error_occurred());
   }
-  REQUIRE(second_result == expected_value);
+  REQUIRE(second_result);
+  REQUIRE(*second_result == expected_value);
 }
 
 // This wasn't working with a reference, so just use a pointer

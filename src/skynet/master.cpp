@@ -449,6 +449,14 @@ namespace skynet
           }
           return Master::ExternalMasterAccessor::handle_report_reduce_result(*master_, msg, *this);
         },
+        [&](const ReportReduceDisconnection& msg) {
+          // TODO: Fill this out
+          if (!tag_name_okay(msg.reduce_tag()))
+          {
+            return false;
+          }
+          return Master::ExternalMasterAccessor::handle_report_reduce_disconnection(*master_, msg, *this);
+        },
         [](...) {
           // Anything else is a programming bug, this shouldn't be reached
           assert(false && "Missing message type in ExternalMaster::handle_message");
@@ -1516,6 +1524,31 @@ namespace skynet
       return false;
     }
     return group_loc->second.group.add_data(value.tag_id(), *var_opt, value.version());
+  }
+
+  bool Master::handle_report_reduce_disconnection(
+    const internal::ReportReduceDisconnection& msg,
+    const internal::ExternalMaster& from
+  ) noexcept
+  {
+    // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
+    (void)from;
+    // Make sure the group exists
+    const auto group_loc = reduce_tag_data_.find(msg.reduce_tag());
+    if (group_loc == reduce_tag_data_.cend())
+    {
+      SKYNET_WARN_LOG(
+        "\"{}\" rejected reduce disconnection from \"{}\", initiated by \"{}\", "
+          "for reduce group \"{}\" for as the reduce group does not exist",
+        id_,
+        from.id(),
+        msg.initiating_machine(),
+        msg.reduce_tag()
+      );
+      return false;
+    }
+    group_loc->second.group.report_cancellation(msg.initiating_machine(), msg.id());
+    return true;
   }
 
   bool Master::try_connections_for_pending_tags() noexcept

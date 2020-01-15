@@ -300,7 +300,7 @@ void machine_task(const int index)
           return result;
         }
       );
-      auto new_global = fut.get();
+      auto new_global = fut.get().value();
       // Divide by the number of machines for the average value
       for (auto& val : new_global)
       {
