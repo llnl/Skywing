@@ -7,9 +7,8 @@
 #include <optional>
 #include <type_traits>
 
-namespace skynet::internal
+namespace skynet
 {
-  // TODO: This probably doesn't belong in the internal namespace?
   template<typename ProducedType, typename IsReadyCallable, typename GetValueCallable>
   class Future : public IsReadyCallable, public GetValueCallable
   {
@@ -90,40 +89,43 @@ namespace skynet::internal
     std::condition_variable& cv_;
   }; // class Future
 
-  struct FutureGetNoOp
+  namespace internal
   {
-    constexpr void operator()() const noexcept {}
-  }; // struct FutureGetNoOp
+    struct FutureGetNoOp
+    {
+      constexpr void operator()() const noexcept {}
+    }; // struct FutureGetNoOp
 
-  // This would be in internal even if Future isn't, however
-  template<typename IsReadyCallable, typename GetValueCallable>
-  auto make_future(
-    std::mutex& mutex,
-    std::condition_variable& cv,
-    IsReadyCallable ready,
-    GetValueCallable get_value
-  ) noexcept
-    -> Future<decltype(get_value()), IsReadyCallable, GetValueCallable>
-  {
-    return Future<decltype(get_value()), IsReadyCallable, GetValueCallable>{
-      mutex,
-      cv,
-      std::move(ready),
-      std::move(get_value)
-    };
-  }
+    // This would be in internal even if Future isn't, however
+    template<typename IsReadyCallable, typename GetValueCallable>
+    auto make_future(
+      std::mutex& mutex,
+      std::condition_variable& cv,
+      IsReadyCallable ready,
+      GetValueCallable get_value
+    ) noexcept
+      -> Future<decltype(get_value()), IsReadyCallable, GetValueCallable>
+    {
+      return Future<decltype(get_value()), IsReadyCallable, GetValueCallable>{
+        mutex,
+        cv,
+        std::move(ready),
+        std::move(get_value)
+      };
+    }
 
-  // Overload for void returning futures
-  template<typename IsReadyCallable>
-  auto make_future(
-    std::mutex& mutex,
-    std::condition_variable& cv,
-    IsReadyCallable ready
-  ) noexcept
-    -> Future<void, IsReadyCallable, FutureGetNoOp>
-  {
-    return make_future(mutex, cv, std::move(ready), FutureGetNoOp{});
-  }
-} // namespace skynet::internal
+    // Overload for void returning futures
+    template<typename IsReadyCallable>
+    auto make_future(
+      std::mutex& mutex,
+      std::condition_variable& cv,
+      IsReadyCallable ready
+    ) noexcept
+      -> Future<void, IsReadyCallable, FutureGetNoOp>
+    {
+      return make_future(mutex, cv, std::move(ready), FutureGetNoOp{});
+    }
+  } // namespace skynet::internal
+} // namespace skynet
 
 #endif // SKYNET_INTERNAL_FUTURE_HPP

@@ -5,5 +5,6 @@
 #include "job.hpp"
 #include "master.hpp"
 #include "types.hpp"
+#include "future.hpp"
 
 #endif // SKYNET_SKYNET_HPP

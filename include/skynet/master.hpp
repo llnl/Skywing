@@ -530,7 +530,7 @@ namespace skynet
     /** \brief Subscribes to the passed tags.
      */
     auto subscribe(const std::vector<TagID>& tag_ids) noexcept
-      -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+      -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     /** \brief Handles the get_publishers message
      */
@@ -580,7 +580,7 @@ namespace skynet
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
     ) noexcept
-      -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     /** \brief Returns true if the specified reduce group has been successfully created.
      *

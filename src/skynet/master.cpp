@@ -865,7 +865,7 @@ namespace skynet
   }
 
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-    -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
+    -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" looking for subscription information for {}", id_, tag_ids);
     std::vector<TagID> tags_to_search_for;
@@ -1274,7 +1274,7 @@ namespace skynet
     const internal::ReduceGroupNeighbors& tags_to_find,
     const std::uint8_t expected_type
   ) noexcept
-    -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     // Create an entry for the group
     const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);

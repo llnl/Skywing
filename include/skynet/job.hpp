@@ -3,10 +3,10 @@
 
 #include "skynet/internal/utility/mutex_guarded.hpp"
 #include "skynet/internal/utility/type_list.hpp"
-#include "skynet/internal/future.hpp"
 #include "skynet/internal/master_future_callables.hpp"
 #include "skynet/internal/reduce_group.hpp"
 #include "skynet/internal/tag_buffer.hpp"
+#include "skynet/future.hpp"
 #include "skynet/types.hpp"
 
 #include <cassert>
@@ -373,7 +373,7 @@ namespace skynet
     ) noexcept;
 
     auto get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
-      -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+      -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
@@ -390,7 +390,7 @@ namespace skynet
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
     ) noexcept
-      -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
 

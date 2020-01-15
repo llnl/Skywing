@@ -201,7 +201,7 @@ namespace skynet
   }
 
   auto Job::get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
-    -> internal::Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
+    -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
@@ -270,7 +270,7 @@ namespace skynet
     const internal::ReduceGroupNeighbors& tags_to_find,
     std::uint8_t expected_type
   ) noexcept
-    -> internal::Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     return Master::JobAccessor::create_reduce_group(
       *master_,

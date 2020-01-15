@@ -2,7 +2,7 @@
 #define SKYNET_INTERNAL_REDUCE_GROUP_HPP
 
 #include "skynet/internal/tag_buffer.hpp"
-#include "skynet/internal/future.hpp"
+#include "skynet/future.hpp"
 #include "skynet/types.hpp"
 
 #include <cassert>
