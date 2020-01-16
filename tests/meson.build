@@ -9,6 +9,7 @@ tests = [
   ['publish_data_wrapper', 'publish_data_wrapper.cpp'],
   ['simple_reduce', 'simple_reduce.cpp'],
   ['broken_subscribes', 'broken_subscribes.cpp'],
+  ['broken_reduce', 'broken_reduce.cpp'],
 
   # devices/
   ['socket_communicator', 'devices/socket_communicator.cpp']

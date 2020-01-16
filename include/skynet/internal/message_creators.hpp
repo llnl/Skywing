@@ -88,6 +88,14 @@ namespace skynet::internal
     const TagID& tag_id,
     const PublishValueVariant& value
   ) noexcept;
+
+  /** \brief Create a message for sending a disconnection notification
+   */
+  std::vector<std::byte> make_report_reduce_disconnection(
+    const TagID& reduce_tag,
+    const MachineID& initiating_machine,
+    ReductionDisconnectID disconnection_id
+  ) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_CREATORS_HPP

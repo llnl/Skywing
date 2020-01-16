@@ -232,4 +232,18 @@ namespace skynet::internal
     set_publish_data(publish_data, version, tag_id, value);
     return finalize_message(builder);
   }
+
+  std::vector<std::byte> make_report_reduce_disconnection(
+    const TagID& reduce_tag,
+    const MachineID& initiating_machine,
+    ReductionDisconnectID disconnection_id
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initReportReduceDisconnection();
+    message.setReduceTag(reduce_tag);
+    message.setInitiatingMachine(initiating_machine);
+    message.setId(disconnection_id);
+    return finalize_message(builder);
+  }
 } // namespace skynet::internal

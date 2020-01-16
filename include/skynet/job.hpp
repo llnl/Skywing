@@ -184,12 +184,12 @@ namespace skynet
       return internal::make_future(
         bufs_.mutex(),
         data_buffer_modified_cv_,
-        [this, &tag_info, tag_conn_id]() {
+        [&tag_info, tag_conn_id]() {
           return tag_info.buffer.has_data()
             || tag_info.error_occurred != TagInfo::Error::no_error
             || tag_info.connection_id != tag_conn_id;
         },
-        [this, &tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
+        [&tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
           // Don't check tag_info.error_occurred because the connection could have
           // errored between storing the value in the buffer and then retrieving it
           if (tag_info.buffer.has_data()
@@ -225,7 +225,10 @@ namespace skynet
       // TODO: Make this std::terminate or something instead?
       assert("Tag attempted to be subscribed to twice!" && (
         [&]() {
-          const auto [buffers, lock] = bufs_.get();
+          const auto [buffers_binding, lock] = bufs_.get();
+          // This is a really dumb workaround for destructred bindings not
+          // being able to be captured by lambda expressions
+          const auto& buffers = buffers_binding;
           (void)lock;
           return std::accumulate(
             tags.cbegin(),

@@ -85,7 +85,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   static std::atomic<int> ready_counter{0};
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
-    return [&tags, &index, &master, i](Job& job) {
+    return [&tags, &index, i](Job& job) {
       const auto& tag1 = std::get<Tag1>(tags[i]);
       const auto& tag2 = std::get<Tag2>(tags[i]);
       const auto& tag3 = std::get<Tag3>(tags[i]);

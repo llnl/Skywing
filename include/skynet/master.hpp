@@ -414,26 +414,22 @@ namespace skynet
     private:
       friend class internal::ReduceGroupBase;
 
-      static void send_reduce_value_to_parent(
+      static void send_reduce_data_to_parent(
         Master& m,
         const TagID& group_id,
-        const VersionID version,
-        const TagID& produced_tag,
-        const PublishValueVariant& value
+        const std::vector<std::byte>& reduce_message
       ) noexcept
       {
-        m.send_reduce_value_to_parent(group_id, version, produced_tag, value);
+        m.send_reduce_data_to_parent(group_id, reduce_message);
       }
 
-      static void send_reduce_value_to_children(
+      static void send_reduce_data_to_children(
         Master& m,
         const TagID& group_id,
-        const VersionID version,
-        const TagID& produced_tag,
-        const PublishValueVariant& value
+        const std::vector<std::byte>& reduce_message
       ) noexcept
       {
-        m.send_reduce_value_to_children(group_id, version, produced_tag, value);
+        m.send_reduce_data_to_children(group_id, reduce_message);
       }
     }; // struct ReduceGroupAccessor
 
@@ -509,11 +505,11 @@ namespace skynet
     /** \brief Broadcasts a message to all neighbors that fit a criteria
      */
     template<typename Callable>
-    void send_to_neighbors_if(const std::vector<std::byte>& to_send, Callable c) noexcept
+    void send_to_neighbors_if(const std::vector<std::byte>& to_send, Callable condition) noexcept
     {
       for (auto&& neighbor : neighbors_)
       {
-        if (c(neighbor.second))
+        if (condition(neighbor.second))
         {
           neighbor.second.send_message(to_send);
         }
@@ -604,18 +600,14 @@ namespace skynet
 
     /** \brief Sends a value for a reduce to the corresponding parents
      */
-    void send_reduce_value_to_parent(
+    void send_reduce_data_to_parent(
       const TagID& group_id,
-      const VersionID version,
-      const TagID& produced_tag,
-      const PublishValueVariant& value
+      const std::vector<std::byte>& reduce_message
     ) noexcept;
 
-    void send_reduce_value_to_children(
+    void send_reduce_data_to_children(
       const TagID& group_id,
-      const VersionID version,
-      const TagID& produced_tag,
-      const PublishValueVariant& value
+      const std::vector<std::byte>& reduce_message
     ) noexcept;
 
     /** \brief Handles a submit reduce value message

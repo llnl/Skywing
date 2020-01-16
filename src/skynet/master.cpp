@@ -338,6 +338,9 @@ namespace skynet
           return true;
         },
         [this](const Heartbeat&) {
+          // If trace logging isn't enable then `this` isn't used, so make
+          // sure it is marked as used
+          (void)this;
           // Nothing to do; this is just to acknowledge it exists
           // (Last heard time was already updated)
           SKYNET_TRACE_LOG(
@@ -788,6 +791,31 @@ namespace skynet
       {
         // TODO: Tell reduce groups when this happens
         send_to_neighbors(internal::make_remove_neighbor(it->first));
+        // Find any reduce groups that this machine is a part of and
+        // notify them of the disconnection
+        // TODO: Probably want to cache this at some point so everything
+        // doesn't have to be scanned over anytime something disconnects?
+        for (auto& [tag, info] : reduce_tag_data_)
+        {
+          (void)tag;
+          // Pointers to prevent copies
+          auto scan_lists = {
+            &info.parent_machines,
+            &info.child_machines[0],
+            &info.child_machines[1]
+          };
+          for (auto& list_ptr : scan_lists)
+          {
+            auto& list = *list_ptr;
+            // Also remove the connection
+            const auto iter = std::find(list.cbegin(), list.cend(), it->first);
+            if (iter != list.cend())
+            {
+              list.erase(iter);
+              info.group.report_disconnection();
+            }
+          }
+        }
         it = neighbors_.erase(it);
       }
       else
@@ -1261,7 +1289,7 @@ namespace skynet
       (void)iter;
       if (!inserted)
       {
-        // Two jobs on the same master can't produce the same job; fail loudly
+        // Two jobs on the same master can't produce the same tag; fail loudly
         std::cerr << "The tag " << std::quoted(tag) << " was reported for publication more than once!\n";
         std::terminate();
       }
@@ -1413,20 +1441,14 @@ namespace skynet
     return loc->second.group;
   }
 
-  void Master::send_reduce_value_to_parent(
+  void Master::send_reduce_data_to_parent(
     const TagID& group_id,
-    const VersionID version,
-    const TagID& produced_tag,
-    const PublishValueVariant& value
+    const std::vector<std::byte>& reduce_message
   ) noexcept
   {
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
     auto& parent_machines = loc->second.parent_machines;
-    // TODO: Change this from an assert to actually handling the situation
-    assert(loc->second.group.tag_neighbors().parent().empty() || !parent_machines.empty());
-    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
-    // TODO: Handle when parents run out
     // Go through all of the parents, removing ones that don't exist
     for (auto parent_iter = parent_machines.begin(); parent_iter != parent_machines.end(); )
     {
@@ -1443,18 +1465,14 @@ namespace skynet
     }
   }
 
-  void Master::send_reduce_value_to_children(
+  void Master::send_reduce_data_to_children(
     const TagID& group_id,
-    const VersionID version,
-    const TagID& produced_tag,
-    const PublishValueVariant& value
+    const std::vector<std::byte>& reduce_message
   ) noexcept
   {
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
     auto child_machines = loc->second.child_machines;
-    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, produced_tag, value);
-    // TODO: Handle children running out
     for (auto& children : child_machines)
     {
       for (auto child_iter = children.begin(); child_iter != children.end(); )
@@ -1547,7 +1565,7 @@ namespace skynet
       );
       return false;
     }
-    group_loc->second.group.report_cancellation(msg.initiating_machine(), msg.id());
+    group_loc->second.group.propagate_disconnection(msg.initiating_machine(), msg.id());
     return true;
   }
 

@@ -49,7 +49,7 @@ namespace skynet::internal
           add_data_index(i, std::move(value), version);
           process_pending_reduce_ops();
         }
-        data_added_to_buffers_cv_.notify_all();
+        future_info_cv_.notify_all();
         return true;
       }
     }
@@ -63,7 +63,7 @@ namespace skynet::internal
     return false;
   }
 
-  void ReduceGroupBase::report_cancellation(const MachineID& initiating_machine, ReductionDisconnectID id) noexcept
+  void ReduceGroupBase::propagate_disconnection(const MachineID& initiating_machine, ReductionDisconnectID id) noexcept
   {
     const bool should_act_on = [&]() {
       const auto iter = last_heard_disconnect.find(initiating_machine);
@@ -89,7 +89,13 @@ namespace skynet::internal
     // Mark all futures invalid until rebuilding happens
     is_valid = false;
     ++conn_counter;
-    // TODO: Send to children & parent
+    send_disconnection(initiating_machine, id);
+    future_info_cv_.notify_all();
+  }
+
+  void ReduceGroupBase::report_disconnection() noexcept
+  {
+    send_disconnection(master_->id(), prng());
   }
 
   void ReduceGroupBase::add_data_index(const std::size_t index, PublishValueVariant value, const VersionID version) noexcept
@@ -189,24 +195,50 @@ namespace skynet::internal
 
   void ReduceGroupBase::send_value_to_parent(const PublishValueVariant& value_to_send, const VersionID version) noexcept
   {
-    Master::ReduceGroupAccessor::send_reduce_value_to_parent(
+    Master::ReduceGroupAccessor::send_reduce_data_to_parent(
       *master_,
       group_id_,
-      version,
-      produced_tag_,
-      value_to_send
+      internal::make_submit_reduce_value(
+        group_id_,
+        version,
+        produced_tag_,
+        value_to_send
+      )
     );
   }
 
 
   void ReduceGroupBase::send_value_to_children(const PublishValueVariant& value_to_send, VersionID version) noexcept
   {
-    Master::ReduceGroupAccessor::send_reduce_value_to_children(
+    Master::ReduceGroupAccessor::send_reduce_data_to_children(
       *master_,
       group_id_,
-      version,
-      produced_tag_,
-      value_to_send
+      internal::make_submit_reduce_value(
+        group_id_,
+        version,
+        produced_tag_,
+        value_to_send
+      )
     );
+  }
+
+  void ReduceGroupBase::send_disconnection(const MachineID& initiating_machine, ReductionDisconnectID disconn_id) noexcept
+  {
+    constexpr std::array senders = {
+      &Master::ReduceGroupAccessor::send_reduce_data_to_children,
+      &Master::ReduceGroupAccessor::send_reduce_data_to_parent
+    };
+    for (const auto& sender: senders)
+    {
+      sender(
+        *master_,
+        group_id_,
+        internal::make_report_reduce_disconnection(
+          group_id_,
+          initiating_machine,
+          disconn_id
+        )
+      );
+    }
   }
 } // namespace skynet::internal

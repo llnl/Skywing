@@ -12,7 +12,6 @@
 using namespace skynet;
 
 constexpr int num_machines = 5;
-constexpr int num_connections = 1;
 constexpr std::uint16_t base_port = 25000;
 
 using ValueTag = ReduceValueTag<std::vector<double>>;
@@ -27,15 +26,17 @@ const std::array<ValueTag, num_machines> tags{
 
 const ReduceGroupTag<std::vector<double>> reduce_tag{"ADMM average x"};
 
+using linear_prob = std::array<double, num_machines + 1>;
+
 // Solve a linear system with 5 variables, defined below:
 // The values were arbitrarily chosen
-constexpr std::array<std::array<double, num_machines + 1>, num_machines> linear_problems{
-  // x0   x1   x2   x3   x4   value
-     1,   2,   3,   4,   5,   1114,
-    11,  18,   5,  20,  80,  12491,
-     8,   1,   4,   1,   2,   3009,
-    10,  45,  19,  10,   3,   5816,
-     2,   8,  20,  49,  88,  18502
+constexpr std::array<linear_prob, num_machines> linear_problems{
+  //            x0   x1   x2   x3   x4   value
+  linear_prob{   1,   2,   3,   4,   5,   1114},
+  linear_prob{  11,  18,   5,  20,  80,  12491},
+  linear_prob{   8,   1,   4,   1,   2,   3009},
+  linear_prob{  10,  45,  19,  10,   3,   5816},
+  linear_prob{   2,   8,  20,  49,  88,  18502}
 };
 constexpr std::array<double, num_machines> real_solution{
   274244569.0 / 219675.0,
@@ -47,7 +48,7 @@ constexpr std::array<double, num_machines> real_solution{
 
 // Evaluates an answer and returns the difference from the solution
 double target_function(
-  const std::array<double, num_machines + 1>& problem,
+  const linear_prob& problem,
   const std::array<double, num_machines>& solution
 )
 {
@@ -60,7 +61,7 @@ double target_function(
 }
 
 double evaluate_solution(
-  const std::array<double, num_machines + 1>& problem,
+  const linear_prob& problem,
   const std::array<double, num_machines>& solution,
   const std::array<double, num_machines>& global_solution,
   const std::array<double, num_machines>& y,
@@ -100,7 +101,7 @@ double evaluate_solution(
 
 // Performs a hill-climbing algorithm to find the minimum of a function
 std::array<double, num_machines> hill_climb(
-  const std::array<double, num_machines + 1>& problem,
+  const linear_prob& problem,
   const std::array<double, num_machines>& initial_guess,
   const std::array<double, num_machines>& global_solution,
   const std::array<double, num_machines>& y,
