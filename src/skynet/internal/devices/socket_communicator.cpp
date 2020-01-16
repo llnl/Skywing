@@ -3,6 +3,7 @@
 #include "socket_wrappers.hpp"
 
 #include "skynet/internal/utility/logging.hpp"
+#include "generated/socket_no_sigpipe.hpp"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -153,7 +154,7 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::send_message(const std::byte* const message, const std::size_t size) noexcept
   {
-    if (send(handle_, message, size, MSG_NOSIGNAL) < 0)
+    if (send(handle_, message, size, SKYNET_NO_SIGPIPE) < 0)
     {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
