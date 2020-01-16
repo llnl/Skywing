@@ -37,7 +37,7 @@ void publish_once(int publish_number)
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   master.submit_job("job", [&](Job& job) {
-    job.declare_publication_intent({value_tag});
+    job.declare_publication_intent(value_tag);
     // Wait for the subscriber to finish subscribe
     while (subscriptions_finished <= publish_number)
     {

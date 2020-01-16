@@ -57,7 +57,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
         my_job.subscribe({Int32Tag{std::to_string(i)}}).wait();
       }
     }
-    while (master.num_subscribers() != num_machines - 1)
+    while (master.num_subscribers() != static_cast<int>(num_machines - 1))
     {
       std::this_thread::sleep_for(10ms);
     }

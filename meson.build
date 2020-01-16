@@ -21,8 +21,6 @@ if use_ns3
   ns3_dep = subproject('ns3').get_variable('ns3_dep')
 endif
 
-zmq_dep = dependency('libzmq', fallback : ['libzmq', 'libzmq_dep'])
-cppzmq_dep = dependency('cppzmq', fallback : ['cppzmq', 'cppzmq_dep'])
 thread_dep = dependency('threads')
 spdlog_dep = subproject('spdlog').get_variable('spdlog_dep')
 

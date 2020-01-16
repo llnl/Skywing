@@ -19,7 +19,7 @@ foreach t : tests
   exe = executable(
     t[0], # test name
     ['skynet/' + t[1], 'catch_main.cpp'], # test executable
-    dependencies : [catch2_dep, skynet_dep, cppzmq_dep, zmq_dep],
+    dependencies : [catch2_dep, skynet_dep],
     include_directories : include_directories('include')
   )
   # Don't run in parallel so that port collisions don't have to be worried about

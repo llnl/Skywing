@@ -161,7 +161,16 @@ namespace skynet
     /** \brief Declare intent to publish on tags, this must be done before publishing
      * on a tag
      */
-    void declare_publication_intent(const std::vector<internal::PublishTagBase>& tags) noexcept;
+    template<typename T>
+    //  requires std::is_base_of_v<internal::PublishTagBase, T>
+    void declare_publication_intent(const std::vector<T>& tags) noexcept
+    {
+      declare_publication_intent_impl(tags.data(), tags.size());
+    }
+    void declare_publication_intent(const internal::PublishTagBase& tag) noexcept
+    {
+      declare_publication_intent_impl(&tag, 1);
+    }
 
     /** \brief Retrieves the specified version for the tag, or latest if no version
      * is specified
@@ -218,7 +227,9 @@ namespace skynet
      * \pre The tags are not currently subscribed to
      * \return A future for when the tags have been subscribed to
      */
-    auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
+    template<typename T>
+    auto subscribe(const std::vector<T>& tags) noexcept
+    //  requires std::is_base_of_v<internal::PublishTagBase, T>
     {
       // Check if any tags are subscribed to
       // (Not seperated out of the assert so that it's only in debug mode)
@@ -239,8 +250,14 @@ namespace skynet
           });
         }()
       ));
-      init_or_update_subscribe(tags);
-      return get_subscribe_future(tags);
+      init_or_update_subscribe(tags.data(), tags.size());
+      return get_subscribe_future(tags.data(), tags.size());
+    }
+    auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
+    {
+      // Forward to the templeted version; specify the template so this
+      // doesn't infinitly recurse
+      return subscribe<internal::PublishTagBase>(tags);
     }
 
     /** \brief Attempts to subscribe to the passed tag
@@ -342,9 +359,13 @@ namespace skynet
         }
         return tags;
       }();
-      init_or_update_subscribe(tags);
-      return get_subscribe_future(tags);
+      init_or_update_subscribe(tags.data(), tags.size());
+      return get_subscribe_future(tags.data(), tags.size());
     }
+
+    /** \brief Check if a tag's subscription is valid or not
+     */
+    bool tag_has_subscription(const internal::PublishTagBase& tag) noexcept;
 
   private:
     /** \brief Checks if a buffer has data without locking
@@ -372,11 +393,20 @@ namespace skynet
     ) noexcept;
 
     void init_or_update_subscribe(
-      const std::vector<internal::PublishTagBase>& tags
+      const internal::PublishTagBase* tags,
+      std::size_t count
     ) noexcept;
 
-    auto get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
+    auto get_subscribe_future(
+      const internal::PublishTagBase* tags,
+      std::size_t count
+    ) noexcept
       -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+
+    void declare_publication_intent_impl(
+      const internal::PublishTagBase* tags,
+      std::size_t count
+    ) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 

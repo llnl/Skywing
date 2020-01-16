@@ -80,7 +80,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
       auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
       auto group = fut.get();
 
-      while (counter != num_machines - 1)
+      while (counter != static_cast<int>(num_machines - 1))
       {
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
       }

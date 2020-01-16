@@ -9,8 +9,8 @@ kill_progs() {
 }
 
 for i in 0 1 2 3; do
-  @hello_exe@ ${i} > /dev/null 2> /dev/null &
+  "@hello_exe@" ${i} > /dev/null 2> /dev/null &
   declare "erase${i}=$!"
 done
 
-@hello_exe@ 4
+"@hello_exe@" 4

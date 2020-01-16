@@ -28,26 +28,6 @@ namespace skynet
     return tags_produced_;
   }
 
-  void Job::declare_publication_intent(const std::vector<internal::PublishTagBase>& tags) noexcept
-  {
-    const std::vector<TagID> tag_ids = [&]() {
-      std::lock_guard g{bufs_.mutex()};
-      for (const auto& tag : tags)
-      {
-        tags_produced_.try_emplace(tag.id(), tag.expected_type());
-      }
-      std::vector<TagID> tag_ids(tags.size());
-      std::transform(
-        tags.cbegin(),
-        tags.cend(),
-        tag_ids.begin(),
-        [&](const internal::PublishTagBase& t) { return t.id(); }
-      );
-      return tag_ids;
-    }();
-    Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
-  }
-
   bool Job::process_data(
     const TagID& tag_id,
     PublishValueVariant data,
@@ -102,6 +82,14 @@ namespace skynet
     // Notify after making sure to release the mutex
     data_buffer_modified_cv_.notify_all();
     return true;
+  }
+
+  bool Job::tag_has_subscription(const internal::PublishTagBase& tag) noexcept
+  {
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    const auto iter = buffers.find(tag.id());
+    return iter != buffers.cend() && iter->second.error_occurred == TagInfo::Error::no_error;
   }
 
   void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
@@ -168,7 +156,8 @@ namespace skynet
   }
 
   void Job::init_or_update_subscribe(
-    const std::vector<internal::PublishTagBase>& tags
+    const internal::PublishTagBase* const tags,
+    const std::size_t count
   ) noexcept
   {
     auto [buffers, lock] = bufs_.get();
@@ -176,8 +165,9 @@ namespace skynet
     // Always subscribe ahead of time, since the gap between the
     // Job::subscribe calls can cause messages to get discarded once the
     // connection is made but before it's marked as subscribed
-    for (const auto& tag : tags)
+    for (std::size_t i = 0; i < count; ++i)
     {
+      const auto& tag = tags[i];
       // Then add the expected type; marking the tag as watched
       const auto [iter, inserted] = buffers.try_emplace(
         tag.id(),
@@ -200,17 +190,43 @@ namespace skynet
     }
   }
 
-  auto Job::get_subscribe_future(const std::vector<internal::PublishTagBase>& tags) noexcept
+  auto Job::get_subscribe_future(
+    const internal::PublishTagBase* const tags,
+    const std::size_t count
+  ) noexcept
     -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
-    std::vector<TagID> tag_ids(tags.size());
+    std::vector<TagID> tag_ids(count);
     std::transform(
-      tags.cbegin(),
-      tags.cend(),
+      tags,
+      tags + count,
       tag_ids.begin(),
       [](const internal::PublishTagBase& t) { return t.id(); }
     );
     return Master::JobAccessor::subscribe(*master_, tag_ids);
+  }
+
+  void Job::declare_publication_intent_impl(
+    const internal::PublishTagBase* const tags,
+    const std::size_t count
+  ) noexcept
+  {
+    const std::vector<TagID> tag_ids = [&]() {
+      std::lock_guard g{bufs_.mutex()};
+      for (std::size_t i = 0; i < count; ++i)
+      {
+        tags_produced_.try_emplace(tags[i].id(), tags[i].expected_type());
+      }
+      std::vector<TagID> tag_ids(count);
+      std::transform(
+        tags,
+        tags + count,
+        tag_ids.begin(),
+        [&](const internal::PublishTagBase& t) { return t.id(); }
+      );
+      return tag_ids;
+    }();
+    Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
   }
 
   // void Job::unsubscribe_impl(const TagID& tag_id) noexcept
