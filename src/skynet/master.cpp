@@ -789,6 +789,7 @@ namespace skynet
     {
       if (it->second.is_dead())
       {
+        SKYNET_TRACE_LOG("\"{}\" removing dead neighbor \"{}\"", id_, it->first);
         // TODO: Tell reduce groups when this happens
         send_to_neighbors(internal::make_remove_neighbor(it->first));
         // Find any reduce groups that this machine is a part of and
@@ -812,6 +813,7 @@ namespace skynet
             if (iter != list.cend())
             {
               list.erase(iter);
+              SKYNET_TRACE_LOG("\"{}\" reporting disconnection in reduce group \"{}\"", id_, tag);
               info.group.report_disconnection();
             }
           }
@@ -1349,6 +1351,7 @@ namespace skynet
   ) noexcept
     -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
   {
+    SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
     const auto iter = reduce_tag_data_.find(group_id);
     assert(iter != reduce_tag_data_.cend());
     const auto& parent_tag = iter->second.group.tag_neighbors().parent();

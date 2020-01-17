@@ -10,7 +10,7 @@
 // The names for each instance that is in this network
 // In this program, the network consists of just 5 machines
 // All names throughout a network must be unique
-constexpr std::array<char[6], 5> node_names{
+constexpr std::array<const char*, 5> node_names{
   "node1", "node2", "node3", "node4", "node5"
 };
 

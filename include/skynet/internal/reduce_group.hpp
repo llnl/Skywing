@@ -194,24 +194,35 @@ namespace skynet
           }
         },
         [this, required_version, conn_id]() noexcept -> produced_type {
-          if (conn_id < base_.conn_counter || !base_.is_valid)
-          {
-            // Error occurred
+          const bool error_occurred = (conn_id < base_.conn_counter || !base_.is_valid);
+          const auto make_error = []() {
             if constexpr (IsAllReduce)
             {
-              return {};
+              return produced_type{};
             }
             else
             {
               return ReduceDisconnection{};
             }
-          }
+          };
           if (IsAllReduce || returns_value_on_reduce())
           {
-            // Value is present
-            const auto value = base_.data_buffers_[0].get(required_version);
-            assert(std::get_if<T>(&value));
-            return *std::get_if<T>(&value);
+            // If there's a value return it regardless of if there's an error
+            if (base_.data_buffers_[0].has_data(required_version))
+            {
+              // Value is present
+              const auto value = base_.data_buffers_[0].get(required_version);
+              assert(std::get_if<T>(&value));
+              return *std::get_if<T>(&value);
+            }
+            else
+            {
+              return make_error();
+            }
+          }
+          else if (error_occurred)
+          {
+            return make_error();
           }
           else if constexpr(!IsAllReduce)
           {

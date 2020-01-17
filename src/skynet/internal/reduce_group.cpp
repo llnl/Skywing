@@ -65,37 +65,46 @@ namespace skynet::internal
 
   void ReduceGroupBase::propagate_disconnection(const MachineID& initiating_machine, ReductionDisconnectID id) noexcept
   {
-    const bool should_act_on = [&]() {
-      const auto iter = last_heard_disconnect.find(initiating_machine);
-      if (iter == last_heard_disconnect.cend())
-      {
-        last_heard_disconnect.try_emplace(iter, initiating_machine, id);
-        return true;
-      }
-      else if (iter->second == id)
-      {
-        return false;
-      }
-      else
-      {
-        iter->second = id;
-        return true;
-      }
-    }();
-    if (!should_act_on)
     {
-      return;
+      std::lock_guard g{buffer_mutex_};
+      const bool should_act_on = [&]() {
+        const auto iter = last_heard_disconnect.find(initiating_machine);
+        if (iter == last_heard_disconnect.cend())
+        {
+          last_heard_disconnect.try_emplace(iter, initiating_machine, id);
+          return true;
+        }
+        else if (iter->second == id)
+        {
+          return false;
+        }
+        else
+        {
+          iter->second = id;
+          return true;
+        }
+      }();
+      if (!should_act_on)
+      {
+        return;
+      }
+      // Mark all futures invalid until rebuilding happens
+      is_valid = false;
+      ++conn_counter;
+      send_disconnection(initiating_machine, id);
     }
-    // Mark all futures invalid until rebuilding happens
-    is_valid = false;
-    ++conn_counter;
-    send_disconnection(initiating_machine, id);
     future_info_cv_.notify_all();
   }
 
   void ReduceGroupBase::report_disconnection() noexcept
   {
-    send_disconnection(master_->id(), prng());
+    {
+      std::lock_guard g{buffer_mutex_};
+      is_valid = false;
+      ++conn_counter;
+      send_disconnection(master_->id(), prng());
+    }
+    future_info_cv_.notify_all();
   }
 
   void ReduceGroupBase::add_data_index(const std::size_t index, PublishValueVariant value, const VersionID version) noexcept

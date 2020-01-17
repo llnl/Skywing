@@ -7,7 +7,7 @@
 #include <array>
 #include <atomic>
 #include <functional>
-                    #include <iostream>
+
 using namespace skynet;
 
 constexpr int num_machines = 5;
@@ -47,14 +47,12 @@ void machine_task(const NetworkInfo* const info, const int index)
     auto reduce1 = group.allreduce(1, std::plus<>{});
     ++counter;
     const auto result1 = reduce1.get();
+    // Wait a while for the disconnection message to propagate so it doesn't reach
+    // here after the group has already been rebuilt
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     group.rebuild().wait();
-    {
-      std::lock_guard lock{catch_mutex};
-      std::cerr << index << " is ready\n";
-    }
     const auto result2 = group.allreduce(1, std::plus<>{}).get();
     std::lock_guard lock{catch_mutex};
-    std::cerr << index << '\n';
     REQUIRE_FALSE(result1);
     REQUIRE(result2);
     REQUIRE(*result2 == num_machines);
@@ -96,7 +94,6 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
       // Only do the reduce on the second go-around
       if (i == 1)
       {
-        std::cerr << index << " is ready\n";
         auto reduce = group.allreduce(1, std::plus<>{});
         const auto result = reduce.get();
         std::lock_guard lock{catch_mutex};
