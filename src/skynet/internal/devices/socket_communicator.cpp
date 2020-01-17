@@ -257,7 +257,7 @@ namespace skynet::internal
     {
       return {};
     }
-    return std::move(to_ret);
+    return std::optional<Subscription>{std::move(to_ret)};
   }
 
   ConnectionError Subscription::read_message(std::byte* const buffer, const std::size_t size) noexcept

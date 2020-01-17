@@ -31,7 +31,7 @@ namespace skynet::internal
     /** \brief Merge is not available, use this as a workaround.
      */
     template<typename T>
-    void merge_impl(T& lhs, T& rhs, PriorityTag<2>) noexcept
+    void merge_impl(T& lhs, T& rhs, PriorityTag<0>) noexcept
     {
       lhs.insert(rhs.begin(), rhs.end());
       rhs.clear();

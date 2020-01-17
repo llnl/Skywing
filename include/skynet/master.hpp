@@ -160,7 +160,7 @@ namespace skynet
         const auto dur1 = duration_cast<decltype(latency_)>(mid - start);
         const auto dur2 = duration_cast<decltype(latency_)>(end - mid);
         m.latency_ = decltype(latency_){(dur1.count() + dur2.count()) / 2};
-        return std::move(m);
+        return std::optional<ExternalMaster>{std::move(m)};
       }
 
       // Send the greeting
@@ -431,6 +431,14 @@ namespace skynet
       {
         m.send_reduce_data_to_children(group_id, reduce_message);
       }
+
+      static auto rebuild_reduce_group(
+        Master& m,
+        const TagID& group_id
+      ) noexcept
+      {
+        return m.rebuild_reduce_group(group_id);
+      }
     }; // struct ReduceGroupAccessor
 
     struct FutureAccessor
@@ -577,6 +585,13 @@ namespace skynet
       std::uint8_t expected_type
     ) noexcept
       -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+
+    /** \brief Gets a future for when a reduce group has been re-built.
+     */
+    auto rebuild_reduce_group(
+      const TagID& group_id
+    ) noexcept
+      -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
 
     /** \brief Returns true if the specified reduce group has been successfully created.
      *

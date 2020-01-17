@@ -2,9 +2,10 @@
 #define SKYNET_SKYNET_HPP
 
 // Just include all of the common files here
+#include "enable_logging.hpp"
+#include "future.hpp"
 #include "job.hpp"
 #include "master.hpp"
 #include "types.hpp"
-#include "future.hpp"
 
 #endif // SKYNET_SKYNET_HPP

@@ -92,7 +92,7 @@ void machine_task(const std::size_t index)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    the_job.publish(Uint64Tag{tag_names[index]}, index);
+    the_job.publish(Uint64Tag{tag_names[index]}, static_cast<std::uint64_t>(index));
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
       if (index != send_index)

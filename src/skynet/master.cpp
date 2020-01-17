@@ -476,7 +476,7 @@ namespace skynet
     std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() const noexcept
     {
       using namespace std::chrono_literals;
-      static constexpr std::array backoff_times{
+      static constexpr std::array<std::chrono::milliseconds, 12> backoff_times{
         5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms
       };
       const auto add_time = backoff_counter_ >= backoff_times.size()
@@ -1341,6 +1341,33 @@ namespace skynet
       reduce_group_cv_,
       internal::MasterReduceGroupIsCreated{*this, group_id},
       internal::MasterGetReduceGroup{*this, group_id}
+    );
+  }
+
+  auto Master::rebuild_reduce_group(
+    const TagID& group_id
+  ) noexcept
+    -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
+  {
+    const auto iter = reduce_tag_data_.find(group_id);
+    assert(iter != reduce_tag_data_.cend());
+    const auto& parent_tag = iter->second.group.tag_neighbors().parent();
+    if (!parent_tag.empty())
+    {
+      // Don't bother searching for machines that already have connections
+      if (iter->second.parent_machines.empty())
+      {
+        pending_tags_.push_back(parent_tag);
+        for (auto& neighbor : neighbors_)
+        {
+          neighbor.second.find_publishers_for_tags({parent_tag}, false);
+        }
+      }
+    }
+    return internal::make_future(
+      job_mut_,
+      reduce_group_cv_,
+      internal::MasterReduceGroupIsCreated{*this, group_id}
     );
   }
 

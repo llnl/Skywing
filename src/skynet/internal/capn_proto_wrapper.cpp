@@ -228,7 +228,7 @@ namespace skynet::internal
     }
     else
     {
-      return std::move(to_ret);
+      return std::optional<StatusMessageHandler>{std::move(to_ret)};
     }
   }
 
@@ -296,7 +296,7 @@ namespace skynet::internal
     }
     else
     {
-      return std::move(to_ret);
+      return std::optional<PublishMessageHandler>{std::move(to_ret)};
     }
   }
 
@@ -312,7 +312,7 @@ namespace skynet::internal
     }
     else
     {
-      return std::move(to_ret);
+      return std::optional<PublishData>{std::move(to_ret)};
     }
   }
 } // namespace skynet::internal

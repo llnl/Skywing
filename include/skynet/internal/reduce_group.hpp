@@ -1,6 +1,7 @@
 #ifndef SKYNET_INTERNAL_REDUCE_GROUP_HPP
 #define SKYNET_INTERNAL_REDUCE_GROUP_HPP
 
+#include "skynet/internal/master_future_callables.hpp"
 #include "skynet/internal/tag_buffer.hpp"
 #include "skynet/future.hpp"
 #include "skynet/types.hpp"
@@ -57,6 +58,8 @@ namespace skynet
       const TagID& produced_tag() const noexcept;
 
       // Rebuilds a reduce group after it fails due to a disconnection
+      auto rebuild() noexcept
+        -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
 
     private:
       // Sends a value to the parent
@@ -140,6 +143,11 @@ namespace skynet
     bool returns_value_on_reduce() const noexcept
     {
       return base_.returns_value_on_reduce();
+    }
+
+    auto rebuild() noexcept
+    {
+      return base_.rebuild();
     }
 
   private:

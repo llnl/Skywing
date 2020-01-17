@@ -193,6 +193,15 @@ namespace skynet::internal
     return produced_tag_;
   }
 
+  auto ReduceGroupBase::rebuild() noexcept
+    -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
+  {
+    // Reset the buffers
+    last_sent_version_ = tag_no_data;
+    is_valid = true;
+    return Master::ReduceGroupAccessor::rebuild_reduce_group(*master_, group_id_);
+  }
+
   void ReduceGroupBase::send_value_to_parent(const PublishValueVariant& value_to_send, const VersionID version) noexcept
   {
     Master::ReduceGroupAccessor::send_reduce_data_to_parent(
@@ -224,7 +233,8 @@ namespace skynet::internal
 
   void ReduceGroupBase::send_disconnection(const MachineID& initiating_machine, ReductionDisconnectID disconn_id) noexcept
   {
-    constexpr std::array senders = {
+    using func_ptr = decltype(&Master::ReduceGroupAccessor::send_reduce_data_to_children);
+    constexpr std::array<func_ptr, 2> senders = {
       &Master::ReduceGroupAccessor::send_reduce_data_to_children,
       &Master::ReduceGroupAccessor::send_reduce_data_to_parent
     };
