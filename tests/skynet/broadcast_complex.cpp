@@ -77,7 +77,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     return m.connect_to_server("127.0.0.1", base_port + i);
   });
   // Submit first and second job
-  const std::array tags{
+  const std::array<std::tuple<Tag1, Tag2, Tag3>, 2> tags{
     std::make_tuple(Tag1{"job0tag0"}, Tag2{"job0tag1"}, Tag3{"job0tag2"}),
     std::make_tuple(Tag1{"job1tag0"}, Tag2{"job1tag1"}, Tag3{"job1tag2"})
   };
