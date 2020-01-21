@@ -47,6 +47,10 @@ namespace skynet::internal
         {
           std::lock_guard<std::mutex> lock{buffer_mutex_};
           add_data_index(i, std::move(value), version);
+          if (i == 0)
+          {
+            send_value_to_children(value, version);
+          }
           process_pending_reduce_ops();
         }
         future_info_cv_.notify_all();
@@ -110,12 +114,6 @@ namespace skynet::internal
   void ReduceGroupBase::add_data_index(const std::size_t index, PublishValueVariant value, const VersionID version) noexcept
   {
     assert(index < 3);
-    // If the result was added to the parent buffer then it is the result of a reduce
-    // and should be propagated to the children
-    if (index == 0)
-    {
-      send_value_to_children(value, version);
-    }
     data_buffers_[index].add(std::move(value), version);
   }
 
@@ -184,6 +182,10 @@ namespace skynet::internal
       if (returns_value_on_reduce())
       {
         add_data_index(0, reduce_result, iter->required_version);
+        if (iter->is_all_reduce)
+        {
+          send_value_to_children(reduce_result, iter->required_version);
+        }
       }
       else
       {
