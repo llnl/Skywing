@@ -1,7 +1,7 @@
 #ifndef SKYNET_TEST_UTILS_HPP
 #define SKYNET_TEST_UTILS_HPP
 
-#include "skynet/master.hpp"
+#include "skynet_core/master.hpp"
 
 #include <algorithm>
 #include <cassert>

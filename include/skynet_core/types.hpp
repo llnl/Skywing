@@ -1,7 +1,7 @@
 #ifndef SKYNET_TYPES_HPP
 #define SKYNET_TYPES_HPP
 
-#include "skynet/internal/utility/type_list.hpp"
+#include "skynet_core/internal/utility/type_list.hpp"
 
 #include <array>
 #include <cstddef>

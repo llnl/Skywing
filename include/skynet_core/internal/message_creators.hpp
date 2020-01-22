@@ -1,7 +1,7 @@
 #ifndef SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
 #define SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
 
-#include "skynet/types.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cstddef>
 #include <vector>

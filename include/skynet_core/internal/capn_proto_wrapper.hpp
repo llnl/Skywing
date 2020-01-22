@@ -8,8 +8,8 @@
 
 #include <capnp/serialize.h>
 
-#include "skynet/internal/utility/overload_set.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/utility/overload_set.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cstddef>
 #include <cstdint>

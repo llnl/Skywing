@@ -1,6 +1,6 @@
-#include "skynet/internal/master_future_callables.hpp"
+#include "skynet_core/internal/master_future_callables.hpp"
 
-#include "skynet/master.hpp"
+#include "skynet_core/master.hpp"
 
 namespace skynet::internal
 {

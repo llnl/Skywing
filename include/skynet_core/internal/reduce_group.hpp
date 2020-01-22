@@ -1,10 +1,10 @@
 #ifndef SKYNET_INTERNAL_REDUCE_GROUP_HPP
 #define SKYNET_INTERNAL_REDUCE_GROUP_HPP
 
-#include "skynet/internal/master_future_callables.hpp"
-#include "skynet/internal/tag_buffer.hpp"
-#include "skynet/future.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/tag_buffer.hpp"
+#include "skynet_core/future.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cassert>
 #include <chrono>

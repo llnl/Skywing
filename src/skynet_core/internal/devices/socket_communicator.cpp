@@ -1,8 +1,8 @@
-#include "skynet/internal/devices/socket_communicator.hpp"
+#include "skynet_core/internal/devices/socket_communicator.hpp"
 
 #include "socket_wrappers.hpp"
 
-#include "skynet/internal/utility/logging.hpp"
+#include "skynet_core/internal/utility/logging.hpp"
 #include "generated/socket_no_sigpipe.hpp"
 
 #include <arpa/inet.h>

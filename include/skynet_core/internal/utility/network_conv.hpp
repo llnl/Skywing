@@ -1,7 +1,7 @@
 #ifndef SKYNET_INTERNAL_UTILITY_NETWORK_CONV_HPP
 #define SKYNET_INTERNAL_UTILITY_NETWORK_CONV_HPP
 
-#include "skynet/types.hpp"
+#include "skynet_core/types.hpp"
 
 #include <array>
 #include <cstddef>

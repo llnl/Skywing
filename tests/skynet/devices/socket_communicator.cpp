@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "skynet/internal/devices/socket_communicator.hpp"
+#include "skynet_core/internal/devices/socket_communicator.hpp"
 
 #include <thread>
 #include <cstring>

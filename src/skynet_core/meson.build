@@ -22,5 +22,5 @@ skynet_lib = static_library('skynet',
     'master.cpp'
   ] + platform_specific_sources,
   dependencies : [skynet_internal_dep],
-  include_directories : include_directories('../include')
+  include_directories : include_directories('include')
 )

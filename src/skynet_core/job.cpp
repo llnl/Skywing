@@ -1,7 +1,7 @@
-#include "skynet/job.hpp"
+#include "skynet_core/job.hpp"
 
-#include "skynet/internal/utility/logging.hpp"
-#include "skynet/master.hpp"
+#include "skynet_core/internal/utility/logging.hpp"
+#include "skynet_core/master.hpp"
 
 namespace skynet
 {

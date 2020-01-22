@@ -1,7 +1,7 @@
-#include "skynet/master.hpp"
+#include "skynet_core/master.hpp"
 
-#include "skynet/internal/utility/algorithms.hpp"
-#include "skynet/internal/utility/logging.hpp"
+#include "skynet_core/internal/utility/algorithms.hpp"
+#include "skynet_core/internal/utility/logging.hpp"
 
 // TODO: Support other types of communicators
 

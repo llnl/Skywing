@@ -1,14 +1,14 @@
 #ifndef SKYNET_MASTER_HPP
 #define SKYNET_MASTER_HPP
 
-#include "skynet/internal/devices/socket_communicator.hpp"
-#include "skynet/internal/utility/network_conv.hpp"
-#include "skynet/internal/capn_proto_wrapper.hpp"
-#include "skynet/internal/master_future_callables.hpp"
-#include "skynet/internal/message_creators.hpp"
-#include "skynet/internal/reduce_group.hpp"
-#include "skynet/job.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/devices/socket_communicator.hpp"
+#include "skynet_core/internal/utility/network_conv.hpp"
+#include "skynet_core/internal/capn_proto_wrapper.hpp"
+#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/message_creators.hpp"
+#include "skynet_core/internal/reduce_group.hpp"
+#include "skynet_core/job.hpp"
+#include "skynet_core/types.hpp"
 
 #include <algorithm>
 #include <array>

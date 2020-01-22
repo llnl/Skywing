@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "skynet/master.hpp"
+#include "skynet_core/master.hpp"
 
 #include <thread>
 

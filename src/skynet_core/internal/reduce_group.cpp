@@ -1,7 +1,7 @@
-#include "skynet/internal/reduce_group.hpp"
+#include "skynet_core/internal/reduce_group.hpp"
 
-#include "skynet/internal/utility/logging.hpp"
-#include "skynet/master.hpp"
+#include "skynet_core/internal/utility/logging.hpp"
+#include "skynet_core/master.hpp"
 
 namespace skynet::internal
 {

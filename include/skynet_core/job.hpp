@@ -1,13 +1,13 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
-#include "skynet/internal/utility/mutex_guarded.hpp"
-#include "skynet/internal/utility/type_list.hpp"
-#include "skynet/internal/master_future_callables.hpp"
-#include "skynet/internal/reduce_group.hpp"
-#include "skynet/internal/tag_buffer.hpp"
-#include "skynet/future.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/utility/mutex_guarded.hpp"
+#include "skynet_core/internal/utility/type_list.hpp"
+#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/reduce_group.hpp"
+#include "skynet_core/internal/tag_buffer.hpp"
+#include "skynet_core/future.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cassert>
 #include <chrono>

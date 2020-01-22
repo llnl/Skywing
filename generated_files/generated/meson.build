@@ -27,9 +27,9 @@ endian_data = configuration_data()
 
 endian_data.set('is_little_endian', (host_machine.endian() == 'little').to_string().to_lower())
 if meson.get_compiler('cpp').get_id() == 'msvc'
-  endian_data.set_quoted('endian_include', 'skynet/internal/endian_win.hpp')
+  endian_data.set_quoted('endian_include', 'skynet_core/internal/endian_win.hpp')
 else
-  endian_data.set_quoted('endian_include', 'skynet/internal/endian_posix.hpp')
+  endian_data.set_quoted('endian_include', 'skynet_core/internal/endian_posix.hpp')
 endif
 
 configure_file(

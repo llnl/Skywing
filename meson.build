@@ -35,16 +35,12 @@ skynet_internal_dep = declare_dependency(
   sources : [generated_sources]
 )
 
-subdir('src/skynet')
+subdir('src/skynet_core')
 
 skynet_dep = declare_dependency(
   dependencies : skynet_internal_dep,
   link_with : skynet_lib
 )
-
-if use_ns3
-  subdir('src/ns3')
-endif
 
 subdir('tests')
 subdir('examples')

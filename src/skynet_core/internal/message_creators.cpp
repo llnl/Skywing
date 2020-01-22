@@ -1,8 +1,8 @@
-#include "skynet/internal/message_creators.hpp"
+#include "skynet_core/internal/message_creators.hpp"
 
-#include "skynet/internal/utility/network_conv.hpp"
-#include "skynet/internal/capn_proto_wrapper.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/utility/network_conv.hpp"
+#include "skynet_core/internal/capn_proto_wrapper.hpp"
+#include "skynet_core/types.hpp"
 #include "publish_value_handler.hpp"
 
 #include "message_format.capnp.h"

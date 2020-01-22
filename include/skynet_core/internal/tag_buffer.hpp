@@ -1,8 +1,8 @@
 #ifndef SKYNET_INTERNAL_TAG_BUFFER_HPP
 #define SKYNET_INTERNAL_TAG_BUFFER_HPP
 
-#include "skynet/internal/utility/type_list.hpp"
-#include "skynet/types.hpp"
+#include "skynet_core/internal/utility/type_list.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cassert>
 #include <optional>

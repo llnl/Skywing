@@ -1,6 +1,6 @@
-#include "skynet/internal/capn_proto_wrapper.hpp"
+#include "skynet_core/internal/capn_proto_wrapper.hpp"
 
-#include "skynet/internal/utility/logging.hpp"
+#include "skynet_core/internal/utility/logging.hpp"
 #include "publish_value_handler.hpp"
 
 namespace skynet::internal

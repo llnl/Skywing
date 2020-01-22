@@ -3,7 +3,7 @@
 
 #include "spdlog/spdlog.h"
 
-#include "skynet/types.hpp"
+#include "skynet_core/types.hpp"
 
 #include <cstdint>
 #include <string>

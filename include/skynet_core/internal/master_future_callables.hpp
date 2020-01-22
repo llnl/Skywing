@@ -4,7 +4,7 @@
 // This header exists so that the Master types returned from the header can be used
 // by Job
 
-#include "skynet/types.hpp"
+#include "skynet_core/types.hpp"
 
 #include <vector>
 

@@ -2,9 +2,9 @@
 
 #include <capnp/message.h>
 
-#include "skynet/internal/capn_proto_wrapper.hpp"
+#include "skynet_core/internal/capn_proto_wrapper.hpp"
 
-#include "../src/include/publish_value_handler.hpp"
+#include "../src/skynet_core/include/publish_value_handler.hpp"
 
 using namespace skynet::internal;
 
