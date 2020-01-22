@@ -18,7 +18,7 @@ tests = [
 foreach t : tests
   exe = executable(
     t[0], # test name
-    ['skynet/' + t[1], 'catch_main.cpp'], # test executable
+    ['skynet_core/' + t[1], 'catch_main.cpp'], # test executable
     dependencies : [catch2_dep, skynet_dep],
     include_directories : include_directories('include')
   )
