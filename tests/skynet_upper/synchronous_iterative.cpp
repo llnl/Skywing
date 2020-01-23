@@ -46,7 +46,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   });
   master.submit_job("job", [&](Job& job_handle) {
     const auto& to_publish = publish_values[index];
-    const SynchronousIterative iter_method = [&]() {
+    SynchronousIterative iter_method = [&]() {
       if (index == 0)
       {
         return SynchronousIterative{job_handle, tags[0], to_publish[0], tags[1], tags[2]};
