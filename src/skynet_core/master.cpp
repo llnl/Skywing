@@ -13,12 +13,6 @@ namespace skynet
 {
   namespace internal
   {
-    /** \brief Attempt to construct an ExternalMaster using an existing connection
-     *
-     * This is for when a server accepts a new connection.  Both have to
-     * send/recieve greetings, but need to do so in the opposite order so
-     * have seperate constructors for both.
-     */
     std::optional<ExternalMaster> ExternalMaster::create(
       ByAccept,
       SocketCommunicator conn,
@@ -37,10 +31,6 @@ namespace skynet
       );
     }
 
-    /** \brief Attempt to construct an ExternalMaster using an existing connection
-     *
-     * This is for when a client connects to a server.
-     */
     std::optional<ExternalMaster> ExternalMaster::create(
       ByRequest,
       SocketCommunicator conn,
@@ -74,11 +64,6 @@ namespace skynet
       }
     }
 
-    /** \brief Sends a raw message to the other master
-     *
-     * Also marks the connection as dead if any errors occur.  Does nothing
-     * if the connection is marked as dead.
-     */
     void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
     {
       if (dead_)
@@ -91,28 +76,18 @@ namespace skynet
       }
     }
 
-    /** \brief Returns the id of the computer this is connected to
-     */
     MachineID ExternalMaster::id() const noexcept { return id_; }
 
-    /** \brief Returns if the connection is dead or not
-     */
     bool ExternalMaster::is_dead() const noexcept { return dead_; }
 
-    /** \brief Marks the connection as dead
-     */
     void ExternalMaster::mark_as_dead() noexcept { dead_ = true; }
 
-    /** \brief Returns true if the given neighbor is present, false otherwise
-     */
     bool ExternalMaster::has_neighbor(const MachineID& id) const noexcept
     {
       const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), id);
       return loc != neighbors_.cend() && *loc == id;
     }
 
-    /** \brief Sends a heartbeat if enough time has passed
-     */
     void ExternalMaster::send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept
     {
       using namespace std::chrono;
@@ -507,20 +482,45 @@ namespace skynet
     }
   }
 
-  /** \brief Destructor; tells all neighbors that the device is dead
-   */
+  // Master::Master(const BuildMasterInfo& info) noexcept
+  //   : Master{info.port, info.name, std::chrono::milliseconds{info.heartbeat_interval_in_ms}}
+  // {
+  //   // TODO: This blocks until it is ready.  I guess that's fine though?
+  //   // Connect to the other machines now
+  //   auto connections_left = info.to_connect_to;
+  //   while (!connections_left.empty())
+  //   {
+  //     for (auto iter = connections_left.begin(); iter != connections_left.end(); /* nothing */)
+  //     {
+  //       const bool already_has_connection = [&]() {
+  //         for (const auto& neighbor : neighbors_)
+  //         {
+  //           if (neighbor.second.two_way_address() == *iter)
+  //           {
+  //             return true;
+  //           }
+  //         }
+  //         return false;
+  //       }();
+  //       if (already_has_connection || connect_to_server(*iter))
+  //       {
+  //         iter = connections_left.erase(iter);
+  //       }
+  //       else
+  //       {
+  //         ++iter;
+  //       }
+  //     }
+  //     SKYNET_CRITICAL_LOG("{} MMMMMM {}", id_, connections_left.size());
+  //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  //   }
+  // }
+
   Master::~Master()
   {
     send_to_neighbors(internal::make_goodbye());
   }
 
-  /** \brief Connects to another instance at the specified address on
-   * the specified port
-   *
-   * \param address The address to connect to
-   * \param port The port to connect on
-   * \return True if the connection was successful, false if it failed
-   */
   bool Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
   {
     return connect_impl(address, port) != neighbors_.end();
@@ -532,8 +532,6 @@ namespace skynet
     return connect_to_server(addr.c_str(), port);
   }
 
-  /** \brief See if there are any pending connections and accept them if so
-   */
   void Master::accept_pending_connections() noexcept
   {
     while (auto conn = server_socket_.accept())
@@ -570,8 +568,6 @@ namespace skynet
     }
   }
 
-  /** \brief Returns the number of machines connected
-   */
   int Master::number_of_neighbors() const noexcept
   {
     return static_cast<int>(neighbors_.size());
@@ -592,8 +588,6 @@ namespace skynet
     return res.second;
   }
 
-  /** \brief Start running all submitted jobs
-   */
   void Master::run() noexcept
   {
     using namespace std::chrono_literals;
@@ -674,7 +668,7 @@ namespace skynet
     );
   }
 
-  int Master::num_subscribers() const noexcept
+  int Master::number_of_subscribers() const noexcept
   {
     std::lock_guard lock{job_mut_};
     return pub_channel_.num_subscriptions();
@@ -761,8 +755,6 @@ namespace skynet
     pub_channel_.send_message(msg.data(), msg.size());
   }
 
-  // Adds data to the tag queue for a job from a message
-  // Returns true if it was successful, false if something went wrong
   bool Master::add_data_to_queue(const internal::PublishData& msg) noexcept
   {
     for (auto& [name, job] : jobs_)
@@ -865,8 +857,6 @@ namespace skynet
     return to_ret;
   }
 
-  /** \brief Broadcasts a message to all neighbors
-   */
   void Master::send_to_neighbors(const std::vector<std::byte>& to_send) noexcept
   {
     send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });

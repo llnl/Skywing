@@ -92,6 +92,12 @@ namespace skynet
     return iter != buffers.cend() && iter->second.error_occurred == TagInfo::Error::no_error;
   }
 
+  int Job::num_subscriptions(const internal::PublishTagBase& tag) noexcept
+  {
+    (void)tag;
+    return master_->number_of_subscribers();
+  }
+
   void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
   {
     SKYNET_TRACE_LOG("\"{}\" tag \"{}\" marked as dead.", id_, tag_id);

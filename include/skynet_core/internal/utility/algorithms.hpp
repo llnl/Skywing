@@ -51,7 +51,7 @@ namespace skynet::internal
     std::vector<std::common_type_t<typename Ts::value_type...>> to_ret((size(containers) + ...));
     // Copy all of the data
     auto copy_loc = begin(to_ret);
-    ((copy_loc = std::copy(cbegin(containers), cend(containers), copy_loc)), ...);
+    (..., (copy_loc = std::copy(cbegin(containers), cend(containers), copy_loc)));
     return to_ret;
   }
 

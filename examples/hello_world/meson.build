@@ -1,7 +1,7 @@
 hello_world_exe = executable(
   'hello_world',
   ['hello_world.cpp'],
-  dependencies : [skynet_dep]
+  dependencies : [skynet_core_dep]
 )
 
 conf_data = configuration_data()

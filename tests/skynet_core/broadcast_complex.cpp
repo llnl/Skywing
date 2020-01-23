@@ -148,7 +148,6 @@ void machine_task(const NetworkInfo* const info, const int index)
 
 TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
 {
-  using namespace std::chrono_literals;
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
   for (auto i = 0; i < num_machines; ++i)

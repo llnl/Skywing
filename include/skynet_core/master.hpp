@@ -7,6 +7,7 @@
 #include "skynet_core/internal/master_future_callables.hpp"
 #include "skynet_core/internal/message_creators.hpp"
 #include "skynet_core/internal/reduce_group.hpp"
+// #include "skynet_core/basic_master_config.hpp"
 #include "skynet_core/job.hpp"
 #include "skynet_core/types.hpp"
 
@@ -23,10 +24,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-// TODO: Support other types of communicators; will probably just be a build
-//       configuration since there doesn't seem to be a strong reason for
-//       having different kinds of masters in the same program
 
 namespace skynet
 {
@@ -249,6 +246,13 @@ namespace skynet
       const std::chrono::milliseconds heartbeat_interval
     ) noexcept;
 
+    // /** \brief Constructor for building from a file format specified in
+    //  * basic_master_config.hpp
+    //  *
+    //  * This will block until all of the specified connections have been made
+    //  */
+    // Master(const BuildMasterInfo& info) noexcept;
+
     /** \brief Destructor; tells all neighbors that the device is dead
      */
     ~Master();
@@ -294,7 +298,7 @@ namespace skynet
 
     /** \brief Returns the number of subscribers
      */
-    int num_subscribers() const noexcept;
+    int number_of_subscribers() const noexcept;
 
     /** \brief Returns the id of the master
      */

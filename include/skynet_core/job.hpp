@@ -69,6 +69,8 @@ namespace skynet
     {
       assert(!id.empty());
     }
+
+    using ValueType = T;
   }; // class PublishTag
 
   /** \brief Tag for reduce values
@@ -82,6 +84,8 @@ namespace skynet
     {
       assert(!id.empty());
     }
+
+    using ValueType = T;
   }; // class ReduceValueTag
 
   /** \brief Tag for reduce groups
@@ -95,6 +99,8 @@ namespace skynet
     {
       assert(!id.empty());
     }
+
+    using ValueType = T;
   }; // class ReduceGroupTag
 
   /** \brief Job with known tags
@@ -366,6 +372,14 @@ namespace skynet
     /** \brief Check if a tag's subscription is valid or not
      */
     bool tag_has_subscription(const internal::PublishTagBase& tag) noexcept;
+
+    /** \brief Returns the number of subscriptions that a tag has
+     *
+     * TODO: There's currently no distinction between tags for a subscription,
+     * add a way to do this and also only send data on tags which machines are
+     * subscribed to.
+     */
+    int num_subscriptions(const internal::PublishTagBase& tag) noexcept;
 
   private:
     /** \brief Checks if a buffer has data without locking

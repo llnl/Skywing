@@ -35,3 +35,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * ninja
  * Run tests
    * ninja test
+
+---
+
+The skynet_upper name is a temporary placeholder name for higher parts of the library that build on the lower parts, which are in skynet_core.

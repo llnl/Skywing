@@ -88,7 +88,7 @@ void machine_task(const std::size_t index)
         the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait();
       }
     }
-    while (master.num_subscribers() != machine_counts.size() - 1)
+    while (master.number_of_subscribers() != machine_counts.size() - 1)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

@@ -10,7 +10,7 @@ else
   error('Unsupported build target "' + target_machine.system() + '"')
 endif
 
-skynet_core_lib = static_library('skynet',
+skynet_core_lib = static_library('skynet_core',
   [
     'internal/devices/socket_communicator.cpp',
     'internal/utility/network_conv.cpp',
@@ -18,6 +18,7 @@ skynet_core_lib = static_library('skynet',
     'internal/master_future_callables.cpp',
     'internal/message_creators.cpp',
     'internal/reduce_group.cpp',
+    # 'basic_master_config.cpp',
     'job.cpp',
     'master.cpp'
   ] + platform_specific_sources,
