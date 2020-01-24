@@ -9,6 +9,8 @@
 #include "skynet_core/waiter.hpp"
 #include "skynet_core/types.hpp"
 
+#include "gsl/span"
+
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -171,11 +173,11 @@ namespace skynet
     //  requires std::is_base_of_v<internal::PublishTagBase, T>
     void declare_publication_intent(const std::vector<T>& tags) noexcept
     {
-      declare_publication_intent_impl(tags.data(), tags.size());
+      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase>{tags});
     }
     void declare_publication_intent(const internal::PublishTagBase& tag) noexcept
     {
-      declare_publication_intent_impl(&tag, 1);
+      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase>{&tag, 1});
     }
 
     /** \brief Retrieves the specified version for the tag, or latest if no version
@@ -256,8 +258,8 @@ namespace skynet
           });
         }()
       ));
-      init_or_update_subscribe(tags.data(), tags.size());
-      return get_subscribe_future(tags.data(), tags.size());
+      init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tags});
+      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
     }
     auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
     {
@@ -365,8 +367,8 @@ namespace skynet
         }
         return tags;
       }();
-      init_or_update_subscribe(tags.data(), tags.size());
-      return get_subscribe_future(tags.data(), tags.size());
+      init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tags});
+      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
     }
 
     /** \brief Check if a tag's subscription is valid or not
@@ -407,19 +409,16 @@ namespace skynet
     ) noexcept;
 
     void init_or_update_subscribe(
-      const internal::PublishTagBase* tags,
-      std::size_t count
+      gsl::span<const internal::PublishTagBase> tags
     ) noexcept;
 
     auto get_subscribe_future(
-      const internal::PublishTagBase* tags,
-      std::size_t count
+      gsl::span<const internal::PublishTagBase> tags
     ) noexcept
       -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
     void declare_publication_intent_impl(
-      const internal::PublishTagBase* tags,
-      std::size_t count
+      gsl::span<const internal::PublishTagBase> tags
     ) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;

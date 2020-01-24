@@ -162,8 +162,7 @@ namespace skynet
   }
 
   void Job::init_or_update_subscribe(
-    const internal::PublishTagBase* const tags,
-    const std::size_t count
+    const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
   {
     auto [buffers, lock] = bufs_.get();
@@ -171,9 +170,8 @@ namespace skynet
     // Always subscribe ahead of time, since the gap between the
     // Job::subscribe calls can cause messages to get discarded once the
     // connection is made but before it's marked as subscribed
-    for (std::size_t i = 0; i < count; ++i)
+    for (const auto& tag : tags)
     {
-      const auto& tag = tags[i];
       // Then add the expected type; marking the tag as watched
       const auto [iter, inserted] = buffers.try_emplace(
         tag.id(),
@@ -197,15 +195,14 @@ namespace skynet
   }
 
   auto Job::get_subscribe_future(
-    const internal::PublishTagBase* const tags,
-    const std::size_t count
+    const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
     -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
   {
-    std::vector<TagID> tag_ids(count);
+    std::vector<TagID> tag_ids(tags.size());
     std::transform(
-      tags,
-      tags + count,
+      tags.cbegin(),
+      tags.cend(),
       tag_ids.begin(),
       [](const internal::PublishTagBase& t) { return t.id(); }
     );
@@ -213,20 +210,19 @@ namespace skynet
   }
 
   void Job::declare_publication_intent_impl(
-    const internal::PublishTagBase* const tags,
-    const std::size_t count
+    const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
   {
     const std::vector<TagID> tag_ids = [&]() {
       std::lock_guard g{bufs_.mutex()};
-      for (std::size_t i = 0; i < count; ++i)
+      for (const auto& tag : tags)
       {
-        tags_produced_.try_emplace(tags[i].id(), tags[i].expected_type());
+        tags_produced_.try_emplace(tag.id(), tag.expected_type());
       }
-      std::vector<TagID> tag_ids(count);
+      std::vector<TagID> tag_ids(tags.size());
       std::transform(
-        tags,
-        tags + count,
+        tags.cbegin(),
+        tags.cend(),
         tag_ids.begin(),
         [&](const internal::PublishTagBase& t) { return t.id(); }
       );

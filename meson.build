@@ -23,6 +23,9 @@ endif
 
 thread_dep = dependency('threads')
 spdlog_dep = subproject('spdlog').get_variable('spdlog_dep')
+gsl_dep = declare_dependency(
+  include_directories : include_directories('subprojects/gsl/include')
+)
 
 capnproto_dep = dependency('capnp')
 
@@ -31,7 +34,7 @@ subdir('generated_files/generated')
 skynet_core_inc = include_directories('include', 'generated_files')
 skynet_core_internal_dep = declare_dependency(
   include_directories : skynet_core_inc,
-  dependencies : [thread_dep, capnproto_dep, spdlog_dep],
+  dependencies : [thread_dep, capnproto_dep, spdlog_dep, gsl_dep],
   sources : [generated_sources]
 )
 
