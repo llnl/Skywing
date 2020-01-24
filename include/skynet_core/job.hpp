@@ -415,7 +415,7 @@ namespace skynet
       const internal::PublishTagBase* tags,
       std::size_t count
     ) noexcept
-      -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+      -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
     void declare_publication_intent_impl(
       const internal::PublishTagBase* tags,

@@ -115,7 +115,7 @@ namespace skynet
       return (... && tuple_setter_single<Indexes>(to_set));
     }
 
-    // Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp> subscribe_future_;
+    // Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp> subscribe_future_;
     Job& job_;
     PublishTag<ValueType> produced_tag_;
     std::tuple<TagTypes...> tags_;

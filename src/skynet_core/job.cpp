@@ -200,7 +200,7 @@ namespace skynet
     const internal::PublishTagBase* const tags,
     const std::size_t count
   ) noexcept
-    -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
+    -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
   {
     std::vector<TagID> tag_ids(count);
     std::transform(

@@ -205,7 +205,7 @@ namespace skynet::internal
   }
 
   auto ReduceGroupBase::rebuild() noexcept
-    -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
+    -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
   {
     // Reset the buffers
     last_sent_version_ = tag_no_data;

@@ -59,7 +59,7 @@ namespace skynet
 
       // Rebuilds a reduce group after it fails due to a disconnection
       auto rebuild() noexcept
-        -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
+        -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>;
 
     private:
       // Sends a value to the parent

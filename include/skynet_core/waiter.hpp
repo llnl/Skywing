@@ -13,6 +13,8 @@ namespace skynet
   class Waiter : public IsReadyCallable, public GetValueCallable
   {
   public:
+    using ValueType = ProducedType;
+
     Waiter(
       std::mutex& mutex_handle,
       std::condition_variable& cv_handle,
@@ -91,12 +93,11 @@ namespace skynet
 
   namespace internal
   {
-    struct FutureGetNoOp
+    struct WaiterGetNoOp
     {
       constexpr void operator()() const noexcept {}
-    }; // struct FutureGetNoOp
+    }; // struct WaiterGetNoOp
 
-    // This would be in internal even if Waiter isn't, however
     template<typename IsReadyCallable, typename GetValueCallable>
     auto make_waiter(
       std::mutex& mutex,
@@ -121,9 +122,9 @@ namespace skynet
       std::condition_variable& cv,
       IsReadyCallable ready
     ) noexcept
-      -> Waiter<void, IsReadyCallable, FutureGetNoOp>
+      -> Waiter<void, IsReadyCallable, WaiterGetNoOp>
     {
-      return make_waiter(mutex, cv, std::move(ready), FutureGetNoOp{});
+      return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
     }
   } // namespace skynet::internal
 } // namespace skynet
