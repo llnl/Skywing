@@ -3,10 +3,10 @@
 
 #include "skynet_core/internal/utility/mutex_guarded.hpp"
 #include "skynet_core/internal/utility/type_list.hpp"
-#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/master_waiter_callables.hpp"
 #include "skynet_core/internal/reduce_group.hpp"
 #include "skynet_core/internal/tag_buffer.hpp"
-#include "skynet_core/future.hpp"
+#include "skynet_core/waiter.hpp"
 #include "skynet_core/types.hpp"
 
 #include <cassert>
@@ -181,7 +181,7 @@ namespace skynet
     /** \brief Retrieves the specified version for the tag, or latest if no version
      * is specified
      *
-     * \return A Future for the value
+     * \return A Waiter for the value
      */
     template<typename ValueType>
     auto get_future_for(
@@ -196,7 +196,7 @@ namespace skynet
       assert(tag_iter != buffers.cend());
       auto& tag_info = tag_iter->second;
       const auto tag_conn_id = tag_info.connection_id;
-      return internal::make_future(
+      return internal::make_waiter(
         bufs_.mutex(),
         data_buffer_modified_cv_,
         [&tag_info, tag_conn_id]() {
@@ -415,7 +415,7 @@ namespace skynet
       const internal::PublishTagBase* tags,
       std::size_t count
     ) noexcept
-      -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+      -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     void declare_publication_intent_impl(
       const internal::PublishTagBase* tags,
@@ -437,7 +437,7 @@ namespace skynet
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
     ) noexcept
-      -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
 

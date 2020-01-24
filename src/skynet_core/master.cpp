@@ -885,7 +885,7 @@ namespace skynet
   }
 
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-    -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
+    -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" looking for subscription information for {}", id_, tag_ids);
     std::vector<TagID> tags_to_search_for;
@@ -939,7 +939,7 @@ namespace skynet
         neighbor.second.find_publishers_for_tags(tags_to_search_for, false);
       }
     }
-    return internal::make_future(
+    return internal::make_waiter(
       job_mut_,
       new_subscription_cv_,
       internal::MasterSubscribeIsDone{*this, tag_ids}
@@ -1294,7 +1294,7 @@ namespace skynet
     const internal::ReduceGroupNeighbors& tags_to_find,
     const std::uint8_t expected_type
   ) noexcept
-    -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     // Create an entry for the group
     const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
@@ -1328,7 +1328,7 @@ namespace skynet
         neighbor.second.find_publishers_for_tags({parent_tag}, false);
       }
     }
-    return internal::make_future(
+    return internal::make_waiter(
       job_mut_,
       reduce_group_cv_,
       internal::MasterReduceGroupIsCreated{*this, group_id},
@@ -1339,7 +1339,7 @@ namespace skynet
   auto Master::rebuild_reduce_group(
     const TagID& group_id
   ) noexcept
-    -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
+    -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
     const auto iter = reduce_tag_data_.find(group_id);
@@ -1357,7 +1357,7 @@ namespace skynet
         }
       }
     }
-    return internal::make_future(
+    return internal::make_waiter(
       job_mut_,
       reduce_group_cv_,
       internal::MasterReduceGroupIsCreated{*this, group_id}

@@ -4,7 +4,7 @@
 #include "skynet_core/internal/devices/socket_communicator.hpp"
 #include "skynet_core/internal/utility/network_conv.hpp"
 #include "skynet_core/internal/capn_proto_wrapper.hpp"
-#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/master_waiter_callables.hpp"
 #include "skynet_core/internal/message_creators.hpp"
 #include "skynet_core/internal/reduce_group.hpp"
 // #include "skynet_core/basic_master_config.hpp"
@@ -445,7 +445,7 @@ namespace skynet
       }
     }; // struct ReduceGroupAccessor
 
-    struct FutureAccessor
+    struct WaiterAccessor
     {
     private:
       friend class internal::MasterSubscribeIsDone;
@@ -466,7 +466,7 @@ namespace skynet
       {
         return m.get_reduce_group(group_id);
       }
-    }; // struct FutureAccessor
+    }; // struct WaiterAccessor
 
   private:
     /** \brief Connects to a remote connection and returns an iterator to the new connection,
@@ -538,7 +538,7 @@ namespace skynet
     /** \brief Subscribes to the passed tags.
      */
     auto subscribe(const std::vector<TagID>& tag_ids) noexcept
-      -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
+      -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>;
 
     /** \brief Handles the get_publishers message
      */
@@ -588,14 +588,14 @@ namespace skynet
       const internal::ReduceGroupNeighbors& tags_to_find,
       std::uint8_t expected_type
     ) noexcept
-      -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     /** \brief Gets a future for when a reduce group has been re-built.
      */
     auto rebuild_reduce_group(
       const TagID& group_id
     ) noexcept
-      -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
+      -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
 
     /** \brief Returns true if the specified reduce group has been successfully created.
      *

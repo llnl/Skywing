@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_MASTER_FUTURE_CALLABLES_HPP
-#define SKYNET_INTERNAL_MASTER_FUTURE_CALLABLES_HPP
+#ifndef SKYNET_INTERNAL_MASTER_WAITER_CALLABLES_HPP
+#define SKYNET_INTERNAL_MASTER_WAITER_CALLABLES_HPP
 
 // This header exists so that the Master types returned from the header can be used
 // by Job
@@ -54,4 +54,4 @@ namespace skynet
   } // namespace skynet::internal
 } // namespace skynet
 
-#endif // SKYNET_INTERNAL_MASTER_FUTURE_CALLABLES_HPP
+#endif // SKYNET_INTERNAL_MASTER_WAITER_CALLABLES_HPP

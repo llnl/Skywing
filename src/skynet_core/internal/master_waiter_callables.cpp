@@ -1,4 +1,4 @@
-#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/master_waiter_callables.hpp"
 
 #include "skynet_core/master.hpp"
 
@@ -11,7 +11,7 @@ namespace skynet::internal
 
   bool MasterSubscribeIsDone::operator()() const noexcept
   {
-    return Master::FutureAccessor::subscribe_is_done(*master_, tags_);
+    return Master::WaiterAccessor::subscribe_is_done(*master_, tags_);
   }
 
   MasterReduceGroupIsCreated::MasterReduceGroupIsCreated(
@@ -24,7 +24,7 @@ namespace skynet::internal
 
   bool MasterReduceGroupIsCreated::operator()() const noexcept
   {
-    return Master::FutureAccessor::reduce_group_is_created(*master_, group_id_);
+    return Master::WaiterAccessor::reduce_group_is_created(*master_, group_id_);
   }
 
   MasterGetReduceGroup::MasterGetReduceGroup(Master& master, const TagID& group_id) noexcept
@@ -34,6 +34,6 @@ namespace skynet::internal
 
   ReduceGroupBase& MasterGetReduceGroup::operator()() const noexcept
   {
-    return Master::FutureAccessor::get_reduce_group(*master_, group_id_);
+    return Master::WaiterAccessor::get_reduce_group(*master_, group_id_);
   }
 } // namespace skynet::internal

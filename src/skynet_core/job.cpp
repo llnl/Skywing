@@ -200,7 +200,7 @@ namespace skynet
     const internal::PublishTagBase* const tags,
     const std::size_t count
   ) noexcept
-    -> Future<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
+    -> Waiter<void, internal::MasterSubscribeIsDone, internal::FutureGetNoOp>
   {
     std::vector<TagID> tag_ids(count);
     std::transform(
@@ -292,7 +292,7 @@ namespace skynet
     const internal::ReduceGroupNeighbors& tags_to_find,
     std::uint8_t expected_type
   ) noexcept
-    -> Future<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     return Master::JobAccessor::create_reduce_group(
       *master_,

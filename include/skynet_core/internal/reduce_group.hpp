@@ -1,9 +1,9 @@
 #ifndef SKYNET_INTERNAL_REDUCE_GROUP_HPP
 #define SKYNET_INTERNAL_REDUCE_GROUP_HPP
 
-#include "skynet_core/internal/master_future_callables.hpp"
+#include "skynet_core/internal/master_waiter_callables.hpp"
 #include "skynet_core/internal/tag_buffer.hpp"
-#include "skynet_core/future.hpp"
+#include "skynet_core/waiter.hpp"
 #include "skynet_core/types.hpp"
 
 #include <cassert>
@@ -59,7 +59,7 @@ namespace skynet
 
       // Rebuilds a reduce group after it fails due to a disconnection
       auto rebuild() noexcept
-        -> Future<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
+        -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::FutureGetNoOp>;
 
     private:
       // Sends a value to the parent
@@ -174,7 +174,7 @@ namespace skynet
       const auto conn_id = base_.conn_counter;
       using produced_type = std::conditional_t<IsAllReduce, std::optional<T>, ReduceResult<T>>;
       // As the produced type is different,
-      return internal::make_future(
+      return internal::make_waiter(
         base_.buffer_mutex_,
         base_.future_info_cv_,
         [this, required_version, conn_id]() noexcept {

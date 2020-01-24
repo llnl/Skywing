@@ -65,6 +65,8 @@ void machine_task(const NetworkInfo* const info, const int index)
       std::lock_guard g{catch_mutex};
       REQUIRE(iter_method.values() == expected_results(index, 0));
     }
+    // Wait to not overwrite other values
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     // Submit next values and then test second array
     iter_method.submit_value(to_publish[1]);
     {

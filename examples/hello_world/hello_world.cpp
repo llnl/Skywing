@@ -74,7 +74,7 @@ void simulate_machine(const int machine_number)
     // As creating this group is an expensive operation with a lot of communication,
     // groups should be kept as long as they are needed and not be discarded as soon
     // as a single reduce operation is finished
-    // This function also does not return the group itself, but a skynet::Future,
+    // This function also does not return the group itself, but a skynet::Waiter,
     // meaning that the work has been initiated and will be finished on a seperate thread
     auto reduce_group_fut = job.create_reduce_group(
       // The tag for the reduce group, the same group tag and tags used for the

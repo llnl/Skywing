@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_FUTURE_HPP
-#define SKYNET_INTERNAL_FUTURE_HPP
+#ifndef SKYNET_WAITER_HPP
+#define SKYNET_WAITER_HPP
 
 #include <chrono>
 #include <condition_variable>
@@ -10,10 +10,10 @@
 namespace skynet
 {
   template<typename ProducedType, typename IsReadyCallable, typename GetValueCallable>
-  class Future : public IsReadyCallable, public GetValueCallable
+  class Waiter : public IsReadyCallable, public GetValueCallable
   {
   public:
-    Future(
+    Waiter(
       std::mutex& mutex_handle,
       std::condition_variable& cv_handle,
       IsReadyCallable ready,
@@ -71,7 +71,7 @@ namespace skynet
       const auto adj_lambda = [adjust = std::move(adjust), getter = static_cast<const GetValueCallable&>(*this)]() {
         return adjust(getter());
       };
-      return Future<decltype(adj_lambda()), IsReadyCallable, decltype(adj_lambda)>{
+      return Waiter<decltype(adj_lambda()), IsReadyCallable, decltype(adj_lambda)>{
         mutex_,
         cv_,
         static_cast<const IsReadyCallable&>(*this),
@@ -87,7 +87,7 @@ namespace skynet
 
     std::mutex& mutex_;
     std::condition_variable& cv_;
-  }; // class Future
+  }; // class Waiter
 
   namespace internal
   {
@@ -96,17 +96,17 @@ namespace skynet
       constexpr void operator()() const noexcept {}
     }; // struct FutureGetNoOp
 
-    // This would be in internal even if Future isn't, however
+    // This would be in internal even if Waiter isn't, however
     template<typename IsReadyCallable, typename GetValueCallable>
-    auto make_future(
+    auto make_waiter(
       std::mutex& mutex,
       std::condition_variable& cv,
       IsReadyCallable ready,
       GetValueCallable get_value
     ) noexcept
-      -> Future<decltype(get_value()), IsReadyCallable, GetValueCallable>
+      -> Waiter<decltype(get_value()), IsReadyCallable, GetValueCallable>
     {
-      return Future<decltype(get_value()), IsReadyCallable, GetValueCallable>{
+      return Waiter<decltype(get_value()), IsReadyCallable, GetValueCallable>{
         mutex,
         cv,
         std::move(ready),
@@ -116,16 +116,16 @@ namespace skynet
 
     // Overload for void returning futures
     template<typename IsReadyCallable>
-    auto make_future(
+    auto make_waiter(
       std::mutex& mutex,
       std::condition_variable& cv,
       IsReadyCallable ready
     ) noexcept
-      -> Future<void, IsReadyCallable, FutureGetNoOp>
+      -> Waiter<void, IsReadyCallable, FutureGetNoOp>
     {
-      return make_future(mutex, cv, std::move(ready), FutureGetNoOp{});
+      return make_waiter(mutex, cv, std::move(ready), FutureGetNoOp{});
     }
   } // namespace skynet::internal
 } // namespace skynet
 
-#endif // SKYNET_INTERNAL_FUTURE_HPP
+#endif // SKYNET_WAITER_HPP
