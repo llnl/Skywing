@@ -13,7 +13,7 @@ bool roundtrip_value(const T& val)
 {
   // Create the message
   capnp::MallocMessageBuilder message;
-  auto builder = message.initRoot<cpnpro::PublishData>().initValue();
+  auto builder = message.initRoot<cpnpro::PublishData>().initValue(1)[0];
   using handler = detail::PublishValueHandler<T>;
   handler::set(builder, val);
 

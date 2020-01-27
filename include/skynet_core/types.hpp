@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -59,6 +60,15 @@ namespace skynet
 
   /// Variant version of the above
   using PublishValueVariant = internal::ApplyTo<PublishValueTypeList, std::variant>;
+
+  /// Takes a parameter pack and either packs it into a tuple or
+  /// turns it into a single type
+  template<typename... Ts>
+  using ValueOrTuple = std::conditional_t<
+    sizeof...(Ts) == 1,
+      internal::At<0, internal::TypeList<Ts...>>,
+      std::tuple<Ts...>
+  >;
 
   /// A type indicating that a reduce did not produce a result intentionally
   /// (i.e., that it is not the root of the reduce tree)

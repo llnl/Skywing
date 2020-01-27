@@ -42,7 +42,7 @@ namespace skynet
       ) noexcept;
 
       // Adds data to the corresponding buffer, returning false if an error occurred
-      bool add_data(const TagID& tag, PublishValueVariant value, VersionID version) noexcept;
+      bool add_data(const TagID& tag, gsl::span<PublishValueVariant> value, VersionID version) noexcept;
 
       // Handle and propagate a disconnection notice from another machine
       void propagate_disconnection(const MachineID& initiating_machine, ReductionDisconnectID id) noexcept;
@@ -77,7 +77,7 @@ namespace skynet
       // Process any pending reduce operations, removing them if finished
       void process_pending_reduce_ops() noexcept;
 
-      using DataBuffer = FifoTagBuffer<PublishValueVariant>;
+      using DataBuffer = std::unique_ptr<FifoTagBufferBase>;
       struct PendingReduce
       {
         VersionID required_version;
@@ -87,7 +87,7 @@ namespace skynet
       };
       std::unordered_map<MachineID, ReductionDisconnectID> last_heard_disconnect;
       std::vector<PendingReduce> pending_reduces_;
-      std::array<DataBuffer, 3> data_buffers_;
+      // std::array<DataBuffer, 3> data_buffers_;
       ReduceGroupNeighbors tag_neighbors_;
       Master* master_;
       TagID group_id_;
@@ -158,79 +158,79 @@ namespace skynet
       Callable reduce_op
     ) noexcept
     {
-      std::lock_guard lock{base_.buffer_mutex_};
-      const auto required_version = base_.last_sent_version_ + 1;
-      base_.pending_reduces_.push_back({
-        required_version,
-        value,
-        [reduce_op](PublishValueVariant lhs, PublishValueVariant rhs) -> PublishValueVariant {
-          assert(std::get_if<T>(&lhs));
-          assert(std::get_if<T>(&rhs));
-          return reduce_op(*std::get_if<T>(&lhs), *std::get_if<T>(&rhs));
-        },
-        IsAllReduce
-      });
-      base_.process_pending_reduce_ops();
-      const auto conn_id = base_.conn_counter;
-      using produced_type = std::conditional_t<IsAllReduce, std::optional<T>, ReduceResult<T>>;
-      // As the produced type is different,
-      return internal::make_waiter(
-        base_.buffer_mutex_,
-        base_.future_info_cv_,
-        [this, required_version, conn_id]() noexcept {
-          if (conn_id < base_.conn_counter || !base_.is_valid)
-          {
-            return true;
-          }
-          if constexpr (IsAllReduce)
-          {
-            return base_.data_buffers_[0].has_data(required_version);
-          }
-          else
-          {
-            return
-              base_.last_sent_version_ != internal::tag_no_data &&
-              base_.last_sent_version_ >= required_version;
-          }
-        },
-        [this, required_version, conn_id]() noexcept -> produced_type {
-          const bool error_occurred = (conn_id < base_.conn_counter || !base_.is_valid);
-          const auto make_error = []() {
-            if constexpr (IsAllReduce)
-            {
-              return produced_type{};
-            }
-            else
-            {
-              return ReduceDisconnection{};
-            }
-          };
-          if (IsAllReduce || returns_value_on_reduce())
-          {
-            // If there's a value return it regardless of if there's an error
-            if (base_.data_buffers_[0].has_data(required_version))
-            {
-              // Value is present
-              const auto value = base_.data_buffers_[0].get(required_version);
-              assert(std::get_if<T>(&value));
-              return *std::get_if<T>(&value);
-            }
-            else
-            {
-              return make_error();
-            }
-          }
-          else if (error_occurred)
-          {
-            return make_error();
-          }
-          else if constexpr(!IsAllReduce)
-          {
-            // Normal reduce - no error occurred, but no value to return
-            return ReduceNoValue{};
-          }
-        }
-      );
+      // std::lock_guard lock{base_.buffer_mutex_};
+      // const auto required_version = base_.last_sent_version_ + 1;
+      // base_.pending_reduces_.push_back({
+      //   required_version,
+      //   value,
+      //   [reduce_op](PublishValueVariant lhs, PublishValueVariant rhs) -> PublishValueVariant {
+      //     assert(std::get_if<T>(&lhs));
+      //     assert(std::get_if<T>(&rhs));
+      //     return reduce_op(*std::get_if<T>(&lhs), *std::get_if<T>(&rhs));
+      //   },
+      //   IsAllReduce
+      // });
+      // base_.process_pending_reduce_ops();
+      // const auto conn_id = base_.conn_counter;
+      // using produced_type = std::conditional_t<IsAllReduce, std::optional<T>, ReduceResult<T>>;
+      // // As the produced type is different,
+      // return internal::make_waiter(
+      //   base_.buffer_mutex_,
+      //   base_.future_info_cv_,
+      //   [this, required_version, conn_id]() noexcept {
+      //     if (conn_id < base_.conn_counter || !base_.is_valid)
+      //     {
+      //       return true;
+      //     }
+      //     if constexpr (IsAllReduce)
+      //     {
+      //       return base_.data_buffers_[0].has_data(required_version);
+      //     }
+      //     else
+      //     {
+      //       return
+      //         base_.last_sent_version_ != internal::tag_no_data &&
+      //         base_.last_sent_version_ >= required_version;
+      //     }
+      //   },
+      //   [this, required_version, conn_id]() noexcept -> produced_type {
+      //     const bool error_occurred = (conn_id < base_.conn_counter || !base_.is_valid);
+      //     const auto make_error = []() {
+      //       if constexpr (IsAllReduce)
+      //       {
+      //         return produced_type{};
+      //       }
+      //       else
+      //       {
+      //         return ReduceDisconnection{};
+      //       }
+      //     };
+      //     if (IsAllReduce || returns_value_on_reduce())
+      //     {
+      //       // If there's a value return it regardless of if there's an error
+      //       if (base_.data_buffers_[0].has_data(required_version))
+      //       {
+      //         // Value is present
+      //         const auto value = base_.data_buffers_[0].get(required_version);
+      //         assert(std::get_if<T>(&value));
+      //         return *std::get_if<T>(&value);
+      //       }
+      //       else
+      //       {
+      //         return make_error();
+      //       }
+      //     }
+      //     else if (error_occurred)
+      //     {
+      //       return make_error();
+      //     }
+      //     else if constexpr(!IsAllReduce)
+      //     {
+      //       // Normal reduce - no error occurred, but no value to return
+      //       return ReduceNoValue{};
+      //     }
+      //   }
+      // );
     }
 
     internal::ReduceGroupBase& base_;

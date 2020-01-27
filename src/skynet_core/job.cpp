@@ -23,14 +23,14 @@ namespace skynet
     return to_run_ == nullptr;
   }
 
-  const std::unordered_map<TagID, std::uint8_t>& Job::tags_produced() const noexcept
+  const std::unordered_map<TagID, gsl::span<const std::uint8_t>>& Job::tags_produced() const noexcept
   {
     return tags_produced_;
   }
 
   bool Job::process_data(
     const TagID& tag_id,
-    PublishValueVariant data,
+    gsl::span<PublishValueVariant> data,
     const VersionID version
   ) noexcept
   {
@@ -51,8 +51,10 @@ namespace skynet
         );
         return true;
       }
-      // If the type is wrong then something went wrong
-      if (data.index() != loc->second.expected_type)
+      // If the types are wrong then something went wrong
+      const auto comparer = [](std::uint8_t lhs, const PublishValueVariant& rhs) { return lhs == rhs.index(); };
+      const auto& expected_types = loc->second.expected_types;
+      if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer))
       {
         SKYNET_WARN_LOG(
           "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index (expected {}, got {})",
@@ -77,7 +79,7 @@ namespace skynet
         data
       );
       // Otherwise just make it the current value
-      loc->second.buffer.add(std::move(data), version);
+      loc->second.buffer->add(std::move(data), version);
     }
     // Notify after making sure to release the mutex
     data_buffer_modified_cv_.notify_all();
@@ -124,8 +126,8 @@ namespace skynet
   {
     assert(tags_produced_.find(tag.id()) != tags_produced_.cend()
       && "Attempted to publish on a tag that was not declared for publishing!");
-    assert(tags_produced_.find(tag.id())->second == to_send.index()
-      && "Attempted to publish the wrong type on a tag!");
+    // assert(tags_produced_.find(tag.id())->second == to_send.index()
+    //   && "Attempted to publish the wrong type on a tag!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
       last_published_version_.try_emplace(tag.id(), internal::tag_no_data).first->second;
@@ -153,7 +155,7 @@ namespace skynet
     {
       return false;
     }
-    return loc->second.buffer.has_data();
+    return loc->second.buffer->has_data();
   }
 
   const JobID& Job::id() const noexcept
@@ -162,7 +164,8 @@ namespace skynet
   }
 
   void Job::init_or_update_subscribe(
-    const gsl::span<const internal::PublishTagBase> tags
+    const gsl::span<const internal::PublishTagBase> tags,
+    std::unique_ptr<internal::DiscardOldVersionTagBufferBase> ptr
   ) noexcept
   {
     auto [buffers, lock] = bufs_.get();
@@ -177,9 +180,9 @@ namespace skynet
         tag.id(),
         TagInfo{
           // Just need a dummy value here
-          {},
+          std::move(ptr),
+          tag.expected_types(),
           0,
-          tag.expected_type(),
           TagInfo::Error::no_error
         }
       );
@@ -188,7 +191,7 @@ namespace skynet
       {
         ++iter->second.connection_id;
         // Reset it to a default constructed buffer
-        iter->second.buffer = decltype(iter->second.buffer){};
+        iter->second.buffer->reset();
         iter->second.error_occurred = TagInfo::Error::no_error;
       }
     }
@@ -210,21 +213,21 @@ namespace skynet
   }
 
   void Job::declare_publication_intent_impl(
-    const gsl::span<const internal::PublishTagBase> tags
+    const gsl::span<const internal::PublishTagBase* const> tags
   ) noexcept
   {
     const std::vector<TagID> tag_ids = [&]() {
       std::lock_guard g{bufs_.mutex()};
       for (const auto& tag : tags)
       {
-        tags_produced_.try_emplace(tag.id(), tag.expected_type());
+        tags_produced_.try_emplace(tag->id(), tag->expected_types());
       }
       std::vector<TagID> tag_ids(tags.size());
       std::transform(
         tags.cbegin(),
         tags.cend(),
         tag_ids.begin(),
-        [&](const internal::PublishTagBase& t) { return t.id(); }
+        [&](const internal::PublishTagBase* t) { return t->id(); }
       );
       return tag_ids;
     }();
@@ -242,14 +245,14 @@ namespace skynet
   internal::ReduceGroupNeighbors Job::create_reduce_group_init(
     const TagID& tag_produced,
     const std::vector<TagID>& reduce_over_tags,
-    std::uint8_t expected_type
+    gsl::span<const std::uint8_t> expected_types
   ) noexcept
   {
     assert(
       tags_produced_.find(tag_produced) == tags_produced_.cend() &&
       "Attempted to create a reduce group with a tag that's published on by this type!"
     );
-    tags_produced_.try_emplace(tag_produced, expected_type);
+    tags_produced_.try_emplace(tag_produced, expected_types);
     auto bin_tree = reduce_over_tags;
     // A heap can't be used; can produce different ordering depending on the input order
     std::sort(bin_tree.begin(), bin_tree.end());
@@ -286,17 +289,17 @@ namespace skynet
     const TagID& group_id,
     const TagID& tag_produced,
     const internal::ReduceGroupNeighbors& tags_to_find,
-    std::uint8_t expected_type
+    gsl::span<const std::uint8_t> expected_types
   ) noexcept
     -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
-    return Master::JobAccessor::create_reduce_group(
-      *master_,
-      group_id,
-      tag_produced,
-      tags_to_find,
-      expected_type
-    );
+    // return Master::JobAccessor::create_reduce_group(
+    //   *master_,
+    //   group_id,
+    //   tag_produced,
+    //   tags_to_find,
+    //   expected_types
+    // );
   }
 
   bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept

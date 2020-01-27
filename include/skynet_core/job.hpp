@@ -26,83 +26,52 @@ namespace skynet
   //  A Job needs to be able to communicate with the Master so forward declare it
   class Master;
 
-  namespace internal
-  {
-    enum class TagType : char
-    {
-      publish_tag = publish_tag_marker,
-      reduce_value = reduce_value_marker,
-      reduce_group = reduce_group_marker
-    };
-
-    // The implementation for all tags would be the same,
-    // so abstract it into a base
-    template<TagType BaseTagType>
-    class TagBase
-    {
-    public:
-      TagBase(const TagID& id, std::uint8_t expected_type) noexcept
-        : id_{static_cast<char>(BaseTagType) + id}
-        , expected_type_{expected_type}
-      {}
-
-      const TagID& id() const noexcept { return id_; }
-      std::uint8_t expected_type() const noexcept { return expected_type_; }
-
-    private:
-      TagID id_;
-      std::uint8_t expected_type_;
-    }; // class TagBase
-
-    // Convenience aliases
-    using PublishTagBase = internal::TagBase<TagType::publish_tag>;
-    using ReduceValueTagBase = internal::TagBase<TagType::reduce_value>;
-    using ReduceGroupTagBase = internal::TagBase<TagType::reduce_group>;
-  } // namespace skynet::internal
-
   /** \brief Tag for pub/sub values
    */
-  template<typename T>
+  template<typename... Ts>
+    // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
   class PublishTag : public internal::PublishTagBase
   {
   public:
     PublishTag(const TagID& id) noexcept
-      : internal::PublishTagBase{id, internal::index_of<T, PublishValueTypeList>}
+      : internal::PublishTagBase{id, internal::expected_type_for<Ts...>}
     {
       assert(!id.empty());
     }
 
-    using ValueType = T;
+    using ValueType = ValueOrTuple<Ts...>;
   }; // class PublishTag
 
   /** \brief Tag for reduce values
    */
-  template<typename T>
+  template<typename... Ts>
+    // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
   class ReduceValueTag : public internal::ReduceValueTagBase
   {
   public:
     ReduceValueTag(const TagID& id) noexcept
-      : internal::ReduceValueTagBase{id, internal::index_of<T, PublishValueTypeList>}
+      : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
     {
       assert(!id.empty());
     }
 
-    using ValueType = T;
+    using ValueType = ValueOrTuple<Ts...>;
   }; // class ReduceValueTag
 
   /** \brief Tag for reduce groups
    */
-  template<typename T>
+  template<typename... Ts>
+    // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
   class ReduceGroupTag : public internal::ReduceGroupTagBase
   {
   public:
     ReduceGroupTag(const TagID& id) noexcept
-      : internal::ReduceGroupTagBase{id, internal::index_of<T, PublishValueTypeList>}
+      : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
     {
       assert(!id.empty());
     }
 
-    using ValueType = T;
+    using ValueType = ValueOrTuple<Ts...>;
   }; // class ReduceGroupTag
 
   /** \brief Job with known tags
@@ -120,7 +89,7 @@ namespace skynet
       static bool process_data(
         Job& j,
         const TagID& tag,
-        PublishValueVariant data,
+        gsl::span<PublishValueVariant> data,
         const VersionID version
       ) noexcept
       {
@@ -169,15 +138,14 @@ namespace skynet
     /** \brief Declare intent to publish on tags, this must be done before publishing
      * on a tag
      */
-    template<typename T>
-    //  requires std::is_base_of_v<internal::PublishTagBase, T>
-    void declare_publication_intent(const std::vector<T>& tags) noexcept
+    template<typename... Ts>
+    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+    void declare_publication_intent(const Ts&... tags) noexcept
     {
-      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase>{tags});
-    }
-    void declare_publication_intent(const internal::PublishTagBase& tag) noexcept
-    {
-      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase>{&tag, 1});
+      const std::array<const internal::PublishTagBase*, sizeof...(Ts)> tag_ptrs{&tags...};
+      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const>{
+        tag_ptrs.data(), tag_ptrs.size()
+      });
     }
 
     /** \brief Retrieves the specified version for the tag, or latest if no version
@@ -202,19 +170,17 @@ namespace skynet
         bufs_.mutex(),
         data_buffer_modified_cv_,
         [&tag_info, tag_conn_id]() {
-          return tag_info.buffer.has_data()
+          return tag_info.buffer->has_data()
             || tag_info.error_occurred != TagInfo::Error::no_error
             || tag_info.connection_id != tag_conn_id;
         },
         [&tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
           // Don't check tag_info.error_occurred because the connection could have
           // errored between storing the value in the buffer and then retrieving it
-          if (tag_info.buffer.has_data()
+          if (tag_info.buffer->has_data()
             && tag_info.connection_id == tag_conn_id)
           {
-            const auto variant = tag_info.buffer.get();
-            assert(std::get_if<ValueType>(&variant) != nullptr);
-            return *std::get_if<ValueType>(&variant);
+            return *static_cast<ValueType*>(tag_info.buffer->get());
           }
           else
           {
@@ -235,46 +201,36 @@ namespace skynet
      * \pre The tags are not currently subscribed to
      * \return A future for when the tags have been subscribed to
      */
-    template<typename T>
-    auto subscribe(const std::vector<T>& tags) noexcept
-    //  requires std::is_base_of_v<internal::PublishTagBase, T>
+    template<typename... Ts>
+    auto subscribe(const Ts&... tags) noexcept
+    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
     {
-      // Check if any tags are subscribed to
-      // (Not seperated out of the assert so that it's only in debug mode)
-      // TODO: Make this std::terminate or something instead?
-      assert("Tag attempted to be subscribed to twice!" && (
-        [&]() {
-          const auto [buffers_binding, lock] = bufs_.get();
-          // This is a really dumb workaround for destructred bindings not
-          // being able to be captured by lambda expressions
-          const auto& buffers = buffers_binding;
-          (void)lock;
-          return std::accumulate(
-            tags.cbegin(),
-            tags.cend(),
-            true,
-            [&](const bool missing, const internal::PublishTagBase& tag) {
-              return missing && buffers.find(tag.id()) == buffers.cend();
-          });
-        }()
-      ));
-      init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tags});
-      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
-    }
-    auto subscribe(const std::vector<internal::PublishTagBase>& tags) noexcept
-    {
-      // Forward to the templeted version; specify the template so this
-      // doesn't infinitly recurse
-      return subscribe<internal::PublishTagBase>(tags);
-    }
-
-    /** \brief Attempts to subscribe to the passed tag
-     *
-     * \return A future for when the tag is subscribed to
-     */
-    auto subscribe(const internal::PublishTagBase& tag) noexcept
-    {
-      return subscribe(std::vector<internal::PublishTagBase>{tag});
+      using ValueType = ValueOrTuple<typename Ts::ValueType...>;
+      // // Check if any tags are subscribed to
+      // // (Not seperated out of the assert so that it's only in debug mode)
+      // // TODO: Make this std::terminate or something instead?
+      // assert("Tag attempted to be subscribed to twice!" && (
+      //   [&]() {
+      //     const auto [buffers_binding, lock] = bufs_.get();
+      //     // This is a really dumb workaround for destructred bindings not
+      //     // being able to be captured by lambda expressions
+      //     const auto& buffers = buffers_binding;
+      //     (void)lock;
+      //     return std::accumulate(
+      //       tags.cbegin(),
+      //       tags.cend(),
+      //       true,
+      //       [&](const bool missing, const internal::PublishTagBase& tag) {
+      //         return missing && buffers.find(tag.id()) == buffers.cend();
+      //     });
+      //   }()
+      // ));
+      const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
+      init_or_update_subscribe(
+        gsl::span<const internal::PublishTagBase>{tag_array},
+        std::make_unique<internal::DiscardOldVersionTagBuffer<ValueType>>()
+      );
+      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tag_array});
     }
 
     /** \brief Create a reduce group over the specified tags
@@ -288,8 +244,8 @@ namespace skynet
     {
       std::vector<TagID> tag_ids(tags.size());
       std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& t) { return t.id(); });
-      const auto tags_to_find = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_type());
-      return create_reduce_group_future(group_tag.id(), tag_produced_for_group.id(), tags_to_find, group_tag.expected_type())
+      const auto tags_to_find = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_types());
+      return create_reduce_group_future(group_tag.id(), tag_produced_for_group.id(), tags_to_find, group_tag.expected_types())
         .adjust_get_function([](internal::ReduceGroupBase& group) {
           return ReduceGroup<ValueType>(group);
         }
@@ -332,7 +288,7 @@ namespace skynet
 
     /** \brief Returns a list of the produced tags
      */
-    const std::unordered_map<TagID, std::uint8_t>& tags_produced() const noexcept;
+    const std::unordered_map<TagID, gsl::span<const std::uint8_t>>& tags_produced() const noexcept;
 
     /** \brief Returns the job's id
      */
@@ -363,11 +319,14 @@ namespace skynet
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          tags.emplace_back(tag_pair.first.substr(1), 0);
+          tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
         }
         return tags;
       }();
-      init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tags});
+      init_or_update_subscribe(
+        gsl::span<const internal::PublishTagBase>{tags},
+        nullptr
+      );
       return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
     }
 
@@ -395,7 +354,7 @@ namespace skynet
      * \param version The version of the data
      * \return True if processing went fine, false if there was an error
      */
-    bool process_data(const TagID& tag_id, PublishValueVariant data, VersionID version) noexcept;
+    bool process_data(const TagID& tag_id, gsl::span<PublishValueVariant> data, VersionID version) noexcept;
 
     /** \brief Marks a tag as dead due to connection issues
      *
@@ -409,7 +368,8 @@ namespace skynet
     ) noexcept;
 
     void init_or_update_subscribe(
-      gsl::span<const internal::PublishTagBase> tags
+      gsl::span<const internal::PublishTagBase> tags,
+      std::unique_ptr<internal::DiscardOldVersionTagBufferBase> ptr
     ) noexcept;
 
     auto get_subscribe_future(
@@ -418,7 +378,7 @@ namespace skynet
       -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
     void declare_publication_intent_impl(
-      gsl::span<const internal::PublishTagBase> tags
+      gsl::span<const internal::PublishTagBase* const> tags
     ) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
@@ -427,14 +387,14 @@ namespace skynet
     internal::ReduceGroupNeighbors create_reduce_group_init(
       const TagID& tag_produced,
       const std::vector<TagID>& reduce_over_tags,
-      std::uint8_t expected_type
+      gsl::span<const std::uint8_t> expected_type
     ) noexcept;
 
     auto create_reduce_group_future(
       const TagID& group_id,
       const TagID& tag_produced,
       const internal::ReduceGroupNeighbors& tags_to_find,
-      std::uint8_t expected_type
+      gsl::span<const std::uint8_t> expected_type
     ) noexcept
       -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
@@ -455,12 +415,12 @@ namespace skynet
         disconnected
       };
       // The buffer
-      internal::DiscardOldVersionTagBuffer<PublishValueVariant> buffer;
+      std::unique_ptr<internal::DiscardOldVersionTagBufferBase> buffer;
+      // The expected type
+      gsl::span<const std::uint8_t> expected_types;
       // ID for the connection so if a subscription is broken then reformed
       // they can be differentiated
       std::uint16_t connection_id;
-      // The expected type
-      std::uint8_t expected_type;
       // The error (if any)
       Error error_occurred;
     };
@@ -476,7 +436,7 @@ namespace skynet
     std::function<void(Job&)> to_run_;
 
     // The list of tags this job produces and the expected types
-    std::unordered_map<TagID, std::uint8_t> tags_produced_;
+    std::unordered_map<TagID, gsl::span<const std::uint8_t>> tags_produced_;
 
     // Condition variable when data is added to buffers or an error occurs
     std::condition_variable data_buffer_modified_cv_;

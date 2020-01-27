@@ -11,6 +11,8 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/types.hpp"
 
+#include "gsl/span"
+
 #include <algorithm>
 #include <array>
 #include <cassert>

@@ -79,7 +79,7 @@ void machine_task(const std::size_t index)
   setup_network(master, index);
   // Submit job and broadcast on the job using each machine
   master.submit_job("job 0", [&master, index](Job& the_job) {
-    the_job.declare_publication_intent({Uint64Tag{tag_names[index]}});
+    the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {

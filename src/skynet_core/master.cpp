@@ -743,7 +743,7 @@ namespace skynet
     const PublishValueVariant& value
   ) noexcept
   {
-    const auto msg = internal::make_publish(version, tag_id, value);
+    const auto msg = internal::make_publish(version, tag_id, gsl::span<const PublishValueVariant>{&value, 1});
     SKYNET_TRACE_LOG(
       "\"{}\" publishing on tag \"{}\", version \"{}\", data {} to {} subscribers",
       id_,
@@ -760,7 +760,7 @@ namespace skynet
     for (auto& [name, job] : jobs_)
     {
       (void)name;
-      const auto msg_var = msg.value().get_variant();
+      auto msg_var = msg.value();
       if (!msg_var) { return false; }
       if (!Job::Accessor::process_data(job, msg.tag_id(), *msg_var, msg.version()))
       {
@@ -1231,7 +1231,7 @@ namespace skynet
           {
             if (const auto data = msg->data())
             {
-              if (const auto variant = data->value().get_variant())
+              if (auto variant = data->value())
               {
                 for (auto& [job_id, job] : jobs_)
                 {
@@ -1549,7 +1549,7 @@ namespace skynet
       );
       return false;
     }
-    const auto var_opt = value.value().get_variant();
+    auto var_opt = value.value();
     if (!var_opt)
     {
       SKYNET_WARN_LOG(

@@ -46,19 +46,23 @@ namespace skynet::internal
       cpnpro::PublishData::Builder to_set,
       const VersionID version,
       const TagID& tag_id,
-      const PublishValueVariant& value
+      gsl::span<const PublishValueVariant> value
     ) noexcept
     {
       to_set.setVersion(version);
       to_set.setTagID(tag_id);
-      auto publish_value = to_set.initValue();
-      std::visit(
-        [&](const auto& data) {
-          using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
-          detail::PublishValueHandler<ValueType>::set(publish_value, data);
-        },
-        value
-      );
+      auto publish_value = to_set.initValue(value.size());
+      for (int i = 0; i < value.size(); ++i)
+      {
+        std::visit(
+          [&](const auto& data) {
+            using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
+            auto to_build = publish_value[i];
+            detail::PublishValueHandler<ValueType>::set(to_build, data);
+          },
+          value[i]
+        );
+      }
     }
   } // namespace {anonymous}
 
@@ -67,7 +71,7 @@ namespace skynet::internal
   std::vector<std::byte> make_publish(
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -207,7 +211,7 @@ namespace skynet::internal
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -222,7 +226,7 @@ namespace skynet::internal
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;

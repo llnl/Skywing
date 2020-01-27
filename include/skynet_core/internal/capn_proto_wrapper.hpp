@@ -23,23 +23,6 @@
 
 namespace skynet::internal
 {
-  /** \brief Class representing values that can be published
-   */
-  class PublishValue
-  {
-  public:
-    /** \brief Return the held value as a variant
-     */
-    std::optional<PublishValueVariant> get_variant() const noexcept;
-
-  private:
-    // Only allow classes that use this directly to construct it
-    friend class PublishData;
-    explicit PublishValue(cpnpro::PublishValue::Reader reader) noexcept;
-
-    cpnpro::PublishValue::Reader r;
-  };
-
   /** \brief Class representing a publish message
    */
   class PublishData
@@ -47,7 +30,7 @@ namespace skynet::internal
   public:
     VersionID version() const noexcept;
     TagID tag_id() const noexcept;
-    PublishValue value() const noexcept;
+    std::optional<std::vector<PublishValueVariant>> value() const noexcept;
 
   private:
     cpnpro::PublishData::Reader r;

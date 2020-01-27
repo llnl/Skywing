@@ -19,14 +19,7 @@ namespace skynet
   {
   private:
     using TupleType = std::tuple<typename TagTypes::ValueType...>;
-    using ValueRetType =
-      std::optional<
-        std::conditional_t<
-          sizeof...(TagTypes) == 1,
-          std::tuple_element_t<0, TupleType>,
-          TupleType
-        >
-      >;
+    using ValueRetType = std::optional<ValueOrTuple<typename TagTypes::ValueType...>>;
 
   public:
     /** \brief Create an object for synchronously iterating over pairs of

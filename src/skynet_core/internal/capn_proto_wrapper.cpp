@@ -43,54 +43,61 @@ namespace skynet::internal
   } // namespace detail
 
   /////////////////////////////////////////////////////
-  // PublishValue
-  /////////////////////////////////////////////////////
-
-  std::optional<PublishValueVariant> PublishValue::get_variant() const noexcept
-  {
-    using namespace detail;
-    // This is gross and I hate it, but...
-    using vals = cpnpro::PublishValue::Which;
-    switch (r.which())
-    {
-    case vals::D:     return pvh<double>::get(r);
-    case vals::R_D:   return pvh_v<double>::get(r);
-    case vals::F:     return pvh<float>::get(r);
-    case vals::R_F:   return pvh_v<float>::get(r);
-    case vals::STR:   return pvh<std::string>::get(r);
-    case vals::R_STR: return pvh_v<std::string>::get(r);
-    case vals::I8:    return pvh<std::int8_t>::get(r);
-    case vals::I16:   return pvh<std::int16_t>::get(r);
-    case vals::I32:   return pvh<std::int32_t>::get(r);
-    case vals::I64:   return pvh<std::int64_t>::get(r);
-    case vals::U8:    return pvh<std::uint8_t>::get(r);
-    case vals::U16:   return pvh<std::uint16_t>::get(r);
-    case vals::U32:   return pvh<std::uint32_t>::get(r);
-    case vals::U64:   return pvh<std::uint64_t>::get(r);
-    case vals::R_I8:  return pvh_v<std::int8_t>::get(r);
-    case vals::R_I16: return pvh_v<std::int16_t>::get(r);
-    case vals::R_I32: return pvh_v<std::int32_t>::get(r);
-    case vals::R_I64: return pvh_v<std::int64_t>::get(r);
-    case vals::R_U8:  return pvh_v<std::uint8_t>::get(r);
-    case vals::R_U16: return pvh_v<std::uint16_t>::get(r);
-    case vals::R_U32: return pvh_v<std::uint32_t>::get(r);
-    case vals::R_U64: return pvh_v<std::uint64_t>::get(r);
-    case vals::BYTES: return pvh_v<std::byte>::get(r);
-    }
-    return {};
-  }
-
-  PublishValue::PublishValue(cpnpro::PublishValue::Reader reader) noexcept
-    : r{std::move(reader)}
-  {}
-
-  /////////////////////////////////////////////////////
   // PublishData
   /////////////////////////////////////////////////////
 
+  std::optional<std::vector<PublishValueVariant>> PublishData::value() const noexcept
+  {
+    using namespace detail;
+    const auto decode_value = [](cpnpro::PublishValue::Reader reader) -> std::optional<PublishValueVariant> {
+      // This is gross and I hate it, but...
+      using vals = cpnpro::PublishValue::Which;
+      switch (reader.which())
+      {
+      case vals::D:     return pvh<double>::get(reader);
+      case vals::R_D:   return pvh_v<double>::get(reader);
+      case vals::F:     return pvh<float>::get(reader);
+      case vals::R_F:   return pvh_v<float>::get(reader);
+      case vals::STR:   return pvh<std::string>::get(reader);
+      case vals::R_STR: return pvh_v<std::string>::get(reader);
+      case vals::I8:    return pvh<std::int8_t>::get(reader);
+      case vals::I16:   return pvh<std::int16_t>::get(reader);
+      case vals::I32:   return pvh<std::int32_t>::get(reader);
+      case vals::I64:   return pvh<std::int64_t>::get(reader);
+      case vals::U8:    return pvh<std::uint8_t>::get(reader);
+      case vals::U16:   return pvh<std::uint16_t>::get(reader);
+      case vals::U32:   return pvh<std::uint32_t>::get(reader);
+      case vals::U64:   return pvh<std::uint64_t>::get(reader);
+      case vals::R_I8:  return pvh_v<std::int8_t>::get(reader);
+      case vals::R_I16: return pvh_v<std::int16_t>::get(reader);
+      case vals::R_I32: return pvh_v<std::int32_t>::get(reader);
+      case vals::R_I64: return pvh_v<std::int64_t>::get(reader);
+      case vals::R_U8:  return pvh_v<std::uint8_t>::get(reader);
+      case vals::R_U16: return pvh_v<std::uint16_t>::get(reader);
+      case vals::R_U32: return pvh_v<std::uint32_t>::get(reader);
+      case vals::R_U64: return pvh_v<std::uint64_t>::get(reader);
+      case vals::BYTES: return pvh_v<std::byte>::get(reader);
+      }
+      return std::nullopt;
+    };
+    const auto& value = r.getValue();
+    std::vector<PublishValueVariant> to_ret(value.size());
+    for (std::size_t i = 0; i < value.size(); ++i)
+    {
+      if (const auto add = decode_value(value[i]))
+      {
+        to_ret[i] = *add;
+      }
+      else
+      {
+        return std::nullopt;
+      }
+    }
+    return to_ret;
+  }
+
   VersionID PublishData::version() const noexcept { return r.getVersion(); }
   TagID PublishData::tag_id() const noexcept { return r.getTagID(); }
-  PublishValue PublishData::value() const noexcept { return PublishValue{r.getValue()}; }
   PublishData::PublishData(cpnpro::PublishData::Reader reader) noexcept
     : r{std::move(reader)}
   {}

@@ -35,7 +35,7 @@ struct PublishValue {
 }
 
 struct PublishData {
-  value   @0 : PublishValue;
+  value   @0 : List(PublishValue);
   version @1 : UInt32;
   tagID   @2 : Text;
 }

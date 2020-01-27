@@ -4,120 +4,240 @@
 #include "skynet_core/internal/utility/type_list.hpp"
 #include "skynet_core/types.hpp"
 
+#include "gsl/span"
+
 #include <cassert>
 #include <optional>
 #include <vector>
 
 namespace skynet::internal
 {
-  inline static constexpr VersionID tag_no_data = -1;
-
   namespace detail
   {
-
-    // This information is the same for all instances of DiscardOldVersionTagBuffer,
-    // so take it out of the template and into a normal structure
-    class DiscardOldVersionTagBufferBase
+    template<typename... Ts, std::size_t... Is>
+    bool span_is_valid(
+      const gsl::span<PublishValueVariant> value,
+      std::index_sequence<Is...>
+    ) noexcept
     {
-    protected:
-      /** Returns true if data is present for the specified version, false if
-       * it is not available.
-       */
-      bool has_data() const noexcept
-      {
-        return stored_version_ != tag_no_data
-          && stored_version_ >= last_fetched_version_ + 1;
-      }
+      return value.size() == sizeof...(Ts)
+        && (... && (value[Is].index() == index_of<Ts, PublishValueTypeList>));
+    }
 
-      VersionID stored_version_ = tag_no_data;
-      VersionID last_fetched_version_ = tag_no_data;
-    }; // class DiscardOldVersionTagBufferBase
-  } // namespace skynet::internal::detail
+    template<typename... Ts, std::size_t... Is>
+    ValueOrTuple<Ts...> make_value(
+      gsl::span<PublishValueVariant> value,
+      std::index_sequence<Is...> seq
+    ) noexcept
+    {
+      static_assert(!(std::is_same_v<Ts, PublishValueVariant> && ...), "blarigoj");
+      assert(span_is_valid<Ts...>(value, seq));
+      if constexpr (sizeof...(Ts) == 1)
+      {
+        assert(std::get_if<Ts...>(&value[0]));
+        return std::move(*std::get_if<Ts...>(&value[0]));
+      }
+      else
+      {
+        assert((... && std::get_if<Ts>(&value[Is])));
+        return std::make_tuple(std::move(*std::get_if<Ts>(&value[Is]))...);
+      }
+    }
+  } // namespace detail
+
+  enum class TagType : char
+  {
+    publish_tag = publish_tag_marker,
+    reduce_value = reduce_value_marker,
+    reduce_group = reduce_group_marker
+  };
+
+  // The implementation for all tags would be the same,
+  // so abstract it into a base
+  template<TagType BaseTagType>
+  class TagBase
+  {
+  public:
+    TagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+      : id_{static_cast<char>(BaseTagType) + id}
+      , expected_types_{expected_types}
+    {}
+
+    const TagID& id() const noexcept { return id_; }
+    const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
+
+  private:
+    TagID id_;
+    gsl::span<const std::uint8_t> expected_types_;
+  }; // class TagBase
+
+  template<typename... Ts>
+  inline static constexpr std::array<std::uint8_t, sizeof...(Ts)> expected_type_for{
+    static_cast<std::uint8_t>(index_of<Ts, PublishValueTypeList>)...
+  };
+
+  // Convenience aliases
+  using PublishTagBase = internal::TagBase<TagType::publish_tag>;
+  using ReduceValueTagBase = internal::TagBase<TagType::reduce_value>;
+  using ReduceGroupTagBase = internal::TagBase<TagType::reduce_group>;
+
+  inline static constexpr VersionID tag_no_data = -1;
 
   /** \brief Buffer for a tag that only keeps the latest version that has
    * been recieved.
    */
-  template<typename T>
-  class DiscardOldVersionTagBuffer : private detail::DiscardOldVersionTagBufferBase
+  class DiscardOldVersionTagBufferBase
   {
   public:
-    using DiscardOldVersionTagBufferBase::has_data;
+    /** \brief Returns true if data is present in the buffer.
+     */
+    bool has_data() const noexcept { return do_has_data(); }
 
-    /** Get the stored data
+    /** \brief Returns a void* to the stored data and marks it as removed
+     * from the buffer
      *
      * \pre There is stored data
      */
-    T& get() noexcept
+    void* get() noexcept { return do_get(); }
+
+    /** \brief Adds data if the version is newer
+     */
+    void add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept
+    {
+      return do_add(value, version);
+    }
+
+    /** \brief Resets the tag buffer to the default state
+     */
+    void reset() noexcept { do_reset(); }
+
+    virtual ~DiscardOldVersionTagBufferBase() = default;
+
+  private:
+    virtual bool do_has_data() const noexcept = 0;
+    virtual void* do_get() noexcept = 0;
+    virtual void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept = 0;
+    virtual void do_reset() noexcept = 0;
+  }; // DiscardOldVersionTagBufferBase
+
+  template<typename... Ts>
+  class DiscardOldVersionTagBuffer : public DiscardOldVersionTagBufferBase
+  {
+    static_assert(!(std::is_same_v<Ts, PublishValueVariant> && ...), "blarigoj");
+  private:
+    bool do_has_data() const noexcept override
+    {
+      return stored_version_ != tag_no_data
+        && stored_version_ >= last_fetched_version_ + 1;
+    }
+
+    void* do_get() noexcept override
     {
       assert(this->has_data());
       this->last_fetched_version_ = this->stored_version_;
-      return value_;
+      return &value_;
     }
 
-    /** Add data if the version is newer
-     */
-    void add(T value, const VersionID version) noexcept
+    void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept override
     {
       if (version > this->stored_version_ || this->stored_version_ == tag_no_data)
       {
         this->stored_version_ = version;
-        value_ = std::move(value);
+        value_ = detail::make_value<Ts...>(value, std::index_sequence_for<Ts...>{});
       }
     }
 
-  private:
-    T value_;
+    void do_reset() noexcept override
+    {
+      stored_version_ = tag_no_data;
+      last_fetched_version_ = tag_no_data;
+    }
+
+    ValueOrTuple<Ts...> value_;
+    VersionID stored_version_ = tag_no_data;
+    VersionID last_fetched_version_ = tag_no_data;
   }; // class DiscardOldVersionTagBuffer
 
   /** \brief Buffer for a tag that keeps all new recieved versions, and returns
    * them in order.  Discards old or already recieved tags.
    */
-  template<typename T>
-  class FifoTagBuffer
+  class FifoTagBufferBase
   {
   public:
-    /** Get the oldest stored data, removing it from the buffer
+    /** \brief Returns a pointer to the stored data and mark it as removed
+     * from the buffer
      *
-     * \pre Data can be retrieved for the specified version
+     * \pre The buffer has available data
      */
-    T get(const VersionID required_version) noexcept
+    void* get_data(const VersionID required_version) { return do_get_data(required_version); }
+
+    /** \brief Adds data to the buffer if the version is newer than the last version
+     *
+     * \pre value matches the expected types for the derived class
+     */
+    void add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept
+    {
+      do_add(value, version);
+    }
+
+    /** \brief Returns true if data can be retrieved for the specified version
+     */
+    bool has_data(const VersionID required_version) const noexcept
+    {
+      return do_has_data(required_version);
+    }
+
+    virtual ~FifoTagBufferBase() = default;
+
+  private:
+    virtual void* do_get_data(VersionID required_version) noexcept = 0;
+    virtual void do_add(gsl::span<PublishValueVariant> value, VersionID version) noexcept = 0;
+    virtual bool do_has_data(VersionID required_version) const noexcept = 0;
+  }; // class FifoTagBufferBase
+
+  template<typename... Ts>
+  class FifoTagBufferTyped : public FifoTagBufferBase
+  {
+  private:
+    using ValueType = ValueOrTuple<Ts...>;
+
+    void* do_get_data(const VersionID required_version) noexcept override
     {
       while (true)
       {
         assert(!buffer_.empty());
-        auto [data, version] = std::move(buffer_.front());
-        buffer_.erase(buffer_.begin());
+        auto& [data, version] = buffer_.front();
         if (version >= required_version)
         {
           last_fetched_version_ = version;
-          return std::move(data);
+          return &data;
+        }
+        else
+        {
+          buffer_.erase(buffer_.begin());
         }
       }
     }
 
-    /** Returns true if data can be retrieved
-     */
-    bool has_data(const VersionID required_version) const noexcept
+    bool do_has_data(const VersionID required_version) const noexcept override
     {
       return !buffer_.empty() &&
         buffer_.back().second >= required_version;
     }
 
-    /** Adds data to the buffer if the version is newer than the last version
-     */
-    void add(T value, const VersionID version) noexcept
+    void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept override
     {
+      assert(detail::span_is_valid<Ts...>(value, std::index_sequence_for<Ts...>{}));
       if (version > last_stored_version_ || last_stored_version_ == tag_no_data)
       {
-        buffer_.emplace_back(std::move(value), version);
+        buffer_.emplace_back(detail::make_value<Ts...>(value, std::index_sequence_for<Ts...>{}), version);
       }
     }
 
-  private:
-    std::vector<std::pair<T, VersionID>> buffer_;
+    std::vector<std::pair<ValueType, VersionID>> buffer_;
     VersionID last_stored_version_ = tag_no_data;
     VersionID last_fetched_version_ = tag_no_data;
-  };
+  }; // class FifoTagBufferTyped
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_TAG_BUFFER_HPP

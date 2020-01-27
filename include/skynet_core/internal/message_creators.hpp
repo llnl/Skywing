@@ -3,6 +3,8 @@
 
 #include "skynet_core/types.hpp"
 
+#include "gsl/span"
+
 #include <cstddef>
 #include <vector>
 
@@ -13,7 +15,7 @@ namespace skynet::internal
   std::vector<std::byte> make_publish(
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept;
 
   /** \brief Create data to signify that a publication channel is closing
@@ -77,7 +79,7 @@ namespace skynet::internal
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept;
 
   /** \brief Create a message to report the result of a reduction to children nodes
@@ -86,7 +88,7 @@ namespace skynet::internal
     const TagID& reduce_tag,
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<const PublishValueVariant> value
   ) noexcept;
 
   /** \brief Create a message for sending a disconnection notification
