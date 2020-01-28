@@ -40,6 +40,7 @@ namespace skynet
     }
 
     using ValueType = ValueOrTuple<Ts...>;
+    using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
   }; // class PublishTag
 
   /** \brief Tag for reduce values
@@ -153,11 +154,12 @@ namespace skynet
      *
      * \return A Waiter for the value
      */
-    template<typename ValueType>
+    template<typename... Ts>
     auto get_future_for(
-      const PublishTag<ValueType>& tag
+      const PublishTag<Ts...>& tag
     ) noexcept
     {
+      using ValueType = ValueOrTuple<Ts...>;
       // Can just capture the reference to the value as it
       // will never get invalidated except when the element is deleted
       // due to being in an unordered_map
@@ -175,10 +177,9 @@ namespace skynet
             || tag_info.connection_id != tag_conn_id;
         },
         [&tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
-          // Don't check tag_info.error_occurred because the connection could have
+          // Don't check error information because the connection could have
           // errored between storing the value in the buffer and then retrieving it
-          if (tag_info.buffer->has_data()
-            && tag_info.connection_id == tag_conn_id)
+          if (tag_info.buffer->has_data())
           {
             return *static_cast<ValueType*>(tag_info.buffer->get());
           }
@@ -205,30 +206,21 @@ namespace skynet
     auto subscribe(const Ts&... tags) noexcept
     //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
     {
-      using ValueType = ValueOrTuple<typename Ts::ValueType...>;
-      // // Check if any tags are subscribed to
-      // // (Not seperated out of the assert so that it's only in debug mode)
-      // // TODO: Make this std::terminate or something instead?
-      // assert("Tag attempted to be subscribed to twice!" && (
-      //   [&]() {
-      //     const auto [buffers_binding, lock] = bufs_.get();
-      //     // This is a really dumb workaround for destructred bindings not
-      //     // being able to be captured by lambda expressions
-      //     const auto& buffers = buffers_binding;
-      //     (void)lock;
-      //     return std::accumulate(
-      //       tags.cbegin(),
-      //       tags.cend(),
-      //       true,
-      //       [&](const bool missing, const internal::PublishTagBase& tag) {
-      //         return missing && buffers.find(tag.id()) == buffers.cend();
-      //     });
-      //   }()
-      // ));
+      const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
+        const auto [buffers, lock] = bufs_.get();
+        (void)lock;
+        return buffers.find(tag.id()) == buffers.cend();
+      };
+      // TODO: Make this std::terminate or something instead?
+      assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
+      using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
       const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
+      std::array<BufferPtr, sizeof...(Ts)> ptrs{
+        std::make_unique<typename Ts::BufferType>()...
+      };
       init_or_update_subscribe(
         gsl::span<const internal::PublishTagBase>{tag_array},
-        std::make_unique<internal::DiscardOldVersionTagBuffer<ValueType>>()
+        gsl::span<BufferPtr>{ptrs}
       );
       return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tag_array});
     }
@@ -273,13 +265,32 @@ namespace skynet
      *
      * Will abort in debug mode if the tag has not been declared for publication
      */
-    template<typename T>
+    template<typename... PublishTagTypes, typename... ArgTypes>
     void publish(
-      const PublishTag<T>& tag,
-      const T& value
+      const PublishTag<PublishTagTypes...>& tag,
+      ArgTypes&&... values
     ) noexcept
     {
-      publish_impl(tag, value);
+      static_assert(
+        sizeof...(PublishTagTypes) == sizeof...(ArgTypes)
+        && (... && std::is_convertible_v<ArgTypes, PublishTagTypes>),
+        "Argument values can not be converted to tag types!"
+      );
+      std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
+        static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...
+      };
+      publish_impl(tag, gsl::span<PublishValueVariant>{variants});
+    }
+    template<typename... PublishTagTypes, typename... TupleTypes>
+    void publish(
+      const PublishTag<PublishTagTypes...>& tag,
+      const std::tuple<TupleTypes...>& value_tuple
+    ) noexcept
+    {
+      const auto apply_to = [&](const auto&... values) {
+        publish(tag, values...);
+      };
+      std::apply(apply_to, value_tuple);
     }
 
     /** \brief Returns true if the job is finished, false if it is not
@@ -323,9 +334,10 @@ namespace skynet
         }
         return tags;
       }();
+      std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
       init_or_update_subscribe(
         gsl::span<const internal::PublishTagBase>{tags},
-        nullptr
+        gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs}
       );
       return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
     }
@@ -364,12 +376,12 @@ namespace skynet
 
     void publish_impl(
       const internal::PublishTagBase& tag,
-      const PublishValueVariant& to_send
+      gsl::span<PublishValueVariant> to_send
     ) noexcept;
 
     void init_or_update_subscribe(
       gsl::span<const internal::PublishTagBase> tags,
-      std::unique_ptr<internal::DiscardOldVersionTagBufferBase> ptr
+      gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr
     ) noexcept;
 
     auto get_subscribe_future(

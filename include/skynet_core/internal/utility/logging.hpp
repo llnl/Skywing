@@ -5,6 +5,8 @@
 
 #include "skynet_core/types.hpp"
 
+#include "gsl/span"
+
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -19,9 +21,9 @@
 #define SKYNET_ERROR_LOG(...)    SPDLOG_ERROR(__VA_ARGS__)
 #define SKYNET_CRITICAL_LOG(...) SPDLOG_CRITICAL(__VA_ARGS__)
 
-// Support for logging of vectors
+// Support for logging of gsl::span
 template<typename T>
-struct fmt::formatter<std::vector<T>>
+struct fmt::formatter<gsl::span<T>>
 {
   template<typename ParseContext>
   constexpr auto parse(ParseContext& ctx) noexcept
@@ -30,7 +32,7 @@ struct fmt::formatter<std::vector<T>>
   }
 
   template<typename FormatContext>
-  auto format(const std::vector<T>& data, FormatContext& ctx) noexcept
+  auto format(const gsl::span<T>& data, FormatContext& ctx) noexcept
   {
     format_to(ctx.out(), "[");
     bool add_comma = false;
@@ -44,6 +46,24 @@ struct fmt::formatter<std::vector<T>>
       add_comma = true;
     }
     return format_to(ctx.out(), "]");
+  }
+};
+
+// Support for logging of vectors
+template<typename T>
+struct fmt::formatter<std::vector<T>>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) noexcept
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const std::vector<T>& data, FormatContext& ctx) noexcept
+  {
+    using const_span = gsl::span<const T>;
+    return fmt::formatter<const_span>{}.format(const_span{data}, ctx);
   }
 };
 

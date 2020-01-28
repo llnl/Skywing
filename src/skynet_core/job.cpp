@@ -57,14 +57,12 @@ namespace skynet
       if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer))
       {
         SKYNET_WARN_LOG(
-          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index (expected {}, got {})",
+          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index",
           master_->id(),
           id_,
           tag_id,
           version,
-          data,
-          loc->second.expected_type,
-          data.index()
+          data
         );
         loc->second.error_occurred = TagInfo::Error::incorrect_type;
         data_buffer_modified_cv_.notify_all();
@@ -121,7 +119,7 @@ namespace skynet
 
   void Job::publish_impl(
     const internal::PublishTagBase& tag,
-    const PublishValueVariant& to_send
+    const gsl::span<PublishValueVariant> to_send
   ) noexcept
   {
     assert(tags_produced_.find(tag.id()) != tags_produced_.cend()
@@ -165,16 +163,19 @@ namespace skynet
 
   void Job::init_or_update_subscribe(
     const gsl::span<const internal::PublishTagBase> tags,
-    std::unique_ptr<internal::DiscardOldVersionTagBufferBase> ptr
+    gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs
   ) noexcept
   {
+    assert(tags.size() == ptrs.size());
     auto [buffers, lock] = bufs_.get();
     (void)lock;
     // Always subscribe ahead of time, since the gap between the
     // Job::subscribe calls can cause messages to get discarded once the
     // connection is made but before it's marked as subscribed
-    for (const auto& tag : tags)
+    for (int i = 0; i < tags.size(); ++i)
     {
+      const auto& tag = tags[i];
+      auto& ptr = ptrs[i];
       // Then add the expected type; marking the tag as watched
       const auto [iter, inserted] = buffers.try_emplace(
         tag.id(),

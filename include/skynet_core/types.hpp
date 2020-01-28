@@ -61,14 +61,26 @@ namespace skynet
   /// Variant version of the above
   using PublishValueVariant = internal::ApplyTo<PublishValueTypeList, std::variant>;
 
+  namespace internal::detail
+  {
+    // Can't use std::conditional_t because of At not working for 0 size packs
+    // but conditional_t requires both types to be well-formed
+    template<typename... Ts>
+    struct ValueOrTupleImpl
+    {
+      using Type = std::tuple<Ts...>;
+    };
+    template<typename T>
+    struct ValueOrTupleImpl<T>
+    {
+      using Type = T;
+    };
+  } // namespace internal::detail
+
   /// Takes a parameter pack and either packs it into a tuple or
   /// turns it into a single type
   template<typename... Ts>
-  using ValueOrTuple = std::conditional_t<
-    sizeof...(Ts) == 1,
-      internal::At<0, internal::TypeList<Ts...>>,
-      std::tuple<Ts...>
-  >;
+  using ValueOrTuple = typename internal::detail::ValueOrTupleImpl<Ts...>::Type;
 
   /// A type indicating that a reduce did not produce a result intentionally
   /// (i.e., that it is not the root of the reduce tree)

@@ -30,7 +30,6 @@ namespace skynet::internal
       std::index_sequence<Is...> seq
     ) noexcept
     {
-      static_assert(!(std::is_same_v<Ts, PublishValueVariant> && ...), "blarigoj");
       assert(span_is_valid<Ts...>(value, seq));
       if constexpr (sizeof...(Ts) == 1)
       {
@@ -123,7 +122,6 @@ namespace skynet::internal
   template<typename... Ts>
   class DiscardOldVersionTagBuffer : public DiscardOldVersionTagBufferBase
   {
-    static_assert(!(std::is_same_v<Ts, PublishValueVariant> && ...), "blarigoj");
   private:
     bool do_has_data() const noexcept override
     {

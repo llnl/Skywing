@@ -316,7 +316,7 @@ namespace skynet
         Master& m,
         const VersionID version,
         const TagID& tag_id,
-        const PublishValueVariant& value
+        gsl::span<PublishValueVariant> value
       ) noexcept
       {
         std::lock_guard lock{m.job_mut_};
@@ -493,7 +493,7 @@ namespace skynet
     void publish(
       const VersionID version,
       const TagID& tag_id,
-      const PublishValueVariant& value
+      gsl::span<PublishValueVariant> value
     ) noexcept;
 
     // Adds data to the tag queue for a job from a message

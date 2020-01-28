@@ -9,8 +9,8 @@ core_tests = {
     'publish_data_wrapper',
     'simple_reduce',
     'broken_subscribes',
-    'broken_reduce'
-    # 'publish_multiple_values',
+    'broken_reduce',
+    'publish_multiple_values'
     # 'basic_master_config'
   ],
   'skynet_core/devices': [

@@ -740,10 +740,10 @@ namespace skynet
   void Master::publish(
     const VersionID version,
     const TagID& tag_id,
-    const PublishValueVariant& value
+    gsl::span<PublishValueVariant> value
   ) noexcept
   {
-    const auto msg = internal::make_publish(version, tag_id, gsl::span<const PublishValueVariant>{&value, 1});
+    const auto msg = internal::make_publish(version, tag_id, value);
     SKYNET_TRACE_LOG(
       "\"{}\" publishing on tag \"{}\", version \"{}\", data {} to {} subscribers",
       id_,
