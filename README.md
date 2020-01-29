@@ -24,6 +24,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Managed automatically:
    * Catch2
    * zmqcpp
+   * Guidelines Support Library (GSL)
 
 ## Build instructions
  * Get dependencies

@@ -43,7 +43,7 @@ namespace skynet
       , tags_{tags...}
     {
       job.declare_publication_intent(produced_tag);
-      job.subscribe({tags...}).get();
+      job.subscribe(tags...).get();
       // TODO: Turn this into a future (waiting for all subscribers)
       while (job.num_subscriptions(produced_tag) != sizeof...(TagTypes))
       {

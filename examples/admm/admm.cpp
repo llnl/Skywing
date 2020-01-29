@@ -275,7 +275,7 @@ void machine_task(const int index)
   master.submit_job("job", [&](Job& the_job) {
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
-    auto group = fut.get();
+    auto& group = fut.get();
 
     admm_work(index, [&](const std::array<double, num_machines>& local_solution, const bool locally_converged) {
       // First value is to indicate convergence
@@ -286,7 +286,6 @@ void machine_task(const int index)
       to_send.front() = locally_converged ? 1.0 : -1.0;
       // Update the global solution
       auto fut = group.allreduce(
-        to_send,
         [&](const std::vector<double>& lhs, const std::vector<double>& rhs) {
           std::vector<double> result{lhs};
           for (std::size_t i = 1; i < lhs.size(); ++i)
@@ -299,7 +298,8 @@ void machine_task(const int index)
             result.front() = -1.0;
           }
           return result;
-        }
+        },
+        to_send
       );
       auto new_global = fut.get().value();
       // Divide by the number of machines for the average value

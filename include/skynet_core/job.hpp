@@ -15,6 +15,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <numeric>
 #include <optional>
 #include <thread>
@@ -145,7 +146,18 @@ namespace skynet
     {
       const std::array<const internal::PublishTagBase*, sizeof...(Ts)> tag_ptrs{&tags...};
       declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const>{
-        tag_ptrs.data(), tag_ptrs.size()
+        tag_ptrs.data(), static_cast<gsl::index>(tag_ptrs.size())
+      });
+    }
+
+    /** \brief Declare publication intent for a range
+     */
+    template<typename Range>
+    void declare_publication_intent_range(const Range& tags) noexcept
+      // requires std::ranges::contiguous_range<Range>
+    {
+      declare_publication_intent_impl(gsl::span<const internal::PublishTagBase>{
+        tags.data(), static_cast<gsl::index>(tags.size())
       });
     }
 
@@ -223,6 +235,27 @@ namespace skynet
         gsl::span<BufferPtr>{ptrs}
       );
       return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tag_array});
+    }
+
+    /** \brief Subscribes to a range of tags.
+     */
+    template<typename Range>
+    auto subscribe_range(const Range& tags) noexcept
+      // requires std::ranges::contiguous_range<Range>
+    {
+      using IterType = std::decay_t<decltype(tags.begin())>;
+      using TagType = typename std::iterator_traits<IterType>::value_type;
+      using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+      std::vector<BufferPtr> ptrs{tags.size()};
+      std::generate(
+        ptrs.begin(),
+        ptrs.end(),
+        []() noexcept { return std::make_unique<typename TagType::BufferType>();
+      });
+      const auto tag_span =
+        gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())};
+      init_or_update_subscribe(tag_span, gsl::span<BufferPtr>{ptrs});
+      return get_subscribe_future(tag_span);
     }
 
     /** \brief Create a reduce group over the specified tags
@@ -396,6 +429,9 @@ namespace skynet
     ) noexcept
       -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
+    void declare_publication_intent_impl(
+      gsl::span<const internal::PublishTagBase> tags
+    ) noexcept;
     void declare_publication_intent_impl(
       gsl::span<const internal::PublishTagBase* const> tags
     ) noexcept;

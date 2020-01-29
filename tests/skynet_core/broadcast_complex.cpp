@@ -91,27 +91,27 @@ void machine_task(const NetworkInfo* const info, const int index)
       const auto& tag3 = std::get<Tag3>(tags[i]);
       switch (index)
       {
-        case 0: job.declare_publication_intent({tag1}); break;
-        case 1: job.declare_publication_intent({tag2}); break;
-        case 2: job.declare_publication_intent({tag3}); break;
+        case 0: job.declare_publication_intent(tag1); break;
+        case 1: job.declare_publication_intent(tag2); break;
+        case 2: job.declare_publication_intent(tag3); break;
       }
       // subscribe
       switch (index)
       {
       case 0:
-        job.subscribe({tag2, tag3}).get();
+        job.subscribe(tag2, tag3).get();
         break;
 
       case 1:
-        job.subscribe({tag1, tag3}).get();
+        job.subscribe(tag1, tag3).get();
         break;
 
       case 2:
-        job.subscribe({tag1, tag2}).get();
+        job.subscribe(tag1, tag2).get();
         break;
 
       default:
-        job.subscribe({tag1, tag2, tag3}).get();
+        job.subscribe(tag1, tag2, tag3).get();
       }
       ++ready_counter;
       while (ready_counter != num_machines * 2)

@@ -90,9 +90,9 @@ void asynchronous_iterative(
     std::exit(1);
   }
   master.submit_job("job", [&](skynet::Job& job) {
-    job.declare_publication_intent(config.tags_produced);
+    job.declare_publication_intent_range(config.tags_produced);
     // Subscribe to all the relevant tags
-    auto fut = job.subscribe(config.tags_to_subscribe_to);
+    auto fut = job.subscribe_range(config.tags_to_subscribe_to);
     if (!fut.wait_for(std::chrono::seconds(10)))
     {
       std::cerr << config.name << ": Took too long to subscribe to tags\n";

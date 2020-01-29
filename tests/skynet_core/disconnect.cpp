@@ -48,13 +48,13 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
   master.submit_job("Job 0", [&](Job& my_job) {
-    my_job.declare_publication_intent({publish_tag});
+    my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
     for (int i = 0; i < num_machines; ++i)
     {
       if (i != publish_num)
       {
-        my_job.subscribe({Int32Tag{std::to_string(i)}}).wait();
+        my_job.subscribe(Int32Tag{std::to_string(i)}).wait();
       }
     }
     while (master.number_of_subscribers() != static_cast<int>(num_machines - 1))

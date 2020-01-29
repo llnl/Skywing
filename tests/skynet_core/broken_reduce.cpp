@@ -42,16 +42,16 @@ void machine_task(const NetworkInfo* const info, const int index)
   master.submit_job("job", [&](Job& the_job) {
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
-    auto group = fut.get();
+    auto& group = fut.get();
 
-    auto reduce1 = group.allreduce(1, std::plus<>{});
+    auto reduce1 = group.allreduce(std::plus<>{}, 1);
     ++counter;
     const auto result1 = reduce1.get();
     // Wait a while for the disconnection message to propagate so it doesn't reach
     // here after the group has already been rebuilt
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     group.rebuild().wait();
-    const auto result2 = group.allreduce(1, std::plus<>{}).get();
+    const auto result2 = group.allreduce(std::plus<>{}, 1).get();
     std::lock_guard lock{catch_mutex};
     REQUIRE_FALSE(result1);
     REQUIRE(result2);
@@ -85,7 +85,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
     });
     master.submit_job("job", [&](Job& the_job) {
       auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
-      auto group = fut.get();
+      auto& group = fut.get();
 
       while (counter != static_cast<int>(num_machines - 1))
       {
@@ -94,7 +94,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
       // Only do the reduce on the second go-around
       if (i == 1)
       {
-        auto reduce = group.allreduce(1, std::plus<>{});
+        auto reduce = group.allreduce(std::plus<>{}, 1);
         const auto result = reduce.get();
         std::lock_guard lock{catch_mutex};
         REQUIRE(result);

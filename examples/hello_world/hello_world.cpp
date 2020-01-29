@@ -91,7 +91,7 @@ void simulate_machine(const int machine_number)
     // Retrieve the reduce group from the future; this will block until the group is
     // finished being created; the returned object can the be used to perform reduce
     // and allreduce operations
-    auto reduce_group = reduce_group_fut.get();
+    auto& reduce_group = reduce_group_fut.get();
     // For this example program, each instance will be generating random numbers
     // and then they will be summed together; these next few lines of code are just
     // setting up to do that
@@ -107,7 +107,7 @@ void simulate_machine(const int machine_number)
       // the proper type (in this case, std::int32_t) and returns the same type
       // Note that the reduce operation is run on the thread that handles
       // communication, and as such, should be limited to simple calculations
-      auto future = reduce_group.allreduce(random_value, std::plus<>{});
+      auto future = reduce_group.allreduce(std::plus<>{}, random_value);
       // The future indicates that the final result of the reduction operation
       // is ready to be retrieved; so just retrieve the value.
       const auto result = future.get().value();
