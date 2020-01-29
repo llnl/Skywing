@@ -287,20 +287,11 @@ namespace skynet
   }
 
   auto Job::create_reduce_group_future(
-    const TagID& group_id,
-    const TagID& tag_produced,
-    const internal::ReduceGroupNeighbors& tags_to_find,
-    gsl::span<const std::uint8_t> expected_types
+    std::unique_ptr<internal::ReduceGroupBase> group_ptr
   ) noexcept
     -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
-    // return Master::JobAccessor::create_reduce_group(
-    //   *master_,
-    //   group_id,
-    //   tag_produced,
-    //   tags_to_find,
-    //   expected_types
-    // );
+    return Master::JobAccessor::create_reduce_group(*master_, std::move(group_ptr));
   }
 
   bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept

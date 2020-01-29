@@ -176,7 +176,7 @@ namespace skynet
             || tag_info.error_occurred != TagInfo::Error::no_error
             || tag_info.connection_id != tag_conn_id;
         },
-        [&tag_info, tag_conn_id]() mutable -> std::optional<ValueType> {
+        [&tag_info]() mutable -> std::optional<ValueType> {
           // Don't check error information because the connection could have
           // errored between storing the value in the buffer and then retrieving it
           if (tag_info.buffer->has_data())
@@ -227,19 +227,26 @@ namespace skynet
 
     /** \brief Create a reduce group over the specified tags
      */
-    template<typename ValueType>
+    template<typename... Ts>
     auto create_reduce_group(
-      const ReduceGroupTag<ValueType>& group_tag,
-      const ReduceValueTag<ValueType>& tag_produced_for_group,
-      const std::vector<ReduceValueTag<ValueType>>& tags
+      const ReduceGroupTag<Ts...>& group_tag,
+      const ReduceValueTag<Ts...>& tag_produced_for_group,
+      const std::vector<ReduceValueTag<Ts...>>& tags
     ) noexcept
     {
       std::vector<TagID> tag_ids(tags.size());
       std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& t) { return t.id(); });
       const auto tags_to_find = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_types());
-      return create_reduce_group_future(group_tag.id(), tag_produced_for_group.id(), tags_to_find, group_tag.expected_types())
-        .adjust_get_function([](internal::ReduceGroupBase& group) {
-          return ReduceGroup<ValueType>(group);
+      auto group_ptr = std::make_unique<ReduceGroup<Ts...>>(
+        tags_to_find,
+        *master_,
+        group_tag.id(),
+        tag_produced_for_group.id()
+      );
+      return create_reduce_group_future(std::move(group_ptr))
+        .adjust_get_function([](internal::ReduceGroupBase& group) -> ReduceGroup<Ts...>& {
+          assert(dynamic_cast<ReduceGroup<Ts...>*>(&group) != nullptr);
+          return static_cast<ReduceGroup<Ts...>&>(group);
         }
       );
     }
@@ -403,10 +410,7 @@ namespace skynet
     ) noexcept;
 
     auto create_reduce_group_future(
-      const TagID& group_id,
-      const TagID& tag_produced,
-      const internal::ReduceGroupNeighbors& tags_to_find,
-      gsl::span<const std::uint8_t> expected_type
+      std::unique_ptr<internal::ReduceGroupBase> group_ptr
     ) noexcept
       -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 

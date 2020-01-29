@@ -17,9 +17,27 @@ using namespace skynet;
 using ValueTag = PublishTag<int, double>;
 using NotifyTag = PublishTag<>;
 
-constexpr std::tuple<int, double> expected_value{10, 3.14159};
+constexpr auto reduce_op = [](const std::tuple<int, double>& lhs, const std::tuple<int, double>& rhs) noexcept
+  -> std::tuple<int, double>
+{
+  return std::tuple<int, double>{
+    std::get<0>(lhs) + std::get<0>(rhs),
+    std::get<1>(lhs) + std::get<1>(rhs)
+  };
+};
+
+constexpr std::tuple<int, double> publish_value{10, 3.14159};
+constexpr std::tuple<int, double> reduce_result = reduce_op(publish_value, publish_value);
 const ValueTag tag0{"tag 0"};
 const NotifyTag tag1{"tag 1"};
+
+using ReduceTag = ReduceValueTag<int, double>;
+const std::vector<ReduceTag> reduce_tags {
+  ReduceTag{"tag 0"},
+  ReduceTag{"tag 1"}
+};
+
+const ReduceGroupTag<int, double> reduce_group_name{"reduce"};
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
@@ -38,9 +56,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       // machine won't publish too early
       job.declare_publication_intent(tag0);
       job.get_future_for(tag1).get();
-      job.publish(tag0, expected_value);
-      // Wait for message to be sent
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      job.publish(tag0, publish_value);
     }
     else
     {
@@ -49,8 +65,14 @@ void machine_task(const NetworkInfo* const info, const int index)
       job.publish(tag1);
       const auto val = job.get_future_for(tag0).get();
       REQUIRE(val);
-      REQUIRE(*val == expected_value);
+      REQUIRE(*val == publish_value);
     }
+    auto& group = job.create_reduce_group(reduce_group_name, reduce_tags[index], reduce_tags).get();
+    const auto value = group.allreduce(reduce_op, publish_value).get();
+    static std::mutex catch_mutex;
+    std::lock_guard g{catch_mutex};
+    REQUIRE(value);
+    REQUIRE(*value == reduce_result);
   });
   master.run();
 }

@@ -31,9 +31,9 @@ void test_reduce(Group& group, const std::int32_t value, Callable reduce_op, con
 {
   static std::mutex catch_mutex;
   // Normal reduce
-  const auto first_result = group.reduce(value, reduce_op).get();
+  const auto first_result = group.reduce(reduce_op, value).get();
   // Allreduce
-  const auto second_result = group.allreduce(value, reduce_op).get();
+  const auto second_result = group.allreduce(reduce_op, value).get();
   // Wait for the value to be ready / propagated
   std::lock_guard g{catch_mutex};
   if (group.returns_value_on_reduce())
@@ -62,7 +62,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   master.submit_job("job", [&](Job& the_job) {
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
-    auto group = fut.get();
+    auto& group = fut.get();
 
     // Do a few reduce operations on the group
     using i32 = std::int32_t;

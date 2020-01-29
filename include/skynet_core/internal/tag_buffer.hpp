@@ -16,7 +16,7 @@ namespace skynet::internal
   {
     template<typename... Ts, std::size_t... Is>
     bool span_is_valid(
-      const gsl::span<PublishValueVariant> value,
+      const gsl::span<const PublishValueVariant> value,
       std::index_sequence<Is...>
     ) noexcept
     {
@@ -40,6 +40,25 @@ namespace skynet::internal
       {
         assert((... && std::get_if<Ts>(&value[Is])));
         return std::make_tuple(std::move(*std::get_if<Ts>(&value[Is]))...);
+      }
+    }
+
+    template<typename... Ts, std::size_t... Is>
+    ValueOrTuple<Ts...> make_value(
+      gsl::span<const PublishValueVariant> value,
+      std::index_sequence<Is...> seq
+    ) noexcept
+    {
+      assert(span_is_valid<Ts...>(value, seq));
+      if constexpr (sizeof...(Ts) == 1)
+      {
+        assert(std::get_if<Ts...>(&value[0]));
+        return *std::get_if<Ts...>(&value[0]);
+      }
+      else
+      {
+        assert((... && std::get_if<Ts>(&value[Is])));
+        return std::make_tuple(*std::get_if<Ts>(&value[Is])...);
       }
     }
   } // namespace detail
@@ -159,56 +178,27 @@ namespace skynet::internal
   /** \brief Buffer for a tag that keeps all new recieved versions, and returns
    * them in order.  Discards old or already recieved tags.
    */
-  class FifoTagBufferBase
+  template<typename... Ts>
+  class FifoTagBuffer
   {
   public:
-    /** \brief Returns a pointer to the stored data and mark it as removed
-     * from the buffer
+    using ValueType = ValueOrTuple<Ts...>;
+
+    /** \brief Returns a pointer to the stored data and remove it from the buffer
      *
      * \pre The buffer has available data
      */
-    void* get_data(const VersionID required_version) { return do_get_data(required_version); }
-
-    /** \brief Adds data to the buffer if the version is newer than the last version
-     *
-     * \pre value matches the expected types for the derived class
-     */
-    void add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept
-    {
-      do_add(value, version);
-    }
-
-    /** \brief Returns true if data can be retrieved for the specified version
-     */
-    bool has_data(const VersionID required_version) const noexcept
-    {
-      return do_has_data(required_version);
-    }
-
-    virtual ~FifoTagBufferBase() = default;
-
-  private:
-    virtual void* do_get_data(VersionID required_version) noexcept = 0;
-    virtual void do_add(gsl::span<PublishValueVariant> value, VersionID version) noexcept = 0;
-    virtual bool do_has_data(VersionID required_version) const noexcept = 0;
-  }; // class FifoTagBufferBase
-
-  template<typename... Ts>
-  class FifoTagBufferTyped : public FifoTagBufferBase
-  {
-  private:
-    using ValueType = ValueOrTuple<Ts...>;
-
-    void* do_get_data(const VersionID required_version) noexcept override
+    ValueType get(const VersionID required_version) noexcept
     {
       while (true)
       {
         assert(!buffer_.empty());
-        auto& [data, version] = buffer_.front();
+        const auto [data, version] = buffer_.front();
         if (version >= required_version)
         {
           last_fetched_version_ = version;
-          return &data;
+          buffer_.erase(buffer_.begin());
+          return data;
         }
         else
         {
@@ -217,13 +207,19 @@ namespace skynet::internal
       }
     }
 
-    bool do_has_data(const VersionID required_version) const noexcept override
+    /** \brief Returns true if data can be retrieved for the specified version
+     */
+    bool has_data(const VersionID required_version) const noexcept
     {
       return !buffer_.empty() &&
         buffer_.back().second >= required_version;
     }
 
-    void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept override
+    /** \brief Adds data to the buffer if the version is newer than the last version
+     *
+     * \pre value matches the expected types for the derived class
+     */
+    void add(gsl::span<const PublishValueVariant> value, const VersionID version) noexcept
     {
       assert(detail::span_is_valid<Ts...>(value, std::index_sequence_for<Ts...>{}));
       if (version > last_stored_version_ || last_stored_version_ == tag_no_data)
@@ -232,10 +228,19 @@ namespace skynet::internal
       }
     }
 
+    /** \brief Resets the buffer to the default state
+     */
+    void reset() noexcept
+    {
+      buffer_.clear();
+      last_stored_version_ = tag_no_data;
+      last_fetched_version_ = tag_no_data;
+    }
+
     std::vector<std::pair<ValueType, VersionID>> buffer_;
     VersionID last_stored_version_ = tag_no_data;
     VersionID last_fetched_version_ = tag_no_data;
-  }; // class FifoTagBufferTyped
+  }; // class FifoTagBuffer
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_TAG_BUFFER_HPP

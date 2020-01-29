@@ -343,14 +343,11 @@ namespace skynet
 
       static auto create_reduce_group(
         Master& m,
-        const TagID& group_id,
-        const TagID& tag_produced,
-        const internal::ReduceGroupNeighbors& tags_to_find,
-        const std::uint8_t expected_type
+        std::unique_ptr<internal::ReduceGroupBase> group_ptr
       ) noexcept
       {
         std::lock_guard lock{m.job_mut_};
-        return m.create_reduce_group(group_id, tag_produced, tags_to_find, expected_type);
+        return m.create_reduce_group(std::move(group_ptr));
       }
     }; // struct JobAccessor
 
@@ -585,10 +582,7 @@ namespace skynet
     /** \brief Starts the process of creating a reduce group
      */
     auto create_reduce_group(
-      const TagID& group_id,
-      const TagID& tag_produced,
-      const internal::ReduceGroupNeighbors& tags_to_find,
-      std::uint8_t expected_type
+      std::unique_ptr<internal::ReduceGroupBase> group_ptr
     ) noexcept
       -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
@@ -695,21 +689,11 @@ namespace skynet
     // ID for the machines that produce those tags for the group
     struct ReduceGroupData
     {
-      // Need a constructor since ReduceGroups aren't movable so they need to
-      // be constructed in place
-      // This could be forwarded or something, but there doesn't seem to be a strong
-      // motivating reason to do so
-      ReduceGroupData(
-        const internal::ReduceGroupNeighbors& tag_neighbors,
-        Master& master,
-        const TagID& group_id,
-        const TagID& produced_tag,
-        const std::uint8_t expected_type
-      ) noexcept
-        : group{tag_neighbors, master, group_id, produced_tag, expected_type}
+      explicit ReduceGroupData(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
+        : group{std::move(group_ptr)}
       {}
 
-      internal::ReduceGroupBase group;
+      std::unique_ptr<internal::ReduceGroupBase> group;
       std::vector<MachineID> parent_machines;
       std::array<std::vector<MachineID>, 2> child_machines;
     };

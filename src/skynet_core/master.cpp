@@ -806,7 +806,7 @@ namespace skynet
             {
               list.erase(iter);
               SKYNET_TRACE_LOG("\"{}\" reporting disconnection in reduce group \"{}\"", id_, tag);
-              info.group.report_disconnection();
+              internal::ReduceGroupBase::Accessor::report_disconnection(*info.group);
             }
           }
         }
@@ -1289,13 +1289,12 @@ namespace skynet
   }
 
   auto Master::create_reduce_group(
-    const TagID& group_id,
-    const TagID& tag_produced,
-    const internal::ReduceGroupNeighbors& tags_to_find,
-    const std::uint8_t expected_type
+      std::unique_ptr<internal::ReduceGroupBase> group_ptr
   ) noexcept
     -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
+    const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
+    const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
     // Create an entry for the group
     const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
     (void)tag_iter;
@@ -1307,11 +1306,7 @@ namespace skynet
     }
     const auto [iter, inserted] = reduce_tag_data_.try_emplace(
       group_id,
-      tags_to_find,
-      *this,
-      group_id,
-      tag_produced,
-      expected_type
+      std::move(group_ptr)
     );
     if (!inserted)
     {
@@ -1319,7 +1314,7 @@ namespace skynet
         << "The reduce group " << std::quoted(group_id) << " was attempted to be created twice!\n";
       std::terminate();
     }
-    const auto& parent_tag = iter->second.group.tag_neighbors().parent();
+    const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*iter->second.group).parent();
     if (!parent_tag.empty())
     {
       pending_tags_.push_back(parent_tag);
@@ -1344,7 +1339,7 @@ namespace skynet
     SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
     const auto iter = reduce_tag_data_.find(group_id);
     assert(iter != reduce_tag_data_.cend());
-    const auto& parent_tag = iter->second.group.tag_neighbors().parent();
+    const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*iter->second.group).parent();
     if (!parent_tag.empty())
     {
       // Don't bother searching for machines that already have connections
@@ -1370,7 +1365,7 @@ namespace skynet
     const auto group_iter = reduce_tag_data_.find(group_id);
     assert(group_iter != reduce_tag_data_.cend());
     const auto& reduce_data = group_iter->second;
-    const auto& parent_tag = reduce_data.group.tag_neighbors().parent();
+    const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
     if (!parent_tag.empty() && reduce_data.parent_machines.empty())
     {
       SKYNET_TRACE_LOG(
@@ -1384,7 +1379,8 @@ namespace skynet
     for (std::size_t i = 0; i < reduce_data.child_machines.size(); ++i)
     {
       // Ignore empty tags
-      if (!reduce_data.group.tag_neighbors().tags[i + 1].empty() && reduce_data.child_machines[i].empty())
+      const auto& neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group);
+      if (!neighbors.tags[i + 1].empty() && reduce_data.child_machines[i].empty())
       {
         SKYNET_TRACE_LOG(
           "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
@@ -1417,7 +1413,8 @@ namespace skynet
     for (std::size_t i = 0; i < child_machines.size(); ++i)
     {
       // See if the tag matches
-      if (msg.tag_produced() == reduce_group.group.tag_neighbors().tags[i + 1])
+      const auto& tag_neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_group.group);
+      if (msg.tag_produced() == tag_neighbors.tags[i + 1])
       {
         // Add it, unless it's already in there; that's an error
         auto& existing_conns = child_machines[i];
@@ -1458,7 +1455,7 @@ namespace skynet
   {
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
-    return loc->second.group;
+    return *loc->second.group;
   }
 
   void Master::send_reduce_data_to_parent(
@@ -1561,7 +1558,7 @@ namespace skynet
       );
       return false;
     }
-    return group_loc->second.group.add_data(value.tag_id(), *var_opt, value.version());
+    return internal::ReduceGroupBase::Accessor::add_data(*group_loc->second.group, value.tag_id(), *var_opt, value.version());
   }
 
   bool Master::handle_report_reduce_disconnection(
@@ -1585,7 +1582,7 @@ namespace skynet
       );
       return false;
     }
-    group_loc->second.group.propagate_disconnection(msg.initiating_machine(), msg.id());
+    internal::ReduceGroupBase::Accessor::propagate_disconnection(*group_loc->second.group, msg.initiating_machine(), msg.id());
     return true;
   }
 
@@ -1641,7 +1638,8 @@ namespace skynet
                 for (auto& data_pair : reduce_tag_data_)
                 {
                   const auto& group_data = data_pair.second;
-                  if (group_data.group.tag_neighbors().parent() == tag_id)
+                  const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
+                  if (parent == tag_id)
                   {
                     return data_pair;
                   }
@@ -1697,7 +1695,7 @@ namespace skynet
                   server_iter->first,
                   tag_id
                 );
-                const auto& tag_produced = reduce_data.group.produced_tag();
+                const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*reduce_data.group);
                 server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
                 reduce_data.parent_machines.push_back(server_iter->second.id());
                 notify_reduce_group_ = true;

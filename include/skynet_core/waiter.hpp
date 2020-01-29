@@ -70,7 +70,9 @@ namespace skynet
     template<typename AdjustCallable>
     auto adjust_get_function(AdjustCallable adjust) const noexcept
     {
-      const auto adj_lambda = [adjust = std::move(adjust), getter = static_cast<const GetValueCallable&>(*this)]() {
+      // Explicitly extract the return type so it won't remove references, etc.
+      using ret_type = decltype(adjust(GetValueCallable::operator()()));
+      const auto adj_lambda = [adjust = std::move(adjust), getter = static_cast<const GetValueCallable&>(*this)]() -> ret_type {
         return adjust(getter());
       };
       return Waiter<decltype(adj_lambda()), IsReadyCallable, decltype(adj_lambda)>{
