@@ -100,7 +100,7 @@ void machine_task(const std::size_t index)
         // Ensure thread safety
         static std::mutex m;
         std::lock_guard g{m};
-        const auto val = the_job.get_future_for(Uint64Tag{tag_names[send_index]}).get();
+        const auto val = the_job.get_waiter(Uint64Tag{tag_names[send_index]}).get();
         REQUIRE(val);
         REQUIRE(*val == send_index);
       }

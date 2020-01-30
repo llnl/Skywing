@@ -167,7 +167,7 @@ namespace skynet
      * \return A Waiter for the value
      */
     template<typename... Ts>
-    auto get_future_for(
+    auto get_waiter(
       const PublishTag<Ts...>& tag
     ) noexcept
     {

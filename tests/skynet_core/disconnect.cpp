@@ -76,7 +76,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
         const Int32Tag get_tag{std::to_string(disconnect_order[i])};
         static std::mutex m;
         std::lock_guard g{m};
-        REQUIRE(my_job.get_future_for(get_tag).get() == to_remove);
+        REQUIRE(my_job.get_waiter(get_tag).get() == to_remove);
       }
     }
   });

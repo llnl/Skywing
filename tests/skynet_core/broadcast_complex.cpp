@@ -47,7 +47,7 @@ void test_tag(Job& job, const Tag& tag) noexcept
 {
   // Catch2's macros are not thread safe
   std::lock_guard g{catch_mutex};
-  const auto opt_value = job.get_future_for(tag).get();
+  const auto opt_value = job.get_waiter(tag).get();
   REQUIRE(opt_value);
   REQUIRE(*opt_value == ExpectedTagValue<Tag>::value());
 }

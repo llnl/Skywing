@@ -55,7 +55,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       // Declare publication intent after subscribing so that the other
       // machine won't publish too early
       job.declare_publication_intent(tag0);
-      job.get_future_for(tag1).get();
+      job.get_waiter(tag1).get();
       job.publish(tag0, publish_value);
     }
     else
@@ -63,7 +63,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       job.declare_publication_intent(tag1);
       job.subscribe(tag0).get();
       job.publish(tag1);
-      const auto val = job.get_future_for(tag0).get();
+      const auto val = job.get_waiter(tag0).get();
       REQUIRE(val);
       REQUIRE(*val == publish_value);
     }

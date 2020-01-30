@@ -90,7 +90,7 @@ namespace skynet
     template<std::size_t Index>
     bool tuple_setter_single(TupleType& to_set)
     {
-      const auto value = job_.get_future_for(std::get<Index>(tags_)).get();
+      const auto value = job_.get_waiter(std::get<Index>(tags_)).get();
       if (!value)
       {
         return false;

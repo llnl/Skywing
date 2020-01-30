@@ -69,13 +69,13 @@ void subscriber()
       }
       // Get value from the publisher
       ++subscriptions_finished;
-      const auto value = job.get_future_for(value_tag).get();
+      const auto value = job.get_waiter(value_tag).get();
       REQUIRE(value);
       REQUIRE(*value == value_to_publish);
       ++values_retrieved;
       // Trying to get another value will always error as the publishing
       // thread will exit (then rejoin)
-      const auto failed_value = job.get_future_for(value_tag).get();
+      const auto failed_value = job.get_waiter(value_tag).get();
       REQUIRE_FALSE(failed_value);
     }
   });

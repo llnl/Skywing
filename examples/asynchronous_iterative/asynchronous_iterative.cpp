@@ -110,7 +110,7 @@ void asynchronous_iterative(
       {
         if (job.has_data(sub_tag))
         {
-          neighbor_values[sub_tag.id()] = *job.get_future_for(sub_tag).get();
+          neighbor_values[sub_tag.id()] = *job.get_waiter(sub_tag).get();
         }
       }
       // Only call the function if there's any data that's been seen
