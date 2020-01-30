@@ -537,7 +537,7 @@ namespace skynet
     /** \brief Subscribes to the passed tags.
      */
     auto subscribe(const std::vector<TagID>& tag_ids) noexcept
-      -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
+      -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
     /** \brief Handles the get_publishers message
      */
@@ -584,14 +584,14 @@ namespace skynet
     auto create_reduce_group(
       std::unique_ptr<internal::ReduceGroupBase> group_ptr
     ) noexcept
-      -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     /** \brief Gets a future for when a reduce group has been re-built.
      */
     auto rebuild_reduce_group(
       const TagID& group_id
     ) noexcept
-      -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>;
+      -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>;
 
     /** \brief Returns true if the specified reduce group has been successfully created.
      *

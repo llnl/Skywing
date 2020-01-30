@@ -115,7 +115,7 @@ namespace skynet
 
       // Rebuilds a reduce group after it fails due to a disconnection
       auto rebuild() noexcept
-        -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>;
+        -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>;
 
       // Process any pending reduce operations, removing them if finished
       void process_pending_reduce_ops() noexcept { do_process_pending_reduce_ops(); }

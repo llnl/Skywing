@@ -9,39 +9,51 @@
 
 namespace skynet
 {
-  template<typename ProducedType, typename IsReadyCallable, typename GetValueCallable>
-  class Waiter : public IsReadyCallable, public GetValueCallable
+  template<typename IsReadyCallable, typename GetValueCallable, typename... Continuations>
+  class Waiter : public IsReadyCallable, public GetValueCallable, public Continuations...
   {
   public:
-    using ValueType = ProducedType;
-
     Waiter(
       std::mutex& mutex_handle,
       std::condition_variable& cv_handle,
       IsReadyCallable ready,
-      GetValueCallable get_value
+      GetValueCallable get_value,
+      Continuations... continuations
     ) noexcept
       : IsReadyCallable{std::move(ready)}
       , GetValueCallable{std::move(get_value)}
+      , Continuations{std::move(continuations)}...
       , mutex_{mutex_handle}
       , cv_{cv_handle}
     {}
 
-    ProducedType get() noexcept
+    decltype(auto) get() noexcept
     {
-      std::unique_lock<std::mutex> lock{mutex_};
-      if (!is_ready_no_lock())
+      // Have the value be returned from a lambda so that no temporaries are made
+      // but the lock will be released before calling the continuations
+      const auto get_value = [&]() noexcept -> decltype(auto) {
+        std::unique_lock<std::mutex> lock{mutex_};
+        if (!is_ready_no_lock())
+        {
+          cv_.wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+        }
+        return GetValueCallable::operator()();
+      };
+      if constexpr (sizeof...(Continuations) == 0)
       {
-        cv_.wait(lock, [this]() { return is_ready_no_lock(); });
+        return get_value();
       }
-      return GetValueCallable::operator()();
+      else
+      {
+        return handle_continuations(get_value, static_cast<Continuations&>(*this)...);
+      }
     }
 
     void wait() noexcept
     {
       std::unique_lock<std::mutex> lock{mutex_};
       if (is_ready_no_lock()) { return; }
-      cv_.wait(lock, [this]() { return is_ready_no_lock(); });
+      cv_.wait(lock, [this]() noexcept { return is_ready_no_lock(); });
     }
 
     template<class Rep, class Period>
@@ -49,7 +61,7 @@ namespace skynet
     {
       std::unique_lock<std::mutex> lock{mutex_};
       if (is_ready_no_lock()) { return true; }
-      return cv_.wait_for(lock, wait_time, [this]() { return is_ready_no_lock(); });
+      return cv_.wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
     }
 
     template<class Rep, class Period>
@@ -57,7 +69,7 @@ namespace skynet
     {
       std::unique_lock<std::mutex> lock{mutex_};
       if (is_ready_no_lock()) { return true; }
-      return cv_.wait_until(lock, end_time, [this]() { return is_ready_no_lock(); });
+      return cv_.wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
     }
 
     bool is_ready() noexcept
@@ -67,19 +79,22 @@ namespace skynet
     }
 
     // For transforming the get type
-    template<typename AdjustCallable>
-    auto adjust_get_function(AdjustCallable adjust) const noexcept
+    template<typename... NewContinuations>
+    auto then(NewContinuations... continuations) && noexcept
     {
-      // Explicitly extract the return type so it won't remove references, etc.
-      using ret_type = decltype(adjust(GetValueCallable::operator()()));
-      const auto adj_lambda = [adjust = std::move(adjust), getter = static_cast<const GetValueCallable&>(*this)]() -> ret_type {
-        return adjust(getter());
-      };
-      return Waiter<decltype(adj_lambda()), IsReadyCallable, decltype(adj_lambda)>{
+      using ret_type = Waiter<
+        IsReadyCallable,
+        GetValueCallable,
+        Continuations...,
+        NewContinuations...
+      >;
+      return ret_type{
         mutex_,
         cv_,
-        static_cast<const IsReadyCallable&>(*this),
-        adj_lambda
+        std::move(static_cast<IsReadyCallable&>(*this)),
+        std::move(static_cast<GetValueCallable&>(*this)),
+        std::move(static_cast<Continuations&>(*this))...,
+        std::move(continuations...)
       };
     }
 
@@ -87,6 +102,41 @@ namespace skynet
     bool is_ready_no_lock() noexcept
     {
       return IsReadyCallable::operator()();
+    }
+
+    // The continuations are in the reverse order that they need to be called
+    // so have to build up a function to return the result
+    template<typename BuildUp, typename Next, typename... Rest>
+    decltype(auto) handle_continuations(
+      const BuildUp& build_up,
+      Next& next,
+      Rest&... rest
+    ) noexcept
+    {
+      const auto next_call = [&]() noexcept -> decltype(auto) {
+        // Can't pass void so have to make a wrapper
+        if constexpr (std::is_same_v<decltype(build_up()), void>)
+        {
+          return [&]() noexcept -> decltype(auto) {
+            build_up();
+            return next();
+          };
+        }
+        else
+        {
+          return [&]() noexcept -> decltype(auto) {
+            return next(build_up());
+          };
+        }
+      };
+      if constexpr (sizeof...(Rest) == 0)
+      {
+        return next_call()();
+      }
+      else
+      {
+        return handle_continuations(next_call(), rest...);
+      }
     }
 
     std::mutex& mutex_;
@@ -100,20 +150,22 @@ namespace skynet
       constexpr void operator()() const noexcept {}
     }; // struct WaiterGetNoOp
 
-    template<typename IsReadyCallable, typename GetValueCallable>
+    template<typename IsReadyCallable, typename GetValueCallable, typename... Continuations>
     auto make_waiter(
       std::mutex& mutex,
       std::condition_variable& cv,
       IsReadyCallable ready,
-      GetValueCallable get_value
+      GetValueCallable get_value,
+      Continuations... continuations
     ) noexcept
-      -> Waiter<decltype(get_value()), IsReadyCallable, GetValueCallable>
+      -> Waiter<IsReadyCallable, GetValueCallable, Continuations...>
     {
-      return Waiter<decltype(get_value()), IsReadyCallable, GetValueCallable>{
+      return Waiter<IsReadyCallable, GetValueCallable, Continuations...>{
         mutex,
         cv,
         std::move(ready),
-        std::move(get_value)
+        std::move(get_value),
+        std::move(continuations)...
       };
     }
 
@@ -124,7 +176,7 @@ namespace skynet
       std::condition_variable& cv,
       IsReadyCallable ready
     ) noexcept
-      -> Waiter<void, IsReadyCallable, WaiterGetNoOp>
+      -> Waiter<IsReadyCallable, WaiterGetNoOp>
     {
       return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
     }

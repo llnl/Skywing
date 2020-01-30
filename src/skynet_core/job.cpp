@@ -201,7 +201,7 @@ namespace skynet
   auto Job::get_subscribe_future(
     const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
-    -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
   {
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
@@ -310,7 +310,7 @@ namespace skynet
   auto Job::create_reduce_group_future(
     std::unique_ptr<internal::ReduceGroupBase> group_ptr
   ) noexcept
-    -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     return Master::JobAccessor::create_reduce_group(*master_, std::move(group_ptr));
   }
