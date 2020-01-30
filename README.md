@@ -34,9 +34,10 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Get dependencies
    * git submodule update --init --recursive
  * Create build files
-   * meson <BUILD_DIRECTORY>
+   * mkdir build
+   * meson build
  * Build Skynet
-   * cd <BUILD_DIRECTORY>
+   * cd build
    * ninja
  * Run tests
    * ninja test
