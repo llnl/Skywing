@@ -277,7 +277,7 @@ namespace skynet
         tag_produced_for_group.id()
       );
       return create_reduce_group_future(std::move(group_ptr))
-        .adjust_get_function([](internal::ReduceGroupBase& group) -> ReduceGroup<Ts...>& {
+        .then([](internal::ReduceGroupBase& group) -> ReduceGroup<Ts...>& {
           assert(dynamic_cast<ReduceGroup<Ts...>*>(&group) != nullptr);
           return static_cast<ReduceGroup<Ts...>&>(group);
         }
@@ -427,7 +427,7 @@ namespace skynet
     auto get_subscribe_future(
       gsl::span<const internal::PublishTagBase> tags
     ) noexcept
-      -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
+      -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
 
     void declare_publication_intent_impl(
       gsl::span<const internal::PublishTagBase> tags
@@ -448,7 +448,7 @@ namespace skynet
     auto create_reduce_group_future(
       std::unique_ptr<internal::ReduceGroupBase> group_ptr
     ) noexcept
-      -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+      -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
 

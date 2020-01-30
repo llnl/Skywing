@@ -885,7 +885,7 @@ namespace skynet
   }
 
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-    -> Waiter<void, internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" looking for subscription information for {}", id_, tag_ids);
     std::vector<TagID> tags_to_search_for;
@@ -1291,7 +1291,7 @@ namespace skynet
   auto Master::create_reduce_group(
       std::unique_ptr<internal::ReduceGroupBase> group_ptr
   ) noexcept
-    -> Waiter<internal::ReduceGroupBase&, internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+    -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
     const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
     const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
@@ -1334,7 +1334,7 @@ namespace skynet
   auto Master::rebuild_reduce_group(
     const TagID& group_id
   ) noexcept
-    -> Waiter<void, internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
     const auto iter = reduce_tag_data_.find(group_id);
