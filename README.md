@@ -10,28 +10,38 @@
 A high-reliability, real-time, decentralized platform for collaborative autonomy.
 
 ## Development team
+ * Adam Harter <harter8@llnl.gov>
  * Aly Fox <fox33@llnl.gov>
  * Corey McNeish <mcneish1@llnl.gov>
- * Amy Musselman <musselman5@llnl.gov>
  * Colin Ponce <ponce11@llnl.gov>
  * Chris Vogl <vogl2@llnl.gov>
 
-## Dependencies
+## Dependencies Not Automatically Managed
  * meson (https://mesonbuild.com/)
  * ninja (https://ninja-build.org/)
- * ns3 (see subprojects/ns3/build_ns3)
  * Cap'n Proto (https://capnproto.org/)
- * Managed automatically:
-   * Catch2
-   * zmqcpp
+
+## Dependencies Managed as Git Submodules
+ * Catch2
+ * zmqcpp
+ * Guidelines Support Library (GSL)
+
+## Dependencies for Simulation, Not Managed
+ * ns3 (see subprojects/ns3/build_ns3)
 
 ## Build instructions
+ * Build non-managed dependencies separately
  * Get dependencies
    * git submodule update --init --recursive
  * Create build files
-   * meson <BUILD_DIRECTORY>
+   * mkdir build
+   * meson build
  * Build Skynet
-   * cd <BUILD_DIRECTORY>
+   * cd build
    * ninja
  * Run tests
    * ninja test
+
+---
+
+The skynet_upper name is a temporary placeholder name for higher parts of the library that build on the lower parts, which are in skynet_core.

@@ -5,7 +5,7 @@
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("cpnpro");
 
-struct BroadcastData {
+struct PublishValue {
   union {
     # Cap'n Proto FORCES camelCase to be used for these...
     d     @0  : Float64;
@@ -30,26 +30,27 @@ struct BroadcastData {
     rU64  @19 : List(UInt64);
     str   @20 : Text;
     rStr  @21 : List(Text);
-    # TODO: Actually figure out how to use bytes?
-    # bytes @22 : Data;
+    bytes @22 : Data;
   }
 }
 
-struct Broadcast {
-  messageID @0 : UInt32;
-  tagID @1 : Text;
-  origin @2 : Text;
-  hopsLeftP1 @3 : UInt8;
-  data @4 : BroadcastData;
+struct PublishData {
+  value   @0 : List(PublishValue);
+  version @1 : UInt32;
+  tagID   @2 : Text;
+}
+
+struct Publish {
+  union {
+    closingConnection @0 : Void;
+    data              @1 : PublishData;
+  }
 }
 
 struct Greeting {
-  from @0 : Text;
+  from      @0 : Text;
   neighbors @1 : List(Text);
-}
-
-struct Goodbye {
-  # Empty
+  basePort  @2 : UInt16;
 }
 
 struct NewNeighbor {
@@ -60,12 +61,53 @@ struct RemoveNeighbor {
   neighborID @0 : Text;
 }
 
-struct Message {
+# For each tag, a list of machines addresses known to publish on that tag
+# Additionally, a list of tags that are produced by the machine that sent the message
+struct ReportPublishers {
+  tags                @0 : List(Text);
+  addresses           @1 : List(List(Text));
+  locallyProducedTags @2 : List(Text);
+}
+
+struct GetPublishers {
+  tags             @0 : List(Text);
+  ignoreCache      @1 : Bool;
+  isForReduceGroup @2 : Bool;
+}
+
+struct JoinReduceGroup {
+  reduceTag   @0 : Text;
+  tagProduced @1 : Text;
+}
+
+struct SubmitReduceValue {
+  reduceTag  @0 : Text;
+  data       @1 : PublishData;
+}
+
+struct ReportReduceResult {
+  reduceTag @0 : Text;
+  data      @1 : PublishData;
+}
+
+struct ReportReduceDisconnection {
+  reduceTag         @0 : Text;
+  initiatingMachine @1 : Text;
+  id                @2 : UInt64;
+}
+
+struct StatusMessage {
   union {
-    broadcast @0 : Broadcast;
-    greeting @1 : Greeting;
-    goodbye @2 : Goodbye;
-    newNeighbor @3 : NewNeighbor;
-    removeNeighbor @4 : RemoveNeighbor;
+    greeting                  @0  : Greeting;
+    goodbye                   @1  : Void;
+    newNeighbor               @2  : NewNeighbor;
+    removeNeighbor            @3  : RemoveNeighbor;
+    heartbeat                 @4  : Void;
+    reportPublishers          @5  : ReportPublishers;
+    getPublishers             @6  : GetPublishers;
+    joinReduceGroup           @7  : JoinReduceGroup;
+    submitReduceValue         @8  : SubmitReduceValue;
+    reportReduceResult        @9  : ReportReduceResult;
+    reportReduceDisconnection @10 : ReportReduceDisconnection;
   }
 }

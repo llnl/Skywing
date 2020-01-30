@@ -1,7 +1,7 @@
 #ifndef SKYNET_TEST_UTILS_HPP
 #define SKYNET_TEST_UTILS_HPP
 
-#include "skynet/master.hpp"
+#include "skynet_core/master.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -42,17 +42,24 @@ namespace skynet
     std::vector<int> num_connections;
   };
 
+  // Returns the maximum number of connections possible for a given number of
+  // machines
+  constexpr int maximum_connections(const int num_machines)
+  {
+    // The total number of connections possible is the sum from 1 to
+    // (number of machines - 1) which is equal to n * (n + 1) / 2
+    // (Where n = number of machines - 1)
+    return (num_machines - 1) * num_machines / 2;
+  }
+
   // Create a random network with the specified number of machines and roughly
   // the number of connections.  The number of connections will generally exceed
-  // the given amount as a random path  is done at the end to make the network
-  // fully connected
+  // the given amount as a random path is done at the end to make sure there are
+  // no "islands" in the graph
   NetworkInfo make_network(const int num_machines, const int num_connections)
   {
     assert(num_machines > 1);
-    // The total number of connections possible is the sum from 1 to
-    // (number of machines - 1) which is equal to n * (n + 1) / 2
-    const auto maximum_connections = [](int n) { return (n - 1) * n / 2; };
-    assert(num_connections < maximum_connections(num_connections));
+    assert(num_connections <= maximum_connections(num_machines));
     // Reserve enough room in the return object for each machine
     NetworkInfo to_ret{num_machines};
     // Adds a random connection; doing nothing if it already exists or is a
@@ -98,16 +105,19 @@ namespace skynet
   }
 
   // Performs the required steps to create the network from a NetworkInfo
-  // The connection argument should have the signature `void(Master&, int)`
+  // The connection argument should have the signature `bool(Master&, int)`
   // with the int parameter corresponding to the index of the machine to
-  // connect to
+  // connect to, and returning true if it connected
   template<typename Callable>
   void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
     {
-      connect(master, connect_to);
+      while (!connect(master, connect_to))
+      {
+        std::this_thread::sleep_for(1ms);
+      }
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {
