@@ -35,9 +35,10 @@ namespace skynet::internal
   private:
     cpnpro::PublishData::Reader r;
 
-    friend class PublishMessageHandler;
+    friend class MessageHandler;
     friend class SubmitReduceValue;
     friend class ReportReduceResult;
+    friend class Publish;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
   };
 
@@ -53,7 +54,7 @@ namespace skynet::internal
   private:
     cpnpro::Greeting::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit Greeting(cpnpro::Greeting::Reader reader) noexcept;
   };
 
@@ -74,7 +75,7 @@ namespace skynet::internal
   private:
     cpnpro::NewNeighbor::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit NewNeighbor(cpnpro::NewNeighbor::Reader reader) noexcept;
   };
 
@@ -88,7 +89,7 @@ namespace skynet::internal
   private:
     cpnpro::RemoveNeighbor::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit RemoveNeighbor(cpnpro::RemoveNeighbor::Reader reader) noexcept;
   };
 
@@ -111,7 +112,7 @@ namespace skynet::internal
   private:
     cpnpro::ReportPublishers::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit ReportPublishers(cpnpro::ReportPublishers::Reader reader) noexcept;
   };
 
@@ -126,7 +127,7 @@ namespace skynet::internal
   private:
     cpnpro::GetPublishers::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept;
   };
 
@@ -141,7 +142,7 @@ namespace skynet::internal
   private:
     cpnpro::JoinReduceGroup::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept;
   };
 
@@ -156,7 +157,7 @@ namespace skynet::internal
   private:
     cpnpro::SubmitReduceValue::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept;
   };
 
@@ -171,11 +172,11 @@ namespace skynet::internal
   private:
     cpnpro::ReportReduceResult::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit ReportReduceResult(cpnpro::ReportReduceResult::Reader reader) noexcept;
   };
 
-  /** \breif Message for reporting that a machine disconnected
+  /** \brief Message for reporting that a machine disconnected
    */
   class ReportReduceDisconnection
   {
@@ -187,25 +188,40 @@ namespace skynet::internal
   private:
     cpnpro::ReportReduceDisconnection::Reader r;
 
-    friend class StatusMessageHandler;
+    friend class MessageHandler;
     explicit ReportReduceDisconnection(cpnpro::ReportReduceDisconnection::Reader reader) noexcept;
+  };
+
+  /** \brief Message for subscribing/unsubscibing to a tag
+   */
+  class SubscriptionNotice
+  {
+  public:
+    std::vector<TagID> tags() const noexcept;
+    bool is_unsubscribe() const noexcept;
+
+  private:
+    cpnpro::SubscriptionNotice::Reader r;
+
+    friend class MessageHandler;
+    explicit SubscriptionNotice(cpnpro::SubscriptionNotice::Reader reader) noexcept;
   };
 
   /** \brief Class for converting the raw bytes of a message into a useable format
    */
-  class StatusMessageHandler
+  class MessageHandler
   {
   public:
     /** \brief Construct a message handler from a raw set of bytes
      */
-    static std::optional<StatusMessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept;
+    static std::optional<MessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept;
 
     // Moveable only
-    StatusMessageHandler() noexcept;
-    StatusMessageHandler(const StatusMessageHandler&) = delete;
-    StatusMessageHandler& operator=(const StatusMessageHandler&) = delete;
-    StatusMessageHandler(StatusMessageHandler&&) noexcept;
-    StatusMessageHandler& operator=(StatusMessageHandler&&) noexcept;
+    MessageHandler() noexcept;
+    MessageHandler(const MessageHandler&) = delete;
+    MessageHandler& operator=(const MessageHandler&) = delete;
+    MessageHandler(MessageHandler&&) noexcept;
+    MessageHandler& operator=(MessageHandler&&) noexcept;
 
     /** \brief Perform a callback on the stored message
      *
@@ -234,7 +250,9 @@ namespace skynet::internal
       JoinReduceGroup,
       SubmitReduceValue,
       ReportReduceResult,
-      ReportReduceDisconnection
+      ReportReduceDisconnection,
+      SubscriptionNotice,
+      PublishData
     >;
 
     // Process the stored message and return its internal type
@@ -249,37 +267,6 @@ namespace skynet::internal
       kj::NullArrayDisposer null_disposer;
       capnp::MallocMessageBuilder message;
       cpnpro::StatusMessage::Reader root;
-    };
-    std::unique_ptr<Impl> impl_;
-  };
-
-  /** Class for converting raw bytes of a publish message into a usable format
-   */
-  class PublishMessageHandler
-  {
-  public:
-    /** \brief Construct a message handler from a raw set of bytes
-     */
-    static std::optional<PublishMessageHandler> try_to_create(const std::vector<std::byte>& data) noexcept;
-
-    // Moveable, not copyable
-    PublishMessageHandler() noexcept;
-    PublishMessageHandler(const PublishMessageHandler&) = delete;
-    PublishMessageHandler& operator=(const PublishMessageHandler&) = delete;
-    PublishMessageHandler(PublishMessageHandler&&) noexcept;
-    PublishMessageHandler& operator=(PublishMessageHandler&&) noexcept;
-
-    /** \brief Gets the published data, or if it was a shutdown message, no data
-     */
-    std::optional<PublishData> data() const noexcept;
-
-  private:
-    // Same thing as above
-    struct Impl
-    {
-      kj::NullArrayDisposer null_disposer;
-      capnp::MallocMessageBuilder message;
-      cpnpro::Publish::Reader root;
     };
     std::unique_ptr<Impl> impl_;
   };

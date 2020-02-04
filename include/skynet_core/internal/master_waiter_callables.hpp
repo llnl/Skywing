@@ -24,7 +24,7 @@ namespace skynet
 
     private:
       Master* master_;
-      const std::vector<TagID> tags_;
+      std::vector<TagID> tags_;
     }; // class MasterSubscribeIsDone
 
     class MasterReduceGroupIsCreated

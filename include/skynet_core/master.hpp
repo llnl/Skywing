@@ -32,10 +32,6 @@ namespace skynet
   // Forward declaration
   class Master;
 
-  // The port difference between the socket used from general communication by
-  // a master and the port used for publications
-  inline constexpr std::uint16_t publisher_port_offset = 100;
-
   namespace internal
   {
     // The default hearbeat interval
@@ -120,13 +116,9 @@ namespace skynet
         bool ignore_cache
       ) noexcept;
 
-      /** \brief The address for two-way communication with the external master
+      /** \brief The address for communication with the external master
        */
-      std::string two_way_address() const noexcept;
-
-      /** \brief The address of the publisher for the external master
-       */
-      std::string publisher_address() const noexcept;
+      std::string address() const noexcept;
 
       /** \brief Send a request for any pending tags if required
        */
@@ -143,22 +135,15 @@ namespace skynet
       // the number of bytes couldn't be read
       std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
 
-      // Attempt to get a StatusMessageHandler from the connection
-      std::optional<StatusMessageHandler> try_to_get_status_message() noexcept;
+      // Attempt to get a MessageHandler from the connection
+      std::optional<MessageHandler> try_to_get_status_message() noexcept;
 
       // Function that handles the joining/accepting connection
       template<typename First, typename Second>
       static std::optional<ExternalMaster> init_conn(ExternalMaster& m, First first, Second second) noexcept
       {
-        using namespace std::chrono;
-        const auto start = steady_clock::now();
         if (!first()) { return {}; }
-        const auto mid = steady_clock::now();
         if (!second()) { return {}; }
-        const auto end = steady_clock::now();
-        const auto dur1 = duration_cast<decltype(latency_)>(mid - start);
-        const auto dur2 = duration_cast<decltype(latency_)>(end - mid);
-        m.latency_ = decltype(latency_){(dur1.count() + dur2.count()) / 2};
         return std::optional<ExternalMaster>{std::move(m)};
       }
 
@@ -173,7 +158,7 @@ namespace skynet
       bool wait_for_greeting() noexcept;
 
       // Handle status messages
-      void handle_message(StatusMessageHandler& handle) noexcept;
+      void handle_message(MessageHandler& handle) noexcept;
 
       // Calculate the next time tags should be requested
       std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
@@ -183,9 +168,6 @@ namespace skynet
 
       // The id of the external master
       MachineID id_;
-
-      // Estimated latency to the other machine
-      std::chrono::microseconds latency_;
 
       // The last time the machine was heard from
       std::chrono::steady_clock::time_point last_heard_;
@@ -198,6 +180,10 @@ namespace skynet
 
       // The time that will be waited until requesting tags again
       std::chrono::steady_clock::time_point request_tags_time_;
+
+      // Set of currently subscribed tags
+      // std::unordered_set for fast look-up
+      std::unordered_set<TagID> subscriptions_;
 
       // The base port to use to connect to the remote machine
       std::uint16_t base_port_;
@@ -293,10 +279,6 @@ namespace skynet
     /** \brief Start running all submitted jobs
      */
     void run() noexcept;
-
-    /** \brief Return the local address of the master, for subscribing to self
-     */
-    std::string local_publishing_address() const noexcept;
 
     /** \brief Returns the number of subscribers
      */
@@ -505,10 +487,6 @@ namespace skynet
      */
     void remove_dead_neighbors() noexcept;
 
-    /** \brief Removes all dead subscriptions
-     */
-    void remove_dead_subscriptions() noexcept;
-
     /** \brief Returns a vector of all the neighboring ID's
      */
     std::vector<MachineID> make_neighbor_vector() const noexcept;
@@ -562,14 +540,6 @@ namespace skynet
     /** \brief Produce a message containing the known publishers and tags
      */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
-
-    /** \brief Attempt to subscribe on the passed address
-     */
-    bool try_to_subscribe(std::string_view address, std::vector<std::string> remote_tags_produced) noexcept;
-
-    /** \brief Reads data from any subscriptions
-     */
-    void read_data_from_subscriptions() noexcept;
 
     /** \brief Returns the list of tags that a publisher is known to produce
      */
@@ -671,14 +641,6 @@ namespace skynet
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
-    // Subscriptions and the tags that they produce
-    struct SubscriptionData
-    {
-      internal::Subscription subscription;
-      std::vector<TagID> produced_tags;
-    };
-    std::vector<SubscriptionData> subscriptions_;
-
     // List of publishers that are known for each tag
     std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
 
@@ -716,9 +678,6 @@ namespace skynet
 
     // The tags that this machine produces
     std::unordered_set<TagID> produced_tags_;
-
-    // The publication channel for this machine
-    internal::PublicationChannel pub_channel_;
 
     // The port used for communications
     std::uint16_t comm_port_;

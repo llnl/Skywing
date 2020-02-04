@@ -88,10 +88,11 @@ void machine_task(const std::size_t index)
         the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait();
       }
     }
-    while (master.number_of_subscribers() != machine_counts.size() - 1)
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    // TODO: PUBLISH CHANGE
+    // while (master.number_of_subscribers() != machine_counts.size() - 1)
+    // {
+    //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
     the_job.publish(Uint64Tag{tag_names[index]}, static_cast<std::uint64_t>(index));
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {

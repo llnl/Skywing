@@ -57,10 +57,11 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
         my_job.subscribe(Int32Tag{std::to_string(i)}).wait();
       }
     }
-    while (master.number_of_subscribers() != static_cast<int>(num_machines - 1))
-    {
-      std::this_thread::sleep_for(10ms);
-    }
+    // TODO: PUBLISH CHANGE
+    // while (master.number_of_subscribers() != static_cast<int>(num_machines - 1))
+    // {
+    //   std::this_thread::sleep_for(10ms);
+    // }
     my_job.publish(publish_tag, index);
     for (std::size_t i = 0; i < disconnect_order.size(); ++i)
     {

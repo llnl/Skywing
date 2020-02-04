@@ -205,21 +205,35 @@ namespace skynet::internal
   {}
 
   /////////////////////////////////////////////////////
-  // StatusMessageHandler
+  // SubscriptionNotice
   /////////////////////////////////////////////////////
 
-  StatusMessageHandler::StatusMessageHandler() noexcept
+  std::vector<TagID> SubscriptionNotice::tags() const noexcept
+  {
+    return detail::list_to_vector<TagID>(r.getTags());
+  }
+  bool SubscriptionNotice::is_unsubscribe() const noexcept { return r.getIsUnsubscribe(); }
+
+  SubscriptionNotice::SubscriptionNotice(cpnpro::SubscriptionNotice::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
+  // MessageHandler
+  /////////////////////////////////////////////////////
+
+  MessageHandler::MessageHandler() noexcept
     : impl_{std::make_unique<Impl>()}
   {}
 
-  StatusMessageHandler::StatusMessageHandler(StatusMessageHandler&&) noexcept = default;
-  StatusMessageHandler& StatusMessageHandler::operator=(StatusMessageHandler&&) noexcept = default;
+  MessageHandler::MessageHandler(MessageHandler&&) noexcept = default;
+  MessageHandler& MessageHandler::operator=(MessageHandler&&) noexcept = default;
 
-  std::optional<StatusMessageHandler> StatusMessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
+  std::optional<MessageHandler> MessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
   {
     detail::ExceptionSuppressor suppressor;
     // Read the message from the passed bytes
-    StatusMessageHandler to_ret;
+    MessageHandler to_ret;
     kj::Array<const kj::byte> buffer{
       reinterpret_cast<const kj::byte*>(data.data()),
       data.size(),
@@ -230,16 +244,16 @@ namespace skynet::internal
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::try_to_create.");
+      SKYNET_WARN_LOG("Failed to decode message in MessageHandler::try_to_create.");
       return {};
     }
     else
     {
-      return std::optional<StatusMessageHandler>{std::move(to_ret)};
+      return std::optional<MessageHandler>{std::move(to_ret)};
     }
   }
 
-  auto StatusMessageHandler::extract_message() const noexcept -> std::optional<MessageVariant>
+  auto MessageHandler::extract_message() const noexcept -> std::optional<MessageVariant>
   {
     using vals = cpnpro::StatusMessage::Which;
     detail::ExceptionSuppressor suppressor;
@@ -258,68 +272,19 @@ namespace skynet::internal
       case vals::SUBMIT_REDUCE_VALUE:         return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
       case vals::REPORT_REDUCE_RESULT:        return ReportReduceResult{impl_->root.getReportReduceResult()};
       case vals::REPORT_REDUCE_DISCONNECTION: return ReportReduceDisconnection{impl_->root.getReportReduceDisconnection()};
+      case vals::PUBLISH_DATA:                return PublishData{impl_->root.getPublishData()};
+      case vals::SUBSCRIPTION_NOTICE:         return SubscriptionNotice{impl_->root.getSubscriptionNotice()};
       }
       return {};
     }();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::extract_message.");
+      SKYNET_WARN_LOG("Failed to decode message in MessageHandler::extract_message.");
       return {};
     }
     else
     {
       return to_ret;
-    }
-  }
-
-  /////////////////////////////////////////////////////
-  // PublishMessageHandler
-  /////////////////////////////////////////////////////
-
-  PublishMessageHandler::PublishMessageHandler() noexcept
-    : impl_{std::make_unique<Impl>()}
-  {}
-
-  PublishMessageHandler::PublishMessageHandler(PublishMessageHandler&&) noexcept = default;
-  PublishMessageHandler& PublishMessageHandler::operator=(PublishMessageHandler&&) noexcept = default;
-
-  std::optional<PublishMessageHandler> PublishMessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
-  {
-    detail::ExceptionSuppressor suppressor;
-    // Read the message from the passed bytes
-    PublishMessageHandler to_ret;
-    kj::Array<const kj::byte> buffer{
-      reinterpret_cast<const kj::byte*>(data.data()),
-      data.size(),
-      to_ret.impl_->null_disposer
-    };
-    kj::ArrayInputStream in_s{buffer};
-    capnp::readMessageCopy(in_s, to_ret.impl_->message);
-    to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Publish>();
-    if (suppressor.failed())
-    {
-      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::try_to_create");
-      return {};
-    }
-    else
-    {
-      return std::optional<PublishMessageHandler>{std::move(to_ret)};
-    }
-  }
-
-  std::optional<PublishData> PublishMessageHandler::data() const noexcept
-  {
-    detail::ExceptionSuppressor suppressor;
-    if (!impl_->root.isData()) { return {}; }
-    auto to_ret = PublishData{impl_->root.getData()};
-    if (suppressor.failed())
-    {
-      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::data");
-      return {};
-    }
-    else
-    {
-      return std::optional<PublishData>{std::move(to_ret)};
     }
   }
 } // namespace skynet::internal
