@@ -5,7 +5,6 @@ core_tests = {
     'broadcast',
     'disconnect',
     'heartbeat',
-    'master_conn',
     'publish_data_wrapper',
     'simple_reduce',
     'broken_subscribes',
