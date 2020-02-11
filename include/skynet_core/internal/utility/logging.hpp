@@ -91,7 +91,7 @@ struct fmt::formatter<skynet::PublishValueVariant>
 // Don't make it a general pair format, since most thing won't want to be
 // printed seperated by a colon
 template<>
-struct fmt::formatter<std::pair<std::string, std::uint16_t>>
+struct fmt::formatter<skynet::AddrPortPair>
 {
   template<typename ParseContext>
   constexpr auto parse(ParseContext& ctx) noexcept
@@ -100,7 +100,7 @@ struct fmt::formatter<std::pair<std::string, std::uint16_t>>
   }
 
   template<typename FormatContext>
-  auto format(const std::pair<std::string, std::uint16_t>& data, FormatContext& ctx) noexcept
+  auto format(const skynet::AddrPortPair& data, FormatContext& ctx) noexcept
   {
     return format_to(ctx.out(), "{}:{}", data.first, data.second);
   }

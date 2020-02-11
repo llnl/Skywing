@@ -2,7 +2,6 @@
 #define SKYNET_MASTER_HPP
 
 #include "skynet_core/internal/devices/socket_communicator.hpp"
-#include "skynet_core/internal/utility/network_conv.hpp"
 #include "skynet_core/internal/capn_proto_wrapper.hpp"
 #include "skynet_core/internal/master_waiter_callables.hpp"
 #include "skynet_core/internal/message_creators.hpp"
@@ -50,32 +49,11 @@ namespace skynet
     class ExternalMaster
     {
     public:
-      /** \brief Attempt to construct an ExternalMaster using an existing connection
-       *
-       * This is for when a server accepts a new connection.  Both have to
-       * send/recieve greetings, but need to do so in the opposite order so
-       * have seperate constructors for both.
-       */
-      static std::optional<ExternalMaster> create(
-        ByAccept,
-        SocketCommunicator conn,
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
-        Master& master,
-        std::uint16_t base_port
-      ) noexcept;
-
-      /** \brief Attempt to construct an ExternalMaster using an existing connection
-       *
-       * This is for when a client connects to a server.
-       */
-      static std::optional<ExternalMaster> create(
-        ByRequest,
-        SocketCommunicator conn,
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
-        Master& master,
-        std::uint16_t base_port
+      ExternalMaster(
+        SocketCommunicator comm,
+        const MachineID& id,
+        const std::vector<MachineID>& neighbors,
+        std::uint16_t port
       ) noexcept;
 
       /** \brief Handles any messages sent from the connection
@@ -125,9 +103,6 @@ namespace skynet
       void ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept;
 
     private:
-      // Only allow private construction from a socket
-      explicit ExternalMaster(SocketCommunicator conn) noexcept;
-
       // Read some bytes from the connection, returning false if the read failed
       bool read_from_conn(std::byte* buffer, std::size_t count) noexcept;
 
@@ -135,27 +110,8 @@ namespace skynet
       // the number of bytes couldn't be read
       std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
 
-      // Attempt to get a MessageHandler from the connection
-      std::optional<MessageHandler> try_to_get_status_message() noexcept;
-
-      // Function that handles the joining/accepting connection
-      template<typename First, typename Second>
-      static std::optional<ExternalMaster> init_conn(ExternalMaster& m, First first, Second second) noexcept
-      {
-        if (!first()) { return {}; }
-        if (!second()) { return {}; }
-        return std::optional<ExternalMaster>{std::move(m)};
-      }
-
-      // Send the greeting
-      bool send_greeting(
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
-        std::uint16_t base_port
-      ) noexcept;
-
-      // Wait until the greeting is sent
-      bool wait_for_greeting() noexcept;
+      // Attempts to get a message
+      std::optional<MessageHandler> try_to_get_message() noexcept;
 
       // Handle status messages
       void handle_message(MessageHandler& handle) noexcept;
@@ -185,8 +141,8 @@ namespace skynet
       // std::unordered_set for fast look-up
       std::unordered_set<TagID> subscriptions_;
 
-      // The base port to use to connect to the remote machine
-      std::uint16_t base_port_;
+      // The port to use to connect to the remote machine
+      std::uint16_t port_;
 
       // The number of times requests have been unfulfilled
       std::uint8_t backoff_counter_ = 0;
@@ -250,13 +206,14 @@ namespace skynet
      *
      * \param address The address to connect to
      * \param port The port to connect on
-     * \return True if the connection was successful, false if it failed
      */
-    bool connect_to_server(const char* const address, const std::uint16_t port) noexcept;
+    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
 
     /** \brief Connects to another instance with the address:port format
      */
-    bool connect_to_server(std::string_view address) noexcept;
+    auto connect_to_server(std::string_view address) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
 
     /** \brief See if there are any pending connections and accept them if so
      */
@@ -432,6 +389,8 @@ namespace skynet
       friend class internal::MasterSubscribeIsDone;
       friend class internal::MasterReduceGroupIsCreated;
       friend class internal::MasterGetReduceGroup;
+      friend class internal::MasterConnectionIsComplete;
+      friend class internal::MasterGetConnectionSuccess;
 
       static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
       {
@@ -446,6 +405,16 @@ namespace skynet
       static internal::ReduceGroupBase& get_reduce_group(Master& m, const TagID& group_id) noexcept
       {
         return m.get_reduce_group(group_id);
+      }
+
+      static bool conn_is_complete(Master& m, const AddrPortPair& address) noexcept
+      {
+        return m.conn_is_complete(address);
+      }
+
+      static bool conn_get_success(Master& m, const AddrPortPair& address) noexcept
+      {
+        return m.addr_is_connected(address);
       }
     }; // struct WaiterAccessor
 
@@ -481,7 +450,7 @@ namespace skynet
 
     /** \brief Notify neighbors of a new new neighbor
      */
-    void notify_of_new_neighbor(const MachineID id) noexcept;
+    void notify_of_new_neighbor(const MachineID& id) noexcept;
 
     /** \brief Removes all dead neighbors
      */
@@ -632,6 +601,25 @@ namespace skynet
      */
     bool try_connections_for_pending_tags() noexcept;
 
+    /** \brief Returns true if the connection to the specified address is complete
+     */
+    bool conn_is_complete(const AddrPortPair& address) noexcept;
+
+    /** \brief Returns true if the connection was successful, false otherwise
+     *
+     * More accurately, checks if an address is currently connected, which may
+     * be usedful to expose at some point?
+     */
+    bool addr_is_connected(const AddrPortPair& address) const noexcept;
+
+    /** Process pending user requested connections
+     */
+    void process_pending_conns() noexcept;
+
+    /** Creates the message for the initial handshake
+     */
+    std::vector<std::byte> make_handshake() const noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
@@ -680,7 +668,38 @@ namespace skynet
     std::unordered_set<TagID> produced_tags_;
 
     // The port used for communications
-    std::uint16_t comm_port_;
+    std::uint16_t port_;
+
+    // Mapping from a machine address to a pointer to the external master
+    // This is also used for testing that a connection has completed
+    std::unordered_map<AddrPortPair, internal::ExternalMaster*> addr_to_machine_;
+
+    /** \brief Connection status for pending connections
+     */
+    enum class ConnStatus
+    {
+      waiting_for_conn,
+      waiting_for_resp
+    };
+
+    /** \brief Type of pending connection
+     */
+    enum class ConnType
+    {
+      user_requested,
+      by_accept,
+      subscription,
+      reduce_group
+    };
+    // Pending connections for all types
+    struct PendingInfo
+    {
+      internal::SocketCommunicator conn;
+      ConnStatus status;
+      ConnType type;
+      std::string tag;
+    };
+    std::unordered_map<AddrPortPair, PendingInfo> pending_conns_;
 
     // Notification for when new subscriptions are created
     std::condition_variable new_subscription_cv_;
@@ -688,10 +707,14 @@ namespace skynet
     // Notification for when reduce group related connections are made
     std::condition_variable reduce_group_cv_;
 
+    // Notification for when connections are complete
+    std::condition_variable connection_cv_;
+
     // Bools seperate for if notifications should be raised so that
     // the CV's can use notifications while the mutex is released
     bool notify_new_subscriptions_ = false;
     bool notify_reduce_group_ = false;
+    bool notify_connection_ = false;
   }; // class Master
 } // namespace skynet
 

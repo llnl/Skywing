@@ -11,41 +11,17 @@ namespace skynet
 {
   namespace internal
   {
-    std::optional<ExternalMaster> ExternalMaster::create(
-      ByAccept,
+    ExternalMaster::ExternalMaster(
       SocketCommunicator conn,
-      const MachineID& local_id,
-      const std::vector<MachineID>& local_neighbors,
-      Master& master,
-      const std::uint16_t base_port
+      const MachineID& id,
+      const std::vector<MachineID>& neighbors,
+      const std::uint16_t port
     ) noexcept
-    {
-      ExternalMaster to_ret(std::move(conn));
-      to_ret.master_ = &master;
-      return init_conn(
-        to_ret,
-        [&]() { return to_ret.send_greeting(local_id, local_neighbors, base_port); },
-        [&]() { return to_ret.wait_for_greeting(); }
-      );
-    }
-
-    std::optional<ExternalMaster> ExternalMaster::create(
-      ByRequest,
-      SocketCommunicator conn,
-      const MachineID& local_id,
-      const std::vector<MachineID>& local_neighbors,
-      Master& master,
-      const std::uint16_t base_port
-    ) noexcept
-    {
-      ExternalMaster to_ret(std::move(conn));
-      to_ret.master_ = &master;
-      return init_conn(
-        to_ret,
-        [&]() { return to_ret.wait_for_greeting(); },
-        [&]() { return to_ret.send_greeting(local_id, local_neighbors, base_port); }
-      );
-    }
+      : conn_{std::move(conn)}
+      , id_{id}
+      , neighbors_{neighbors}
+      , port_{port}
+    {}
 
     void ExternalMaster::get_and_handle_messages() noexcept
     {
@@ -53,7 +29,7 @@ namespace skynet
       {
         return;
       }
-      while (auto handler = try_to_get_status_message())
+      while (auto handler = try_to_get_message())
       {
         // Update the last time something was heard
         last_heard_ = std::chrono::steady_clock::now();
@@ -124,7 +100,7 @@ namespace skynet
     {
       const auto [ip_address, dummy] = conn_.ip_address_and_port();
       (void)dummy;
-      return ip_address + ':' + std::to_string(base_port_);
+      return ip_address + ':' + std::to_string(port_);
     }
 
     void ExternalMaster::ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept
@@ -138,11 +114,6 @@ namespace skynet
         request_tags_time_ = calc_next_request_time();
       }
     }
-
-    ExternalMaster::ExternalMaster(SocketCommunicator conn) noexcept
-      : conn_{std::move(conn)}
-      , last_heard_{std::chrono::steady_clock::now()}
-    {}
 
     // Read some bytes from the connection, returning false if the read failed
     bool ExternalMaster::read_from_conn(std::byte* const buffer, const std::size_t count) noexcept
@@ -162,14 +133,12 @@ namespace skynet
       return true;
     }
 
-    std::optional<MessageHandler> ExternalMaster::try_to_get_status_message() noexcept
+    std::optional<MessageHandler> ExternalMaster::try_to_get_message() noexcept
     {
-      std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
-      if (read_from_conn(size_buffer.data(), size_buffer.size()))
+      if (const auto bytes_to_read = read_network_size(conn_))
       {
-        const auto bytes_to_read = from_network_bytes(size_buffer);
         // Then read the actual message and parse it
-        if (const auto message_buffer = read_chunked(conn_, bytes_to_read); !message_buffer.empty())
+        if (const auto message_buffer = read_chunked(conn_, *bytes_to_read); !message_buffer.empty())
         {
           return MessageHandler::try_to_create(message_buffer);
         }
@@ -181,64 +150,6 @@ namespace skynet
         }
       }
       return {};
-    }
-
-    // Send the greeting
-    bool ExternalMaster::send_greeting(
-      const MachineID& local_id,
-      const std::vector<MachineID>& local_neighbors,
-      const std::uint16_t base_port
-    ) noexcept
-    {
-      send_message(make_greeting(local_id, local_neighbors, base_port));
-      SKYNET_TRACE_LOG(
-        "\"{}\" sending greeting to {}",
-        master_->id(),
-        conn_.ip_address_and_port()
-      );
-      return !dead_;
-    }
-
-    // Wait until the greeting is sent
-    bool ExternalMaster::wait_for_greeting() noexcept
-    {
-      // Wait for the greeting
-      // TODO: Probably want a time-out?
-      SKYNET_TRACE_LOG(
-        "\"{}\" waiting for greeting from {}",
-        master_->id(),
-        conn_.ip_address_and_port()
-      );
-      while (!dead_)
-      {
-        if (auto handle = try_to_get_status_message())
-        {
-          return handle->do_callback(
-            [&](const Greeting& msg) {
-              neighbors_ = msg.neighbors();
-              id_ = msg.from();
-              base_port_ = msg.base_port();
-              SKYNET_TRACE_LOG(
-                "\"{}\" got greeting from {}",
-                master_->id(),
-                conn_.ip_address_and_port()
-              );
-              return true;
-            },
-            // Any other kind of message is an error
-            [&](...) {
-              SKYNET_WARN_LOG(
-                "\"{}\" recieved a non-greeting from {} during the handshake",
-                master_->id(),
-                conn_.ip_address_and_port().first
-              );
-              return false;
-            }
-          );
-        }
-        std::this_thread::sleep_for(std::chrono::microseconds{10});
-      }
-      return false;
     }
 
     // Handle status messages
@@ -485,7 +396,7 @@ namespace skynet
     : id_{id}
     , heartbeat_interval_{heartbeat_interval}
     // , pub_channel_{static_cast<std::uint16_t>(port + publisher_port_offset)}
-    , comm_port_{port}
+    , port_{port}
   {
     if (server_socket_.set_to_listen(port) != internal::ConnectionError::no_error)
     {
@@ -533,12 +444,36 @@ namespace skynet
     send_to_neighbors(internal::make_goodbye());
   }
 
-  bool Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
+  auto Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
+    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
   {
-    return connect_impl(address, port) != neighbors_.end();
+    const auto [iter, inserted] = pending_conns_.try_emplace(
+      AddrPortPair{address, port},
+      PendingInfo{
+        internal::SocketCommunicator{},
+        ConnStatus::waiting_for_conn,
+        ConnType::user_requested,
+        ""
+      }
+    );
+    if (!inserted)
+    {
+      std::cerr << "Address " << address << ':' << port << " attempted to be connected to twice!\n";
+      std::exit(1);
+    }
+    const auto status = iter->second.conn.connect_non_blocking(address, port);
+    // Ignore status - if this initially fails it will be handled later
+    (void)status;
+    return internal::make_waiter(
+      job_mut_,
+      connection_cv_,
+      internal::MasterConnectionIsComplete{*this, address, port},
+      internal::MasterGetConnectionSuccess{*this, address, port}
+    );
   }
 
-  bool Master::connect_to_server(std::string_view address) noexcept
+  auto Master::connect_to_server(std::string_view address) noexcept
+    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
   {
     const auto [port, addr] = internal::split_address(address);
     return connect_to_server(addr.c_str(), port);
@@ -548,35 +483,32 @@ namespace skynet
   {
     while (auto conn = server_socket_.accept())
     {
-      if (auto new_neighbor = internal::ExternalMaster::create(
-        internal::ByAccept{},
+      // This feels gross since it's basically the same thing as above, but I'm not
+      // sure how to condense them as they are slightly different
+      const auto& [address, port] = conn->ip_address_and_port();
+      auto info = PendingInfo{
         std::move(*conn),
-        id_,
-        make_neighbor_vector(),
-        *this,
-        comm_port_
-      )) {
-        const auto new_id = new_neighbor->id();
-        // This ID already exists; so drop the connection
-        if (neighbors_.find(new_id) != neighbors_.end())
+        ConnStatus::waiting_for_conn,
+        ConnType::user_requested,
+        ""
+      };
+      // Accept seems to re-use ports, and the actual address doesn't matter, so keep shuffling
+      // until it manages to get in
+      auto inc_port = port;
+      while (true)
+      {
+        const auto [iter, inserted] = pending_conns_.try_emplace(
+          AddrPortPair{address, inc_port},
+          std::move(info)
+        );
+        (void)iter;
+        ++inc_port;
+        if (inserted)
         {
-          SKYNET_WARN_LOG(
-            "\"{}\" rejected connection due to the id already being used",
-            id_,
-            new_neighbor->id()
-          );
-          continue;
-        }
-        SKYNET_TRACE_LOG("\"{}\" accepted connection from \"{}\"", id_, new_neighbor->id());
-        notify_of_new_neighbor(new_id);
-        const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
-        assert(inserted);
-        // Send request for any pending tags
-        if (!pending_tags_.empty())
-        {
-          iter->second.find_publishers_for_tags(pending_tags_, false);
+          break;
         }
       }
+      // No need for waiters or anything
     }
   }
 
@@ -632,6 +564,7 @@ namespace skynet
       {
         // Ensure there's no data race with jobs
         std::lock_guard lock{job_mut_};
+        process_pending_conns();
         accept_pending_connections();
         handle_neighbor_messages();
         remove_dead_neighbors();
@@ -646,9 +579,10 @@ namespace skynet
       }
       // Mutex has been released - notify CV's if requested
       using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
-      std::array<cv_ref_pair, 2> cv_array{
+      std::array<cv_ref_pair, 3> cv_array{
         cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
-        cv_ref_pair{notify_reduce_group_, reduce_group_cv_}
+        cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
+        cv_ref_pair{notify_connection_, connection_cv_}
       };
       for (auto& [notify, cv] : cv_array)
       {
@@ -681,52 +615,56 @@ namespace skynet
 
   auto Master::connect_impl(const char* address, std::uint16_t port) noexcept -> decltype(neighbors_)::iterator
   {
-    internal::SocketCommunicator to_connect;
-    SKYNET_TRACE_LOG("\"{}\" attempting to connect to {}:{}", id_, address, port);
-    if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
-    {
-      // Failing to connect to a server is normal enough that the logging level
-      // here should probably be trace or debug at the most
-      SKYNET_TRACE_LOG("\"{}\" failed to connect to {}:{}", id_, address, port);
-      // internal::on_error("Master::connect_to_server failed!");
-      return neighbors_.end();
-    }
-    if (auto new_neighbor = internal::ExternalMaster::create(
-      internal::ByRequest{},
-      std::move(to_connect),
-      id_,
-      make_neighbor_vector(),
-      *this,
-      comm_port_
-    ))
-    {
-      const auto new_id = new_neighbor->id();
-      // This ID already exists; drop the connection
-      if (neighbors_.find(new_id) != neighbors_.end())
-      {
-        SKYNET_WARN_LOG(
-          "\"{}\" rejected {}:{} due to a neighbor already using the id \"{}\"",
-          id_,
-          address,
-          port,
-          new_neighbor->id()
-        );
-        return neighbors_.end();
-      }
-      notify_of_new_neighbor(new_id);
-      const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
-      assert(inserted);
-      // Send request for any pending tags
-      if (!pending_tags_.empty())
-      {
-        iter->second.find_publishers_for_tags(pending_tags_, false);
-      }
-      return iter;
-    }
-    else
-    {
-      return neighbors_.end();
-    }
+    (void)address;
+    (void)port;
+    // TODO: FIX
+    return neighbors_.end();
+    // internal::SocketCommunicator to_connect;
+    // SKYNET_TRACE_LOG("\"{}\" attempting to connect to {}:{}", id_, address, port);
+    // if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
+    // {
+    //   // Failing to connect to a server is normal enough that the logging level
+    //   // here should probably be trace or debug at the most
+    //   SKYNET_TRACE_LOG("\"{}\" failed to connect to {}:{}", id_, address, port);
+    //   // internal::on_error("Master::connect_to_server failed!");
+    //   return neighbors_.end();
+    // }
+    // if (auto new_neighbor = internal::ExternalMaster::create(
+    //   internal::ByRequest{},
+    //   std::move(to_connect),
+    //   id_,
+    //   make_neighbor_vector(),
+    //   *this,
+    //   port_
+    // ))
+    // {
+    //   const auto new_id = new_neighbor->id();
+    //   // This ID already exists; drop the connection
+    //   if (neighbors_.find(new_id) != neighbors_.end())
+    //   {
+    //     SKYNET_WARN_LOG(
+    //       "\"{}\" rejected {}:{} due to a neighbor already using the id \"{}\"",
+    //       id_,
+    //       address,
+    //       port,
+    //       new_neighbor->id()
+    //     );
+    //     return neighbors_.end();
+    //   }
+    //   notify_of_new_neighbor(new_id);
+    //   const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
+    //   assert(inserted);
+    //   // Send request for any pending tags
+    //   if (!pending_tags_.empty())
+    //   {
+    //     iter->second.find_publishers_for_tags(pending_tags_, false);
+    //   }
+    //   return iter;
+    // }
+    // else
+    // {
+    //   return neighbors_.end();
+    // }
   }
 
   void Master::handle_neighbor_messages() noexcept
@@ -771,9 +709,11 @@ namespace skynet
     return true;
   }
 
-  void Master::notify_of_new_neighbor(const MachineID id) noexcept
+  void Master::notify_of_new_neighbor(const MachineID& id) noexcept
   {
-    send_to_neighbors(internal::make_new_neighbor(id));
+    send_to_neighbors_if(internal::make_new_neighbor(id), [&](const internal::ExternalMaster& neighbor) {
+      return neighbor.id() != id;
+    });
   }
 
   void Master::remove_dead_neighbors() noexcept
@@ -1553,146 +1493,250 @@ namespace skynet
 
   bool Master::try_connections_for_pending_tags() noexcept
   {
-    bool ignore_cache = false;
-    for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
+    return true;
+    // bool ignore_cache = false;
+    // for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
+    // {
+    //   const auto& tag_id = *iter;
+    //   // Check if there is a list of known producers for the tag
+    //   const auto loc = publishers_for_tag_.find(tag_id);
+    //   // Create the entry if it exists
+    //   if (loc != publishers_for_tag_.cend())
+    //   {
+    //     auto& publishers = loc->second;
+    //     // Now, if there are any known subscriptions, try to subscribe to them
+    //     if (!publishers.empty())
+    //     {
+    //       for (auto pub_iter = publishers.begin(); pub_iter != publishers.end(); )
+    //       {
+    //         // Sub/pub connections
+    //         const auto& subscribe_address = *pub_iter;
+    //         if (tag_id[0] == internal::publish_tag_marker)
+    //         {
+    //           // TODO: PUBLISH CHANGE
+    //           // if (auto sub = internal::Subscription::try_to_create(subscribe_address))
+    //           // {
+    //           //   subscriptions_.push_back(SubscriptionData{
+    //           //     std::move(*sub),
+    //           //     get_tags_for_publisher(subscribe_address)
+    //           //   });
+    //           //   // Managed to subscribe; remove the pending tag
+    //           //   using std::swap;
+    //           //   swap(*iter, pending_tags_.back());
+    //           //   pending_tags_.pop_back();
+    //           //   --iter;
+    //           //   notify_new_subscriptions_ = true;
+    //           //   break;
+    //           // }
+    //           // else
+    //           // {
+    //           //   SKYNET_TRACE_LOG("\"{}\" failed to subscribe to \"{}\" for tag \"{}\"", id_, subscribe_address, tag_id);
+    //           //   // Couldn't subscribe - remove this as a producer
+    //           //   pub_iter = publishers.erase(pub_iter);
+    //           // }
+    //         }
+    //         else
+    //         {
+    //           // Reduce group connections
+    //           // First find the group that the tag the parent is for.
+    //           // If there's no matching tag then just ignore it
+    //           // TODO: Keep a look-up map if this becomes a performance issue
+    //           auto& [group_id, reduce_data] = [&]() -> decltype(reduce_tag_data_)::reference {
+    //             for (auto& data_pair : reduce_tag_data_)
+    //             {
+    //               const auto& group_data = data_pair.second;
+    //               const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
+    //               if (parent == tag_id)
+    //               {
+    //                 return data_pair;
+    //               }
+    //             }
+    //             assert(false && "No group matching the produced tag found?");
+    //             return *reduce_tag_data_.begin();
+    //           }();
+    //           const decltype(neighbors_)::iterator server_iter = [&]() {
+    //             // Check if there is already a connection present, and just add the
+    //             // ID if so
+    //             // const auto conn_iter = addr_to_iter_.find(subscribe_address);
+    //             // if (conn_iter != neighbors_.cend())
+    //             // {
+    //             //   SKYNET_TRACE_LOG(
+    //             //     "\"{}\" already has connection to \"{}\" ({}) for tag \"{}\" for reduce groups",
+    //             //     id_,
+    //             //     conn_iter->second.id(),
+    //             //     subscribe_address,
+    //             //     tag_id
+    //             //   );
+    //             //   return conn_iter;
+    //             // }
+    //             // else
+    //             // {
+    //             //   const auto [port, addr] = internal::split_address(subscribe_address);
+    //             //   SKYNET_TRACE_LOG(
+    //             //     "\"{}\" attempting to connect to {}:{} for tag \"{}\" for reduce group",
+    //             //     id_,
+    //             //     addr,
+    //             //     port,
+    //             //     tag_id
+    //             //   );
+    //             //   return connect_impl(addr.c_str(), port);
+    //             // }
+    //           }();
+    //           if (server_iter != neighbors_.cend())
+    //           {
+    //             SKYNET_TRACE_LOG(
+    //               "\"{}\" using \"{}\" for tag \"{}\" for reduce group",
+    //               id_,
+    //               server_iter->first,
+    //               tag_id
+    //             );
+    //             const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*reduce_data.group);
+    //             server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
+    //             reduce_data.parent_machines.push_back(server_iter->second.id());
+    //             notify_reduce_group_ = true;
+    //             // Managed to create a connection; remove the pending tag
+    //             using std::swap;
+    //             swap(*iter, pending_tags_.back());
+    //             pending_tags_.pop_back();
+    //             --iter;
+    //             break;
+    //           }
+    //           else
+    //           {
+    //             SKYNET_TRACE_LOG(
+    //               "\"{}\" failed to connect to \"{}\" for tag \"{}\" for reduce groups",
+    //               id_,
+    //               subscribe_address,
+    //               tag_id
+    //             );
+    //             pub_iter = publishers.erase(pub_iter);
+    //           }
+    //         }
+    //       }
+    //     }
+    //     // Check if the producers are now empty (happens if all subscription attempts failed)
+    //     if (publishers.empty())
+    //     {
+    //       // Need to get original producers for tags now, so have to ignore caches
+    //       ignore_cache = true;
+    //     }
+    //   }
+    // }
+    // return ignore_cache;
+  }
+
+  bool Master::conn_is_complete(const AddrPortPair& address) noexcept
+  {
+    return pending_conns_.find(address) == pending_conns_.cend();
+  }
+
+  bool Master::addr_is_connected(const AddrPortPair& address) const noexcept
+  {
+    const auto iter = addr_to_machine_.find(address);
+    if (iter == addr_to_machine_.cend()) { return false; }
+    return !iter->second->is_dead();
+  }
+
+  void Master::process_pending_conns() noexcept
+  {
+    // TODO: Add error handling in here, kind of tricky on where to place it
+    // as there are a variety of failure points
+    for (auto iter = pending_conns_.begin(); iter != pending_conns_.end(); )
     {
-      const auto& tag_id = *iter;
-      // Check if there is a list of known producers for the tag
-      const auto loc = publishers_for_tag_.find(tag_id);
-      // Create the entry if it exists
-      if (loc != publishers_for_tag_.cend())
+      auto& info = iter->second;
+      if (info.status == ConnStatus::waiting_for_conn)
       {
-        auto& publishers = loc->second;
-        // Now, if there are any known subscriptions, try to subscribe to them
-        if (!publishers.empty())
+        const auto init_status = info.conn.connection_progress_status();
+        switch (init_status)
         {
-          for (auto pub_iter = publishers.begin(); pub_iter != publishers.end(); )
+        case internal::ConnectionError::connection_in_progress:
+          break;
+
+        case internal::ConnectionError::no_error:
           {
-            // Sub/pub connections
-            const auto& subscribe_address = *pub_iter;
-            if (tag_id[0] == internal::publish_tag_marker)
+            // Send message and mark as waiting
+            const auto message = make_handshake();
+            if (info.conn.send_message(message.data(), message.size()) != internal::ConnectionError::no_error)
             {
-              // TODO: PUBLISH CHANGE
-              // if (auto sub = internal::Subscription::try_to_create(subscribe_address))
-              // {
-              //   subscriptions_.push_back(SubscriptionData{
-              //     std::move(*sub),
-              //     get_tags_for_publisher(subscribe_address)
-              //   });
-              //   // Managed to subscribe; remove the pending tag
-              //   using std::swap;
-              //   swap(*iter, pending_tags_.back());
-              //   pending_tags_.pop_back();
-              //   --iter;
-              //   notify_new_subscriptions_ = true;
-              //   break;
-              // }
-              // else
-              // {
-              //   SKYNET_TRACE_LOG("\"{}\" failed to subscribe to \"{}\" for tag \"{}\"", id_, subscribe_address, tag_id);
-              //   // Couldn't subscribe - remove this as a producer
-              //   pub_iter = publishers.erase(pub_iter);
-              // }
+              notify_connection_ = true;
+              iter = pending_conns_.erase(iter);
+              break;
             }
-            else
+            info.status = ConnStatus::waiting_for_resp;
+          }
+          break;
+
+        // Anything else is an error
+        default:
+          notify_connection_ = true;
+          iter = pending_conns_.erase(iter);
+          break;
+        }
+      }
+      else if (info.status == ConnStatus::waiting_for_resp)
+      {
+        // Try to read message from the connection
+        if (const auto bytes_to_read = read_network_size(info.conn))
+        {
+          if (const auto message_buffer = internal::read_chunked(info.conn, *bytes_to_read); !message_buffer.empty())
+          {
+            if (const auto msg = internal::MessageHandler::try_to_create(message_buffer))
             {
-              // Reduce group connections
-              // First find the group that the tag the parent is for.
-              // If there's no matching tag then just ignore it
-              // TODO: Keep a look-up map if this becomes a performance issue
-              auto& [group_id, reduce_data] = [&]() -> decltype(reduce_tag_data_)::reference {
-                for (auto& data_pair : reduce_tag_data_)
-                {
-                  const auto& group_data = data_pair.second;
-                  const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
-                  if (parent == tag_id)
-                  {
-                    return data_pair;
-                  }
-                }
-                assert(false && "No group matching the produced tag found?");
-                return *reduce_tag_data_.begin();
-              }();
-              const decltype(neighbors_)::iterator server_iter = [&]() {
-                // Check if there is already a connection present, and just add the
-                // ID if so
-                // TODO: If this is a bottleneck, keep a mapping of the ip addresses to
-                // the machine names as well
-                const decltype(neighbors_)::iterator conn_iter = [&]() {
-                  for (auto neighbor_iter = neighbors_.begin(); neighbor_iter != neighbors_.end(); ++neighbor_iter)
-                  {
-                    const auto& neighbor = *neighbor_iter;
-                    if (subscribe_address == neighbor.second.address())
-                    {
-                      return neighbor_iter;
-                    }
-                  }
-                  return neighbors_.end();
-                }();
-                if (conn_iter != neighbors_.cend())
-                {
-                  SKYNET_TRACE_LOG(
-                    "\"{}\" already has connection to \"{}\" ({}) for tag \"{}\" for reduce groups",
-                    id_,
-                    conn_iter->second.id(),
-                    subscribe_address,
-                    tag_id
+              decltype(neighbors_)::iterator new_neighbor_iter;
+              const auto okay = msg->do_callback(
+                [&](const internal::Greeting& greeting) {
+                  // add connection to active list / remove from pending list
+                  auto [neighbor_iter, inserted] = neighbors_.try_emplace(
+                    greeting.from(),
+                    std::move(info.conn),
+                    greeting.from(),
+                    greeting.neighbors(),
+                    iter->first.second
                   );
-                  return conn_iter;
-                }
-                else
+                  new_neighbor_iter = neighbor_iter;
+                  if (!inserted)
+                  {
+                    return false;
+                  }
+                  addr_to_machine_.try_emplace(iter->first, &neighbor_iter->second);
+                  return true;
+                },
+                [](...) { return false; }
+              );
+              if (okay)
+              {
+                switch (info.type)
                 {
-                  const auto [port, addr] = internal::split_address(subscribe_address);
-                  SKYNET_TRACE_LOG(
-                    "\"{}\" attempting to connect to {}:{} for tag \"{}\" for reduce group",
-                    id_,
-                    addr,
-                    port,
-                    tag_id
-                  );
-                  return connect_impl(addr.c_str(), port);
+                case ConnType::by_accept:
+                case ConnType::user_requested:
+                  break;
+
+                case ConnType::reduce_group:
+                  // TODO: THIS
+                  break;
+
+                case ConnType::subscription:
+                  // TODO: THIS
+                  break;
                 }
-              }();
-              if (server_iter != neighbors_.cend())
-              {
-                SKYNET_TRACE_LOG(
-                  "\"{}\" using \"{}\" for tag \"{}\" for reduce group",
-                  id_,
-                  server_iter->first,
-                  tag_id
-                );
-                const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*reduce_data.group);
-                server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
-                reduce_data.parent_machines.push_back(server_iter->second.id());
-                notify_reduce_group_ = true;
-                // Managed to create a connection; remove the pending tag
-                using std::swap;
-                swap(*iter, pending_tags_.back());
-                pending_tags_.pop_back();
-                --iter;
-                break;
-              }
-              else
-              {
-                SKYNET_TRACE_LOG(
-                  "\"{}\" failed to connect to \"{}\" for tag \"{}\" for reduce groups",
-                  id_,
-                  subscribe_address,
-                  tag_id
-                );
-                pub_iter = publishers.erase(pub_iter);
+                // These will always happen at the end
+                notify_of_new_neighbor(new_neighbor_iter->first);
+                if (!pending_tags_.empty())
+                {
+                  new_neighbor_iter->second.find_publishers_for_tags(pending_tags_, false);
+                }
               }
             }
           }
-        }
-        // Check if the producers are now empty (happens if all subscription attempts failed)
-        if (publishers.empty())
-        {
-          // Need to get original producers for tags now, so have to ignore caches
-          ignore_cache = true;
+          notify_connection_ = true;
+          iter = pending_conns_.erase(iter);
         }
       }
     }
-    return ignore_cache;
+  }
+
+  std::vector<std::byte> Master::make_handshake() const noexcept
+  {
+    return internal::make_greeting(id_, make_neighbor_vector());
   }
 } // namespace skynet

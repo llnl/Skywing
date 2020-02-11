@@ -105,19 +105,16 @@ namespace skynet
   }
 
   // Performs the required steps to create the network from a NetworkInfo
-  // The connection argument should have the signature `bool(Master&, int)`
+  // The connection argument should have the signature `void(Master&, int)`
   // with the int parameter corresponding to the index of the machine to
-  // connect to, and returning true if it connected
+  // connect to, and blocking until connected
   template<typename Callable>
   void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
     {
-      while (!connect(master, connect_to))
-      {
-        std::this_thread::sleep_for(1ms);
-      }
+      connect(master, connect_to);
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {

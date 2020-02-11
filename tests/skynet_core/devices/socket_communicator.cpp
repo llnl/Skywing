@@ -49,7 +49,7 @@ void server()
 void client()
 {
   const auto do_send = [](SocketCommunicator& conn) {
-    std::array<std::byte, sizeof(int)> int_buffer;
+    std::array<std::byte, sizeof(value_to_send)> int_buffer;
     std::memcpy(int_buffer.data(), &value_to_send, sizeof(value_to_send));
     REQUIRE(conn.send_message(int_buffer.data(), int_buffer.size()) == ConnectionError::no_error);
   };

@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <string>
+#include <iostream>
 
 // TODO: Come up with a better testing scheme, will probably involve
 //       actually having multiple (virtual) machines to test so that
@@ -25,10 +26,10 @@ void machine_task(const NetworkInfo* const info, const int index)
     std::to_string(index),
     heartbeat_interval
   };
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
-  master.submit_job("dummy job", [](Job&) {
+  master.submit_job("dummy job", [&](Job&) {
+    connect_network(*info, master, index, [&](Master& m, const int i) {
+      m.connect_to_server("127.0.0.1", base_port + i).get();
+    });
     std::this_thread::sleep_for(heartbeat_interval * 10);
   });
   master.run();

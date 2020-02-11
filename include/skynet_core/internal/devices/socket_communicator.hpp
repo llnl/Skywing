@@ -1,6 +1,9 @@
 #ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 #define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
+#include "skynet_core/internal/utility/network_conv.hpp"
+#include "skynet_core/types.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -102,7 +105,7 @@ namespace skynet::internal
 
     /** \brief Returns the IP address and port of the socket
      */
-    std::pair<std::string, std::uint16_t> ip_address_and_port() const noexcept;
+    AddrPortPair ip_address_and_port() const noexcept;
 
   private:
     // Tag for using the raw handle constructor
@@ -119,10 +122,14 @@ namespace skynet::internal
    */
   std::vector<std::byte> read_chunked(SocketCommunicator& conn, std::size_t num_bytes) noexcept;
 
-  /** \brief Splits a "ip:port" address into its parts
+  /** \brief Splits an "ip:port" address into its parts
    * The string is empty if the input was invalid
    */
   std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept;
+
+  /** \brief Attempts to read a network size from a connection
+   */
+  std::optional<NetworkSizeType> read_network_size(SocketCommunicator& conn) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

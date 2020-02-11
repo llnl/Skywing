@@ -49,7 +49,6 @@ namespace skynet::internal
   public:
     MachineID from() const noexcept;
     std::vector<MachineID> neighbors() const noexcept;
-    std::uint16_t base_port() const noexcept;
 
   private:
     cpnpro::Greeting::Reader r;

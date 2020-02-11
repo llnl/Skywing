@@ -228,7 +228,7 @@ namespace skynet::internal
     return read_bytes == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
 
-  std::pair<std::string, std::uint16_t> SocketCommunicator::ip_address_and_port() const noexcept
+  AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
   {
     sockaddr_in client_address;
     socklen_t len = sizeof(client_address);
@@ -293,5 +293,16 @@ namespace skynet::internal
     // Need to make a std::string to ensure that it is null-terminated
     const std::string address_str{address.begin(), address.begin() + colon_loc};
     return {port, address_str};
+  }
+
+  std::optional<NetworkSizeType> read_network_size(SocketCommunicator& conn) noexcept
+  {
+
+      std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
+      if (conn.read_message(size_buffer.data(), size_buffer.size()) == ConnectionError::no_error)
+      {
+        return from_network_bytes(size_buffer);
+      }
+      return {};
   }
 } // namespace skynet::internal
