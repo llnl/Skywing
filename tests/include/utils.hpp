@@ -118,7 +118,6 @@ namespace skynet
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {
-      master.accept_pending_connections();
       std::this_thread::sleep_for(1ms);
     }
   }

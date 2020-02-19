@@ -29,14 +29,8 @@ void publish_once(int publish_number)
   // disconnected so it won't discard this connection for re-using the id
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
   Master master{publisher_port, publisher_id};
-  // TODO: I don't think this can be called from the job thread safely
-  // Maybe add a queue to master for pending connections to make and a way
-  // to add connections to submit to the queue or something
-  while (!master.connect_to_server("127.0.0.1", subscriber_port))
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
   master.submit_job("job", [&](Job& job) {
+    master.connect_to_server("127.0.0.1", subscriber_port).get();
     job.declare_publication_intent(value_tag);
     // Wait for the subscriber to finish subscribe
     while (subscriptions_finished <= publish_number)

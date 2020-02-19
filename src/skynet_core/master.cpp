@@ -15,11 +15,13 @@ namespace skynet
       SocketCommunicator conn,
       const MachineID& id,
       const std::vector<MachineID>& neighbors,
+      Master& master,
       const std::uint16_t port
     ) noexcept
       : conn_{std::move(conn)}
       , id_{id}
       , neighbors_{neighbors}
+      , master_{&master}
       , port_{port}
     {}
 
@@ -55,6 +57,8 @@ namespace skynet
     bool ExternalMaster::is_dead() const noexcept { return dead_; }
 
     void ExternalMaster::mark_as_dead() noexcept { dead_ = true; }
+
+    void ExternalMaster::ignore_cache_on_next_request() noexcept { ignore_cache_on_next_request_ = true; }
 
     bool ExternalMaster::has_neighbor(const MachineID& id) const noexcept
     {
@@ -103,6 +107,13 @@ namespace skynet
       return ip_address + ':' + std::to_string(port_);
     }
 
+    AddrPortPair ExternalMaster::address_pair() const noexcept
+    {
+      const auto [ip_address, dummy] = conn_.ip_address_and_port();
+      (void)dummy;
+      return {ip_address, port_};
+    }
+
     void ExternalMaster::ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept
     {
       assert(!tags.empty());
@@ -135,10 +146,12 @@ namespace skynet
 
     std::optional<MessageHandler> ExternalMaster::try_to_get_message() noexcept
     {
-      if (const auto bytes_to_read = read_network_size(conn_))
+      const auto bytes_to_read_or_error = read_network_size(conn_);
+      if (std::holds_alternative<NetworkSizeType>(bytes_to_read_or_error))
       {
+        const auto bytes_to_read = *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
         // Then read the actual message and parse it
-        if (const auto message_buffer = read_chunked(conn_, *bytes_to_read); !message_buffer.empty())
+        if (const auto message_buffer = read_chunked(conn_, bytes_to_read); !message_buffer.empty())
         {
           return MessageHandler::try_to_create(message_buffer);
         }
@@ -149,7 +162,15 @@ namespace skynet
           return {};
         }
       }
-      return {};
+      else
+      {
+        const auto err = *std::get_if<ConnectionError>(&bytes_to_read_or_error);
+        if (err != ConnectionError::would_block)
+        {
+          dead_ = true;
+        }
+        return {};
+      }
     }
 
     // Handle status messages
@@ -249,13 +270,7 @@ namespace skynet
               }
             }
           }
-          const bool ignore_cache =
-            Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
-          // Don't overwrite needing to ignore the cache with not needing to ignore it
-          if (ignore_cache)
-          {
-            ignore_cache_on_next_request_ = true;
-          }
+          Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
           // Mark there as not being a request out there and update the time to send out
           pending_tag_request_ = false;
           request_tags_time_ = calc_next_request_time();
@@ -374,8 +389,8 @@ namespace skynet
     std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() const noexcept
     {
       using namespace std::chrono_literals;
-      static constexpr std::array<std::chrono::milliseconds, 12> backoff_times{
-        5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms
+      static constexpr std::array<std::chrono::milliseconds, 10> backoff_times{
+        20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms
       };
       const auto add_time = backoff_counter_ >= backoff_times.size()
         ? backoff_times.back()
@@ -434,7 +449,6 @@ namespace skynet
   //         ++iter;
   //       }
   //     }
-  //     SKYNET_CRITICAL_LOG("{} MMMMMM {}", id_, connections_left.size());
   //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   //   }
   // }
@@ -475,7 +489,7 @@ namespace skynet
   auto Master::connect_to_server(std::string_view address) noexcept
     -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
   {
-    const auto [port, addr] = internal::split_address(address);
+    const auto [addr, port] = internal::split_address(address);
     return connect_to_server(addr.c_str(), port);
   }
 
@@ -505,6 +519,7 @@ namespace skynet
         ++inc_port;
         if (inserted)
         {
+          SKYNET_TRACE_LOG("{} accepted connection from {}", id_, iter->second.conn.ip_address_and_port());
           break;
         }
       }
@@ -613,60 +628,6 @@ namespace skynet
     return id_;
   }
 
-  auto Master::connect_impl(const char* address, std::uint16_t port) noexcept -> decltype(neighbors_)::iterator
-  {
-    (void)address;
-    (void)port;
-    // TODO: FIX
-    return neighbors_.end();
-    // internal::SocketCommunicator to_connect;
-    // SKYNET_TRACE_LOG("\"{}\" attempting to connect to {}:{}", id_, address, port);
-    // if (to_connect.connect_to_server(address, port) != internal::ConnectionError::no_error)
-    // {
-    //   // Failing to connect to a server is normal enough that the logging level
-    //   // here should probably be trace or debug at the most
-    //   SKYNET_TRACE_LOG("\"{}\" failed to connect to {}:{}", id_, address, port);
-    //   // internal::on_error("Master::connect_to_server failed!");
-    //   return neighbors_.end();
-    // }
-    // if (auto new_neighbor = internal::ExternalMaster::create(
-    //   internal::ByRequest{},
-    //   std::move(to_connect),
-    //   id_,
-    //   make_neighbor_vector(),
-    //   *this,
-    //   port_
-    // ))
-    // {
-    //   const auto new_id = new_neighbor->id();
-    //   // This ID already exists; drop the connection
-    //   if (neighbors_.find(new_id) != neighbors_.end())
-    //   {
-    //     SKYNET_WARN_LOG(
-    //       "\"{}\" rejected {}:{} due to a neighbor already using the id \"{}\"",
-    //       id_,
-    //       address,
-    //       port,
-    //       new_neighbor->id()
-    //     );
-    //     return neighbors_.end();
-    //   }
-    //   notify_of_new_neighbor(new_id);
-    //   const auto [iter, inserted] = neighbors_.emplace(new_id, std::move(*new_neighbor));
-    //   assert(inserted);
-    //   // Send request for any pending tags
-    //   if (!pending_tags_.empty())
-    //   {
-    //     iter->second.find_publishers_for_tags(pending_tags_, false);
-    //   }
-    //   return iter;
-    // }
-    // else
-    // {
-    //   return neighbors_.end();
-    // }
-  }
-
   void Master::handle_neighbor_messages() noexcept
   {
     for (auto&& neighbor : neighbors_)
@@ -682,6 +643,7 @@ namespace skynet
   ) noexcept
   {
     const auto msg = internal::make_publish(version, tag_id, value);
+    (void)msg;
     // TODO: PUBLISH CHANGE
     // SKYNET_TRACE_LOG(
     //   "\"{}\" publishing on tag \"{}\", version \"{}\", data {} to {} subscribers",
@@ -946,6 +908,9 @@ namespace skynet
           from.id()
         );
         from.send_message(make_known_tag_publisher_message());
+        // No longer need to propagate information to this neighbor, as it
+        // is being sent now
+        send_publisher_information_to_.erase(from.id());
       }
       else
       {
@@ -986,7 +951,7 @@ namespace skynet
     return tags_left;
   }
 
-  bool Master::add_publishers_and_propagate(
+  void Master::add_publishers_and_propagate(
     const internal::ReportPublishers& msg,
     const internal::ExternalMaster& from
   ) noexcept
@@ -999,7 +964,7 @@ namespace skynet
     if (tags.size() != publishers_list.size())
     {
       SKYNET_WARN_LOG("\"{}\" recieved tag/publisher list size mismatch from \"{}\"", id_, from.id());
-      return false;
+      return;
     }
     // Add the information to what is locally known
     for (std::size_t i = 0; i < tags.size(); ++i)
@@ -1084,7 +1049,7 @@ namespace skynet
         }
       }
     }
-    return try_connections_for_pending_tags();
+    init_connections_for_pending_tags();
   }
 
   std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
@@ -1194,7 +1159,7 @@ namespace skynet
   }
 
   auto Master::create_reduce_group(
-      std::unique_ptr<internal::ReduceGroupBase> group_ptr
+    std::unique_ptr<internal::ReduceGroupBase> group_ptr
   ) noexcept
     -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
   {
@@ -1491,9 +1456,89 @@ namespace skynet
     return true;
   }
 
-  bool Master::try_connections_for_pending_tags() noexcept
+  void Master::init_connections_for_pending_tags() noexcept
   {
-    return true;
+    for (auto tag_iter = pending_tags_.begin(); tag_iter != pending_tags_.end();)
+    {
+      const auto& tag = *tag_iter;
+      const auto iter = publishers_for_tag_.find(tag);
+      if (iter == publishers_for_tag_.cend())
+      {
+        ++tag_iter;
+        continue;
+      }
+      auto& publishers = iter->second;
+      if (publishers.empty())
+      {
+        ++tag_iter;
+        continue;
+      }
+      while (!publishers.empty())
+      {
+        const auto& addr = *publishers.begin();
+        // Check if the machine is already a neighbor, and handle it if so
+        const auto neighbor_iter = addr_to_machine_.find(internal::split_address(addr));
+        if (neighbor_iter != addr_to_machine_.cend())
+        {
+          if (tag[0] == internal::publish_tag_marker)
+          {
+            // TODO: Subscribe
+          }
+          else
+          {
+            // Reduce group
+            finalize_reduce_group(
+              neighbor_iter->second->id(),
+              group_from_parent_tag(tag).first
+            );
+          }
+          tag_iter = pending_tags_.erase(tag_iter);
+          break;
+        }
+        internal::SocketCommunicator conn{};
+        const auto err = conn.connect_non_blocking(addr);
+        if (err == internal::ConnectionError::connection_in_progress
+          || err == internal::ConnectionError::no_error)
+        {
+          // Port can be recycled, so have to iterate until it gets inserted
+          // Ignore the address as the IP isn't initilized until the connection is complete
+          auto [ignore, port] = conn.ip_address_and_port();
+          (void)ignore;
+          while (true)
+          {
+            const auto [iter, inserted] = pending_conns_.try_emplace(
+              AddrPortPair{addr.substr(0, addr.find(':')), port},
+              PendingInfo{
+                std::move(conn),
+                ConnStatus::waiting_for_conn,
+                tag[0] == internal::publish_tag_marker ? ConnType::subscription : ConnType::reduce_group,
+                tag
+              }
+            );
+            (void)iter;
+            if (inserted)
+            {
+              break;
+            }
+            ++port;
+          }
+          tag_iter = pending_tags_.erase(tag_iter);
+          publishers.erase(publishers.begin());
+          break;
+        }
+        else
+        {
+          SKYNET_WARN_LOG(
+            "\"{}\" failed to connect to {} for tag \"{}\"",
+            id_,
+            *publishers.begin(),
+            tag
+          );
+          publishers.erase(publishers.begin());
+        }
+      }
+      // Check if out of publishers, have to re-add as a pending tag
+    }
     // bool ignore_cache = false;
     // for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
     // {
@@ -1641,8 +1686,70 @@ namespace skynet
   {
     // TODO: Add error handling in here, kind of tricky on where to place it
     // as there are a variety of failure points
+    // TODO: Move this into its own function?  It isn't used anywhere else...
+    const auto handle_error = [&](PendingInfo& info) {
+      switch (info.type)
+      {
+      case ConnType::by_accept:
+      case ConnType::user_requested:
+        // nothing special needs to happen
+        break;
+
+      case ConnType::subscription:
+        // TODO
+        // (May be about the same as the reduce group, just with a different tag...)
+        break;
+
+      case ConnType::reduce_group:
+        {
+          // Initiate a new connection with the next producer, or mark that
+          // the tag still needs to be found
+          auto& [group_id, reduce_data] = group_from_parent_tag(info.tag);
+          (void)group_id;
+          const auto& parent_tag =
+            internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
+          const auto pub_iter = publishers_for_tag_.find(parent_tag);
+          assert(pub_iter != publishers_for_tag_.cend());
+          auto& publishers = pub_iter->second;
+          if (publishers.empty())
+          {
+            SKYNET_TRACE_LOG(
+              "\"{}\" ran out of publishers for tag \"{}\", look for new ones.",
+              id_,
+              info.tag
+            );
+            pending_tags_.emplace_back(info.tag);
+            for (auto&& neighbor : neighbors_)
+            {
+              neighbor.second.ignore_cache_on_next_request();
+            }
+          }
+          else
+          {
+            SKYNET_TRACE_LOG("\"{}\" failed previous connection, trying {}", id_, *publishers.begin());
+            const auto connect_to = internal::split_address(*publishers.begin());
+            auto [iter, inserted] = pending_conns_.try_emplace(
+              connect_to,
+              PendingInfo{
+                internal::SocketCommunicator{},
+                ConnStatus::waiting_for_conn,
+                ConnType::reduce_group,
+                info.tag
+              }
+            );
+            assert(inserted);
+            // Ignore errors for now; they will be handled later
+            (void)iter->second.conn.connect_non_blocking(*publishers.begin());
+            publishers.erase(publishers.begin());
+          }
+          break;
+        }
+      }
+    };
     for (auto iter = pending_conns_.begin(); iter != pending_conns_.end(); )
     {
+      // I don't like this okay variable, but I can't think of a better way
+      bool okay = true;
       auto& info = iter->second;
       if (info.status == ConnStatus::waiting_for_conn)
       {
@@ -1654,6 +1761,7 @@ namespace skynet
 
         case internal::ConnectionError::no_error:
           {
+            SKYNET_TRACE_LOG("{} sending greeting to {}", id_, info.conn.ip_address_and_port());
             // Send message and mark as waiting
             const auto message = make_handshake();
             if (info.conn.send_message(message.data(), message.size()) != internal::ConnectionError::no_error)
@@ -1668,22 +1776,40 @@ namespace skynet
 
         // Anything else is an error
         default:
+          SKYNET_WARN_LOG(
+            "{} errored trying to connect to {}",
+            id_,
+            iter->first
+          );
+          handle_error(info);
           notify_connection_ = true;
           iter = pending_conns_.erase(iter);
+          okay = false;
           break;
         }
       }
       else if (info.status == ConnStatus::waiting_for_resp)
       {
+        // TODO: Add timeout here?
         // Try to read message from the connection
-        if (const auto bytes_to_read = read_network_size(info.conn))
+        const auto bytes_to_read_or_error = read_network_size(info.conn);
+        if (std::holds_alternative<internal::ConnectionError>(bytes_to_read_or_error))
         {
-          if (const auto message_buffer = internal::read_chunked(info.conn, *bytes_to_read); !message_buffer.empty())
+          const auto err = *std::get_if<internal::ConnectionError>(&bytes_to_read_or_error);
+          if (err != internal::ConnectionError::would_block)
+          {
+            okay = false;
+          }
+        }
+        else
+        {
+          const auto bytes_to_read = *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
+          if (const auto message_buffer = internal::read_chunked(info.conn, bytes_to_read); !message_buffer.empty())
           {
             if (const auto msg = internal::MessageHandler::try_to_create(message_buffer))
             {
               decltype(neighbors_)::iterator new_neighbor_iter;
-              const auto okay = msg->do_callback(
+              okay &= msg->do_callback(
                 [&](const internal::Greeting& greeting) {
                   // add connection to active list / remove from pending list
                   auto [neighbor_iter, inserted] = neighbors_.try_emplace(
@@ -1691,17 +1817,35 @@ namespace skynet
                     std::move(info.conn),
                     greeting.from(),
                     greeting.neighbors(),
-                    iter->first.second
+                    *this,
+                    greeting.port()
                   );
                   new_neighbor_iter = neighbor_iter;
                   if (!inserted)
                   {
+                    SKYNET_TRACE_LOG(
+                      "\"{}\" rejected greeting from \"{}\" due to the name already being present",
+                      id_,
+                      neighbor_iter->first
+                    );
                     return false;
                   }
-                  addr_to_machine_.try_emplace(iter->first, &neighbor_iter->second);
+                  addr_to_machine_.try_emplace(new_neighbor_iter->second.address_pair(), &neighbor_iter->second);
+                  SKYNET_TRACE_LOG(
+                    "\"{}\" recieved greeting from \"{}\"",
+                    id_,
+                    neighbor_iter->first
+                  );
                   return true;
                 },
-                [](...) { return false; }
+                [&](...) {
+                  SKYNET_WARN_LOG(
+                    "\"{}\" recieved unexpected message from \"{}\", expected greeting",
+                    id_,
+                    iter->first
+                  );
+                  return false;
+                }
               );
               if (okay)
               {
@@ -1712,7 +1856,10 @@ namespace skynet
                   break;
 
                 case ConnType::reduce_group:
-                  // TODO: THIS
+                  finalize_reduce_group(
+                    new_neighbor_iter->first,
+                    group_from_parent_tag(info.tag).first
+                  );
                   break;
 
                 case ConnType::subscription:
@@ -1725,18 +1872,45 @@ namespace skynet
                 {
                   new_neighbor_iter->second.find_publishers_for_tags(pending_tags_, false);
                 }
+                // Finally, remove the pending connection and re-loop
+                notify_connection_ = true;
+                iter = pending_conns_.erase(iter);
+                continue;
               }
             }
+            else
+            {
+              okay = false;
+            }
           }
+        }
+        if (!okay)
+        {
           notify_connection_ = true;
+          handle_error(info);
           iter = pending_conns_.erase(iter);
         }
       }
+      // A failure can make the loop invalid - just exit if one occurred
+      if (!okay) { break; }
     }
   }
 
   std::vector<std::byte> Master::make_handshake() const noexcept
   {
-    return internal::make_greeting(id_, make_neighbor_vector());
+    return internal::make_greeting(id_, make_neighbor_vector(), port_);
+  }
+
+  void Master::finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept
+  {
+    const auto iter = reduce_tag_data_.find(group_tag);
+    assert(iter != reduce_tag_data_.cend());
+    auto& group = *iter->second.group;
+    const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(group);
+    const auto& parent_id = iter->second.parent_machines.emplace_back(parent_machine_id);
+    const auto neighbor_iter = neighbors_.find(parent_id);
+    assert(neighbor_iter != neighbors_.cend());
+    neighbor_iter->second.send_message(internal::make_join_reduce_group(group_tag, tag_produced));
+    notify_reduce_group_ = true;
   }
 } // namespace skynet

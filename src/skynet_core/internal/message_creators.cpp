@@ -80,7 +80,8 @@ namespace skynet::internal
 
   std::vector<std::byte> make_greeting(
     const MachineID& from,
-    const std::vector<MachineID>& neighbors
+    const std::vector<MachineID>& neighbors,
+    const std::uint16_t port
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -91,6 +92,7 @@ namespace skynet::internal
     {
       to_set.set(i, neighbors[i]);
     }
+    message.setPort(port);
     return finalize_message(builder);
   }
 

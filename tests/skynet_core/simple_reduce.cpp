@@ -56,10 +56,14 @@ void machine_task(const NetworkInfo* const info, const int index)
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
   master.submit_job("job", [&](Job& the_job) {
+    connect_network(*info, master, index, [&](Master& m, const int i) {
+      // std::cout << index << " -> " << i << '\n';
+      while (true)
+      {
+        if (m.connect_to_server("127.0.0.1", base_port + i).get()) { break; }
+      }
+    });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto& group = fut.get();

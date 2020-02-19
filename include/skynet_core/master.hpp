@@ -53,6 +53,7 @@ namespace skynet
         SocketCommunicator comm,
         const MachineID& id,
         const std::vector<MachineID>& neighbors,
+        Master& master,
         std::uint16_t port
       ) noexcept;
 
@@ -98,9 +99,18 @@ namespace skynet
        */
       std::string address() const noexcept;
 
+      /** \brief Pair version of the address
+       */
+      AddrPortPair address_pair() const noexcept;
+
       /** \brief Send a request for any pending tags if required
        */
       void ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept;
+
+      /** \brief Sets the external master to ignore the cache on the next request
+       * for publishers
+       */
+      void ignore_cache_on_next_request() noexcept;
 
     private:
       // Read some bytes from the connection, returning false if the read failed
@@ -215,10 +225,6 @@ namespace skynet
     auto connect_to_server(std::string_view address) noexcept
       -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
 
-    /** \brief See if there are any pending connections and accept them if so
-     */
-    void accept_pending_connections() noexcept;
-
     /** \brief Returns the number of machines connected
      */
     int number_of_neighbors() const noexcept;
@@ -305,13 +311,13 @@ namespace skynet
         m.handle_get_publishers(msg, from);
       }
 
-      static auto add_publishers_and_propagate(
+      static void add_publishers_and_propagate(
         Master& m,
         const internal::ReportPublishers& msg,
         const internal::ExternalMaster& from
       ) noexcept
       {
-        return m.add_publishers_and_propagate(msg, from);
+        m.add_publishers_and_propagate(msg, from);
       }
 
       static bool handle_join_reduce_group(
@@ -419,13 +425,9 @@ namespace skynet
     }; // struct WaiterAccessor
 
   private:
-    /** \brief Connects to a remote connection and returns an iterator to the new connection,
-     * or an end iterator if the connection failed
+    /** \brief See if there are any pending connections and accept them if so
      */
-    std::unordered_map<MachineID, internal::ExternalMaster>::iterator connect_impl(
-      const char* address,
-      std::uint16_t port
-    ) noexcept;
+    void accept_pending_connections() noexcept;
 
     /** \brief Listens for messages from neighbors and handles them if there
      * are any.
@@ -501,7 +503,7 @@ namespace skynet
      *
      * Returns a bool indicating if the next request for publishers should ignore the cache
      */
-    bool add_publishers_and_propagate(
+    void add_publishers_and_propagate(
       const internal::ReportPublishers& msg,
       const internal::ExternalMaster& from
     ) noexcept;
@@ -593,13 +595,9 @@ namespace skynet
       const internal::ExternalMaster& from
     ) noexcept;
 
-    // TODO: The return value/type for this feels really weird; probably want
-    // to change it to use a enum class or something at some point?
     /** \brief Attempt to create connections for any pending tags.
-     *
-     * Returns true if the the cache needs to be ignored for the next request.
      */
-    bool try_connections_for_pending_tags() noexcept;
+    void init_connections_for_pending_tags() noexcept;
 
     /** \brief Returns true if the connection to the specified address is complete
      */
@@ -612,13 +610,37 @@ namespace skynet
      */
     bool addr_is_connected(const AddrPortPair& address) const noexcept;
 
-    /** Process pending user requested connections
+    /** \brief Process pending user requested connections
      */
     void process_pending_conns() noexcept;
 
-    /** Creates the message for the initial handshake
+    /** \brief Creates the message for the initial handshake
      */
     std::vector<std::byte> make_handshake() const noexcept;
+
+    /** \brief Does the final steps needed for creating a reduce group
+     */
+    void finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept;
+
+    /** \brief Returns a reduce_tag_data_ iterator from the parent machine
+     *
+     * Implemented in here since it would have to be below the member variables otherwise
+     */
+    decltype(auto) group_from_parent_tag(const TagID& parent_tag) noexcept
+    {
+      // TODO: Keep a look-up map if this becomes a performance issue
+      for (auto& data_pair : reduce_tag_data_)
+      {
+        const auto& group_data = data_pair.second;
+        const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
+        if (parent == parent_tag)
+        {
+          return data_pair;
+        }
+      }
+      assert(false && "No group matching the produced tag found?");
+      return *reduce_tag_data_.begin();
+    }
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
@@ -643,6 +665,7 @@ namespace skynet
         : group{std::move(group_ptr)}
       {}
 
+      // unique_ptr so that this is a movable type
       std::unique_ptr<internal::ReduceGroupBase> group;
       std::vector<MachineID> parent_machines;
       std::array<std::vector<MachineID>, 2> child_machines;

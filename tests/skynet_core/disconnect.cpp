@@ -27,14 +27,10 @@ void setup_network(const int index, Master& master)
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i)
   {
-    while (!master.connect_to_server("127.0.0.1", base_port + i))
-    {
-      std::this_thread::sleep_for(10ms);
-    }
+    master.connect_to_server("127.0.0.1", base_port + i).get();
   }
   while (master.number_of_neighbors() != num_machines - 1)
   {
-    master.accept_pending_connections();
     std::this_thread::sleep_for(1ms);
   }
 }
@@ -44,10 +40,10 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  setup_network(index, master);
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
   master.submit_job("Job 0", [&](Job& my_job) {
+    setup_network(index, master);
     my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
     for (int i = 0; i < num_machines; ++i)

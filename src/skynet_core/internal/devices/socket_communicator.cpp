@@ -149,7 +149,7 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::connect_to_server(const std::string_view address) noexcept
   {
-    const auto [port, address_str] = split_address(address);
+    const auto [address_str, port] = split_address(address);
     if (address_str.empty())
     {
       return ConnectionError::unrecoverable;
@@ -168,7 +168,7 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::connect_non_blocking(const std::string_view address) noexcept
   {
-    const auto [port, address_str] = split_address(address);
+    const auto [address_str, port] = split_address(address);
     if (address_str.empty())
     {
       return ConnectionError::unrecoverable;
@@ -183,11 +183,25 @@ namespace skynet::internal
     to_poll.events = POLLOUT;
     if (poll(&to_poll, 1, 0) < 0)
     {
+      // This is also required?
+      if (errno == EINPROGRESS)
+      {
+        std::puts("a");
+        return ConnectionError::connection_in_progress;
+      }
+      std::puts("b");
       return ConnectionError::unrecoverable;
     }
     constexpr auto err_mask = POLLERR | POLLHUP | POLLNVAL;
     if ((to_poll.revents & err_mask) != 0)
     {
+      std::puts("c");
+      std::printf(
+        "%i %i %i\n",
+        to_poll.revents & POLLERR,
+        to_poll.revents & POLLHUP,
+        to_poll.revents & POLLNVAL
+      );
       return ConnectionError::unrecoverable;
     }
     if ((to_poll.revents & POLLOUT) != 0)
@@ -278,7 +292,7 @@ namespace skynet::internal
     return read_bytes;
   }
 
-  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept
+  AddrPortPair split_address(const std::string_view address) noexcept
   {
     // Split the address by the colon
     const auto colon_loc = address.find(':');
@@ -292,17 +306,17 @@ namespace skynet::internal
     // Try to connect to the publisher
     // Need to make a std::string to ensure that it is null-terminated
     const std::string address_str{address.begin(), address.begin() + colon_loc};
-    return {port, address_str};
+    return {address_str, port};
   }
 
-  std::optional<NetworkSizeType> read_network_size(SocketCommunicator& conn) noexcept
+  std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunicator& conn) noexcept
   {
-
-      std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
-      if (conn.read_message(size_buffer.data(), size_buffer.size()) == ConnectionError::no_error)
-      {
-        return from_network_bytes(size_buffer);
-      }
-      return {};
+    std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
+    const auto err = conn.read_message(size_buffer.data(), size_buffer.size());
+    if (err == ConnectionError::no_error)
+    {
+      return from_network_bytes(size_buffer);
+    }
+    return err;
   }
 } // namespace skynet::internal

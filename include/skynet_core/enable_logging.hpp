@@ -35,4 +35,21 @@
   #define SKYNET_ENABLE_CRITICAL_LOG() (void)0
 #endif
 
+// Automatically enable the set logging level; this is something that's too easy
+// to forget to do
+namespace skynet::internal::detail
+{
+  #if SPDLOG_ACTIVE_LEVEL == SPDLOG_LEVEL_TRACE
+    static inline const auto dummy = []{ SKYNET_ENABLE_TRACE_LOG(); return 0; }();
+  #elif SPDLOG_ACTIVE_LEVEL == SPDLOG_LEVEL_DEBUG
+    static inline const auto dummy = []{ SKYNET_ENABLE_DEBUG_LOG(); return 0; }();
+  #elif SPDLOG_ACTIVE_LEVEL == SPDLOG_LEVEL_WARN
+    static inline const auto dummy = []{ SKYNET_ENABLE_WARN_LOG(); return 0; }();
+  #elif SPDLOG_ACTIVE_LEVEL == SPDLOG_LEVEL_ERROR
+    static inline const auto dummy = []{ SKYNET_ENABLE_ERROR_LOG(); return 0; }();
+  #elif SPDLOG_ACTIVE_LEVEL == SPDLOG_LEVEL_CRITICAL
+    static inline const auto dummy = []{ SKYNET_ENABLE_CRITICAL_LOG(); return 0; }();
+  #endif
+}
+
 #endif // SKYNET_ENABLE_LOGGING_HPP

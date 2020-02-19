@@ -43,6 +43,7 @@ struct PublishData {
 struct Greeting {
   from      @0 : Text;
   neighbors @1 : List(Text);
+  port      @2 : UInt16;
 }
 
 struct NewNeighbor {

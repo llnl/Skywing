@@ -265,14 +265,12 @@ void machine_task(const int index)
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  if (index != 0)
-  {
-    while (!master.connect_to_server("127.0.0.1", base_port + index - 1))
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-  }
   master.submit_job("job", [&](Job& the_job) {
+    if (index != 0)
+    {
+      master.connect_to_server("127.0.0.1", base_port + index - 1).get();
+    }
+
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto& group = fut.get();

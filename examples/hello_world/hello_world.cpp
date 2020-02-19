@@ -52,31 +52,30 @@ void simulate_machine(const int machine_number)
     // The name of the Master, each instance in the network must have a unique name
     node_names[machine_number]
   };
-  // Skynet currently has no way of automatically scanning for new machines while running
-  // It will accept any connection requests made to it, however, and the only requirement
-  // for it to function is that all nodes have paths to other nodes. To accomplish this,
-  // have each instance connect to the higher numbered one, or for the highest numbered
-  // one, just advance to the job so the connection can be accepted
-  if (machine_number != node_ports.size() - 1)
-  {
-    while (!master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]))
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds{10});
-    }
-  }
   // Submit work to the master, each job must have a unique name locally, but can be
   // duplicated on other instances.  Jobs run on seperate threads than the master and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
   // be copyable and the signature must be compatible with void(skynet::Job&)
   master.submit_job("job", [&](skynet::Job& job) {
+    // Skynet currently has no way of automatically scanning for new machines while running
+    // It will accept any connection requests made to it, however, and the only requirement
+    // for it to function is that all nodes have paths to other nodes. To accomplish this,
+    // have each instance connect to the higher numbered one, or for the highest numbered
+    // one, just advance to the job so the connection can be accepted.
+    // This must be done in the job, as it is an asynchronous operation, which requires
+    // the master to be running as well.
+    if (machine_number != node_ports.size() - 1)
+    {
+      master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get();
+    }
     // Initiate the work to create a group that can perform reductions
     // As creating this group is an expensive operation with a lot of communication,
     // groups should be kept as long as they are needed and not be discarded as soon
     // as a single reduce operation is finished
     // This function also does not return the group itself, but a skynet::Waiter,
     // meaning that the work has been initiated and will be finished on a seperate thread
-    auto reduce_group_fut = job.create_reduce_group(
+    auto reduce_group_waiter = job.create_reduce_group(
       // The tag for the reduce group, the same group tag and tags used for the
       // reduce must be used for all instances taking part in the group, otherwise
       // it will malfunction
@@ -88,10 +87,10 @@ void simulate_machine(const int machine_number)
       // All of the tags that are to take part in the reduce
       reduce_group_tags
     );
-    // Retrieve the reduce group from the future; this will block until the group is
+    // Retrieve the reduce group from the waiter; this will block until the group is
     // finished being created; the returned object can the be used to perform reduce
     // and allreduce operations
-    auto& reduce_group = reduce_group_fut.get();
+    auto& reduce_group = reduce_group_waiter.get();
     // For this example program, each instance will be generating random numbers
     // and then they will be summed together; these next few lines of code are just
     // setting up to do that
@@ -107,10 +106,10 @@ void simulate_machine(const int machine_number)
       // the proper type (in this case, std::int32_t) and returns the same type
       // Note that the reduce operation is run on the thread that handles
       // communication, and as such, should be limited to simple calculations
-      auto future = reduce_group.allreduce(std::plus<>{}, random_value);
-      // The future indicates that the final result of the reduction operation
+      auto waiter = reduce_group.allreduce(std::plus<>{}, random_value);
+      // The waiter indicates that the final result of the reduction operation
       // is ready to be retrieved; so just retrieve the value.
-      const auto result = future.get().value();
+      const auto result = waiter.get().value();
       const auto cur_time = std::time(nullptr);
       // The result should never fall outside of the specified range, but do a sanity
       // check just in case

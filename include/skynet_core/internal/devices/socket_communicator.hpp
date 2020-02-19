@@ -125,11 +125,13 @@ namespace skynet::internal
   /** \brief Splits an "ip:port" address into its parts
    * The string is empty if the input was invalid
    */
-  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept;
+  AddrPortPair split_address(const std::string_view address) noexcept;
 
   /** \brief Attempts to read a network size from a connection
+   *
+   * Returns either the network size or the error that occurred
    */
-  std::optional<NetworkSizeType> read_network_size(SocketCommunicator& conn) noexcept;
+  std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunicator& conn) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

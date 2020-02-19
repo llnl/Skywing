@@ -59,15 +59,11 @@ void setup_network(Master& master, const std::size_t index)
     {
       break;
     }
-    while (!master.connect_to_server("127.0.0.1", ports[machine]))
-    {
-      std::this_thread::sleep_for(10ms);
-    }
+    master.connect_to_server("127.0.0.1", ports[machine]).get();
   }
   // Wait until all machines have connected
   while (master.number_of_neighbors() != machine_counts[index])
   {
-    master.accept_pending_connections();
     std::this_thread::sleep_for(10ms);
   }
 }
@@ -76,9 +72,9 @@ void setup_network(Master& master, const std::size_t index)
 void machine_task(const std::size_t index)
 {
   Master master{ports[index], machine_names[index]};
-  setup_network(master, index);
   // Submit job and broadcast on the job using each machine
   master.submit_job("job 0", [&master, index](Job& the_job) {
+    setup_network(master, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)

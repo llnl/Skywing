@@ -62,34 +62,28 @@ void asynchronous_iterative(
 )
 {
   skynet::Master master(config.port, config.name);
-  for (const auto& connect_to_name : config.machines_to_connect_to)
-  {
-    const auto conn_to_iter = machines.find(connect_to_name);
-    if (conn_to_iter == machines.cend())
-    {
-      std::cerr << "Could not find machine \"" << connect_to_name << "\" to connect to.\n";
-    }
-    const auto start_time = std::chrono::steady_clock::now();
-    while (!master.connect_to_server("127.0.0.1", conn_to_iter->second.port))
-    {
-      if (std::chrono::steady_clock::now() - start_time > std::chrono::seconds(10))
-      {
-        std::cerr
-          << config.name << ": Took too long to connect to "
-            << conn_to_iter->second.remote_address
-            << ":"
-            << conn_to_iter->second.port << '\n';
-        std::exit(1);
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-  }
   if (config.tags_produced.empty())
   {
     std::cerr << config.name << ": Must produce at least one tag\n";
     std::exit(1);
   }
   master.submit_job("job", [&](skynet::Job& job) {
+    for (const auto& connect_to_name : config.machines_to_connect_to)
+    {
+      const auto conn_to_iter = machines.find(connect_to_name);
+      if (conn_to_iter == machines.cend())
+      {
+        std::cerr << "Could not find machine \"" << connect_to_name << "\" to connect to.\n";
+      }
+      if (!master.connect_to_server("127.0.0.1", conn_to_iter->second.port).wait_for(std::chrono::seconds(10)))
+      {
+        std::cerr
+          << config.name << ": Took too long to connect to "
+            << conn_to_iter->second.remote_address
+            << ":"
+            << conn_to_iter->second.port << '\n';
+      }
+    }
     job.declare_publication_intent_range(config.tags_produced);
     // Subscribe to all the relevant tags
     auto fut = job.subscribe_range(config.tags_to_subscribe_to);

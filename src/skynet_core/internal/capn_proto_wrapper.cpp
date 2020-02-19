@@ -108,6 +108,7 @@ namespace skynet::internal
 
   MachineID Greeting::from() const noexcept { return r.getFrom(); }
   std::vector<MachineID> Greeting::neighbors() const noexcept { return detail::list_to_vector<MachineID>(r.getNeighbors()); }
+  std::uint16_t Greeting::port() const noexcept { return r.getPort(); }
   Greeting::Greeting(cpnpro::Greeting::Reader reader) noexcept
     : r{std::move(reader)}
   {}
