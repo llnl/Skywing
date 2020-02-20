@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <numeric>
 #include <random>
 #include <vector>
@@ -35,6 +36,28 @@ namespace skynet
       : connect_to(num_machines)
       , num_connections(num_machines)
     {}
+
+    friend std::ostream& operator<<(std::ostream& out, const NetworkInfo& info)
+    {
+      int i = 0;
+      for (const auto& conn : info.connect_to)
+      {
+        out << i << " -> [";
+        bool first = true;
+        for (const auto& machine : conn)
+        {
+          if (!first)
+          {
+            out << ", ";
+          }
+          out << machine;
+          first = false;
+        }
+        out << "]\n";
+        ++i;
+      }
+      return out;
+    }
 
     // The machines that each index should connect to
     std::vector<std::vector<int>> connect_to;

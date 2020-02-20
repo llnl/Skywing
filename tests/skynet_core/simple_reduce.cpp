@@ -6,7 +6,10 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <functional>
+
+      #include "skynet_core/internal/utility/logging.hpp"
 
 using namespace skynet;
 
@@ -70,10 +73,10 @@ void machine_task(const NetworkInfo* const info, const int index)
 
     // Do a few reduce operations on the group
     using i32 = std::int32_t;
-    test_reduce(group, index, std::plus<>{}, 10);
-    test_reduce(group, index, [](i32 a, i32 b) { return std::max(a, b); }, 4);
+    test_reduce(group, index, std::plus<>{}, num_machines * (num_machines - 1) / 2);
+    test_reduce(group, index, [](i32 a, i32 b) { return std::max(a, b); }, num_machines - 1);
     test_reduce(group, index, [](i32 a, i32 b) { return std::min(a, b); }, 0);
-    test_reduce(group, index + 1, std::multiplies<>{}, 1 * 2 * 3 * 4 * 5);
+    test_reduce(group, index + 1, std::multiplies<>{}, static_cast<i32>(std::tgamma(num_machines + 1)));
 
     ++counter;
     while (counter != num_machines)

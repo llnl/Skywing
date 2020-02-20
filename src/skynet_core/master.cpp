@@ -20,6 +20,7 @@ namespace skynet
     ) noexcept
       : conn_{std::move(conn)}
       , id_{id}
+      , last_heard_{std::chrono::steady_clock::now()}
       , neighbors_{neighbors}
       , master_{&master}
       , port_{port}
@@ -180,7 +181,7 @@ namespace skynet
         [&](const Greeting&) {
           // shouldn't be seeing a greeting here
           SKYNET_WARN_LOG(
-            "\"{}\" recieved an unexpected greeting from \"{}\"",
+            "\"{}\" received an unexpected greeting from \"{}\"",
             master_->id(),
             id_
           );
@@ -188,7 +189,7 @@ namespace skynet
         },
         [&](const Goodbye&) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved goodbye from \"{}\"",
+            "\"{}\" received goodbye from \"{}\"",
             master_->id(),
             id_
           );
@@ -201,7 +202,7 @@ namespace skynet
           // NewNeighbor message with a repeated ID
           const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id());
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved new neighbor from \"{}\" with id \"{}\"",
+            "\"{}\" received new neighbor from \"{}\" with id \"{}\"",
             master_->id(),
             id_,
             msg.neighbor_id()
@@ -215,7 +216,7 @@ namespace skynet
         },
         [&](const RemoveNeighbor& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved remove neighbor from \"{}\" with id \"{}\"",
+            "\"{}\" received remove neighbor from \"{}\" with id \"{}\"",
             master_->id(),
             id_,
             msg.neighbor_id()
@@ -239,7 +240,7 @@ namespace skynet
           // Nothing to do; this is just to acknowledge it exists
           // (Last heard time was already updated)
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved heartbeat from \"{}\"",
+            "\"{}\" received heartbeat from \"{}\"",
             master_->id(),
             id_
           );
@@ -247,7 +248,7 @@ namespace skynet
         },
         [&](const ReportPublishers& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved report publishers from \"{}\" with remote tags \"{}\" and local tags \"{}\"",
+            "\"{}\" received report publishers from \"{}\" with remote tags \"{}\" and local tags \"{}\"",
             master_->id(),
             id_,
             msg.tags(),
@@ -278,7 +279,7 @@ namespace skynet
         },
         [&](const GetPublishers& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved get publishers from \"{}\" requesting tags {}",
+            "\"{}\" received get publishers from \"{}\" requesting tags {}",
             master_->id(),
             id_,
             msg.tags()
@@ -301,7 +302,7 @@ namespace skynet
         },
         [&](const JoinReduceGroup& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved join reduce group from \"{}\" for group \"{}\", producing tag \"{}\"",
+            "\"{}\" received join reduce group from \"{}\" for group \"{}\", producing tag \"{}\"",
             master_->id(),
             id_,
             msg.reduce_tag(),
@@ -315,11 +316,12 @@ namespace skynet
         },
         [&](const SubmitReduceValue& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved submit reduce value from \"{}\" for group \"{}\", tag \"{}\"",
+            "\"{}\" received submit reduce value from \"{}\" for group \"{}\", tag \"{}\", version {}",
             master_->id(),
             id_,
             msg.reduce_tag(),
-            msg.data().tag_id()
+            msg.data().tag_id(),
+            msg.data().version()
           );
           if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id()))
           {
@@ -329,11 +331,12 @@ namespace skynet
         },
         [&](const ReportReduceResult& msg) {
           SKYNET_TRACE_LOG(
-            "\"{}\" recieved report reduce value from \"{}\" for group \"{}\", tag \"{}\"",
+            "\"{}\" received report reduce value from \"{}\" for group \"{}\", tag \"{}\", version {}",
             master_->id(),
             id_,
             msg.reduce_tag(),
-            msg.data().tag_id()
+            msg.data().tag_id(),
+            msg.data().version()
           );
           if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id()))
           {
@@ -365,7 +368,7 @@ namespace skynet
             }
             const auto [iter, inserted] = subscriptions_.emplace(tag);
             (void)iter;
-            // Shouldn't recieve multiple subscriptions to the same tag
+            // Shouldn't receive multiple subscriptions to the same tag
             if (!inserted)
             {
               return false;
@@ -461,6 +464,7 @@ namespace skynet
   auto Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
     -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
   {
+    std::lock_guard<std::mutex> lock{job_mut_};
     const auto [iter, inserted] = pending_conns_.try_emplace(
       AddrPortPair{address, port},
       PendingInfo{
@@ -519,7 +523,7 @@ namespace skynet
         ++inc_port;
         if (inserted)
         {
-          SKYNET_TRACE_LOG("{} accepted connection from {}", id_, iter->second.conn.ip_address_and_port());
+          SKYNET_TRACE_LOG("\"{}\" accepted connection from {}", id_, iter->second.conn.ip_address_and_port());
           break;
         }
       }
@@ -529,6 +533,7 @@ namespace skynet
 
   int Master::number_of_neighbors() const noexcept
   {
+    std::lock_guard<std::mutex> lock{job_mut_};
     return static_cast<int>(neighbors_.size());
   }
 
@@ -849,7 +854,7 @@ namespace skynet
     else
     {
       // Mark all tags from the message in the cache so that they will be
-      // sent back so that the recieving end no longer thinks they are pending
+      // sent back so that the receiving end no longer thinks they are pending
       // Also clear them if the cache is being ignored, as it is assumed that
       // they are now invalid
       for (const auto& tag : remaining_tags)
@@ -963,7 +968,7 @@ namespace skynet
     // TODO: Actually handle this
     if (tags.size() != publishers_list.size())
     {
-      SKYNET_WARN_LOG("\"{}\" recieved tag/publisher list size mismatch from \"{}\"", id_, from.id());
+      SKYNET_WARN_LOG("\"{}\" received tag/publisher list size mismatch from \"{}\"", id_, from.id());
       return;
     }
     // Add the information to what is locally known
@@ -1083,7 +1088,7 @@ namespace skynet
   //   //   {
   //   //     const auto bytes_to_read = internal::from_network_bytes(size_buffer);
   //   //     SKYNET_TRACE_LOG(
-  //   //       "\"{}\" recieved a publication of {} bytes from \"{}\"",
+  //   //       "\"{}\" received a publication of {} bytes from \"{}\"",
   //   //       id_,
   //   //       bytes_to_read,
   //   //       sub.ip_address_and_port()
@@ -1106,7 +1111,7 @@ namespace skynet
   //   //             for (auto& [job_id, job] : jobs_)
   //   //             {
   //   //               SKYNET_TRACE_LOG(
-  //   //                 "\"{}\" recieved data on tag \"{}\", version {}, data: {}",
+  //   //                 "\"{}\" received data on tag \"{}\", version {}, data: {}",
   //   //                 id_,
   //   //                 data->tag_id(),
   //   //                 data->version(),
@@ -1292,7 +1297,7 @@ namespace skynet
         if (tag_loc != existing_conns.cend())
         {
           SKYNET_WARN_LOG(
-            "\"{}\" recieved join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but it already existed in the group.",
+            "\"{}\" received join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but it already existed in the group.",
             id_,
             from.id(),
             msg.tag_produced(),
@@ -1312,7 +1317,7 @@ namespace skynet
       }
     }
     SKYNET_WARN_LOG(
-      "\"{}\" recieved join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but such a group does not exist.",
+      "\"{}\" received join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but such a group does not exist.",
       id_,
       from.id(),
       msg.tag_produced(),
@@ -1486,6 +1491,7 @@ namespace skynet
           }
           else
           {
+            SKYNET_TRACE_LOG("\"{}\" already has connection for tag \"{}\"", id_, tag);
             // Reduce group
             finalize_reduce_group(
               neighbor_iter->second->id(),
@@ -1501,9 +1507,10 @@ namespace skynet
           || err == internal::ConnectionError::no_error)
         {
           // Port can be recycled, so have to iterate until it gets inserted
-          // Ignore the address as the IP isn't initilized until the connection is complete
+          // Ignore the address as the IP isn't initialized until the connection is complete
           auto [ignore, port] = conn.ip_address_and_port();
           (void)ignore;
+          SKYNET_TRACE_LOG("\"{}\" connecting to \"{}\" for tag \"{}\"", id_, addr, tag);
           while (true)
           {
             const auto [iter, inserted] = pending_conns_.try_emplace(
@@ -1537,7 +1544,6 @@ namespace skynet
           publishers.erase(publishers.begin());
         }
       }
-      // Check if out of publishers, have to re-add as a pending tag
     }
     // bool ignore_cache = false;
     // for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
@@ -1761,7 +1767,7 @@ namespace skynet
 
         case internal::ConnectionError::no_error:
           {
-            SKYNET_TRACE_LOG("{} sending greeting to {}", id_, info.conn.ip_address_and_port());
+            SKYNET_TRACE_LOG("\"{}\" sending greeting to {}", id_, info.conn.ip_address_and_port());
             // Send message and mark as waiting
             const auto message = make_handshake();
             if (info.conn.send_message(message.data(), message.size()) != internal::ConnectionError::no_error)
@@ -1832,7 +1838,7 @@ namespace skynet
                   }
                   addr_to_machine_.try_emplace(new_neighbor_iter->second.address_pair(), &neighbor_iter->second);
                   SKYNET_TRACE_LOG(
-                    "\"{}\" recieved greeting from \"{}\"",
+                    "\"{}\" received greeting from \"{}\"",
                     id_,
                     neighbor_iter->first
                   );
@@ -1840,7 +1846,7 @@ namespace skynet
                 },
                 [&](...) {
                   SKYNET_WARN_LOG(
-                    "\"{}\" recieved unexpected message from \"{}\", expected greeting",
+                    "\"{}\" received unexpected message from \"{}\", expected greeting",
                     id_,
                     iter->first
                   );

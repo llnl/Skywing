@@ -180,31 +180,22 @@ namespace skynet::internal
   {
     pollfd to_poll;
     to_poll.fd = handle_;
-    to_poll.events = POLLOUT;
+    to_poll.events = POLLOUT | POLLIN;
     if (poll(&to_poll, 1, 0) < 0)
     {
       // This is also required?
       if (errno == EINPROGRESS)
       {
-        std::puts("a");
         return ConnectionError::connection_in_progress;
       }
-      std::puts("b");
       return ConnectionError::unrecoverable;
     }
     constexpr auto err_mask = POLLERR | POLLHUP | POLLNVAL;
     if ((to_poll.revents & err_mask) != 0)
     {
-      std::puts("c");
-      std::printf(
-        "%i %i %i\n",
-        to_poll.revents & POLLERR,
-        to_poll.revents & POLLHUP,
-        to_poll.revents & POLLNVAL
-      );
       return ConnectionError::unrecoverable;
     }
-    if ((to_poll.revents & POLLOUT) != 0)
+    if ((to_poll.revents & (POLLOUT | POLLIN)) != 0)
     {
       return ConnectionError::no_error;
     }
