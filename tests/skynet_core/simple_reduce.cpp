@@ -9,8 +9,6 @@
 #include <cmath>
 #include <functional>
 
-      #include "skynet_core/internal/utility/logging.hpp"
-
 using namespace skynet;
 
 constexpr int num_machines = 5;

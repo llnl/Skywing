@@ -385,6 +385,7 @@ namespace skynet
         const TagID& group_id
       ) noexcept
       {
+        std::lock_guard<std::mutex> lock{m.job_mut_};
         return m.rebuild_reduce_group(group_id);
       }
     }; // struct ReduceGroupAccessor
@@ -684,7 +685,7 @@ namespace skynet
     // List of machines that are waiting for information for producers of a certain tag
     // Uses MachineID's instead of pointers in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
-    // is recieved
+    // is received
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
 
     // The tags that this machine produces

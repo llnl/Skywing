@@ -718,6 +718,12 @@ namespace skynet
             }
           }
         }
+        // Remove corresponding address
+        const auto erase_iter = std::find_if(addr_to_machine_.begin(), addr_to_machine_.end(), [&](const auto& pair) {
+          return pair.second == std::addressof(it->second);
+        });
+        assert(erase_iter != addr_to_machine_.end());
+        addr_to_machine_.erase(erase_iter);
         it = neighbors_.erase(it);
       }
       else
@@ -1492,6 +1498,7 @@ namespace skynet
           else
           {
             SKYNET_TRACE_LOG("\"{}\" already has connection for tag \"{}\"", id_, tag);
+            assert(neighbor_iter->second);
             // Reduce group
             finalize_reduce_group(
               neighbor_iter->second->id(),
@@ -1545,135 +1552,6 @@ namespace skynet
         }
       }
     }
-    // bool ignore_cache = false;
-    // for (auto iter = pending_tags_.begin(); iter != pending_tags_.end(); ++iter)
-    // {
-    //   const auto& tag_id = *iter;
-    //   // Check if there is a list of known producers for the tag
-    //   const auto loc = publishers_for_tag_.find(tag_id);
-    //   // Create the entry if it exists
-    //   if (loc != publishers_for_tag_.cend())
-    //   {
-    //     auto& publishers = loc->second;
-    //     // Now, if there are any known subscriptions, try to subscribe to them
-    //     if (!publishers.empty())
-    //     {
-    //       for (auto pub_iter = publishers.begin(); pub_iter != publishers.end(); )
-    //       {
-    //         // Sub/pub connections
-    //         const auto& subscribe_address = *pub_iter;
-    //         if (tag_id[0] == internal::publish_tag_marker)
-    //         {
-    //           // TODO: PUBLISH CHANGE
-    //           // if (auto sub = internal::Subscription::try_to_create(subscribe_address))
-    //           // {
-    //           //   subscriptions_.push_back(SubscriptionData{
-    //           //     std::move(*sub),
-    //           //     get_tags_for_publisher(subscribe_address)
-    //           //   });
-    //           //   // Managed to subscribe; remove the pending tag
-    //           //   using std::swap;
-    //           //   swap(*iter, pending_tags_.back());
-    //           //   pending_tags_.pop_back();
-    //           //   --iter;
-    //           //   notify_new_subscriptions_ = true;
-    //           //   break;
-    //           // }
-    //           // else
-    //           // {
-    //           //   SKYNET_TRACE_LOG("\"{}\" failed to subscribe to \"{}\" for tag \"{}\"", id_, subscribe_address, tag_id);
-    //           //   // Couldn't subscribe - remove this as a producer
-    //           //   pub_iter = publishers.erase(pub_iter);
-    //           // }
-    //         }
-    //         else
-    //         {
-    //           // Reduce group connections
-    //           // First find the group that the tag the parent is for.
-    //           // If there's no matching tag then just ignore it
-    //           // TODO: Keep a look-up map if this becomes a performance issue
-    //           auto& [group_id, reduce_data] = [&]() -> decltype(reduce_tag_data_)::reference {
-    //             for (auto& data_pair : reduce_tag_data_)
-    //             {
-    //               const auto& group_data = data_pair.second;
-    //               const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
-    //               if (parent == tag_id)
-    //               {
-    //                 return data_pair;
-    //               }
-    //             }
-    //             assert(false && "No group matching the produced tag found?");
-    //             return *reduce_tag_data_.begin();
-    //           }();
-    //           const decltype(neighbors_)::iterator server_iter = [&]() {
-    //             // Check if there is already a connection present, and just add the
-    //             // ID if so
-    //             // const auto conn_iter = addr_to_iter_.find(subscribe_address);
-    //             // if (conn_iter != neighbors_.cend())
-    //             // {
-    //             //   SKYNET_TRACE_LOG(
-    //             //     "\"{}\" already has connection to \"{}\" ({}) for tag \"{}\" for reduce groups",
-    //             //     id_,
-    //             //     conn_iter->second.id(),
-    //             //     subscribe_address,
-    //             //     tag_id
-    //             //   );
-    //             //   return conn_iter;
-    //             // }
-    //             // else
-    //             // {
-    //             //   const auto [port, addr] = internal::split_address(subscribe_address);
-    //             //   SKYNET_TRACE_LOG(
-    //             //     "\"{}\" attempting to connect to {}:{} for tag \"{}\" for reduce group",
-    //             //     id_,
-    //             //     addr,
-    //             //     port,
-    //             //     tag_id
-    //             //   );
-    //             //   return connect_impl(addr.c_str(), port);
-    //             // }
-    //           }();
-    //           if (server_iter != neighbors_.cend())
-    //           {
-    //             SKYNET_TRACE_LOG(
-    //               "\"{}\" using \"{}\" for tag \"{}\" for reduce group",
-    //               id_,
-    //               server_iter->first,
-    //               tag_id
-    //             );
-    //             const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*reduce_data.group);
-    //             server_iter->second.send_message(internal::make_join_reduce_group(group_id, tag_produced));
-    //             reduce_data.parent_machines.push_back(server_iter->second.id());
-    //             notify_reduce_group_ = true;
-    //             // Managed to create a connection; remove the pending tag
-    //             using std::swap;
-    //             swap(*iter, pending_tags_.back());
-    //             pending_tags_.pop_back();
-    //             --iter;
-    //             break;
-    //           }
-    //           else
-    //           {
-    //             SKYNET_TRACE_LOG(
-    //               "\"{}\" failed to connect to \"{}\" for tag \"{}\" for reduce groups",
-    //               id_,
-    //               subscribe_address,
-    //               tag_id
-    //             );
-    //             pub_iter = publishers.erase(pub_iter);
-    //           }
-    //         }
-    //       }
-    //     }
-    //     // Check if the producers are now empty (happens if all subscription attempts failed)
-    //     if (publishers.empty())
-    //     {
-    //       // Need to get original producers for tags now, so have to ignore caches
-    //       ignore_cache = true;
-    //     }
-    //   }
-    // }
-    // return ignore_cache;
   }
 
   bool Master::conn_is_complete(const AddrPortPair& address) noexcept

@@ -35,11 +35,11 @@ void machine_task(const NetworkInfo* const info, const int index)
 {
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
 
   master.submit_job("job", [&](Job& the_job) {
+    connect_network(*info, master, index, [](Master& m, const int i) {
+      while (!m.connect_to_server("127.0.0.1", base_port + i).get()) { /* empty */ };
+    });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto& group = fut.get();
@@ -62,7 +62,6 @@ void machine_task(const NetworkInfo* const info, const int index)
 
 TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
 {
-  // SKYNET_ENABLE_TRACE_LOG();
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
   for (auto i = 1; i < num_machines; ++i)
@@ -80,10 +79,10 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
     // needed as lower numbered machines connect to higher numbered ones
     const auto index = 0;
     Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-    connect_network(network_info, master, index, [](Master& m, const int i) {
-      return m.connect_to_server("127.0.0.1", base_port + i);
-    });
     master.submit_job("job", [&](Job& the_job) {
+      connect_network(network_info, master, index, [](Master& m, const int i) {
+        while (!m.connect_to_server("127.0.0.1", base_port + i).get()) { /* empty */ };
+      });
       auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
       auto& group = fut.get();
 

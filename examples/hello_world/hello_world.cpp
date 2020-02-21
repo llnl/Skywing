@@ -53,7 +53,7 @@ void simulate_machine(const int machine_number)
     node_names[machine_number]
   };
   // Submit work to the master, each job must have a unique name locally, but can be
-  // duplicated on other instances.  Jobs run on seperate threads than the master and
+  // duplicated on other instances.  Jobs run on separate threads than the master and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
   // be copyable and the signature must be compatible with void(skynet::Job&)
@@ -67,14 +67,19 @@ void simulate_machine(const int machine_number)
     // the master to be running as well.
     if (machine_number != node_ports.size() - 1)
     {
-      master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get();
+      // Connecting to the server is an asynchronous operation and can fail.
+      // Wait for the result each time and keep attempting to connect until it does
+      while (!master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get())
+      {
+        // Empty
+      }
     }
     // Initiate the work to create a group that can perform reductions
     // As creating this group is an expensive operation with a lot of communication,
     // groups should be kept as long as they are needed and not be discarded as soon
     // as a single reduce operation is finished
     // This function also does not return the group itself, but a skynet::Waiter,
-    // meaning that the work has been initiated and will be finished on a seperate thread
+    // meaning that the work has been initiated and will be finished on a separate thread
     auto reduce_group_waiter = job.create_reduce_group(
       // The tag for the reduce group, the same group tag and tags used for the
       // reduce must be used for all instances taking part in the group, otherwise
@@ -109,27 +114,40 @@ void simulate_machine(const int machine_number)
       auto waiter = reduce_group.allreduce(std::plus<>{}, random_value);
       // The waiter indicates that the final result of the reduction operation
       // is ready to be retrieved; so just retrieve the value.
-      const auto result = waiter.get().value();
-      const auto cur_time = std::time(nullptr);
-      // The result should never fall outside of the specified range, but do a sanity
-      // check just in case
-      if (result >= min_value && result <= max_value)
+      // It returns an optional as the reduce operation can fail due to disconnections
+      const auto result_opt = waiter.get();
+      if (!result_opt)
       {
+        const auto cur_time = std::time(nullptr);
         std::cout
           << std::put_time(std::localtime(&cur_time), "[%F %T]")
-          << " Allreduce summation: " << result << '\n';
+          << " Reduce operation failed; exiting...\n";
+        return;
       }
       else
       {
-        // If this message is ever seen and the code has otherwise been unchanged,
-        // there's some kind of bug!
-        std::cerr
-          << std::put_time(std::localtime(&cur_time), "[%F %T]")
-          << " !!! Out of range value " << result << " !!!\n";
-        std::exit(1);
+        const auto cur_time = std::time(nullptr);
+        // The result should never fall outside of the specified range, but do a sanity
+        // check just in case
+        const auto result = *result_opt;
+        if (result >= min_value && result <= max_value)
+        {
+          std::cout
+            << std::put_time(std::localtime(&cur_time), "[%F %T]")
+            << " Allreduce summation: " << result << '\n';
+        }
+        else
+        {
+          // If this message is ever seen and the code has otherwise been unchanged,
+          // there's some kind of bug!
+          std::cerr
+            << std::put_time(std::localtime(&cur_time), "[%F %T]")
+            << " !!! Out of range value " << result << " !!!\n";
+          std::exit(1);
+        }
+        // Sleep so there aren't tons of lines of output
+        std::this_thread::sleep_for(std::chrono::seconds(1));
       }
-      // Sleep so there aren't tons of lines of output
-      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   });
   // Start running the master, this will start all submitted jobs and continue
@@ -166,6 +184,6 @@ int main(const int argc, const char* const argv[])
       << "Must be an integer between 0 and " << node_ports.size() - 1 << '\n';
     return -1;
   }
-  // Continuously run the machine until the user kills the process
+  // Run until an error occurs or the user kills the process
   simulate_machine(machine_number);
 }
