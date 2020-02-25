@@ -197,7 +197,7 @@ namespace skynet
           }
           else
           {
-            return {};
+            return std::nullopt;
           }
         }
       );

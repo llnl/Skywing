@@ -1,16 +1,17 @@
 core_tests = {
   # Base path, test names
   'skynet_core': [
+    'assorted',
+    # 'basic_master_config',
     'broadcast_complex',
     'broadcast',
+    'broken_reduce',
+    'broken_subscribes',
     'disconnect',
     'heartbeat',
     'publish_data_wrapper',
+    'publish_multiple_values',
     'simple_reduce',
-    'broken_subscribes',
-    'broken_reduce',
-    'publish_multiple_values'
-    # 'basic_master_config'
   ],
   'skynet_core/devices': [
     'socket_communicator'

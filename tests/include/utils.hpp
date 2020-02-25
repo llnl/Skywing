@@ -131,13 +131,14 @@ namespace skynet
   // The connection argument should have the signature `void(Master&, int)`
   // with the int parameter corresponding to the index of the machine to
   // connect to, and blocking until connected
+  // Connect should return a bool indicating if the connection was successful
   template<typename Callable>
   void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
     {
-      connect(master, connect_to);
+      while (!connect(master, connect_to)) { /* nothing */ }
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {

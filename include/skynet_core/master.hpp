@@ -105,12 +105,21 @@ namespace skynet
 
       /** \brief Send a request for any pending tags if required
        */
-      void ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept;
+      void ask_for_tags(const std::vector<TagID>& tags) noexcept;
 
       /** \brief Sets the external master to ignore the cache on the next request
        * for publishers
        */
       void ignore_cache_on_next_request() noexcept;
+
+      /** \brief Returns true if the external master is subscribed to the tag,
+       * returns false if it is not.
+       */
+      bool is_subscribed_to(const TagID& tag) const noexcept;
+
+      /** \brief Returns true if the time is past the time to ask for tags.
+       */
+      bool is_past_tag_asking_time() const noexcept;
 
     private:
       // Read some bytes from the connection, returning false if the read failed
@@ -355,6 +364,23 @@ namespace skynet
       {
         return m.handle_report_reduce_disconnection(msg, from);
       }
+
+      static bool subscription_tags_are_produced(
+        Master& m,
+        const internal::SubscriptionNotice& msg
+      ) noexcept
+      {
+        return m.subscription_tags_are_produced(msg);
+      }
+
+      static bool handle_publish_data(
+        Master& m,
+        const internal::PublishData& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_publish_data(msg, from);
+      }
     }; // struct ExternalMasterAccessor
 
     struct ReduceGroupAccessor
@@ -482,7 +508,7 @@ namespace skynet
     void send_to_neighbors(const std::vector<std::byte>& to_send) noexcept;
 
     // Auxillary function to help with subscribe function
-    bool subscribe_is_done(const std::vector<TagID>& required_tags) noexcept;
+    bool subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept;
 
     /** \brief Subscribes to the passed tags.
      */
@@ -643,6 +669,20 @@ namespace skynet
       return *reduce_tag_data_.begin();
     }
 
+    /** \brief Returns true if the subscription tags are all produced
+     */
+    bool subscription_tags_are_produced(const internal::SubscriptionNotice& msg) const noexcept;
+
+    /** \brief Handles published information
+     */
+    bool handle_publish_data(const internal::PublishData& msg, const internal::ExternalMaster& from) noexcept;
+
+    /** \brief Finalizes a subscription connection.
+     *
+     * \param tags '\0' seperated list of tags
+     */
+    void finalize_subscription(const std::string& tags, internal::ExternalMaster& source) noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
@@ -686,6 +726,8 @@ namespace skynet
     // Uses MachineID's instead of pointers in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
     // is received
+    // TODO: Maybe move to pointers and just make sure to remove them when the neighbor is removed?
+    // Also potentially combine with tag_to_machine_id_ since they are tags into the same thing
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
 
     // The tags that this machine produces
@@ -697,6 +739,11 @@ namespace skynet
     // Mapping from a machine address to a pointer to the external master
     // This is also used for testing that a connection has completed
     std::unordered_map<AddrPortPair, internal::ExternalMaster*> addr_to_machine_;
+
+    // Mapping from a tag to the ID used for the subscription to the tag
+    // Used to know when a subscription is done and for if multiple jobs
+    // subscribe to the same tag
+    std::unordered_map<TagID, internal::ExternalMaster*> tag_to_machine_id_;
 
     /** \brief Connection status for pending connections
      */
@@ -734,7 +781,7 @@ namespace skynet
     // Notification for when connections are complete
     std::condition_variable connection_cv_;
 
-    // Bools separate for if notifications should be raised so that
+    // Booleans separate for if notifications should be raised so that
     // the CV's can use notifications while the mutex is released
     bool notify_new_subscriptions_ = false;
     bool notify_reduce_group_ = false;

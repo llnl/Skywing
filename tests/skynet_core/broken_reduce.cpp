@@ -38,7 +38,7 @@ void machine_task(const NetworkInfo* const info, const int index)
 
   master.submit_job("job", [&](Job& the_job) {
     connect_network(*info, master, index, [](Master& m, const int i) {
-      while (!m.connect_to_server("127.0.0.1", base_port + i).get()) { /* empty */ };
+      return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
@@ -81,7 +81,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
     Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
     master.submit_job("job", [&](Job& the_job) {
       connect_network(network_info, master, index, [](Master& m, const int i) {
-        while (!m.connect_to_server("127.0.0.1", base_port + i).get()) { /* empty */ };
+        return m.connect_to_server("127.0.0.1", base_port + i).get();
       });
       auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
       auto& group = fut.get();

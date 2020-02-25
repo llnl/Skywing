@@ -292,7 +292,7 @@ namespace skynet
     for (const auto child_index : {lchild_index, rchild_index})
     {
       const auto write_index = (child_index == lchild_index ? 1 : 2);
-      if (child_index < static_cast<decltype(child_index)>(bin_tree.size()))
+      if (child_index < static_cast<std::remove_const_t<decltype(child_index)>>(bin_tree.size()))
       {
         tags_to_find.tags[write_index] = bin_tree[child_index];
       }

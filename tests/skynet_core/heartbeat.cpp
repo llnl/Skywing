@@ -28,7 +28,7 @@ void machine_task(const NetworkInfo* const info, const int index)
   };
   master.submit_job("dummy job", [&](Job&) {
     connect_network(*info, master, index, [&](Master& m, const int i) {
-      m.connect_to_server("127.0.0.1", base_port + i).get();
+      return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
     std::this_thread::sleep_for(heartbeat_interval * 10);
   });

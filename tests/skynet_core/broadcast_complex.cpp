@@ -73,9 +73,6 @@ void machine_task(const NetworkInfo* const info, const int index)
 {
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
   // Submit first and second job
   const std::array<std::tuple<Tag1, Tag2, Tag3>, 2> tags{
     std::make_tuple(Tag1{"job0tag0"}, Tag2{"job0tag1"}, Tag3{"job0tag2"}),
@@ -85,7 +82,13 @@ void machine_task(const NetworkInfo* const info, const int index)
   static std::atomic<int> ready_counter{0};
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
-    return [&tags, &index, i](Job& job) {
+    return [&tags, &index, info, &master, i](Job& job) {
+      if (i == 0)
+      {
+        connect_network(*info, master, index, [](Master& m, const int num) {
+          return m.connect_to_server("127.0.0.1", base_port + num).get();
+        });
+      }
       const auto& tag1 = std::get<Tag1>(tags[i]);
       const auto& tag2 = std::get<Tag2>(tags[i]);
       const auto& tag3 = std::get<Tag3>(tags[i]);

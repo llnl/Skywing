@@ -41,10 +41,10 @@ std::mutex catch_mutex;
 void machine_task(const NetworkInfo* const info, const int index)
 {
   Master master{ports[index], std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", ports[i]);
-  });
   master.submit_job("job", [&](Job& job_handle) {
+    connect_network(*info, master, index, [](Master& m, const int i) {
+      return m.connect_to_server("127.0.0.1", ports[i]).get();
+    });
     const auto& to_publish = publish_values[index];
     SynchronousIterative iter_method = [&]() {
       if (index == 0)

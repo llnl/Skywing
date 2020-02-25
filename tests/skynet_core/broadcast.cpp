@@ -59,7 +59,7 @@ void setup_network(Master& master, const std::size_t index)
     {
       break;
     }
-    master.connect_to_server("127.0.0.1", ports[machine]).get();
+    while (!master.connect_to_server("127.0.0.1", ports[machine]).get()) { /* nothing */ }
   }
   // Wait until all machines have connected
   while (master.number_of_neighbors() != machine_counts[index])
