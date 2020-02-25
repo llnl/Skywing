@@ -34,7 +34,7 @@ namespace skynet
   namespace internal
   {
     // The default hearbeat interval
-    inline static constexpr std::chrono::milliseconds default_heartbeat_interval{2000};
+    inline static constexpr std::chrono::milliseconds default_heartbeat_interval{5000};
 
     /** \brief Tag to indicate that this connection was made by accepting a connection
      */
@@ -90,10 +90,7 @@ namespace skynet
 
       /** \brief Begins the search process for publishers tags
        */
-      void find_publishers_for_tags(
-        const std::vector<TagID>& tags,
-        bool ignore_cache
-      ) noexcept;
+      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
 
       /** \brief The address for communication with the external master
        */
@@ -259,6 +256,10 @@ namespace skynet
     /** \brief Returns the id of the master
      */
     const std::string& id() const noexcept;
+
+    /** \brief Returns the number of subscriptions a tag has
+     */
+    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept;
 
     // Access for the Job class
     struct JobAccessor

@@ -90,10 +90,7 @@ namespace skynet
       }
     }
 
-    void ExternalMaster::find_publishers_for_tags(
-      const std::vector<TagID>& tags,
-      const bool ignore_cache
-    ) noexcept
+    void ExternalMaster::find_publishers_for_tags(const std::vector<TagID>& tags) noexcept
     {
       SKYNET_TRACE_LOG(
         "\"{}\" asking \"{}\" for tags {}",
@@ -103,7 +100,7 @@ namespace skynet
       );
       if (!pending_tag_request_)
       {
-        send_message(make_get_publishers(tags, ignore_cache));
+        send_message(make_get_publishers(tags, false));
         pending_tag_request_ = true;
       }
       // Always update these when new requests come in;
@@ -670,15 +667,22 @@ namespace skynet
     }
   }
 
-  // int Master::number_of_subscribers() const noexcept
-  // {
-  //   std::lock_guard lock{job_mut_};
-  //   return pub_channel_.num_subscriptions();
-  // }
-
   const std::string& Master::id() const noexcept
   {
     return id_;
+  }
+
+  int Master::num_subscriptions(const internal::PublishTagBase& tag) const noexcept
+  {
+    std::lock_guard<std::mutex> lock{job_mut_};
+    return std::accumulate(
+      neighbors_.cbegin(),
+      neighbors_.cend(),
+      0,
+      [&](const int sum, const auto& neighbor_pair) noexcept {
+        return sum + neighbor_pair.second.is_subscribed_to(tag.id());
+      }
+    );
   }
 
   void Master::handle_neighbor_messages() noexcept
@@ -820,7 +824,12 @@ namespace skynet
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
     -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
   {
+    SKYNET_TRACE_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
     std::copy(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_));
+    for (auto& [name, neighbor] : neighbors_)
+    {
+      neighbor.find_publishers_for_tags(tag_ids);
+    }
     return internal::make_waiter(
       job_mut_,
       new_subscription_cv_,
@@ -924,7 +933,7 @@ namespace skynet
         {
           if (&neighbor.second != &from)
           {
-            neighbor.second.find_publishers_for_tags(remaining_tags, false);
+            neighbor.second.find_publishers_for_tags(remaining_tags);
           }
         }
       }
@@ -1127,7 +1136,7 @@ namespace skynet
       pending_tags_.push_back(parent_tag);
       for (auto& neighbor : neighbors_)
       {
-        neighbor.second.find_publishers_for_tags({parent_tag}, false);
+        neighbor.second.find_publishers_for_tags({parent_tag});
       }
     }
     return internal::make_waiter(
@@ -1155,7 +1164,7 @@ namespace skynet
         pending_tags_.push_back(parent_tag);
         for (auto& neighbor : neighbors_)
         {
-          neighbor.second.find_publishers_for_tags({parent_tag}, false);
+          neighbor.second.find_publishers_for_tags({parent_tag});
         }
       }
     }
@@ -1445,7 +1454,10 @@ namespace skynet
         if (!inserted)
         {
           auto& tag_list = conn_iter->second;
-          tag_list.push_back('\0');
+          if (!tag_list.empty())
+          {
+            tag_list.push_back('\0');
+          }
           tag_list += tag;
         }
         to_delete.push_back(tag_iter);
@@ -1567,7 +1579,12 @@ namespace skynet
 
         case internal::ConnectionError::no_error:
           {
-            SKYNET_TRACE_LOG("\"{}\" sending greeting to {}", id_, info.conn.ip_address_and_port());
+            SKYNET_TRACE_LOG(
+              "\"{}\" sending greeting to {} for tag \"{}\"",
+              id_,
+              info.conn.ip_address_and_port(),
+              info.tag
+            );
             // Send message and mark as waiting
             const auto message = make_handshake();
             if (info.conn.send_message(message.data(), message.size()) != internal::ConnectionError::no_error)
@@ -1679,7 +1696,7 @@ namespace skynet
                 notify_of_new_neighbor(new_neighbor_iter->first);
                 if (!pending_tags_.empty())
                 {
-                  new_neighbor_iter->second.find_publishers_for_tags(pending_tags_, false);
+                  new_neighbor_iter->second.find_publishers_for_tags(pending_tags_);
                 }
                 // Finally, remove the pending connection and re-loop
                 notify_connection_ = true;
