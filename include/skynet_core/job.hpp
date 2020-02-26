@@ -321,6 +321,7 @@ namespace skynet
       };
       publish_impl(tag, gsl::span<PublishValueVariant>{variants});
     }
+
     template<typename... PublishTagTypes, typename... TupleTypes>
     void publish(
       const PublishTag<PublishTagTypes...>& tag,

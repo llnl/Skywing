@@ -65,7 +65,7 @@ namespace skynet
     }
 
     template<class Rep, class Period>
-    bool wait_until(const std::chrono::duration<Rep, Period>& end_time) noexcept
+    bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
     {
       std::unique_lock<std::mutex> lock{mutex_};
       if (is_ready_no_lock()) { return true; }

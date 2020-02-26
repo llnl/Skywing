@@ -153,9 +153,9 @@ namespace skynet
       // The time that will be waited until requesting tags again
       std::chrono::steady_clock::time_point request_tags_time_;
 
-      // Set of currently subscribed tags
+      // Tags that the remote is subscribed for
       // std::unordered_set for fast look-up
-      std::unordered_set<TagID> subscriptions_;
+      std::unordered_set<TagID> remote_subscriptions_;
 
       // The port to use to connect to the remote machine
       std::uint16_t port_;
@@ -728,7 +728,7 @@ namespace skynet
     // the ExternalMaster is deleted between the time a request is started and a response
     // is received
     // TODO: Maybe move to pointers and just make sure to remove them when the neighbor is removed?
-    // Also potentially combine with tag_to_machine_id_ since they are tags into the same thing
+    // Also potentially combine with tag_to_machine_ since they are tags into the same thing
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
 
     // The tags that this machine produces
@@ -744,7 +744,8 @@ namespace skynet
     // Mapping from a tag to the ID used for the subscription to the tag
     // Used to know when a subscription is done and for if multiple jobs
     // subscribe to the same tag
-    std::unordered_map<TagID, internal::ExternalMaster*> tag_to_machine_id_;
+    // This is also use to mark when a pending connection is for a tag
+    std::unordered_map<TagID, internal::ExternalMaster*> tag_to_machine_;
 
     /** \brief Connection status for pending connections
      */

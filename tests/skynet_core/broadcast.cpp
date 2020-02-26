@@ -32,11 +32,11 @@ constexpr std::array<const char*, 5> tag_names{"t0", "t1", "t2", "t3", "t4"};
 
 // The port each machine is on
 std::array<std::uint16_t, 5> ports{
-  15000,
-  16000,
-  17000,
-  18000,
-  19000
+  45000,
+  46000,
+  47000,
+  48000,
+  49000
 };
 
 // machine connections to make
@@ -68,8 +68,8 @@ void setup_network(Master& master, const std::size_t index)
     std::this_thread::sleep_for(10ms);
   }
 }
+              #include <skynet_core/internal/utility/logging.hpp>
 
-// Reference wasn't working
 void machine_task(const std::size_t index)
 {
   Master master{ports[index], machine_names[index]};
@@ -78,17 +78,29 @@ void machine_task(const std::size_t index)
     setup_network(master, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
+    // Things trying to subscribe to each other concurrently can cause the subscription to
+    // fail (and always will have that chance) so do it like this to prevent any subscriptions
+    // from failing
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
       if (index != send_index)
       {
         the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait();
       }
+      else
+      {
+        // while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
+        // {
+        //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // }
+      }
     }
-    while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+          SKYNET_TRACE_LOG("\"m{}\" !!!!!!!!!!!!!!!!!", index);
+          // TEMPORARY - USED TO TEST SUBSCRIBING AT THE SAME TIME
+          while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
+          {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          }
     the_job.publish(Uint64Tag{tag_names[index]}, static_cast<std::uint64_t>(index));
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {

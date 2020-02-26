@@ -63,7 +63,7 @@ namespace skynet
 
     bool ExternalMaster::is_subscribed_to(const TagID& tag) const noexcept
     {
-      return subscriptions_.find(tag) != subscriptions_.cend();
+      return remote_subscriptions_.find(tag) != remote_subscriptions_.cend();
     }
 
     bool ExternalMaster::is_past_tag_asking_time() const noexcept
@@ -383,7 +383,7 @@ namespace skynet
             {
               return false;
             }
-            const auto [iter, inserted] = subscriptions_.emplace(tag);
+            const auto [iter, inserted] = remote_subscriptions_.emplace(tag);
             (void)iter;
             // Shouldn't receive multiple subscriptions to the same tag
             if (!inserted)
@@ -393,19 +393,19 @@ namespace skynet
           }
           if (!Master::ExternalMasterAccessor::subscription_tags_are_produced(*master_, msg))
           {
+            // TODO: Send a cancellation notice instead for the tags that aren't there
+            // when this happens
             return false;
           }
           const auto& tags = msg.tags();
           for (const auto& tag : tags)
           {
-            subscriptions_.emplace(tag);
+            remote_subscriptions_.emplace(tag);
           }
           SKYNET_TRACE_LOG(
-            "\"{}\" accepted subscription notice from \"{}\" for tags {}, is unsubscribe: {}",
+            "\"{}\" accepted subscription notice from \"{}\"",
             master_->id(),
-            id_,
-            msg.tags(),
-            msg.is_unsubscribe()
+            id_
           );
           return true;
         },
@@ -737,6 +737,7 @@ namespace skynet
 
   void Master::remove_dead_neighbors() noexcept
   {
+    bool new_tags = false;
     for (auto it = neighbors_.begin(); it != neighbors_.end(); /* nothing */)
     {
       if (it->second.is_dead())
@@ -771,23 +772,38 @@ namespace skynet
           }
         }
         // Remove corresponding address
-        const auto erase_addr = [&](auto& erase_from) {
+        const auto erase_addr = [&](auto& erase_from, const auto& on_erase) {
           const auto addr_matches = [&](const auto& pair) {
             return pair.second == std::addressof(it->second);
           };
-          const auto erase_iter = std::find_if(erase_from.begin(), erase_from.end(), addr_matches);
-          if (erase_iter != erase_from.end())
+          const auto find_next = [&](const auto& iter) {
+            return std::find_if(iter, erase_from.end(), addr_matches);
+          };
+          for (auto iter = find_next(erase_from.begin()); iter != erase_from.end(); iter = find_next(iter))
           {
-            erase_from.erase(erase_iter);
+            on_erase(*iter);
+            iter = erase_from.erase(iter);
           }
         };
-        erase_addr(addr_to_machine_);
-        erase_addr(tag_to_machine_id_);
+        erase_addr(addr_to_machine_, [](const auto&){});
+        // Need to re-look for the subscription tags, if any
+        erase_addr(tag_to_machine_, [&](const auto& tag_pair) {
+          new_tags = true;
+          pending_tags_.emplace_back(tag_pair.first);
+        });
         it = neighbors_.erase(it);
       }
       else
       {
         ++it;
+      }
+    }
+    // Do this after removing the neighbors so that the dead neighbors won't be considered
+    if (new_tags)
+    {
+      for (auto& neighbor : neighbors_)
+      {
+        neighbor.second.find_publishers_for_tags(pending_tags_);
       }
     }
   }
@@ -814,8 +830,8 @@ namespace skynet
   {
     for (const auto& tag : required_tags)
     {
-      const auto iter = tag_to_machine_id_.find(tag);
-      if (iter == tag_to_machine_id_.cend()) { return false; }
+      const auto iter = tag_to_machine_.find(tag);
+      if (iter == tag_to_machine_.cend()) { return false; }
     }
     SKYNET_TRACE_LOG("\"{}\" subscription for tags {} finished.", id_, required_tags);
     return true;
@@ -1403,6 +1419,10 @@ namespace skynet
 
   void Master::init_connections_for_pending_tags() noexcept
   {
+    if (!pending_tags_.empty())
+    {
+      SKYNET_TRACE_LOG("\"{}\" is initiating connections for tags {}", id_, pending_tags_);
+    }
     // A single connection can supply multiple tags, so look through all the pending tags
     // first so that multiple connections to the same machine aren't started
     std::unordered_map<std::string, std::string> to_conn;
@@ -1420,9 +1440,8 @@ namespace skynet
       if (publishers.empty())
       {
         ++tag_iter;
-        continue;
       }
-      while (!publishers.empty())
+      else
       {
         const auto& addr = *publishers.begin();
         // Check if the machine is already a neighbor, and handle it if so
@@ -1447,20 +1466,22 @@ namespace skynet
             );
           }
           tag_iter = pending_tags_.erase(tag_iter);
-          break;
         }
-        auto [conn_iter, inserted] = to_conn.try_emplace(addr, tag);
-        // Append tag to "list" if already there
-        if (!inserted)
+        else
         {
-          auto& tag_list = conn_iter->second;
-          if (!tag_list.empty())
+          auto [conn_iter, inserted] = to_conn.try_emplace(addr, tag);
+          // Append tag to "list" if already there
+          if (!inserted)
           {
-            tag_list.push_back('\0');
+            auto& tag_list = conn_iter->second;
+            if (!tag_list.empty())
+            {
+              tag_list.push_back('\0');
+            }
+            tag_list += tag;
           }
-          tag_list += tag;
+          to_delete.push_back(tag_iter);
         }
-        to_delete.push_back(tag_iter);
         publishers.erase(publishers.begin());
       }
     }
@@ -1513,9 +1534,11 @@ namespace skynet
 
   void Master::process_pending_conns() noexcept
   {
+    bool new_pending_tags = false;
     // TODO: Move this into its own function?  It isn't used anywhere else...
     const auto handle_error = [&](PendingInfo& info) {
       const auto handle_tag = [&](const std::string& pub_tag, const std::string& base_tag) {
+        new_pending_tags = true;
         const auto pub_iter = publishers_for_tag_.find(pub_tag);
         assert(pub_iter != publishers_for_tag_.cend());
         auto& publishers = pub_iter->second;
@@ -1531,6 +1554,14 @@ namespace skynet
           {
             neighbor.second.ignore_cache_on_next_request();
           }
+        }
+        else
+        {
+          SKYNET_TRACE_LOG(
+            "\"{}\" still has publishers for tag \"{}\", going to next one",
+            id_,
+            info.tag
+          );
         }
         // Just replace the tag to re-init the connection
         pending_tags_.emplace_back(std::string{base_tag});
@@ -1672,6 +1703,7 @@ namespace skynet
               );
               if (okay)
               {
+                SKYNET_TRACE_LOG("\"{}\" finalizing connection to \"{}\" for tag \"{}\"", id_, iter->first, info.tag);
                 switch (info.type)
                 {
                 case ConnType::by_accept:
@@ -1712,13 +1744,29 @@ namespace skynet
         }
         if (!okay)
         {
+          SKYNET_TRACE_LOG(
+            "\"{}\" failed connecting to {} for tag \"{}\"",
+            id_,
+            info.conn.ip_address_and_port(),
+            info.tag
+          );
           notify_connection_ = true;
           handle_error(info);
           iter = pending_conns_.erase(iter);
         }
       }
-      // A failure can make the loop invalid - just exit if one occurred
-      if (!okay) { break; }
+      if (okay)
+      {
+        ++iter;
+      }
+    }
+    // Find publishers if there are new pending tags
+    if (new_pending_tags)
+    {
+      for (auto& neighbor : neighbors_)
+      {
+        neighbor.second.find_publishers_for_tags(pending_tags_);
+      }
     }
   }
 
@@ -1806,7 +1854,7 @@ namespace skynet
     );
     for (const auto& tag : tags_to_sub_to)
     {
-      tag_to_machine_id_[tag] = &source;
+      tag_to_machine_[tag] = &source;
     }
     const auto msg = internal::make_subscription_notice(tags_to_sub_to, false);
     source.send_message(msg);
