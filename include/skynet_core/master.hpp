@@ -88,7 +88,7 @@ namespace skynet
        */
       void send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept;
 
-      /** \brief Begins the search process for publishers tags
+      /** \brief Begins the search process for the specified tags
        */
       void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
 
@@ -100,10 +100,6 @@ namespace skynet
        */
       AddrPortPair address_pair() const noexcept;
 
-      /** \brief Send a request for any pending tags if required
-       */
-      void ask_for_tags(const std::vector<TagID>& tags) noexcept;
-
       /** \brief Sets the external master to ignore the cache on the next request
        * for publishers
        */
@@ -114,9 +110,21 @@ namespace skynet
        */
       bool is_subscribed_to(const TagID& tag) const noexcept;
 
-      /** \brief Returns true if the time is past the time to ask for tags.
+      /** \brief Returns true if tags should be asked for
        */
-      bool is_past_tag_asking_time() const noexcept;
+      bool should_ask_for_tags() const noexcept;
+
+      /** \brief Returns true if there are pending tags
+       */
+      bool has_pending_tag_request() const noexcept;
+
+      /** \brief Resets the backoff counter
+       */
+      void reset_backoff_counter() noexcept;
+
+      /** \brief Increments the backoff counter
+       */
+      void increase_backoff_counter() noexcept;
 
     private:
       // Read some bytes from the connection, returning false if the read failed
@@ -683,6 +691,10 @@ namespace skynet
      * \param tags '\0' seperated list of tags
      */
     void finalize_subscription(const std::string& tags, internal::ExternalMaster& source) noexcept;
+
+    /** \brief Asks neighbors for publishers for pending tags with no know publishers
+     */
+    void find_publishers_for_pending_tags() noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;

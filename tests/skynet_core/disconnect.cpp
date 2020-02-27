@@ -2,6 +2,7 @@
 
 #include "skynet_core/master.hpp"
 #include "skynet_core/job.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include "utils.hpp"
 
@@ -14,7 +15,7 @@
 using namespace skynet;
 
 static constexpr std::uint16_t base_port = 5000;
-static constexpr int num_machines = 10;
+static constexpr int num_machines = 4;
 
 using Int32Tag = PublishTag<std::int32_t>;
 
@@ -52,12 +53,23 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       {
         my_job.subscribe(Int32Tag{std::to_string(i)}).wait();
       }
+      else
+      {
+        while (master.num_subscriptions(publish_tag) != static_cast<int>(num_machines - 1))
+        {
+          std::this_thread::sleep_for(10ms);
+        }
+      }
     }
-    // TODO: PUBLISH CHANGE
-    // while (master.number_of_subscribers() != static_cast<int>(num_machines - 1))
-    // {
-    //   std::this_thread::sleep_for(10ms);
-    // }
+    SKYNET_SYNCRONIZE_MACHINES(num_machines);
+    static std::atomic<int> ready_count{0};
+    if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1))
+    {
+      while (ready_count != static_cast<int>(num_machines))
+      {
+        std::this_thread::sleep_for(10ms);
+      }
+    }
     my_job.publish(publish_tag, index);
     for (std::size_t i = 0; i < disconnect_order.size(); ++i)
     {

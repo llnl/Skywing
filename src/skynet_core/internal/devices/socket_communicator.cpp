@@ -183,8 +183,9 @@ namespace skynet::internal
     to_poll.events = POLLOUT | POLLIN;
     if (poll(&to_poll, 1, 0) < 0)
     {
+      // std::perror("SOCKET POLL ERROR: ");
       // This is also required?
-      if (errno == EINPROGRESS)
+      if (errno == EINPROGRESS || errno == EAGAIN)
       {
         return ConnectionError::connection_in_progress;
       }
@@ -193,6 +194,7 @@ namespace skynet::internal
     constexpr auto err_mask = POLLERR | POLLHUP | POLLNVAL;
     if ((to_poll.revents & err_mask) != 0)
     {
+      // std::printf("SOCKET ERR FLAGS %i - COMP %i %i %i\n", to_poll.revents, POLLERR, POLLHUP, POLLNVAL);
       return ConnectionError::unrecoverable;
     }
     if ((to_poll.revents & (POLLOUT | POLLIN)) != 0)

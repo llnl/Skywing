@@ -30,7 +30,7 @@ void publish_once(int publish_number)
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
   Master master{publisher_port, publisher_id};
   master.submit_job("job", [&](Job& job) {
-    master.connect_to_server("127.0.0.1", subscriber_port).get();
+    while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */ }
     job.declare_publication_intent(value_tag);
     // Wait for the subscriber to finish subscribe
     while (subscriptions_finished <= publish_number)

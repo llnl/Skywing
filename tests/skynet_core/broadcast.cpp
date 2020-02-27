@@ -32,11 +32,11 @@ constexpr std::array<const char*, 5> tag_names{"t0", "t1", "t2", "t3", "t4"};
 
 // The port each machine is on
 std::array<std::uint16_t, 5> ports{
-  45000,
-  46000,
-  47000,
-  48000,
-  49000
+  15000,
+  16000,
+  17000,
+  18000,
+  19000
 };
 
 // machine connections to make
@@ -68,7 +68,6 @@ void setup_network(Master& master, const std::size_t index)
     std::this_thread::sleep_for(10ms);
   }
 }
-              #include <skynet_core/internal/utility/logging.hpp>
 
 void machine_task(const std::size_t index)
 {
@@ -89,18 +88,12 @@ void machine_task(const std::size_t index)
       }
       else
       {
-        // while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
-        // {
-        //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        // }
+        while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
       }
     }
-          SKYNET_TRACE_LOG("\"m{}\" !!!!!!!!!!!!!!!!!", index);
-          // TEMPORARY - USED TO TEST SUBSCRIBING AT THE SAME TIME
-          while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
-          {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-          }
     the_job.publish(Uint64Tag{tag_names[index]}, static_cast<std::uint64_t>(index));
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {

@@ -147,4 +147,19 @@ namespace skynet
   }
 } // namespace skynet
 
+// Macro to synchronize all machines
+#define SKYNET_SYNCRONIZE_MACHINES(machine_count) \
+  do \
+  { \
+    static std::atomic<int> sync; \
+    if (sync.fetch_add(1) != static_cast<int>(machine_count - 1)) \
+    { \
+      while (sync != static_cast<int>(machine_count)) \
+      { \
+        std::this_thread::sleep_for(std::chrono::milliseconds{10}); \
+      } \
+    } \
+  } \
+  while (false)
+
 #endif // SKYNET_TEST_UTILS_HPP

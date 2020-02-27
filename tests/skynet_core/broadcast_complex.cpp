@@ -2,6 +2,7 @@
 
 #include "skynet_core/master.hpp"
 #include "skynet_core/job.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include "utils.hpp"
 
@@ -17,7 +18,7 @@
 
 using namespace skynet;
 
-constexpr int num_machines = 20;
+constexpr int num_machines = 10;
 constexpr int num_connections = num_machines * 2;
 constexpr std::uint16_t base_port = 30000;
 
@@ -78,8 +79,6 @@ void machine_task(const NetworkInfo* const info, const int index)
     std::make_tuple(Tag1{"job0tag0"}, Tag2{"job0tag1"}, Tag3{"job0tag2"}),
     std::make_tuple(Tag1{"job1tag0"}, Tag2{"job1tag1"}, Tag3{"job1tag2"})
   };
-  // For making sure all tasks are ready to go before starting
-  static std::atomic<int> ready_counter{0};
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
     return [&tags, &index, info, &master, i](Job& job) {
@@ -89,6 +88,7 @@ void machine_task(const NetworkInfo* const info, const int index)
           return m.connect_to_server("127.0.0.1", base_port + num).get();
         });
       }
+      SKYNET_SYNCRONIZE_MACHINES(num_machines * 2);
       const auto& tag1 = std::get<Tag1>(tags[i]);
       const auto& tag2 = std::get<Tag2>(tags[i]);
       const auto& tag3 = std::get<Tag3>(tags[i]);
@@ -116,24 +116,28 @@ void machine_task(const NetworkInfo* const info, const int index)
       default:
         job.subscribe(tag1, tag2, tag3).get();
       }
-      ++ready_counter;
-      while (ready_counter != num_machines * 2)
-      {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
+      const auto wait_for_subs = [&](const auto& tag) {
+        while (master.num_subscriptions(tag) != num_machines - 1)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        }
+      };
       switch (index)
       {
       case 0:
+        wait_for_subs(tag1);
         job.publish(tag1, tag1_value);
         test_tags(job, tag2, tag3);
         break;
 
       case 1:
+        wait_for_subs(tag2);
         job.publish(tag2, tag2_value);
         test_tags(job, tag1, tag3);
         break;
 
       case 2:
+        wait_for_subs(tag3);
         job.publish(tag3, std::string{tag3_value});
         test_tags(job, tag1, tag2);
         break;
