@@ -785,6 +785,10 @@ namespace skynet
         // Need to re-look for the subscription tags, if any
         erase_addr(tag_to_machine_, [&](const auto& tag_pair) {
           new_tags = true;
+          for (auto& job_pair : jobs_)
+          {
+            Job::Accessor::report_dead_tag(job_pair.second, tag_pair.first);
+          }
           pending_tags_.emplace_back(tag_pair.first);
         });
         it = neighbors_.erase(it);

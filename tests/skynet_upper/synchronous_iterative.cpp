@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "skynet_upper/synchronous_iterative.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include "utils.hpp"
 
@@ -14,7 +15,7 @@ constexpr int num_connections = 1;
 using ValueTag = skynet::PublishTag<int>;
 
 const std::array<ValueTag, 3> tags{
-  ValueTag{"tag1"}, ValueTag{"tag2"}, ValueTag{"tag3"}
+  ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}
 };
 
 const std::array<std::uint16_t, 3> ports{

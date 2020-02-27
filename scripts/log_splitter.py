@@ -16,7 +16,6 @@ with open(sys.argv[1]) as f:
         logs[id_] = []
       logs[id_].append((time, level, source, f'"{id_}"{message}'))
     except AttributeError:
-      sys.exit(row)
       pass
 
 for id_, lines in sorted(logs.items()):

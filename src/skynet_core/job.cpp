@@ -94,10 +94,7 @@ namespace skynet
 
   int Job::num_subscriptions(const internal::PublishTagBase& tag) noexcept
   {
-    (void)tag;
-    // TODO: PUBLISH CHANGE
-    return 0;
-    // return master_->number_of_subscribers();
+    return master_->num_subscriptions(tag);
   }
 
   void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
