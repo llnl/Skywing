@@ -15,7 +15,10 @@ add_project_arguments(
 use_ns3 = get_option('use_ns3')
 message('using ns3: ' + use_ns3.to_string())
 
-catch2_dep = subproject('catch2').get_variable('catch2_dep')
+enable_tests = get_option('enable_tests')
+if enable_tests
+  catch2_dep = subproject('catch2').get_variable('catch2_dep')
+endif
 
 if use_ns3
   ns3_dep = subproject('ns3').get_variable('ns3_dep')
@@ -50,5 +53,11 @@ skynet_upper_dep = declare_dependency(
   dependencies : skynet_core_dep
 )
 
-subdir('tests')
-subdir('examples')
+if enable_tests
+  subdir('tests')
+endif
+
+build_examples = get_option('build_examples')
+if build_examples
+  subdir('examples')
+endif

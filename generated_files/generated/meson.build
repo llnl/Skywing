@@ -9,15 +9,17 @@
 cpn_builder_prog = find_program('capnp')
 cpn_builder_cpp_prog = find_program('capnpc-c++')
 
-capn_proto_gen = generator(cpn_builder_prog,
-  output : ['@PLAINNAME@.c++', '@PLAINNAME@.h'],
-  arguments : [
+capn_proto_sources = custom_target('capn_proto_sources',
+  input : ['message_format.capnp'],
+  output : ['message_format.capnp.c++', 'message_format.capnp.h'],
+  command : [
+    cpn_builder_prog,
     '-I' + meson.current_source_dir(),
     'compile',
     # This is ugly and I don't know why it was working before but isn't now
     # Just hardcode the path
     '--src-prefix=../generated_files/generated',
-    '-o' + cpn_builder_cpp_prog.path() + ':@BUILD_DIR@',
+    '-o' + cpn_builder_cpp_prog.path() + ':@OUTDIR@',
     '@INPUT@'
   ]
 )
@@ -54,4 +56,4 @@ configure_file(
   configuration : no_sigpipe_data
 )
 
-generated_sources = capn_proto_gen.process('message_format.capnp')
+generated_sources = capn_proto_sources
