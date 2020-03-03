@@ -31,6 +31,8 @@ struct PublishValue {
     str   @20 : Text;
     rStr  @21 : List(Text);
     bytes @22 : Data;
+    bool  @23 : Bool;
+    rBool @24 : List(Bool);
   }
 }
 

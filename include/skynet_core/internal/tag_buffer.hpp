@@ -41,6 +41,7 @@ namespace skynet::internal
       }
       else
       {
+        // Is lines up for the span, Ts is the types for the tuple
         assert((... && std::get_if<Ts>(&value[Is])));
         return std::make_tuple(std::move(*std::get_if<Ts>(&value[Is]))...);
       }

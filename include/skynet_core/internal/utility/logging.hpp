@@ -81,7 +81,16 @@ struct fmt::formatter<skynet::PublishValueVariant>
   auto format(const skynet::PublishValueVariant& data, FormatContext& ctx) noexcept
   {
     return std::visit([&](const auto& value) {
-      return format_to(ctx.out(), "{}", value);
+      using Type = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<Type, std::vector<bool>>)
+      {
+        // dumb std::vector<bool> workaround
+        return format_to(ctx.out(), "{}", std::vector<std::uint8_t>{value.cbegin(), value.cend()});
+      }
+      else
+      {
+        return format_to(ctx.out(), "{}", value);
+      }
     }, data);
   }
 };

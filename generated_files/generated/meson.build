@@ -12,6 +12,7 @@ cpn_builder_cpp_prog = find_program('capnpc-c++')
 capn_proto_sources = custom_target('capn_proto_sources',
   input : ['message_format.capnp'],
   output : ['message_format.capnp.c++', 'message_format.capnp.h'],
+  build_by_default : true,
   command : [
     cpn_builder_prog,
     '-I' + meson.current_source_dir(),

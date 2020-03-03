@@ -56,7 +56,10 @@ namespace skynet
     std::vector<std::uint64_t>,
     std::string,
     std::vector<std::string>,
-    std::vector<std::byte>
+    std::vector<std::byte>,
+    bool,
+    // TODO: std::vector<bool> is awful, but don't really want an exception either...
+    std::vector<bool>
   >;
 
   /// Variant version of the above

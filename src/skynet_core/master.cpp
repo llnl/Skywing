@@ -1429,12 +1429,14 @@ namespace skynet
       const auto iter = publishers_for_tag_.find(tag);
       if (iter == publishers_for_tag_.cend())
       {
+        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag {}", id_, tag);
         ++tag_iter;
         continue;
       }
       auto& publishers = iter->second;
       if (publishers.empty())
       {
+        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag {}", id_, tag);
         ++tag_iter;
       }
       else

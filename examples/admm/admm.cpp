@@ -14,7 +14,7 @@ using namespace skynet;
 constexpr int num_machines = 5;
 constexpr std::uint16_t base_port = 25000;
 
-using ValueTag = ReduceValueTag<std::vector<double>>;
+using ValueTag = ReduceValueTag<bool, std::vector<double>>;
 
 const std::array<ValueTag, num_machines> tags{
   ValueTag{"x0"},
@@ -24,7 +24,7 @@ const std::array<ValueTag, num_machines> tags{
   ValueTag{"x4"}
 };
 
-const ReduceGroupTag<std::vector<double>> reduce_tag{"ADMM average x"};
+const ReduceGroupTag<bool, std::vector<double>> reduce_tag{"ADMM average x"};
 
 using linear_prob = std::array<double, num_machines + 1>;
 
@@ -277,38 +277,37 @@ void machine_task(const int index)
 
     admm_work(index, [&](const std::array<double, num_machines>& local_solution, const bool locally_converged) {
       // First value is to indicate convergence
-      std::vector<double> to_send(num_machines + 1);
+      std::vector<double> to_send(num_machines);
       // TODO: Allow sending different typed values so stuff like this can be avoided in the future
       //   This will require quite a lot of work / thinking about how to support it, though
-      std::copy(local_solution.cbegin(), local_solution.cend(), to_send.begin() + 1);
-      to_send.front() = locally_converged ? 1.0 : -1.0;
+      std::copy(local_solution.cbegin(), local_solution.cend(), to_send.begin());
       // Update the global solution
       auto fut = group.allreduce(
-        [&](const std::vector<double>& lhs, const std::vector<double>& rhs) {
+        [&](
+          bool converged_lhs,
+          const std::vector<double>& lhs,
+          bool converged_rhs,
+          const std::vector<double>& rhs
+        ) {
           std::vector<double> result{lhs};
-          for (std::size_t i = 1; i < lhs.size(); ++i)
+          for (std::size_t i = 0; i < lhs.size(); ++i)
           {
             result[i] += rhs[i];
           }
-          // Not yet converged; lhs is already checked because result copies from lhs
-          if (rhs.front() < 0.0)
-          {
-            result.front() = -1.0;
-          }
-          return result;
+          return std::make_tuple(converged_lhs && converged_rhs, result);
         },
+        locally_converged,
         to_send
       );
-      auto new_global = fut.get().value();
+      auto [is_converged, new_global] = fut.get().value();
       // Divide by the number of machines for the average value
       for (auto& val : new_global)
       {
         val /= num_machines;
       }
       // This has converged if this is the case
-      const bool is_converged = new_global.front() > 0.0;
       std::array<double, 5> to_ret;
-      std::copy(new_global.cbegin() + 1, new_global.cend(), to_ret.begin());
+      std::copy(new_global.cbegin(), new_global.cend(), to_ret.begin());
       return std::make_tuple(to_ret, is_converged);
     });
 

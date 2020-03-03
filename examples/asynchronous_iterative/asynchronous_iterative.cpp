@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "skynet_core/enable_logging.hpp"
+
 using DataTag = skynet::PublishTag<double>;
 
 struct MachineConfig
@@ -75,13 +77,19 @@ void asynchronous_iterative(
       {
         std::cerr << "Could not find machine \"" << connect_to_name << "\" to connect to.\n";
       }
-      if (!master_handle.connect_to_server("127.0.0.1", conn_to_iter->second.port).wait_for(std::chrono::seconds(10)))
+      const auto time_limit = std::chrono::steady_clock::now() + std::chrono::seconds{10};
+      while (!master_handle.connect_to_server("127.0.0.1", conn_to_iter->second.port).get())
       {
-        std::cerr
-          << config.name << ": Took too long to connect to "
-            << conn_to_iter->second.remote_address
-            << ":"
-            << conn_to_iter->second.port << '\n';
+        if (std::chrono::steady_clock::now() > time_limit)
+        {
+          std::cerr
+            << config.name << ": Took too long to connect to "
+              << conn_to_iter->second.remote_address
+              << ":"
+              << conn_to_iter->second.port << '\n';
+          return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
       }
     }
     job.declare_publication_intent_range(config.tags_produced);
@@ -157,6 +165,8 @@ void asynchronous_iterative(
 
 int main(const int argc, const char* const argv[])
 {
+  // Explicitly disable logging as the output is too noisy otherwise
+  SKYNET_SET_LOG_LEVEL_TO_WARN();
   if (argc != 3)
   {
     std::cerr
