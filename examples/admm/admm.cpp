@@ -163,6 +163,7 @@ void admm_work(const std::size_t index, GetGlobalAndConverged get_global_and_con
 {
   constexpr double min_starting = -10.0;
   constexpr double max_starting = 10.0;
+  const auto start_time = std::chrono::steady_clock::now();
 
   // Randomly initialize the local solution
   std::array<double, num_machines> local_solution = [&]() {
@@ -185,9 +186,12 @@ void admm_work(const std::size_t index, GetGlobalAndConverged get_global_and_con
   constexpr int output_width = 11;
   constexpr int full_row_width = 11 * 3 + 6;
   const auto output_status = [&](int iter_num) {
+    const auto elapsed_time = std::chrono::steady_clock::now() - start_time;
     std::cout
       << std::setfill('-') << std::setw(full_row_width) << '-' << '\n'
       << std::setfill(' ') << "Iter " << std::setw(full_row_width - 5) << iter_num << '\n'
+      << "Elapsed time " << std::setw(full_row_width - 15)
+        << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time).count() << "ms\n"
       << std::setfill('-') << std::setw(full_row_width) << '-' << '\n'
       << std::setfill(' ')
         << std::setw(output_width) << "Actual" << " | "
