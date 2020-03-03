@@ -56,8 +56,9 @@ void simulate_machine(const int machine_number)
   // duplicated on other instances.  Jobs run on separate threads than the master and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
-  // be copyable and the signature must be compatible with void(skynet::Job&)
-  master.submit_job("job", [&](skynet::Job& job) {
+  // be copyable and the signature must be compatible with the function signature
+  // void(skynet::Job&, skynet::MasterHandle)
+  master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle master_handle) {
     // Skynet currently has no way of automatically scanning for new machines while running
     // It will accept any connection requests made to it, however, and the only requirement
     // for it to function is that all nodes have paths to other nodes. To accomplish this,
@@ -69,7 +70,7 @@ void simulate_machine(const int machine_number)
     {
       // Connecting to the server is an asynchronous operation and can fail.
       // Wait for the result each time and keep attempting to connect until it does
-      while (!master.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get())
+      while (!master_handle.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get())
       {
         // Empty
       }

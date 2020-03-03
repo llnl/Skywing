@@ -128,12 +128,12 @@ namespace skynet
   }
 
   // Performs the required steps to create the network from a NetworkInfo
-  // The connection argument should have the signature `void(Master&, int)`
+  // The connection argument should have the signature `void(MasterHandle, int)`
   // with the int parameter corresponding to the index of the machine to
   // connect to, and blocking until connected
   // Connect should return a bool indicating if the connection was successful
   template<typename Callable>
-  void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
+  void connect_network(const NetworkInfo& info, MasterHandle& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
@@ -148,7 +148,7 @@ namespace skynet
 } // namespace skynet
 
 // Macro to synchronize all machines
-#define SKYNET_SYNCRONIZE_MACHINES(machine_count) \
+#define SKYNET_SYNCHRONIZE_MACHINES(machine_count) \
   do \
   { \
     static std::atomic<int> sync; \

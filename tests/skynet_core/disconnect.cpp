@@ -19,7 +19,7 @@ static constexpr int num_machines = 4;
 
 using Int32Tag = PublishTag<std::int32_t>;
 
-void setup_network(const int index, Master& master)
+void setup_network(const int index, MasterHandle master)
 {
   using namespace std::chrono_literals;
   // Give some time to allow all of the servers to start
@@ -43,7 +43,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
-  master.submit_job("Job 0", [&](Job& my_job) {
+  master.submit_job("Job 0", [&](Job& my_job, MasterHandle master) {
     setup_network(index, master);
     my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
@@ -61,7 +61,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
         }
       }
     }
-    SKYNET_SYNCRONIZE_MACHINES(num_machines);
+    SKYNET_SYNCHRONIZE_MACHINES(num_machines);
     static std::atomic<int> ready_count{0};
     if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1))
     {

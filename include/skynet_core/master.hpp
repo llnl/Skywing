@@ -28,8 +28,9 @@
 
 namespace skynet
 {
-  // Forward declaration
   class Master;
+  class MasterHandle;
+  class Job;
 
   namespace internal
   {
@@ -187,6 +188,7 @@ namespace skynet
   class Master
   {
   public:
+    friend class MasterHandle;
     /** \brief Creates a Master instance that listens on the specified
      * port for connections.
      *
@@ -225,24 +227,6 @@ namespace skynet
      */
     ~Master();
 
-    /** \brief Connects to another instance at the specified address on
-     * the specified port
-     *
-     * \param address The address to connect to
-     * \param port The port to connect on
-     */
-    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
-      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
-
-    /** \brief Connects to another instance with the address:port format
-     */
-    auto connect_to_server(std::string_view address) noexcept
-      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
-
-    /** \brief Returns the number of machines connected
-     */
-    int number_of_neighbors() const noexcept;
-
     /** \brief Creates a job for the master to execute that produces the
      * specified tags.
      *
@@ -250,24 +234,16 @@ namespace skynet
      */
     bool submit_job(
       JobID name,
-      std::function<void(Job&)> to_run
+      std::function<void(Job&, MasterHandle)> to_run
     ) noexcept;
 
     /** \brief Start running all submitted jobs
      */
     void run() noexcept;
 
-    /** \brief Returns the number of subscribers
-     */
-    int number_of_subscribers() const noexcept;
-
-    /** \brief Returns the id of the master
+    /** \brief Gets the id of the master
      */
     const std::string& id() const noexcept;
-
-    /** \brief Returns the number of subscriptions a tag has
-     */
-    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept;
 
     // Access for the Job class
     struct JobAccessor
@@ -461,6 +437,22 @@ namespace skynet
     }; // struct WaiterAccessor
 
   private:
+    ///////////////////////////////////////
+    // Interface for MasterHandle
+    ///////////////////////////////////////
+
+    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
+    auto connect_to_server(std::string_view address) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
+    int number_of_neighbors() const noexcept;
+    int number_of_subscribers() const noexcept;
+    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept;
+
+    ///////////////////////////////////////
+    // End Interface for MasterHandle
+    ///////////////////////////////////////
+
     /** \brief See if there are any pending connections and accept them if so
      */
     void accept_pending_connections() noexcept;
@@ -801,6 +793,57 @@ namespace skynet
     bool notify_reduce_group_ = false;
     bool notify_connection_ = false;
   }; // class Master
+
+  class MasterHandle
+  {
+  public:
+    /** \brief Connects to another instance at the specified address on
+     * the specified port
+     *
+     * \param address The address to connect to
+     * \param port The port to connect on
+     */
+    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+    {
+      return handle_->connect_to_server(address, port);
+    }
+
+    /** \brief Connects to another instance with the address:port format
+     */
+    auto connect_to_server(std::string_view address) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+    {
+      return handle_->connect_to_server(address);
+    }
+
+    /** \brief Returns the number of machines connected
+     */
+    int number_of_neighbors() const noexcept { return handle_->number_of_neighbors(); }
+
+    /** \brief Returns the number of subscribers
+     */
+    int number_of_subscribers() const noexcept { return handle_->number_of_subscribers(); }
+
+    /** \brief Returns the id of the master
+     */
+    const std::string& id() const noexcept { return handle_->id(); }
+
+    /** \brief Returns the number of subscriptions a tag has
+     */
+    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept
+    {
+      return handle_->num_subscriptions(tag);
+    }
+
+  private:
+    friend class Job;
+
+    // Private so that only jobs can create a handle
+    explicit MasterHandle(Master& m) noexcept : handle_{&m} {}
+
+    Master* handle_;
+  }; // class MasterHandle
 } // namespace skynet
 
 #endif // SKYNET_MASTER_HPP

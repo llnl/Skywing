@@ -56,9 +56,9 @@ void machine_task(const NetworkInfo* const info, const int index)
 {
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  master.submit_job("job", [&](Job& the_job) {
-    connect_network(*info, master, index, [&](Master& m, const int i) {
+  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  base_master.submit_job("job", [&](Job& the_job, MasterHandle master) {
+    connect_network(*info, master, index, [&](MasterHandle& m, const int i) {
       return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
     // Create the reduce group
@@ -78,7 +78,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       std::this_thread::sleep_for(std::chrono::milliseconds{10});
     }
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")

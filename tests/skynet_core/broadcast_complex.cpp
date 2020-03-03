@@ -81,14 +81,14 @@ void machine_task(const NetworkInfo* const info, const int index)
   };
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
-    return [&tags, &index, info, &master, i](Job& job) {
+    return [&tags, &index, info, i](Job& job, MasterHandle master_handle) {
       if (i == 0)
       {
-        connect_network(*info, master, index, [](Master& m, const int num) {
+        connect_network(*info, master_handle, index, [](MasterHandle& m, const int num) {
           return m.connect_to_server("127.0.0.1", base_port + num).get();
         });
       }
-      SKYNET_SYNCRONIZE_MACHINES(num_machines * 2);
+      SKYNET_SYNCHRONIZE_MACHINES(num_machines * 2);
       const auto& tag1 = std::get<Tag1>(tags[i]);
       const auto& tag2 = std::get<Tag2>(tags[i]);
       const auto& tag3 = std::get<Tag3>(tags[i]);
@@ -117,7 +117,7 @@ void machine_task(const NetworkInfo* const info, const int index)
         job.subscribe(tag1, tag2, tag3).get();
       }
       const auto wait_for_subs = [&](const auto& tag) {
-        while (master.num_subscriptions(tag) != num_machines - 1)
+        while (master_handle.num_subscriptions(tag) != num_machines - 1)
         {
           std::this_thread::sleep_for(std::chrono::milliseconds{10});
         }

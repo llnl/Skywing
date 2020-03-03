@@ -5,11 +5,22 @@
 
 namespace skynet
 {
+  std::thread Job::Accessor::run(Job& j) noexcept
+  {
+    return std::thread{[&j]() {
+      j.to_run_(j, MasterHandle{*j.master_});
+      // Re-use the buffer mutex here
+      std::lock_guard lock{j.bufs_.mutex()};
+      // Signify that the work is done
+      j.to_run_ = nullptr;
+    }};
+  }
+
   Job::Job(
     Accessor::AllowConstruction,
     const std::string& id,
     Master& master,
-    std::function<void(Job&)> to_run
+    std::function<void(Job&, MasterHandle)> to_run
   ) noexcept
     : id_{id}
     , master_{&master}
@@ -94,7 +105,7 @@ namespace skynet
 
   int Job::num_subscriptions(const internal::PublishTagBase& tag) noexcept
   {
-    return master_->num_subscriptions(tag);
+    return MasterHandle{*master_}.num_subscriptions(tag);
   }
 
   void Job::mark_tag_as_dead(const TagID& tag_id) noexcept

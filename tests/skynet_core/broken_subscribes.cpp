@@ -27,8 +27,8 @@ void publish_once(int publish_number)
   // Wait to start to allow the subscriber to notice that the publisher has
   // disconnected so it won't discard this connection for re-using the id
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  Master master{publisher_port, publisher_id};
-  master.submit_job("job", [&](Job& job) {
+  Master base_master{publisher_port, publisher_id};
+  base_master.submit_job("job", [&](Job& job, MasterHandle master) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */ }
     job.declare_publication_intent(value_tag);
@@ -43,13 +43,13 @@ void publish_once(int publish_number)
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
-  master.run();
+  base_master.run();
 }
 
 void subscriber()
 {
-  Master master{subscriber_port, subscriber_id};
-  master.submit_job("job", [&](Job& job) {
+  Master base_master{subscriber_port, subscriber_id};
+  base_master.submit_job("job", [&](Job& job, MasterHandle) {
     job.subscribe(value_tag).get();
     while (values_retrieved != num_values_to_publish)
     {
@@ -70,7 +70,7 @@ void subscriber()
       REQUIRE_FALSE(failed_value);
     }
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Subscribe channels breaking is fine", "[Skynet_BrokenSubscribe]")

@@ -50,7 +50,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
 
 using Uint64Tag = PublishTag<std::uint64_t>;
 
-void setup_network(Master& master, const std::size_t index)
+void setup_network(MasterHandle master, const std::size_t index)
 {
   using namespace std::chrono_literals;
   // Connect to the corresponding machines (if any)
@@ -71,9 +71,9 @@ void setup_network(Master& master, const std::size_t index)
 
 void machine_task(const std::size_t index)
 {
-  Master master{ports[index], machine_names[index]};
+  Master base_master{ports[index], machine_names[index]};
   // Submit job and broadcast on the job using each machine
-  master.submit_job("job 0", [&master, index](Job& the_job) {
+  base_master.submit_job("job 0", [index](Job& the_job, MasterHandle master) {
     setup_network(master, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
@@ -109,7 +109,7 @@ void machine_task(const std::size_t index)
     }
   });
   // Start processing messages
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")

@@ -67,7 +67,7 @@ void asynchronous_iterative(
     std::cerr << config.name << ": Must produce at least one tag\n";
     std::exit(1);
   }
-  master.submit_job("job", [&](skynet::Job& job) {
+  master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle master_handle) {
     for (const auto& connect_to_name : config.machines_to_connect_to)
     {
       const auto conn_to_iter = machines.find(connect_to_name);
@@ -75,7 +75,7 @@ void asynchronous_iterative(
       {
         std::cerr << "Could not find machine \"" << connect_to_name << "\" to connect to.\n";
       }
-      if (!master.connect_to_server("127.0.0.1", conn_to_iter->second.port).wait_for(std::chrono::seconds(10)))
+      if (!master_handle.connect_to_server("127.0.0.1", conn_to_iter->second.port).wait_for(std::chrono::seconds(10)))
       {
         std::cerr
           << config.name << ": Took too long to connect to "

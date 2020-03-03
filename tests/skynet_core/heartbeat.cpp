@@ -21,18 +21,18 @@ using namespace skynet;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master master{
+  Master base_master{
     static_cast<std::uint16_t>(base_port + index),
     std::to_string(index),
     heartbeat_interval
   };
-  master.submit_job("dummy job", [&](Job&) {
-    connect_network(*info, master, index, [&](Master& m, const int i) {
+  base_master.submit_job("dummy job", [&](Job&, MasterHandle master) {
+    connect_network(*info, master, index, [&](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
     std::this_thread::sleep_for(heartbeat_interval * 10);
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Heartbeats are sent", "[Heartbeat_basic]")

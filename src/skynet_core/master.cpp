@@ -567,7 +567,7 @@ namespace skynet
 
   bool Master::submit_job(
     JobID name,
-    std::function<void(Job&)> to_run
+    std::function<void(Job&, MasterHandle)> to_run
   ) noexcept
   {
     const auto res = jobs_.try_emplace(

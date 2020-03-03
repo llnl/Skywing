@@ -41,9 +41,9 @@ std::mutex catch_mutex;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master master{ports[index], std::to_string(index)};
-  master.submit_job("job", [&](Job& job_handle) {
-    connect_network(*info, master, index, [](Master& m, const int i) {
+  Master base_master{ports[index], std::to_string(index)};
+  base_master.submit_job("job", [&](Job& job_handle, MasterHandle master) {
+    connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
     const auto& to_publish = publish_values[index];
@@ -75,7 +75,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       REQUIRE(iter_method.values() == expected_results(index, 1));
     }
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Synchronous Iterative", "[Skynet_SynchronousIterative]")
