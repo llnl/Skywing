@@ -80,11 +80,6 @@ struct SubmitReduceValue {
   data       @1 : PublishData;
 }
 
-struct ReportReduceResult {
-  reduceTag @0 : Text;
-  data      @1 : PublishData;
-}
-
 struct ReportReduceDisconnection {
   reduceTag         @0 : Text;
   initiatingMachine @1 : Text;
@@ -107,9 +102,8 @@ struct StatusMessage {
     getPublishers             @6  : GetPublishers;
     joinReduceGroup           @7  : JoinReduceGroup;
     submitReduceValue         @8  : SubmitReduceValue;
-    reportReduceResult        @9  : ReportReduceResult;
-    reportReduceDisconnection @10 : ReportReduceDisconnection;
-    publishData               @11 : PublishData;
-    subscriptionNotice        @12 : SubscriptionNotice;
+    reportReduceDisconnection @9  : ReportReduceDisconnection;
+    publishData               @10 : PublishData;
+    subscriptionNotice        @11 : SubscriptionNotice;
   }
 }

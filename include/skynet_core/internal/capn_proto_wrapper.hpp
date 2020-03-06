@@ -37,7 +37,6 @@ namespace skynet::internal
 
     friend class MessageHandler;
     friend class SubmitReduceValue;
-    friend class ReportReduceResult;
     friend class Publish;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
   };
@@ -146,7 +145,7 @@ namespace skynet::internal
     explicit JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept;
   };
 
-  /** \brief Message for submitting a value for reduction to the parent
+  /** \brief Message for submitting a value for reduction to the parent/children
    */
   class SubmitReduceValue
   {
@@ -159,21 +158,6 @@ namespace skynet::internal
 
     friend class MessageHandler;
     explicit SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept;
-  };
-
-  /** \brief Message for reporting the result of a reduction to children
-   */
-  class ReportReduceResult
-  {
-  public:
-    TagID reduce_tag() const noexcept;
-    PublishData data() const noexcept;
-
-  private:
-    cpnpro::ReportReduceResult::Reader r;
-
-    friend class MessageHandler;
-    explicit ReportReduceResult(cpnpro::ReportReduceResult::Reader reader) noexcept;
   };
 
   /** \brief Message for reporting that a machine disconnected
@@ -249,7 +233,6 @@ namespace skynet::internal
       GetPublishers,
       JoinReduceGroup,
       SubmitReduceValue,
-      ReportReduceResult,
       ReportReduceDisconnection,
       SubscriptionNotice,
       PublishData
