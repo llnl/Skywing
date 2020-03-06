@@ -14,6 +14,7 @@ namespace skynet::internal
 {
   namespace detail
   {
+    // Checks if a span representing a tag's value is valid compared to what is expected
     template<typename... Ts, std::size_t... Is>
     bool span_is_valid(
       const gsl::span<const PublishValueVariant> value,
@@ -24,6 +25,8 @@ namespace skynet::internal
         && (... && (value[Is].index() == index_of<Ts, PublishValueTypeList>));
     }
 
+    // Takes a tag value and turns it into either a value (single element) or tuple
+    // non-const version
     template<typename... Ts, std::size_t... Is>
     ValueOrTuple<Ts...> make_value(
       gsl::span<PublishValueVariant> value,
@@ -38,11 +41,13 @@ namespace skynet::internal
       }
       else
       {
+        // Is lines up for the span, Ts is the types for the tuple
         assert((... && std::get_if<Ts>(&value[Is])));
         return std::make_tuple(std::move(*std::get_if<Ts>(&value[Is]))...);
       }
     }
 
+    // Const version of the above
     template<typename... Ts, std::size_t... Is>
     ValueOrTuple<Ts...> make_value(
       gsl::span<const PublishValueVariant> value,

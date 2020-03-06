@@ -26,6 +26,7 @@ namespace skynet
 {
   //  A Job needs to be able to communicate with the Master so forward declare it
   class Master;
+  class MasterHandle;
 
   /** \brief Tag for pub/sub values
    */
@@ -98,16 +99,7 @@ namespace skynet
         return j.process_data(tag, data, version);
       }
 
-      static std::thread run(Job& j) noexcept
-      {
-        return std::thread{[&j]() {
-          j.to_run_(j);
-          // Re-use the buffer mutex here
-          std::lock_guard lock{j.bufs_.mutex()};
-          // Signify that the work is done
-          j.to_run_ = nullptr;
-        }};
-      }
+      static std::thread run(Job& j) noexcept;
 
       static std::mutex& get_mutex(Job& j) noexcept
       {
@@ -134,7 +126,7 @@ namespace skynet
       Accessor::AllowConstruction,
       const std::string& id,
       Master& master,
-      std::function<void(Job&)> to_run
+      std::function<void(Job&, MasterHandle)> to_run
     ) noexcept;
 
     /** \brief Declare intent to publish on tags, this must be done before publishing
@@ -197,7 +189,7 @@ namespace skynet
           }
           else
           {
-            return {};
+            return std::nullopt;
           }
         }
       );
@@ -321,6 +313,7 @@ namespace skynet
       };
       publish_impl(tag, gsl::span<PublishValueVariant>{variants});
     }
+
     template<typename... PublishTagTypes, typename... TupleTypes>
     void publish(
       const PublishTag<PublishTagTypes...>& tag,
@@ -485,7 +478,7 @@ namespace skynet
     Master* master_;
 
     // The function this job will run
-    std::function<void(Job&)> to_run_;
+    std::function<void(Job&, MasterHandle)> to_run_;
 
     // The list of tags this job produces and the expected types
     std::unordered_map<TagID, gsl::span<const std::uint8_t>> tags_produced_;

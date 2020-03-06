@@ -34,12 +34,12 @@ std::mutex catch_mutex;
 void machine_task(const NetworkInfo* const info, const int index)
 {
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
+  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
 
-  master.submit_job("job", [&](Job& the_job) {
+  base_master.submit_job("job", [&](Job& the_job, MasterHandle master) {
+    connect_network(*info, master, index, [](MasterHandle& m, const int i) {
+      return m.connect_to_server("127.0.0.1", base_port + i).get();
+    });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto& group = fut.get();
@@ -57,12 +57,11 @@ void machine_task(const NetworkInfo* const info, const int index)
     REQUIRE(result2);
     REQUIRE(*result2 == num_machines);
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
 {
-  // SKYNET_ENABLE_TRACE_LOG();
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
   for (auto i = 1; i < num_machines; ++i)
@@ -79,11 +78,11 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
     // Have to have be the 0-th machine because it will form any connections
     // needed as lower numbered machines connect to higher numbered ones
     const auto index = 0;
-    Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-    connect_network(network_info, master, index, [](Master& m, const int i) {
-      return m.connect_to_server("127.0.0.1", base_port + i);
-    });
-    master.submit_job("job", [&](Job& the_job) {
+    Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+    base_master.submit_job("job", [&](Job& the_job, MasterHandle master) {
+      connect_network(network_info, master, index, [](MasterHandle& m, const int i) {
+        return m.connect_to_server("127.0.0.1", base_port + i).get();
+      });
       auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
       auto& group = fut.get();
 
@@ -101,7 +100,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
         REQUIRE(*result == num_machines);
       }
     });
-    master.run();
+    base_master.run();
   }
   for (auto&& thread : threads)
   {

@@ -2,10 +2,11 @@
 
 #include "skynet_core/internal/devices/socket_communicator.hpp"
 
-#include <thread>
-#include <cstring>
 #include <array>
 #include <chrono>
+#include <cstring>
+#include <iostream>
+#include <thread>
 
 using namespace skynet;
 using namespace skynet::internal;
@@ -17,35 +18,75 @@ void server()
 {
   SocketCommunicator conn;
   REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
-  // Wait for the client to connect
-  SocketCommunicator with_client = [&]() {
-    while (true)
-    {
-      if (auto val = conn.accept())
-      {
-        return std::move(*val);
-      }
-    }
-  }();
-  // Wait for an int to be send
-  std::array<std::byte, sizeof(int)> int_buffer;
-  while (with_client.read_message(int_buffer.data(), int_buffer.size()) != ConnectionError::no_error)
+  // Twice for non-blocking/blocking connection
+  for (int i = 0; i < 2; ++i)
   {
-    // empty
+    const auto get_client = [&]() {
+      while (true)
+      {
+        if (auto val = conn.accept())
+        {
+          return std::move(*val);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+      }
+    };
+    // Wait for the client to connect
+    SocketCommunicator with_client = get_client();
+    // Wait for an int to be send
+    std::array<std::byte, sizeof(value_to_send)> int_buffer;
+    while (with_client.read_message(int_buffer.data(), int_buffer.size()) != ConnectionError::no_error)
+    {
+      // empty
+    }
+    // verify that it's the same
+    int read_value;
+    std::memcpy(&read_value, int_buffer.data(), sizeof(int));
+    REQUIRE(read_value == value_to_send);
   }
-  // verify that it's the same
-  int read_value;
-  std::memcpy(&read_value, int_buffer.data(), sizeof(int));
-  REQUIRE(read_value == value_to_send);
 }
 
 void client()
 {
-  SocketCommunicator conn;
-  REQUIRE(conn.connect_to_server("127.0.0.1", port) == ConnectionError::no_error);
-  std::array<std::byte, sizeof(int)> int_buffer;
-  std::memcpy(int_buffer.data(), &value_to_send, sizeof(int));
-  REQUIRE(conn.send_message(int_buffer.data(), int_buffer.size()) == ConnectionError::no_error);
+  const auto do_send = [](SocketCommunicator& conn) {
+    std::array<std::byte, sizeof(value_to_send)> int_buffer;
+    std::memcpy(int_buffer.data(), &value_to_send, sizeof(value_to_send));
+    REQUIRE(conn.send_message(int_buffer.data(), int_buffer.size()) == ConnectionError::no_error);
+  };
+  // Blocking
+  {
+    SocketCommunicator conn;
+    REQUIRE(conn.connect_to_server("127.0.0.1", port) == ConnectionError::no_error);
+    do_send(conn);
+  }
+  // Non-blocking
+  {
+    SocketCommunicator conn;
+    REQUIRE(conn.connect_non_blocking("127.0.0.1", port) == ConnectionError::connection_in_progress);
+    // Clunky work-around to actually be able to test the status
+    // (This lambda in immediately invoked)
+    [&]() {
+      while (true)
+      {
+        const auto status = conn.connection_progress_status();
+        switch (status)
+        {
+        case ConnectionError::connection_in_progress:
+          std::this_thread::sleep_for(std::chrono::milliseconds{1});
+          break;
+
+        case ConnectionError::no_error:
+          return;
+
+        default:
+          std::cerr << "Error returned from conn.connection_progress_status()\n";
+          std::exit(1);
+          break;
+        }
+      }
+    }();
+    do_send(conn);
+  }
 }
 
 TEST_CASE("Communicating between sockets works", "[Skynet_SocketCommunicator]")

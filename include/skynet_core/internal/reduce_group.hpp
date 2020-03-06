@@ -442,6 +442,7 @@ namespace skynet
             // Normal reduce - no error occurred, but no value to return
             return ReduceNoValue{};
           }
+          return make_error();
         }
       );
     }

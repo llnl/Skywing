@@ -36,4 +36,24 @@ namespace skynet::internal
   {
     return Master::WaiterAccessor::get_reduce_group(*master_, group_id_);
   }
+
+  MasterConnectionIsComplete::MasterConnectionIsComplete(Master& master, const std::string& address, std::uint16_t port) noexcept
+    : master_{&master}
+    , address_{address, port}
+  {}
+
+  bool MasterConnectionIsComplete::operator()() const noexcept
+  {
+    return Master::WaiterAccessor::conn_is_complete(*master_, address_);
+  }
+
+  MasterGetConnectionSuccess::MasterGetConnectionSuccess(Master& master, const std::string& address, std::uint16_t port) noexcept
+    : master_{&master}
+    , address_{address, port}
+  {}
+
+  bool MasterGetConnectionSuccess::operator()() const noexcept
+  {
+    return Master::WaiterAccessor::conn_get_success(*master_, address_);
+  }
 } // namespace skynet::internal

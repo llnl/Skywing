@@ -6,6 +6,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <functional>
 
 using namespace skynet;
@@ -55,21 +56,21 @@ void machine_task(const NetworkInfo* const info, const int index)
 {
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  connect_network(*info, master, index, [](Master& m, const int i) {
-    return m.connect_to_server("127.0.0.1", base_port + i);
-  });
-  master.submit_job("job", [&](Job& the_job) {
+  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  base_master.submit_job("job", [&](Job& the_job, MasterHandle master) {
+    connect_network(*info, master, index, [&](MasterHandle& m, const int i) {
+      return m.connect_to_server("127.0.0.1", base_port + i).get();
+    });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
     auto& group = fut.get();
 
     // Do a few reduce operations on the group
     using i32 = std::int32_t;
-    test_reduce(group, index, std::plus<>{}, 10);
-    test_reduce(group, index, [](i32 a, i32 b) { return std::max(a, b); }, 4);
+    test_reduce(group, index, std::plus<>{}, num_machines * (num_machines - 1) / 2);
+    test_reduce(group, index, [](i32 a, i32 b) { return std::max(a, b); }, num_machines - 1);
     test_reduce(group, index, [](i32 a, i32 b) { return std::min(a, b); }, 0);
-    test_reduce(group, index + 1, std::multiplies<>{}, 1 * 2 * 3 * 4 * 5);
+    test_reduce(group, index + 1, std::multiplies<>{}, static_cast<i32>(std::tgamma(num_machines + 1)));
 
     ++counter;
     while (counter != num_machines)
@@ -77,7 +78,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       std::this_thread::sleep_for(std::chrono::milliseconds{10});
     }
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")

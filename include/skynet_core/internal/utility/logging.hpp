@@ -81,7 +81,16 @@ struct fmt::formatter<skynet::PublishValueVariant>
   auto format(const skynet::PublishValueVariant& data, FormatContext& ctx) noexcept
   {
     return std::visit([&](const auto& value) {
-      return format_to(ctx.out(), "{}", value);
+      using Type = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<Type, std::vector<bool>>)
+      {
+        // dumb std::vector<bool> workaround
+        return format_to(ctx.out(), "{}", std::vector<std::uint8_t>{value.cbegin(), value.cend()});
+      }
+      else
+      {
+        return format_to(ctx.out(), "{}", value);
+      }
     }, data);
   }
 };
@@ -91,7 +100,7 @@ struct fmt::formatter<skynet::PublishValueVariant>
 // Don't make it a general pair format, since most thing won't want to be
 // printed seperated by a colon
 template<>
-struct fmt::formatter<std::pair<std::string, std::uint16_t>>
+struct fmt::formatter<skynet::AddrPortPair>
 {
   template<typename ParseContext>
   constexpr auto parse(ParseContext& ctx) noexcept
@@ -100,7 +109,7 @@ struct fmt::formatter<std::pair<std::string, std::uint16_t>>
   }
 
   template<typename FormatContext>
-  auto format(const std::pair<std::string, std::uint16_t>& data, FormatContext& ctx) noexcept
+  auto format(const skynet::AddrPortPair& data, FormatContext& ctx) noexcept
   {
     return format_to(ctx.out(), "{}:{}", data.first, data.second);
   }

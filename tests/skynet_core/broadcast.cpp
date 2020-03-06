@@ -2,6 +2,7 @@
 
 #include "skynet_core/master.hpp"
 #include "skynet_core/job.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include <array>
 #include <chrono>
@@ -49,7 +50,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
 
 using Uint64Tag = PublishTag<std::uint64_t>;
 
-void setup_network(Master& master, const std::size_t index)
+void setup_network(MasterHandle master, const std::size_t index)
 {
   using namespace std::chrono_literals;
   // Connect to the corresponding machines (if any)
@@ -59,38 +60,39 @@ void setup_network(Master& master, const std::size_t index)
     {
       break;
     }
-    while (!master.connect_to_server("127.0.0.1", ports[machine]))
-    {
-      std::this_thread::sleep_for(10ms);
-    }
+    while (!master.connect_to_server("127.0.0.1", ports[machine]).get()) { /* nothing */ }
   }
   // Wait until all machines have connected
   while (master.number_of_neighbors() != machine_counts[index])
   {
-    master.accept_pending_connections();
     std::this_thread::sleep_for(10ms);
   }
 }
 
-// Reference wasn't working
 void machine_task(const std::size_t index)
 {
-  Master master{ports[index], machine_names[index]};
-  setup_network(master, index);
+  Master base_master{ports[index], machine_names[index]};
   // Submit job and broadcast on the job using each machine
-  master.submit_job("job 0", [&master, index](Job& the_job) {
+  base_master.submit_job("job 0", [index](Job& the_job, MasterHandle master) {
+    setup_network(master, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
+    // Things trying to subscribe to each other concurrently can cause the subscription to
+    // fail (and always will have that chance) so do it like this to prevent any subscriptions
+    // from failing
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
     {
       if (index != send_index)
       {
         the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait();
       }
-    }
-    while (master.number_of_subscribers() != machine_counts.size() - 1)
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      else
+      {
+        while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+      }
     }
     the_job.publish(Uint64Tag{tag_names[index]}, static_cast<std::uint64_t>(index));
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index)
@@ -107,7 +109,7 @@ void machine_task(const std::size_t index)
     }
   });
   // Start processing messages
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")

@@ -1,6 +1,9 @@
 #ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 #define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
+#include "skynet_core/internal/utility/network_conv.hpp"
+#include "skynet_core/types.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -19,6 +22,9 @@ namespace skynet::internal
 
     /// The call would block
     would_block,
+
+    /// Non-blocking connected has been initiated
+    connection_in_progress = would_block,
 
     /// An error occurred with communication that has left the connection
     /// in an unusable state
@@ -69,6 +75,17 @@ namespace skynet::internal
      */
     ConnectionError connect_to_server(std::string_view address) noexcept;
 
+    /** \brief Initiates a non-blocking connection to a server
+     */
+    ConnectionError connect_non_blocking(const char* address, std::uint16_t port) noexcept;
+    ConnectionError connect_non_blocking(std::string_view address) noexcept;
+
+    /** \brief Returns status on a pending connection
+     *
+     * \pre A connection has been initiated
+     */
+    ConnectionError connection_progress_status() noexcept;
+
     /** \brief Sends a message on the socket
      *
      * \param message The message to send
@@ -88,7 +105,7 @@ namespace skynet::internal
 
     /** \brief Returns the IP address and port of the socket
      */
-    std::pair<std::string, std::uint16_t> ip_address_and_port() const noexcept;
+    AddrPortPair ip_address_and_port() const noexcept;
 
   private:
     // Tag for using the raw handle constructor
@@ -105,79 +122,16 @@ namespace skynet::internal
    */
   std::vector<std::byte> read_chunked(SocketCommunicator& conn, std::size_t num_bytes) noexcept;
 
-  /** \brief Splits a "ip:port" address into its parts
+  /** \brief Splits an "ip:port" address into its parts
    * The string is empty if the input was invalid
    */
-  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept;
+  AddrPortPair split_address(const std::string_view address) noexcept;
 
-  /** \brief Subscription for recieving data from a publisher
+  /** \brief Attempts to read a network size from a connection
+   *
+   * Returns either the network size or the error that occurred
    */
-  class Subscription
-  {
-  public:
-    /** \brief Attempt to create a subscription to the specified address
-     */
-    static std::optional<Subscription> try_to_create(std::string_view address) noexcept;
-
-    /** \brief Recieve a message from the socket if one is available
-     *
-     * If there is no message to read (ConnectionError::would_block is returned)
-     * then the buffer is left in an unspecified state.
-     *
-     * \param buffer The buffer to write to
-     * \param size The size of the buffer / number of bytes to read
-     */
-    ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
-
-    /** \brief Read a message in chunks
-     */
-    std::vector<std::byte> read_chunked(const std::size_t num_bytes) noexcept;
-
-    /** \brief Returns the IP address and port of the socket
-     */
-    std::pair<std::string, std::uint16_t> ip_address_and_port() const noexcept;
-
-    /** \brief Returns if the subscription has been disconnected
-     */
-    bool is_disconnected() const noexcept;
-
-  private:
-    // Don't allow external construction
-    explicit Subscription() = default;
-
-    SocketCommunicator conn_;
-    bool is_disconnected_ = false;
-  }; // class Subscription
-
-  /** \brief Publication channel
-   */
-  class PublicationChannel
-  {
-  public:
-    /** \brief Create a publication channel on the specified port
-     */
-    PublicationChannel(std::uint16_t port) noexcept;
-
-    /** \brief Accepts any pending subscriptions
-     */
-    void accept_subscriptions() noexcept;
-
-    /** \brief Sends a message on the socket
-     *
-     * \param message The message to send
-     * \param size The size of the message
-     */
-    void send_message(const std::byte* message, std::size_t size) noexcept;
-
-    /** \brief Returns the number of subscriptions that are present
-     */
-    int num_subscriptions() const noexcept;
-
-  private:
-    SocketCommunicator conn_;
-
-    std::vector<SocketCommunicator> subscriptions_;
-  };
+  std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunicator& conn) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

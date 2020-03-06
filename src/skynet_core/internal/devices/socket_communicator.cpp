@@ -18,6 +18,15 @@
 namespace
 {
   constexpr int invalid_handle = -1;
+
+  int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
+  {
+    sockaddr_in servaddr;
+    servaddr.sin_family = AF_INET;
+    inet_pton(AF_INET, address, &servaddr.sin_addr);
+    servaddr.sin_port = ntohs(port);
+    return connect(sockfd, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr));
+  }
 } // namespace {anonymous}
 
 namespace skynet::internal
@@ -107,11 +116,7 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::connect_to_server(const char* const address, const std::uint16_t port) noexcept
   {
-    sockaddr_in servaddr;
-    servaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, address, &servaddr.sin_addr);
-    servaddr.sin_port = ntohs(port);
-    if (connect(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr)) == -1)
+    if (init_connection(handle_, address, port) == -1)
     {
       if (errno == EINPROGRESS)
       {
@@ -144,12 +149,59 @@ namespace skynet::internal
 
   ConnectionError SocketCommunicator::connect_to_server(const std::string_view address) noexcept
   {
-    const auto [port, address_str] = split_address(address);
+    const auto [address_str, port] = split_address(address);
     if (address_str.empty())
     {
       return ConnectionError::unrecoverable;
     }
     return connect_to_server(address_str.c_str(), port);
+  }
+
+  ConnectionError SocketCommunicator::connect_non_blocking(const char* address, std::uint16_t port) noexcept
+  {
+    if (init_connection(handle_, address, port) == -1 && errno == EINPROGRESS)
+    {
+      return ConnectionError::connection_in_progress;
+    }
+    return ConnectionError::unrecoverable;
+  }
+
+  ConnectionError SocketCommunicator::connect_non_blocking(const std::string_view address) noexcept
+  {
+    const auto [address_str, port] = split_address(address);
+    if (address_str.empty())
+    {
+      return ConnectionError::unrecoverable;
+    }
+    return connect_non_blocking(address_str.c_str(), port);
+  }
+
+  ConnectionError SocketCommunicator::connection_progress_status() noexcept
+  {
+    pollfd to_poll;
+    to_poll.fd = handle_;
+    to_poll.events = POLLOUT | POLLIN;
+    if (poll(&to_poll, 1, 0) < 0)
+    {
+      // std::perror("SOCKET POLL ERROR: ");
+      // This is also required?
+      if (errno == EINPROGRESS || errno == EAGAIN)
+      {
+        return ConnectionError::connection_in_progress;
+      }
+      return ConnectionError::unrecoverable;
+    }
+    constexpr auto err_mask = POLLERR | POLLHUP | POLLNVAL;
+    if ((to_poll.revents & err_mask) != 0)
+    {
+      // std::printf("SOCKET ERR FLAGS %i - COMP %i %i %i\n", to_poll.revents, POLLERR, POLLHUP, POLLNVAL);
+      return ConnectionError::unrecoverable;
+    }
+    if ((to_poll.revents & (POLLOUT | POLLIN)) != 0)
+    {
+      return ConnectionError::no_error;
+    }
+    return ConnectionError::connection_in_progress;
   }
 
   ConnectionError SocketCommunicator::send_message(const std::byte* const message, const std::size_t size) noexcept
@@ -183,7 +235,7 @@ namespace skynet::internal
     return read_bytes == 0 ? ConnectionError::closed : ConnectionError::no_error;
   }
 
-  std::pair<std::string, std::uint16_t> SocketCommunicator::ip_address_and_port() const noexcept
+  AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
   {
     sockaddr_in client_address;
     socklen_t len = sizeof(client_address);
@@ -233,7 +285,7 @@ namespace skynet::internal
     return read_bytes;
   }
 
-  std::pair<std::uint16_t, std::string> split_address(const std::string_view address) noexcept
+  AddrPortPair split_address(const std::string_view address) noexcept
   {
     // Split the address by the colon
     const auto colon_loc = address.find(':');
@@ -247,86 +299,17 @@ namespace skynet::internal
     // Try to connect to the publisher
     // Need to make a std::string to ensure that it is null-terminated
     const std::string address_str{address.begin(), address.begin() + colon_loc};
-    return {port, address_str};
+    return {address_str, port};
   }
 
-  std::optional<Subscription> Subscription::try_to_create(const std::string_view address) noexcept
+  std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunicator& conn) noexcept
   {
-    Subscription to_ret;
-    if (to_ret.conn_.connect_to_server(address) != ConnectionError::no_error)
+    std::array<std::byte, sizeof(NetworkSizeType)> size_buffer;
+    const auto err = conn.read_message(size_buffer.data(), size_buffer.size());
+    if (err == ConnectionError::no_error)
     {
-      return {};
+      return from_network_bytes(size_buffer);
     }
-    return std::optional<Subscription>{std::move(to_ret)};
+    return err;
   }
-
-  ConnectionError Subscription::read_message(std::byte* const buffer, const std::size_t size) noexcept
-  {
-    const auto error = conn_.read_message(buffer, size);
-    if (error != ConnectionError::no_error && error != ConnectionError::would_block)
-    {
-      is_disconnected_ = true;
-    }
-    return error;
-  }
-
-  std::vector<std::byte> Subscription::read_chunked(const std::size_t num_bytes) noexcept
-  {
-    return ::skynet::internal::read_chunked(conn_, num_bytes);
-  }
-
-  std::pair<std::string, std::uint16_t> Subscription::ip_address_and_port() const noexcept
-  {
-    return conn_.ip_address_and_port();
-  }
-
-  bool Subscription::is_disconnected() const noexcept
-  {
-    return is_disconnected_;
-  }
-
-  PublicationChannel::PublicationChannel(const std::uint16_t port) noexcept
-  {
-    if (conn_.set_to_listen(port) != ConnectionError::no_error)
-    {
-      std::perror("PublicationChannel::PublicationChannel");
-      std::exit(-1);
-    }
-  }
-
-  void PublicationChannel::accept_subscriptions() noexcept
-  {
-    while (auto new_sub = conn_.accept())
-    {
-      subscriptions_.push_back(std::move(*new_sub));
-    }
-  }
-
-  void PublicationChannel::send_message(const std::byte* const message, const std::size_t size) noexcept
-  {
-    for (std::size_t i = 0; i < subscriptions_.size(); ++i)
-    {
-      auto& sub = subscriptions_[i];
-      if (sub.send_message(message, size) != ConnectionError::no_error)
-      {
-        SKYNET_DEBUG_LOG(
-          "Message from {} failed to be send to {}",
-          conn_.ip_address_and_port(),
-          sub.ip_address_and_port()
-        );
-        // Delete the subscription
-        using std::swap;
-        swap(sub, subscriptions_.back());
-        subscriptions_.pop_back();
-        // The size decreased, so must also reduce the loop iterator
-        --i;
-      }
-    }
-  }
-
-  int PublicationChannel::num_subscriptions() const noexcept
-  {
-    return static_cast<int>(subscriptions_.size());
-  }
-
 } // namespace skynet::internal

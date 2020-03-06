@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <numeric>
 #include <random>
 #include <vector>
@@ -35,6 +36,28 @@ namespace skynet
       : connect_to(num_machines)
       , num_connections(num_machines)
     {}
+
+    friend std::ostream& operator<<(std::ostream& out, const NetworkInfo& info)
+    {
+      int i = 0;
+      for (const auto& conn : info.connect_to)
+      {
+        out << i << " -> [";
+        bool first = true;
+        for (const auto& machine : conn)
+        {
+          if (!first)
+          {
+            out << ", ";
+          }
+          out << machine;
+          first = false;
+        }
+        out << "]\n";
+        ++i;
+      }
+      return out;
+    }
 
     // The machines that each index should connect to
     std::vector<std::vector<int>> connect_to;
@@ -105,26 +128,38 @@ namespace skynet
   }
 
   // Performs the required steps to create the network from a NetworkInfo
-  // The connection argument should have the signature `bool(Master&, int)`
+  // The connection argument should have the signature `void(MasterHandle, int)`
   // with the int parameter corresponding to the index of the machine to
-  // connect to, and returning true if it connected
+  // connect to, and blocking until connected
+  // Connect should return a bool indicating if the connection was successful
   template<typename Callable>
-  void connect_network(const NetworkInfo& info, Master& master, const int index, Callable connect)
+  void connect_network(const NetworkInfo& info, MasterHandle& master, const int index, Callable connect)
   {
     using namespace std::chrono_literals;
     for (const auto connect_to : info.connect_to[index])
     {
-      while (!connect(master, connect_to))
-      {
-        std::this_thread::sleep_for(1ms);
-      }
+      while (!connect(master, connect_to)) { /* nothing */ }
     }
     while (master.number_of_neighbors() != info.num_connections[index])
     {
-      master.accept_pending_connections();
       std::this_thread::sleep_for(1ms);
     }
   }
 } // namespace skynet
+
+// Macro to synchronize all machines
+#define SKYNET_SYNCHRONIZE_MACHINES(machine_count) \
+  do \
+  { \
+    static std::atomic<int> sync; \
+    if (sync.fetch_add(1) != static_cast<int>(machine_count - 1)) \
+    { \
+      while (sync != static_cast<int>(machine_count)) \
+      { \
+        std::this_thread::sleep_for(std::chrono::milliseconds{10}); \
+      } \
+    } \
+  } \
+  while (false)
 
 #endif // SKYNET_TEST_UTILS_HPP

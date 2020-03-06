@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <type_traits>
 #include <variant>
@@ -55,7 +56,10 @@ namespace skynet
     std::vector<std::uint64_t>,
     std::string,
     std::vector<std::string>,
-    std::vector<std::byte>
+    std::vector<std::byte>,
+    bool,
+    // TODO: std::vector<bool> is awful, but don't really want an exception either...
+    std::vector<bool>
   >;
 
   /// Variant version of the above
@@ -150,6 +154,9 @@ namespace skynet
     std::variant<ReduceNoValue, ReduceDisconnection, T> var_;
   };
 
+  /// Address/port pair
+  using AddrPortPair = std::pair<std::string, std::uint16_t>;
+
   namespace internal
   {
     /// Structure for reporting reduce group building
@@ -189,5 +196,19 @@ namespace skynet
     }
   } // namespace skynet::internal
 } // namespace skynet
+
+// Hashing support for addr/pair
+namespace std
+{
+  template<>
+  struct hash<skynet::AddrPortPair>
+  {
+    std::size_t operator()(const skynet::AddrPortPair& val) const noexcept
+    {
+      const std::size_t str_hash = std::hash<std::string>{}(val.first);
+      return str_hash ^ val.second;
+    }
+  };
+}
 
 #endif // SKYNET_TYPES_HPP

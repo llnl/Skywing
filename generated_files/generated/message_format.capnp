@@ -31,6 +31,8 @@ struct PublishValue {
     str   @20 : Text;
     rStr  @21 : List(Text);
     bytes @22 : Data;
+    bool  @23 : Bool;
+    rBool @24 : List(Bool);
   }
 }
 
@@ -40,17 +42,10 @@ struct PublishData {
   tagID   @2 : Text;
 }
 
-struct Publish {
-  union {
-    closingConnection @0 : Void;
-    data              @1 : PublishData;
-  }
-}
-
 struct Greeting {
   from      @0 : Text;
   neighbors @1 : List(Text);
-  basePort  @2 : UInt16;
+  port      @2 : UInt16;
 }
 
 struct NewNeighbor {
@@ -96,6 +91,11 @@ struct ReportReduceDisconnection {
   id                @2 : UInt64;
 }
 
+struct SubscriptionNotice {
+  tags          @0 : List(Text);
+  isUnsubscribe @1 : Bool;
+}
+
 struct StatusMessage {
   union {
     greeting                  @0  : Greeting;
@@ -109,5 +109,7 @@ struct StatusMessage {
     submitReduceValue         @8  : SubmitReduceValue;
     reportReduceResult        @9  : ReportReduceResult;
     reportReduceDisconnection @10 : ReportReduceDisconnection;
+    publishData               @11 : PublishData;
+    subscriptionNotice        @12 : SubscriptionNotice;
   }
 }

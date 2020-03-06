@@ -24,7 +24,7 @@ namespace skynet
 
     private:
       Master* master_;
-      const std::vector<TagID> tags_;
+      std::vector<TagID> tags_;
     }; // class MasterSubscribeIsDone
 
     class MasterReduceGroupIsCreated
@@ -51,6 +51,36 @@ namespace skynet
       Master* master_;
       TagID group_id_;
     }; // class MasterGetReduceGroup
+
+    class MasterConnectionIsComplete
+    {
+    public:
+      MasterConnectionIsComplete(
+        Master& master,
+        const std::string& address,
+        std::uint16_t port
+      ) noexcept;
+      bool operator()() const noexcept;
+
+    private:
+      Master* master_;
+      AddrPortPair address_;
+    }; // class MasterConnectionIsComplete
+
+    class MasterGetConnectionSuccess
+    {
+    public:
+      MasterGetConnectionSuccess(
+        Master& master,
+        const std::string& address,
+        std::uint16_t port
+      ) noexcept;
+      bool operator()() const noexcept;
+
+    private:
+      Master* master_;
+      AddrPortPair address_;
+    }; // class MasterGetConnectionSuccess
   } // namespace skynet::internal
 } // namespace skynet
 

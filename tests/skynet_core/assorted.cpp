@@ -1,0 +1,27 @@
+// Tests various assorted things that don't really belong in their own tests
+
+#include <catch2/catch.hpp>
+
+#include "skynet_core/internal/utility/algorithms.hpp"
+
+#include <array>
+#include <vector>
+
+using namespace skynet::internal;
+
+TEST_CASE("Split", "[Skynet_Split]")
+{
+  using namespace std::literals;
+  using vec = std::vector<std::string_view>;
+  std::string test_string{"test string"};
+  REQUIRE(split("test string"s, ' ') == vec{"test"sv, "string"sv});
+  REQUIRE(split("weird\1char", '\1') == vec{"weird"sv, "char"sv});
+  REQUIRE(split("null\0embed"s, '\0') == vec{"null"sv, "embed"sv});
+}
+
+TEST_CASE("Concatenate", "[Skynet_Concatenate]")
+{
+  std::vector<int> vals1{1, 2, 3};
+  std::array<int, 3> vals2{4, 5, 6};
+  REQUIRE(concatenate(vals1, vals2) == std::vector<int>{1, 2, 3, 4, 5, 6});
+}

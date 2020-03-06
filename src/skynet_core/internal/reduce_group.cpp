@@ -141,9 +141,12 @@ namespace skynet::internal
     -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
   {
     // Reset the buffers
-    last_sent_version_ = tag_no_data;
-    is_valid = true;
-    do_reset_buffers();
+    {
+      std::lock_guard<std::mutex> lock{buffer_mutex_};
+      last_sent_version_ = tag_no_data;
+      is_valid = true;
+      do_reset_buffers();
+    }
     return Master::ReduceGroupAccessor::rebuild_reduce_group(*master_, group_id_);
   }
 

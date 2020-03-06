@@ -2,7 +2,6 @@
 #define SKYNET_MASTER_HPP
 
 #include "skynet_core/internal/devices/socket_communicator.hpp"
-#include "skynet_core/internal/utility/network_conv.hpp"
 #include "skynet_core/internal/capn_proto_wrapper.hpp"
 #include "skynet_core/internal/master_waiter_callables.hpp"
 #include "skynet_core/internal/message_creators.hpp"
@@ -29,17 +28,14 @@
 
 namespace skynet
 {
-  // Forward declaration
   class Master;
-
-  // The port difference between the socket used from general communication by
-  // a master and the port used for publications
-  inline constexpr std::uint16_t publisher_port_offset = 100;
+  class MasterHandle;
+  class Job;
 
   namespace internal
   {
     // The default hearbeat interval
-    inline static constexpr std::chrono::milliseconds default_heartbeat_interval{2000};
+    inline static constexpr std::chrono::milliseconds default_heartbeat_interval{5000};
 
     /** \brief Tag to indicate that this connection was made by accepting a connection
      */
@@ -54,32 +50,12 @@ namespace skynet
     class ExternalMaster
     {
     public:
-      /** \brief Attempt to construct an ExternalMaster using an existing connection
-       *
-       * This is for when a server accepts a new connection.  Both have to
-       * send/recieve greetings, but need to do so in the opposite order so
-       * have seperate constructors for both.
-       */
-      static std::optional<ExternalMaster> create(
-        ByAccept,
-        SocketCommunicator conn,
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
+      ExternalMaster(
+        SocketCommunicator comm,
+        const MachineID& id,
+        const std::vector<MachineID>& neighbors,
         Master& master,
-        std::uint16_t base_port
-      ) noexcept;
-
-      /** \brief Attempt to construct an ExternalMaster using an existing connection
-       *
-       * This is for when a client connects to a server.
-       */
-      static std::optional<ExternalMaster> create(
-        ByRequest,
-        SocketCommunicator conn,
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
-        Master& master,
-        std::uint16_t base_port
+        std::uint16_t port
       ) noexcept;
 
       /** \brief Handles any messages sent from the connection
@@ -113,29 +89,45 @@ namespace skynet
        */
       void send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept;
 
-      /** \brief Begins the search process for publishers tags
+      /** \brief Begins the search process for the specified tags
        */
-      void find_publishers_for_tags(
-        const std::vector<TagID>& tags,
-        bool ignore_cache
-      ) noexcept;
+      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
 
-      /** \brief The address for two-way communication with the external master
+      /** \brief The address for communication with the external master
        */
-      std::string two_way_address() const noexcept;
+      std::string address() const noexcept;
 
-      /** \brief The address of the publisher for the external master
+      /** \brief Pair version of the address
        */
-      std::string publisher_address() const noexcept;
+      AddrPortPair address_pair() const noexcept;
 
-      /** \brief Send a request for any pending tags if required
+      /** \brief Sets the external master to ignore the cache on the next request
+       * for publishers
        */
-      void ask_for_pending_tags_if_past_time(const std::vector<TagID>& tags) noexcept;
+      void ignore_cache_on_next_request() noexcept;
+
+      /** \brief Returns true if the external master is subscribed to the tag,
+       * returns false if it is not.
+       */
+      bool is_subscribed_to(const TagID& tag) const noexcept;
+
+      /** \brief Returns true if tags should be asked for
+       */
+      bool should_ask_for_tags() const noexcept;
+
+      /** \brief Returns true if there are pending tags
+       */
+      bool has_pending_tag_request() const noexcept;
+
+      /** \brief Resets the backoff counter
+       */
+      void reset_backoff_counter() noexcept;
+
+      /** \brief Increments the backoff counter
+       */
+      void increase_backoff_counter() noexcept;
 
     private:
-      // Only allow private construction from a socket
-      explicit ExternalMaster(SocketCommunicator conn) noexcept;
-
       // Read some bytes from the connection, returning false if the read failed
       bool read_from_conn(std::byte* buffer, std::size_t count) noexcept;
 
@@ -143,37 +135,11 @@ namespace skynet
       // the number of bytes couldn't be read
       std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
 
-      // Attempt to get a StatusMessageHandler from the connection
-      std::optional<StatusMessageHandler> try_to_get_status_message() noexcept;
-
-      // Function that handles the joining/accepting connection
-      template<typename First, typename Second>
-      static std::optional<ExternalMaster> init_conn(ExternalMaster& m, First first, Second second) noexcept
-      {
-        using namespace std::chrono;
-        const auto start = steady_clock::now();
-        if (!first()) { return {}; }
-        const auto mid = steady_clock::now();
-        if (!second()) { return {}; }
-        const auto end = steady_clock::now();
-        const auto dur1 = duration_cast<decltype(latency_)>(mid - start);
-        const auto dur2 = duration_cast<decltype(latency_)>(end - mid);
-        m.latency_ = decltype(latency_){(dur1.count() + dur2.count()) / 2};
-        return std::optional<ExternalMaster>{std::move(m)};
-      }
-
-      // Send the greeting
-      bool send_greeting(
-        const MachineID& local_id,
-        const std::vector<MachineID>& local_neighbors,
-        std::uint16_t base_port
-      ) noexcept;
-
-      // Wait until the greeting is sent
-      bool wait_for_greeting() noexcept;
+      // Attempts to get a message
+      std::optional<MessageHandler> try_to_get_message() noexcept;
 
       // Handle status messages
-      void handle_message(StatusMessageHandler& handle) noexcept;
+      void handle_message(MessageHandler& handle) noexcept;
 
       // Calculate the next time tags should be requested
       std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
@@ -183,9 +149,6 @@ namespace skynet
 
       // The id of the external master
       MachineID id_;
-
-      // Estimated latency to the other machine
-      std::chrono::microseconds latency_;
 
       // The last time the machine was heard from
       std::chrono::steady_clock::time_point last_heard_;
@@ -199,8 +162,12 @@ namespace skynet
       // The time that will be waited until requesting tags again
       std::chrono::steady_clock::time_point request_tags_time_;
 
-      // The base port to use to connect to the remote machine
-      std::uint16_t base_port_;
+      // Tags that the remote is subscribed for
+      // std::unordered_set for fast look-up
+      std::unordered_set<TagID> remote_subscriptions_;
+
+      // The port to use to connect to the remote machine
+      std::uint16_t port_;
 
       // The number of times requests have been unfulfilled
       std::uint8_t backoff_counter_ = 0;
@@ -221,6 +188,7 @@ namespace skynet
   class Master
   {
   public:
+    friend class MasterHandle;
     /** \brief Creates a Master instance that listens on the specified
      * port for connections.
      *
@@ -259,27 +227,6 @@ namespace skynet
      */
     ~Master();
 
-    /** \brief Connects to another instance at the specified address on
-     * the specified port
-     *
-     * \param address The address to connect to
-     * \param port The port to connect on
-     * \return True if the connection was successful, false if it failed
-     */
-    bool connect_to_server(const char* const address, const std::uint16_t port) noexcept;
-
-    /** \brief Connects to another instance with the address:port format
-     */
-    bool connect_to_server(std::string_view address) noexcept;
-
-    /** \brief See if there are any pending connections and accept them if so
-     */
-    void accept_pending_connections() noexcept;
-
-    /** \brief Returns the number of machines connected
-     */
-    int number_of_neighbors() const noexcept;
-
     /** \brief Creates a job for the master to execute that produces the
      * specified tags.
      *
@@ -287,22 +234,14 @@ namespace skynet
      */
     bool submit_job(
       JobID name,
-      std::function<void(Job&)> to_run
+      std::function<void(Job&, MasterHandle)> to_run
     ) noexcept;
 
     /** \brief Start running all submitted jobs
      */
     void run() noexcept;
 
-    /** \brief Return the local address of the master, for subscribing to self
-     */
-    std::string local_publishing_address() const noexcept;
-
-    /** \brief Returns the number of subscribers
-     */
-    int number_of_subscribers() const noexcept;
-
-    /** \brief Returns the id of the master
+    /** \brief Gets the id of the master
      */
     const std::string& id() const noexcept;
 
@@ -366,13 +305,13 @@ namespace skynet
         m.handle_get_publishers(msg, from);
       }
 
-      static auto add_publishers_and_propagate(
+      static void add_publishers_and_propagate(
         Master& m,
         const internal::ReportPublishers& msg,
         const internal::ExternalMaster& from
       ) noexcept
       {
-        return m.add_publishers_and_propagate(msg, from);
+        m.add_publishers_and_propagate(msg, from);
       }
 
       static bool handle_join_reduce_group(
@@ -410,6 +349,23 @@ namespace skynet
       {
         return m.handle_report_reduce_disconnection(msg, from);
       }
+
+      static bool subscription_tags_are_produced(
+        Master& m,
+        const internal::SubscriptionNotice& msg
+      ) noexcept
+      {
+        return m.subscription_tags_are_produced(msg);
+      }
+
+      static bool handle_publish_data(
+        Master& m,
+        const internal::PublishData& msg,
+        const internal::ExternalMaster& from
+      ) noexcept
+      {
+        return m.handle_publish_data(msg, from);
+      }
     }; // struct ExternalMasterAccessor
 
     struct ReduceGroupAccessor
@@ -440,6 +396,7 @@ namespace skynet
         const TagID& group_id
       ) noexcept
       {
+        std::lock_guard<std::mutex> lock{m.job_mut_};
         return m.rebuild_reduce_group(group_id);
       }
     }; // struct ReduceGroupAccessor
@@ -450,6 +407,8 @@ namespace skynet
       friend class internal::MasterSubscribeIsDone;
       friend class internal::MasterReduceGroupIsCreated;
       friend class internal::MasterGetReduceGroup;
+      friend class internal::MasterConnectionIsComplete;
+      friend class internal::MasterGetConnectionSuccess;
 
       static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
       {
@@ -465,16 +424,38 @@ namespace skynet
       {
         return m.get_reduce_group(group_id);
       }
+
+      static bool conn_is_complete(Master& m, const AddrPortPair& address) noexcept
+      {
+        return m.conn_is_complete(address);
+      }
+
+      static bool conn_get_success(Master& m, const AddrPortPair& address) noexcept
+      {
+        return m.addr_is_connected(address);
+      }
     }; // struct WaiterAccessor
 
   private:
-    /** \brief Connects to a remote connection and returns an iterator to the new connection,
-     * or an end iterator if the connection failed
+    ///////////////////////////////////////
+    // Interface for MasterHandle
+    ///////////////////////////////////////
+
+    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
+    auto connect_to_server(std::string_view address) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
+    int number_of_neighbors() const noexcept;
+    int number_of_subscribers() const noexcept;
+    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept;
+
+    ///////////////////////////////////////
+    // End Interface for MasterHandle
+    ///////////////////////////////////////
+
+    /** \brief See if there are any pending connections and accept them if so
      */
-    std::unordered_map<MachineID, internal::ExternalMaster>::iterator connect_impl(
-      const char* address,
-      std::uint16_t port
-    ) noexcept;
+    void accept_pending_connections() noexcept;
 
     /** \brief Listens for messages from neighbors and handles them if there
      * are any.
@@ -499,15 +480,11 @@ namespace skynet
 
     /** \brief Notify neighbors of a new new neighbor
      */
-    void notify_of_new_neighbor(const MachineID id) noexcept;
+    void notify_of_new_neighbor(const MachineID& id) noexcept;
 
     /** \brief Removes all dead neighbors
      */
     void remove_dead_neighbors() noexcept;
-
-    /** \brief Removes all dead subscriptions
-     */
-    void remove_dead_subscriptions() noexcept;
 
     /** \brief Returns a vector of all the neighboring ID's
      */
@@ -532,7 +509,7 @@ namespace skynet
     void send_to_neighbors(const std::vector<std::byte>& to_send) noexcept;
 
     // Auxillary function to help with subscribe function
-    bool subscribe_is_done(const std::vector<TagID>& required_tags) noexcept;
+    bool subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept;
 
     /** \brief Subscribes to the passed tags.
      */
@@ -554,7 +531,7 @@ namespace skynet
      *
      * Returns a bool indicating if the next request for publishers should ignore the cache
      */
-    bool add_publishers_and_propagate(
+    void add_publishers_and_propagate(
       const internal::ReportPublishers& msg,
       const internal::ExternalMaster& from
     ) noexcept;
@@ -562,14 +539,6 @@ namespace skynet
     /** \brief Produce a message containing the known publishers and tags
      */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
-
-    /** \brief Attempt to subscribe on the passed address
-     */
-    bool try_to_subscribe(std::string_view address, std::vector<std::string> remote_tags_produced) noexcept;
-
-    /** \brief Reads data from any subscriptions
-     */
-    void read_data_from_subscriptions() noexcept;
 
     /** \brief Returns the list of tags that a publisher is known to produce
      */
@@ -654,13 +623,70 @@ namespace skynet
       const internal::ExternalMaster& from
     ) noexcept;
 
-    // TODO: The return value/type for this feels really weird; probably want
-    // to change it to use a enum class or something at some point?
     /** \brief Attempt to create connections for any pending tags.
-     *
-     * Returns true if the the cache needs to be ignored for the next request.
      */
-    bool try_connections_for_pending_tags() noexcept;
+    void init_connections_for_pending_tags() noexcept;
+
+    /** \brief Returns true if the connection to the specified address is complete
+     */
+    bool conn_is_complete(const AddrPortPair& address) noexcept;
+
+    /** \brief Returns true if the connection was successful, false otherwise
+     *
+     * More accurately, checks if an address is currently connected, which may
+     * be usedful to expose at some point?
+     */
+    bool addr_is_connected(const AddrPortPair& address) const noexcept;
+
+    /** \brief Process pending user requested connections
+     */
+    void process_pending_conns() noexcept;
+
+    /** \brief Creates the message for the initial handshake
+     */
+    std::vector<std::byte> make_handshake() const noexcept;
+
+    /** \brief Does the final steps needed for creating a reduce group
+     */
+    void finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept;
+
+    /** \brief Returns a reduce_tag_data_ iterator from the parent machine
+     *
+     * Implemented in here since it would have to be below the member variables otherwise
+     */
+    decltype(auto) group_from_parent_tag(const TagID& parent_tag) noexcept
+    {
+      // TODO: Keep a look-up map if this becomes a performance issue
+      for (auto& data_pair : reduce_tag_data_)
+      {
+        const auto& group_data = data_pair.second;
+        const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
+        if (parent == parent_tag)
+        {
+          return data_pair;
+        }
+      }
+      assert(false && "No group matching the produced tag found?");
+      return *reduce_tag_data_.begin();
+    }
+
+    /** \brief Returns true if the subscription tags are all produced
+     */
+    bool subscription_tags_are_produced(const internal::SubscriptionNotice& msg) const noexcept;
+
+    /** \brief Handles published information
+     */
+    bool handle_publish_data(const internal::PublishData& msg, const internal::ExternalMaster& from) noexcept;
+
+    /** \brief Finalizes a subscription connection.
+     *
+     * \param tags '\0' seperated list of tags
+     */
+    void finalize_subscription(const std::string& tags, internal::ExternalMaster& source) noexcept;
+
+    /** \brief Asks neighbors for publishers for pending tags with no know publishers
+     */
+    void find_publishers_for_pending_tags() noexcept;
 
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
@@ -670,14 +696,6 @@ namespace skynet
 
     // List of neighboring connections
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
-
-    // Subscriptions and the tags that they produce
-    struct SubscriptionData
-    {
-      internal::Subscription subscription;
-      std::vector<TagID> produced_tags;
-    };
-    std::vector<SubscriptionData> subscriptions_;
 
     // List of publishers that are known for each tag
     std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
@@ -693,6 +711,7 @@ namespace skynet
         : group{std::move(group_ptr)}
       {}
 
+      // unique_ptr so that this is a movable type
       std::unique_ptr<internal::ReduceGroupBase> group;
       std::vector<MachineID> parent_machines;
       std::array<std::vector<MachineID>, 2> child_machines;
@@ -711,17 +730,53 @@ namespace skynet
     // List of machines that are waiting for information for producers of a certain tag
     // Uses MachineID's instead of pointers in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
-    // is recieved
+    // is received
+    // TODO: Maybe move to pointers and just make sure to remove them when the neighbor is removed?
+    // Also potentially combine with tag_to_machine_ since they are tags into the same thing
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
 
     // The tags that this machine produces
     std::unordered_set<TagID> produced_tags_;
 
-    // The publication channel for this machine
-    internal::PublicationChannel pub_channel_;
-
     // The port used for communications
-    std::uint16_t comm_port_;
+    std::uint16_t port_;
+
+    // Mapping from a machine address to a pointer to the external master
+    // This is also used for testing that a connection has completed
+    std::unordered_map<AddrPortPair, internal::ExternalMaster*> addr_to_machine_;
+
+    // Mapping from a tag to the ID used for the subscription to the tag
+    // Used to know when a subscription is done and for if multiple jobs
+    // subscribe to the same tag
+    // This is also use to mark when a pending connection is for a tag
+    std::unordered_map<TagID, internal::ExternalMaster*> tag_to_machine_;
+
+    /** \brief Connection status for pending connections
+     */
+    enum class ConnStatus
+    {
+      waiting_for_conn,
+      waiting_for_resp
+    };
+
+    /** \brief Type of pending connection
+     */
+    enum class ConnType
+    {
+      user_requested,
+      by_accept,
+      subscription,
+      reduce_group
+    };
+    // Pending connections for all types
+    struct PendingInfo
+    {
+      internal::SocketCommunicator conn;
+      ConnStatus status;
+      ConnType type;
+      std::string tag;
+    };
+    std::unordered_map<AddrPortPair, PendingInfo> pending_conns_;
 
     // Notification for when new subscriptions are created
     std::condition_variable new_subscription_cv_;
@@ -729,11 +784,66 @@ namespace skynet
     // Notification for when reduce group related connections are made
     std::condition_variable reduce_group_cv_;
 
-    // Bools seperate for if notifications should be raised so that
+    // Notification for when connections are complete
+    std::condition_variable connection_cv_;
+
+    // Booleans separate for if notifications should be raised so that
     // the CV's can use notifications while the mutex is released
     bool notify_new_subscriptions_ = false;
     bool notify_reduce_group_ = false;
+    bool notify_connection_ = false;
   }; // class Master
+
+  class MasterHandle
+  {
+  public:
+    /** \brief Connects to another instance at the specified address on
+     * the specified port
+     *
+     * \param address The address to connect to
+     * \param port The port to connect on
+     */
+    auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+    {
+      return handle_->connect_to_server(address, port);
+    }
+
+    /** \brief Connects to another instance with the address:port format
+     */
+    auto connect_to_server(std::string_view address) noexcept
+      -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+    {
+      return handle_->connect_to_server(address);
+    }
+
+    /** \brief Returns the number of machines connected
+     */
+    int number_of_neighbors() const noexcept { return handle_->number_of_neighbors(); }
+
+    /** \brief Returns the number of subscribers
+     */
+    int number_of_subscribers() const noexcept { return handle_->number_of_subscribers(); }
+
+    /** \brief Returns the id of the master
+     */
+    const std::string& id() const noexcept { return handle_->id(); }
+
+    /** \brief Returns the number of subscriptions a tag has
+     */
+    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept
+    {
+      return handle_->num_subscriptions(tag);
+    }
+
+  private:
+    friend class Job;
+
+    // Private so that only jobs can create a handle
+    explicit MasterHandle(Master& m) noexcept : handle_{&m} {}
+
+    Master* handle_;
+  }; // class MasterHandle
 } // namespace skynet
 
 #endif // SKYNET_MASTER_HPP

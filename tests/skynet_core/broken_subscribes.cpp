@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "skynet_core/master.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include <thread>
 
@@ -19,8 +20,6 @@ const Int64Tag value_tag{"value"};
 
 std::mutex catch_mutex;
 int values_published = 0;
-// For knowing that the subscriber has completed subscribing
-int subscriptions_finished = 0;
 int values_retrieved = 0;
 
 void publish_once(int publish_number)
@@ -28,47 +27,39 @@ void publish_once(int publish_number)
   // Wait to start to allow the subscriber to notice that the publisher has
   // disconnected so it won't discard this connection for re-using the id
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  Master master{publisher_port, publisher_id};
-  // TODO: I don't think this can be called from the job thread safely
-  // Maybe add a queue to master for pending connections to make and a way
-  // to add connections to submit to the queue or something
-  while (!master.connect_to_server("127.0.0.1", subscriber_port))
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  master.submit_job("job", [&](Job& job) {
+  Master base_master{publisher_port, publisher_id};
+  base_master.submit_job("job", [&](Job& job, MasterHandle master) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */ }
     job.declare_publication_intent(value_tag);
-    // Wait for the subscriber to finish subscribe
-    while (subscriptions_finished <= publish_number)
+    while (master.num_subscriptions(value_tag) == 0)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    // Wait a bit for the subscription to finish
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
     job.publish(value_tag, value_to_publish);
+    // Wait for the value to be retrieved
     while (values_retrieved <= publish_number)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
-  master.run();
+  base_master.run();
 }
 
 void subscriber()
 {
-  Master master{subscriber_port, subscriber_id};
-  master.submit_job("job", [&](Job& job) {
+  Master base_master{subscriber_port, subscriber_id};
+  base_master.submit_job("job", [&](Job& job, MasterHandle) {
     job.subscribe(value_tag).get();
-    while (subscriptions_finished != num_values_to_publish)
+    while (values_retrieved != num_values_to_publish)
     {
-      if (subscriptions_finished != 0)
+      if (values_retrieved != 0)
       {
         // wait a bit so the publisher can disconnect
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         job.rebuild_missing_tag_connections().wait();
       }
       // Get value from the publisher
-      ++subscriptions_finished;
       const auto value = job.get_waiter(value_tag).get();
       REQUIRE(value);
       REQUIRE(*value == value_to_publish);
@@ -79,7 +70,7 @@ void subscriber()
       REQUIRE_FALSE(failed_value);
     }
   });
-  master.run();
+  base_master.run();
 }
 
 TEST_CASE("Subscribe channels breaking is fine", "[Skynet_BrokenSubscribe]")

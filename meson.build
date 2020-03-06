@@ -12,14 +12,17 @@ add_project_arguments(
   language : 'cpp'
 )
 
-use_ns3 = get_option('use_ns3')
-message('using ns3: ' + use_ns3.to_string())
+# use_ns3 = get_option('use_ns3')
+# message('using ns3: ' + use_ns3.to_string())
 
-catch2_dep = subproject('catch2').get_variable('catch2_dep')
-
-if use_ns3
-  ns3_dep = subproject('ns3').get_variable('ns3_dep')
+build_tests = get_option('build_tests')
+if build_tests
+  catch2_dep = subproject('catch2').get_variable('catch2_dep')
 endif
+
+# if use_ns3
+#   ns3_dep = subproject('ns3').get_variable('ns3_dep')
+# endif
 
 thread_dep = dependency('threads')
 spdlog_dep = subproject('spdlog').get_variable('spdlog_dep')
@@ -50,5 +53,11 @@ skynet_upper_dep = declare_dependency(
   dependencies : skynet_core_dep
 )
 
-subdir('tests')
-subdir('examples')
+if build_tests
+  subdir('tests')
+endif
+
+build_examples = get_option('build_examples')
+if build_examples
+  subdir('examples')
+endif

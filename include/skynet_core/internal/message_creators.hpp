@@ -18,16 +18,12 @@ namespace skynet::internal
     gsl::span<const PublishValueVariant> value
   ) noexcept;
 
-  /** \brief Create data to signify that a publication channel is closing
-   */
-  std::vector<std::byte> make_close_publish() noexcept;
-
   /** \brief Create data for a greeting
    */
   std::vector<std::byte> make_greeting(
     const MachineID& from,
     const std::vector<MachineID>& neighbors,
-    std::uint16_t base_port
+    std::uint16_t port
   ) noexcept;
 
   /** \brief Create data for a goodbyte
@@ -97,6 +93,13 @@ namespace skynet::internal
     const TagID& reduce_tag,
     const MachineID& initiating_machine,
     ReductionDisconnectID disconnection_id
+  ) noexcept;
+
+  /** \brief Create a message for subscribing/unsubscribing
+   */
+  std::vector<std::byte> make_subscription_notice(
+    const std::vector<TagID>& tags,
+    bool is_unsubscribe
   ) noexcept;
 } // namespace skynet::internal
 

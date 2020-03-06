@@ -66,8 +66,6 @@ namespace skynet::internal
     }
   } // namespace {anonymous}
 
-  /** \brief Create data for a publish
-   */
   std::vector<std::byte> make_publish(
     const VersionID version,
     const TagID& tag_id,
@@ -75,26 +73,15 @@ namespace skynet::internal
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
-    auto message = builder.initRoot<cpnpro::Publish>().initData();
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initPublishData();
     set_publish_data(message, version, tag_id, value);
     return finalize_message(builder);
   }
 
-  /** \brief Create data to signify that a publication channel is closing
-   */
-  std::vector<std::byte> make_close_publish() noexcept
-  {
-    capnp::MallocMessageBuilder builder;
-    builder.initRoot<cpnpro::Publish>().setClosingConnection();
-    return finalize_message(builder);
-  }
-
-  /** \brief Create data for a greeting
-   */
   std::vector<std::byte> make_greeting(
     const MachineID& from,
     const std::vector<MachineID>& neighbors,
-    const std::uint16_t base_port
+    const std::uint16_t port
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -105,12 +92,10 @@ namespace skynet::internal
     {
       to_set.set(i, neighbors[i]);
     }
-    message.setBasePort(base_port);
+    message.setPort(port);
     return finalize_message(builder);
   }
 
-  /** \brief Create data for a goodbyte
-   */
   std::vector<std::byte> make_goodbye() noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -118,8 +103,6 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  /** \brief Create data for a new neighbor notification
-   */
   std::vector<std::byte> make_new_neighbor(const MachineID& neighbor) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -128,8 +111,6 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  /** \brief Create data for a removed neighbor notification
-   */
   std::vector<std::byte> make_remove_neighbor(const MachineID& neighbor) noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -138,8 +119,6 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  /** \brief Create data for a heartbeat
-   */
   std::vector<std::byte> make_heartbeat() noexcept
   {
     capnp::MallocMessageBuilder builder;
@@ -177,8 +156,6 @@ namespace skynet::internal
     return finalize_message(builder);
   }
 
-  /** \brief Create data for a request for producers of a tag
-   */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
     const bool ignore_cache
@@ -248,6 +225,22 @@ namespace skynet::internal
     message.setReduceTag(reduce_tag);
     message.setInitiatingMachine(initiating_machine);
     message.setId(disconnection_id);
+    return finalize_message(builder);
+  }
+
+  std::vector<std::byte> make_subscription_notice(
+    const std::vector<TagID>& tags,
+    bool is_unsubscribe
+  ) noexcept
+  {
+    capnp::MallocMessageBuilder builder;
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initSubscriptionNotice();
+    auto msg_tags = message.initTags(tags.size());
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      msg_tags.set(i, tags[i]);
+    }
+    message.setIsUnsubscribe(is_unsubscribe);
     return finalize_message(builder);
   }
 } // namespace skynet::internal

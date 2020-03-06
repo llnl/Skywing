@@ -2,6 +2,7 @@
 
 #include "skynet_core/master.hpp"
 #include "skynet_core/job.hpp"
+#include "skynet_core/enable_logging.hpp"
 
 #include "utils.hpp"
 
@@ -14,11 +15,11 @@
 using namespace skynet;
 
 static constexpr std::uint16_t base_port = 5000;
-static constexpr int num_machines = 10;
+static constexpr int num_machines = 4;
 
 using Int32Tag = PublishTag<std::int32_t>;
 
-void setup_network(const int index, Master& master)
+void setup_network(const int index, MasterHandle master)
 {
   using namespace std::chrono_literals;
   // Give some time to allow all of the servers to start
@@ -27,14 +28,10 @@ void setup_network(const int index, Master& master)
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i)
   {
-    while (!master.connect_to_server("127.0.0.1", base_port + i))
-    {
-      std::this_thread::sleep_for(10ms);
-    }
+    while (!master.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */ }
   }
   while (master.number_of_neighbors() != num_machines - 1)
   {
-    master.accept_pending_connections();
     std::this_thread::sleep_for(1ms);
   }
 }
@@ -44,10 +41,10 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
   Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  setup_network(index, master);
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
-  master.submit_job("Job 0", [&](Job& my_job) {
+  master.submit_job("Job 0", [&](Job& my_job, MasterHandle master) {
+    setup_network(index, master);
     my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
     for (int i = 0; i < num_machines; ++i)
@@ -56,10 +53,22 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       {
         my_job.subscribe(Int32Tag{std::to_string(i)}).wait();
       }
+      else
+      {
+        while (master.num_subscriptions(publish_tag) != static_cast<int>(num_machines - 1))
+        {
+          std::this_thread::sleep_for(10ms);
+        }
+      }
     }
-    while (master.number_of_subscribers() != static_cast<int>(num_machines - 1))
+    SKYNET_SYNCHRONIZE_MACHINES(num_machines);
+    static std::atomic<int> ready_count{0};
+    if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1))
     {
-      std::this_thread::sleep_for(10ms);
+      while (ready_count != static_cast<int>(num_machines))
+      {
+        std::this_thread::sleep_for(10ms);
+      }
     }
     my_job.publish(publish_tag, index);
     for (std::size_t i = 0; i < disconnect_order.size(); ++i)

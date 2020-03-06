@@ -54,29 +54,31 @@ namespace skynet::internal
       using vals = cpnpro::PublishValue::Which;
       switch (reader.which())
       {
-      case vals::D:     return pvh<double>::get(reader);
-      case vals::R_D:   return pvh_v<double>::get(reader);
-      case vals::F:     return pvh<float>::get(reader);
-      case vals::R_F:   return pvh_v<float>::get(reader);
-      case vals::STR:   return pvh<std::string>::get(reader);
-      case vals::R_STR: return pvh_v<std::string>::get(reader);
-      case vals::I8:    return pvh<std::int8_t>::get(reader);
-      case vals::I16:   return pvh<std::int16_t>::get(reader);
-      case vals::I32:   return pvh<std::int32_t>::get(reader);
-      case vals::I64:   return pvh<std::int64_t>::get(reader);
-      case vals::U8:    return pvh<std::uint8_t>::get(reader);
-      case vals::U16:   return pvh<std::uint16_t>::get(reader);
-      case vals::U32:   return pvh<std::uint32_t>::get(reader);
-      case vals::U64:   return pvh<std::uint64_t>::get(reader);
-      case vals::R_I8:  return pvh_v<std::int8_t>::get(reader);
-      case vals::R_I16: return pvh_v<std::int16_t>::get(reader);
-      case vals::R_I32: return pvh_v<std::int32_t>::get(reader);
-      case vals::R_I64: return pvh_v<std::int64_t>::get(reader);
-      case vals::R_U8:  return pvh_v<std::uint8_t>::get(reader);
-      case vals::R_U16: return pvh_v<std::uint16_t>::get(reader);
-      case vals::R_U32: return pvh_v<std::uint32_t>::get(reader);
-      case vals::R_U64: return pvh_v<std::uint64_t>::get(reader);
-      case vals::BYTES: return pvh_v<std::byte>::get(reader);
+      case vals::D:      return pvh<double>::get(reader);
+      case vals::R_D:    return pvh_v<double>::get(reader);
+      case vals::F:      return pvh<float>::get(reader);
+      case vals::R_F:    return pvh_v<float>::get(reader);
+      case vals::STR:    return pvh<std::string>::get(reader);
+      case vals::R_STR:  return pvh_v<std::string>::get(reader);
+      case vals::I8:     return pvh<std::int8_t>::get(reader);
+      case vals::I16:    return pvh<std::int16_t>::get(reader);
+      case vals::I32:    return pvh<std::int32_t>::get(reader);
+      case vals::I64:    return pvh<std::int64_t>::get(reader);
+      case vals::U8:     return pvh<std::uint8_t>::get(reader);
+      case vals::U16:    return pvh<std::uint16_t>::get(reader);
+      case vals::U32:    return pvh<std::uint32_t>::get(reader);
+      case vals::U64:    return pvh<std::uint64_t>::get(reader);
+      case vals::R_I8:   return pvh_v<std::int8_t>::get(reader);
+      case vals::R_I16:  return pvh_v<std::int16_t>::get(reader);
+      case vals::R_I32:  return pvh_v<std::int32_t>::get(reader);
+      case vals::R_I64:  return pvh_v<std::int64_t>::get(reader);
+      case vals::R_U8:   return pvh_v<std::uint8_t>::get(reader);
+      case vals::R_U16:  return pvh_v<std::uint16_t>::get(reader);
+      case vals::R_U32:  return pvh_v<std::uint32_t>::get(reader);
+      case vals::R_U64:  return pvh_v<std::uint64_t>::get(reader);
+      case vals::BYTES:  return pvh_v<std::byte>::get(reader);
+      case vals::BOOL:   return pvh<bool>::get(reader);
+      case vals::R_BOOL: return pvh_v<bool>::get(reader);
       }
       return std::nullopt;
     };
@@ -108,7 +110,7 @@ namespace skynet::internal
 
   MachineID Greeting::from() const noexcept { return r.getFrom(); }
   std::vector<MachineID> Greeting::neighbors() const noexcept { return detail::list_to_vector<MachineID>(r.getNeighbors()); }
-  std::uint16_t Greeting::base_port() const noexcept { return r.getBasePort(); }
+  std::uint16_t Greeting::port() const noexcept { return r.getPort(); }
   Greeting::Greeting(cpnpro::Greeting::Reader reader) noexcept
     : r{std::move(reader)}
   {}
@@ -205,21 +207,35 @@ namespace skynet::internal
   {}
 
   /////////////////////////////////////////////////////
-  // StatusMessageHandler
+  // SubscriptionNotice
   /////////////////////////////////////////////////////
 
-  StatusMessageHandler::StatusMessageHandler() noexcept
+  std::vector<TagID> SubscriptionNotice::tags() const noexcept
+  {
+    return detail::list_to_vector<TagID>(r.getTags());
+  }
+  bool SubscriptionNotice::is_unsubscribe() const noexcept { return r.getIsUnsubscribe(); }
+
+  SubscriptionNotice::SubscriptionNotice(cpnpro::SubscriptionNotice::Reader reader) noexcept
+    : r{std::move(reader)}
+  {}
+
+  /////////////////////////////////////////////////////
+  // MessageHandler
+  /////////////////////////////////////////////////////
+
+  MessageHandler::MessageHandler() noexcept
     : impl_{std::make_unique<Impl>()}
   {}
 
-  StatusMessageHandler::StatusMessageHandler(StatusMessageHandler&&) noexcept = default;
-  StatusMessageHandler& StatusMessageHandler::operator=(StatusMessageHandler&&) noexcept = default;
+  MessageHandler::MessageHandler(MessageHandler&&) noexcept = default;
+  MessageHandler& MessageHandler::operator=(MessageHandler&&) noexcept = default;
 
-  std::optional<StatusMessageHandler> StatusMessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
+  std::optional<MessageHandler> MessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
   {
     detail::ExceptionSuppressor suppressor;
     // Read the message from the passed bytes
-    StatusMessageHandler to_ret;
+    MessageHandler to_ret;
     kj::Array<const kj::byte> buffer{
       reinterpret_cast<const kj::byte*>(data.data()),
       data.size(),
@@ -230,16 +246,16 @@ namespace skynet::internal
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::try_to_create.");
+      SKYNET_WARN_LOG("Failed to decode message in MessageHandler::try_to_create.");
       return {};
     }
     else
     {
-      return std::optional<StatusMessageHandler>{std::move(to_ret)};
+      return std::optional<MessageHandler>{std::move(to_ret)};
     }
   }
 
-  auto StatusMessageHandler::extract_message() const noexcept -> std::optional<MessageVariant>
+  auto MessageHandler::extract_message() const noexcept -> std::optional<MessageVariant>
   {
     using vals = cpnpro::StatusMessage::Which;
     detail::ExceptionSuppressor suppressor;
@@ -258,68 +274,19 @@ namespace skynet::internal
       case vals::SUBMIT_REDUCE_VALUE:         return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
       case vals::REPORT_REDUCE_RESULT:        return ReportReduceResult{impl_->root.getReportReduceResult()};
       case vals::REPORT_REDUCE_DISCONNECTION: return ReportReduceDisconnection{impl_->root.getReportReduceDisconnection()};
+      case vals::PUBLISH_DATA:                return PublishData{impl_->root.getPublishData()};
+      case vals::SUBSCRIPTION_NOTICE:         return SubscriptionNotice{impl_->root.getSubscriptionNotice()};
       }
       return {};
     }();
     if (suppressor.failed())
     {
-      SKYNET_WARN_LOG("Failed to decode message in StatusMessageHandler::extract_message.");
+      SKYNET_WARN_LOG("Failed to decode message in MessageHandler::extract_message.");
       return {};
     }
     else
     {
       return to_ret;
-    }
-  }
-
-  /////////////////////////////////////////////////////
-  // PublishMessageHandler
-  /////////////////////////////////////////////////////
-
-  PublishMessageHandler::PublishMessageHandler() noexcept
-    : impl_{std::make_unique<Impl>()}
-  {}
-
-  PublishMessageHandler::PublishMessageHandler(PublishMessageHandler&&) noexcept = default;
-  PublishMessageHandler& PublishMessageHandler::operator=(PublishMessageHandler&&) noexcept = default;
-
-  std::optional<PublishMessageHandler> PublishMessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
-  {
-    detail::ExceptionSuppressor suppressor;
-    // Read the message from the passed bytes
-    PublishMessageHandler to_ret;
-    kj::Array<const kj::byte> buffer{
-      reinterpret_cast<const kj::byte*>(data.data()),
-      data.size(),
-      to_ret.impl_->null_disposer
-    };
-    kj::ArrayInputStream in_s{buffer};
-    capnp::readMessageCopy(in_s, to_ret.impl_->message);
-    to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::Publish>();
-    if (suppressor.failed())
-    {
-      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::try_to_create");
-      return {};
-    }
-    else
-    {
-      return std::optional<PublishMessageHandler>{std::move(to_ret)};
-    }
-  }
-
-  std::optional<PublishData> PublishMessageHandler::data() const noexcept
-  {
-    detail::ExceptionSuppressor suppressor;
-    if (!impl_->root.isData()) { return {}; }
-    auto to_ret = PublishData{impl_->root.getData()};
-    if (suppressor.failed())
-    {
-      SKYNET_WARN_LOG("Failed to decode message in PublishMessageHandler::data");
-      return {};
-    }
-    else
-    {
-      return std::optional<PublishData>{std::move(to_ret)};
     }
   }
 } // namespace skynet::internal
