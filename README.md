@@ -24,16 +24,13 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ## Dependencies Managed as Git Submodules
  * Catch2
- * zmqcpp
+ * Spd Log
  * Guidelines Support Library (GSL)
-
-## Dependencies for Simulation, Not Managed
- * ns3 (see subprojects/ns3/build_ns3)
 
 ## Build instructions
  * Build non-managed dependencies separately
  * Get dependencies
-   * git submodule update --init --recursive
+   * git submodule update --init
  * Create build files
    * mkdir build
    * meson build
