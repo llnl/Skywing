@@ -7,12 +7,17 @@
 #include <optional>
 #include <type_traits>
 
+#include "skynet_core/types.hpp"
+
 namespace skynet
 {
   template<typename IsReadyCallable, typename GetValueCallable, typename... Continuations>
   class Waiter : public IsReadyCallable, public GetValueCallable, public Continuations...
   {
   public:
+    /// The return type of get()
+    using ValueType = decltype(std::declval<GetValueCallable>()());
+
     Waiter(
       std::mutex& mutex_handle,
       std::condition_variable& cv_handle,
@@ -181,6 +186,77 @@ namespace skynet
       return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
     }
   } // namespace skynet::internal
+
+  /** \brief Class used to wait on multiple waiters.  Generally created using
+   * when_all instead of directly
+   */
+  template<typename... Waiters>
+  class AllWaiter
+  {
+  public:
+    explicit AllWaiter(Waiters&... waiters) noexcept
+      : to_wait_on_{waiters...}
+    {}
+
+    auto get() noexcept
+      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    {
+      return for_each_waiter(
+        [](auto& waiter) noexcept -> typename decltype(waiter)::ValueType {
+          return waiter.get();
+        }
+      );
+    }
+
+    void wait() noexcept
+    {
+      for_each_waiter([](auto& waiter) noexcept { waiter.wait(); });
+    }
+
+    template<class Rep, class Period>
+    bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
+    {
+      bool value_available = true;
+      for_each_waiter([&](auto& waiter) noexcept {
+        value_available = value_available && waiter.wait_unti(end_time);
+      });
+      return value_available;
+    }
+
+    template<class Rep, class Period>
+    bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
+    {
+      const auto end_time = std::chrono::steady_clock::now() + wait_time;
+      return wait_until(end_time);
+    }
+
+  private:
+    template<typename Callable, std::size_t... Is>
+    auto for_each_waiter_impl(Callable&& c, std::index_sequence<Is...>) noexcept
+      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    {
+      return {c(std::get<Is>(to_wait_on_))...};
+    }
+
+    template<typename Callable>
+    auto for_each_waiter(Callable&& c) noexcept
+      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    {
+      return for_each_waiter_impl(std::forward<Callable>(c), std::index_sequence_for<Waiters...>{});
+    }
+
+    std::tuple<Waiters...> to_wait_on_;
+  }; // class AllWaiter
+
+  /** \brief Returns an AllWaiter that can be used to wait for when multiple
+   * waiters complete and return a tuple of the values, with void values represented
+   * as VoidWrapper instead
+   */
+  template<typename... Waiters>
+  AllWaiter<Waiters...> when_all(Waiters&... waiters) noexcept
+  {
+    return AllWaiter{waiters...};
+  }
 } // namespace skynet
 
 #endif // SKYNET_WAITER_HPP

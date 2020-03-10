@@ -185,16 +185,6 @@ namespace skynet::internal
   {}
 
   /////////////////////////////////////////////////////
-  // ReportReduceResult
-  /////////////////////////////////////////////////////
-
-  TagID ReportReduceResult::reduce_tag() const noexcept { return r.getReduceTag(); }
-  PublishData ReportReduceResult::data() const noexcept { return PublishData{r.getData()}; }
-  ReportReduceResult::ReportReduceResult(cpnpro::ReportReduceResult::Reader reader) noexcept
-    : r{std::move(reader)}
-  {}
-
-  /////////////////////////////////////////////////////
   // ReportReduceDisconnection
   /////////////////////////////////////////////////////
 
@@ -272,7 +262,6 @@ namespace skynet::internal
       case vals::GET_PUBLISHERS:              return GetPublishers{impl_->root.getGetPublishers()};
       case vals::JOIN_REDUCE_GROUP:           return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
       case vals::SUBMIT_REDUCE_VALUE:         return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
-      case vals::REPORT_REDUCE_RESULT:        return ReportReduceResult{impl_->root.getReportReduceResult()};
       case vals::REPORT_REDUCE_DISCONNECTION: return ReportReduceDisconnection{impl_->root.getReportReduceDisconnection()};
       case vals::PUBLISH_DATA:                return PublishData{impl_->root.getPublishData()};
       case vals::SUBSCRIPTION_NOTICE:         return SubscriptionNotice{impl_->root.getSubscriptionNotice()};

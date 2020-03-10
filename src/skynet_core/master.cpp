@@ -340,21 +340,6 @@ namespace skynet
           }
           return Master::ExternalMasterAccessor::handle_submit_reduce_value(*master_, msg, *this);
         },
-        [&](const ReportReduceResult& msg) {
-          SKYNET_TRACE_LOG(
-            "\"{}\" received report reduce value from \"{}\" for group \"{}\", tag \"{}\", version {}",
-            master_->id(),
-            id_,
-            msg.reduce_tag(),
-            msg.data().tag_id(),
-            msg.data().version()
-          );
-          if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id()))
-          {
-            return false;
-          }
-          return Master::ExternalMasterAccessor::handle_report_reduce_result(*master_, msg, *this);
-        },
         [&](const ReportReduceDisconnection& msg) {
           if (!tag_name_okay(msg.reduce_tag()))
           {
@@ -594,24 +579,24 @@ namespace skynet
     while (!jobs_.empty())
     {
       const auto end_sleep_time = std::chrono::steady_clock::now() + 100us;
-      // Remove any finished jobs
-      for (auto iter = jobs_.begin(); iter != jobs_.end(); )
-      {
-        std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
-        if (lock.owns_lock() && iter->second.is_finished())
-        {
-          // Need to unlock before deallocation
-          lock.unlock();
-          iter = jobs_.erase(iter);
-        }
-        else
-        {
-          ++iter;
-        }
-      }
       {
         // Ensure there's no data race with jobs
         std::lock_guard lock{job_mut_};
+        // Remove any finished jobs
+        for (auto iter = jobs_.begin(); iter != jobs_.end(); )
+        {
+          std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
+          if (lock.owns_lock() && iter->second.is_finished())
+          {
+            // Need to unlock before deallocation
+            lock.unlock();
+            iter = jobs_.erase(iter);
+          }
+          else
+          {
+            ++iter;
+          }
+        }
         process_pending_conns();
         accept_pending_connections();
         handle_neighbor_messages();
@@ -637,20 +622,19 @@ namespace skynet
             neighbor.second.find_publishers_for_tags(tags_to_ask_for);
           }
         }
-      }
-      // Mutex has been released - notify CV's if requested
-      using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
-      std::array<cv_ref_pair, 3> cv_array{
-        cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
-        cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
-        cv_ref_pair{notify_connection_, connection_cv_}
-      };
-      for (auto& [notify, cv] : cv_array)
-      {
-        if (notify)
+        using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
+        std::array<cv_ref_pair, 3> cv_array{
+          cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
+          cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
+          cv_ref_pair{notify_connection_, connection_cv_}
+        };
+        for (auto& [notify, cv] : cv_array)
         {
-          cv.notify_all();
-          notify = false;
+          if (notify)
+          {
+            cv.notify_all();
+            notify = false;
+          }
         }
       }
       // Wait a bit for other messages
@@ -704,6 +688,11 @@ namespace skynet
       version,
       value
     );
+    for (auto& [name, job] : jobs_)
+    {
+      (void)name;
+      Job::Accessor::process_data(job, tag_id, value, version);
+    }
     send_to_neighbors_if(msg, [&](const auto& neighbor) {
       return neighbor.is_subscribed_to(tag_id);
     });
@@ -827,6 +816,7 @@ namespace skynet
   {
     for (const auto& tag : required_tags)
     {
+      if (produced_tags_.find(tag) != produced_tags_.cend()) { continue; }
       const auto iter = tag_to_machine_.find(tag);
       if (iter == tag_to_machine_.cend()) { return false; }
     }
@@ -841,6 +831,7 @@ namespace skynet
     std::copy(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_));
     for (auto& [name, neighbor] : neighbors_)
     {
+      (void)name;
       neighbor.reset_backoff_counter();
       neighbor.find_publishers_for_tags(tag_ids);
     }
@@ -1112,6 +1103,8 @@ namespace skynet
         std::terminate();
       }
     }
+    // Notify publish groups for self-subscribing
+    notify_new_subscriptions_ = true;
   }
 
   auto Master::create_reduce_group(
@@ -1128,18 +1121,20 @@ namespace skynet
     {
       std::cerr
         << "The tag " << std::quoted(tag_produced) << " was attempted to be produced for more than one reduce group!\n";
-      std::terminate();
+      std::exit(2);
     }
     const auto [iter, inserted] = reduce_tag_data_.try_emplace(
       group_id,
       std::move(group_ptr)
     );
-    if (!inserted)
-    {
-      std::cerr
-        << "The reduce group " << std::quoted(group_id) << " was attempted to be created twice!\n";
-      std::terminate();
-    }
+    // Allow creating the same group twice as tags can be reused
+    // There's probably an additional check that should be done, but I'm not sure what
+    // if (!inserted)
+    // {
+    //   std::cerr
+    //     << "The reduce group " << std::quoted(group_id) << " was attempted to be created twice!\n";
+    //   std::terminate();
+    // }
     const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*iter->second.group).parent();
     if (!parent_tag.empty())
     {
@@ -1150,6 +1145,8 @@ namespace skynet
         neighbor.second.find_publishers_for_tags({parent_tag});
       }
     }
+    // Notify reduce groups for when new tags are produced
+    notify_reduce_group_ = true;
     return internal::make_waiter(
       job_mut_,
       reduce_group_cv_,
@@ -1196,12 +1193,15 @@ namespace skynet
     const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
     if (!parent_tag.empty() && reduce_data.parent_machines.empty())
     {
-      SKYNET_TRACE_LOG(
-        "\"{}\" - reduce group \"{}\" is not yet created as there is no parent connection",
-        id_,
-        group_id
-      );
-      return false;
+      if (produced_tags_.find(parent_tag) == produced_tags_.cend())
+      {
+        SKYNET_TRACE_LOG(
+          "\"{}\" - reduce group \"{}\" is not yet created as there is no parent connection",
+          id_,
+          group_id
+        );
+        return false;
+      }
     }
     // Check that the children have joined the group
     for (std::size_t i = 0; i < reduce_data.child_machines.size(); ++i)
@@ -1210,13 +1210,16 @@ namespace skynet
       const auto& neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group);
       if (!neighbors.tags[i + 1].empty() && reduce_data.child_machines[i].empty())
       {
-        SKYNET_TRACE_LOG(
-          "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
-          id_,
-          group_id,
-          i == 0 ? "left" : "right"
-        );
-        return false;
+        if (produced_tags_.find(neighbors.tags[i + 1]) == produced_tags_.cend())
+        {
+          SKYNET_TRACE_LOG(
+            "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
+            id_,
+            group_id,
+            i == 0 ? "left" : "right"
+          );
+          return false;
+        }
       }
     }
     SKYNET_TRACE_LOG("\"{}\" - reduce group \"{}\" is ready", id_, group_id);
@@ -1286,66 +1289,77 @@ namespace skynet
     return *loc->second.group;
   }
 
+  void Master::reduce_send_data_and_remove_missing(
+    std::vector<MachineID>& machines,
+    const std::vector<std::byte>& message
+  ) noexcept
+  {
+    for (auto iter = machines.begin(); iter != machines.end(); )
+    {
+      const auto parent_loc = neighbors_.find(*iter);
+      if (parent_loc == neighbors_.cend())
+      {
+        iter = machines.erase(iter);
+      }
+      else
+      {
+        parent_loc->second.send_message(message);
+        ++iter;
+      }
+    }
+  }
+
   void Master::send_reduce_data_to_parent(
     const TagID& group_id,
-    const std::vector<std::byte>& reduce_message
+    const VersionID version,
+    const TagID& reduce_tag,
+    gsl::span<const PublishValueVariant> value
   ) noexcept
   {
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
     auto& parent_machines = loc->second.parent_machines;
-    // Go through all of the parents, removing ones that don't exist
-    for (auto parent_iter = parent_machines.begin(); parent_iter != parent_machines.end(); )
-    {
-      const auto parent_loc = neighbors_.find(*parent_iter);
-      if (parent_loc == neighbors_.cend())
-      {
-        parent_iter = parent_machines.erase(parent_iter);
-      }
-      else
-      {
-        parent_loc->second.send_message(reduce_message);
-        ++parent_iter;
-      }
-    }
+    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, reduce_tag, value);
+    reduce_send_data_and_remove_missing(parent_machines, reduce_message);
+    // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
   }
 
   void Master::send_reduce_data_to_children(
     const TagID& group_id,
-    const std::vector<std::byte>& reduce_message
+    const VersionID version,
+    const TagID& reduce_tag,
+    gsl::span<const PublishValueVariant> value
   ) noexcept
   {
     const auto loc = reduce_tag_data_.find(group_id);
     assert(loc != reduce_tag_data_.cend());
-    auto child_machines = loc->second.child_machines;
+    auto& child_machines = loc->second.child_machines;
+    const auto reduce_message = internal::make_submit_reduce_value(group_id, version, reduce_tag, value);
     for (auto& children : child_machines)
     {
-      for (auto child_iter = children.begin(); child_iter != children.end(); )
-      {
-        const auto child_loc = neighbors_.find(*child_iter);
-        if (child_loc == neighbors_.cend())
-        {
-          child_iter = children.erase(child_iter);
-        }
-        else
-        {
-          child_loc->second.send_message(reduce_message);
-          ++child_iter;
-        }
-      }
+      reduce_send_data_and_remove_missing(children, reduce_message);
+    }
+    // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
+  }
+
+  void Master::send_report_disconnection(
+    const TagID& group_id,
+    const MachineID& initiating_machine,
+    const ReductionDisconnectID disconnect_id
+  ) noexcept
+  {
+    const auto loc = reduce_tag_data_.find(group_id);
+    assert(loc != reduce_tag_data_.cend());
+    const auto msg = internal::make_report_reduce_disconnection(group_id, initiating_machine, disconnect_id);
+    reduce_send_data_and_remove_missing(loc->second.parent_machines, msg);
+    for (auto& children : loc->second.child_machines)
+    {
+      reduce_send_data_and_remove_missing(children, msg);
     }
   }
 
   bool Master::handle_submit_reduce_value(
     const internal::SubmitReduceValue& msg,
-    const internal::ExternalMaster& from
-  ) noexcept
-  {
-    return handle_reduce_value(msg.reduce_tag(), msg.data(), from);
-  }
-
-  bool Master::handle_report_reduce_result(
-    const internal::ReportReduceResult& msg,
     const internal::ExternalMaster& from
   ) noexcept
   {
@@ -1427,16 +1441,23 @@ namespace skynet
     {
       const auto& tag = *tag_iter;
       const auto iter = publishers_for_tag_.find(tag);
+      // Delete pending tags for self-published tags
+      if (produced_tags_.find(tag) != produced_tags_.cend())
+      {
+        SKYNET_TRACE_LOG("\"{}\" produces tag \"{}\", not creating connection", id_, tag);
+        tag_iter = pending_tags_.erase(tag_iter);
+        continue;
+      }
       if (iter == publishers_for_tag_.cend())
       {
-        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag {}", id_, tag);
+        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag \"{}\"", id_, tag);
         ++tag_iter;
         continue;
       }
       auto& publishers = iter->second;
       if (publishers.empty())
       {
-        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag {}", id_, tag);
+        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag \"{}\"", id_, tag);
         ++tag_iter;
       }
       else

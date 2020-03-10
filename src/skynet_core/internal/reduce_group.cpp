@@ -62,13 +62,18 @@ namespace skynet::internal
         return true;
       }
     }
-    SKYNET_WARN_LOG(
-      "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to not matching any buffer",
-      master_->id(),
-      group_id_,
-      tag,
-      version
-    );
+    // There's not good way for the master to know ahead of time if the tag should
+    // be supplied so only output this if it really is unexpected
+    if (tag != produced_tag_)
+    {
+      SKYNET_WARN_LOG(
+        "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to not matching any buffer",
+        master_->id(),
+        group_id_,
+        tag,
+        version
+      );
+    }
     return false;
   }
 
@@ -155,12 +160,9 @@ namespace skynet::internal
     Master::ReduceGroupAccessor::send_reduce_data_to_parent(
       *master_,
       group_id_,
-      internal::make_submit_reduce_value(
-        group_id_,
-        version,
-        produced_tag_,
-        value_to_send
-      )
+      version,
+      produced_tag_,
+      value_to_send
     );
   }
 
@@ -170,33 +172,14 @@ namespace skynet::internal
     Master::ReduceGroupAccessor::send_reduce_data_to_children(
       *master_,
       group_id_,
-      internal::make_submit_reduce_value(
-        group_id_,
-        version,
-        produced_tag_,
-        value_to_send
-      )
+      version,
+      produced_tag_,
+      value_to_send
     );
   }
 
   void ReduceGroupBase::send_disconnection(const MachineID& initiating_machine, ReductionDisconnectID disconn_id) noexcept
   {
-    using func_ptr = decltype(&Master::ReduceGroupAccessor::send_reduce_data_to_children);
-    constexpr std::array<func_ptr, 2> senders = {
-      &Master::ReduceGroupAccessor::send_reduce_data_to_children,
-      &Master::ReduceGroupAccessor::send_reduce_data_to_parent
-    };
-    for (const auto& sender: senders)
-    {
-      sender(
-        *master_,
-        group_id_,
-        internal::make_report_reduce_disconnection(
-          group_id_,
-          initiating_machine,
-          disconn_id
-        )
-      );
-    }
+    Master::ReduceGroupAccessor::send_report_disconnection(*master_, group_id_, initiating_machine, disconn_id);
   }
 } // namespace skynet::internal

@@ -332,15 +332,6 @@ namespace skynet
         return m.handle_submit_reduce_value(msg, from);
       }
 
-      static bool handle_report_reduce_result(
-        Master& m,
-        const internal::ReportReduceResult& msg,
-        const internal::ExternalMaster& from
-      ) noexcept
-      {
-        return m.handle_report_reduce_result(msg, from);
-      }
-
       static bool handle_report_reduce_disconnection(
         Master& m,
         const internal::ReportReduceDisconnection& msg,
@@ -376,19 +367,33 @@ namespace skynet
       static void send_reduce_data_to_parent(
         Master& m,
         const TagID& group_id,
-        const std::vector<std::byte>& reduce_message
+        const VersionID version,
+        const TagID& reduce_tag,
+        gsl::span<const PublishValueVariant> value
       ) noexcept
       {
-        m.send_reduce_data_to_parent(group_id, reduce_message);
+        m.send_reduce_data_to_parent(group_id, version, reduce_tag, value);
       }
 
       static void send_reduce_data_to_children(
         Master& m,
         const TagID& group_id,
-        const std::vector<std::byte>& reduce_message
+        const VersionID version,
+        const TagID& reduce_tag,
+        gsl::span<const PublishValueVariant> value
       ) noexcept
       {
-        m.send_reduce_data_to_children(group_id, reduce_message);
+        m.send_reduce_data_to_children(group_id, version, reduce_tag, value);
+      }
+
+      static void send_report_disconnection(
+        Master& m,
+        const TagID& group_id,
+        const MachineID& initiating_machine,
+        const ReductionDisconnectID disconnect_id
+      ) noexcept
+      {
+        m.send_report_disconnection(group_id, initiating_machine, disconnect_id);
       }
 
       static auto rebuild_reduce_group(
@@ -582,29 +587,40 @@ namespace skynet
      */
     internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
 
+    /** \brief Sends a raw message to the specified ID's, removing the ID's from
+     * the array if not present
+     */
+    void reduce_send_data_and_remove_missing(
+      std::vector<MachineID>& machines,
+      const std::vector<std::byte>& message
+    ) noexcept;
+
     /** \brief Sends a value for a reduce to the corresponding parents
      */
     void send_reduce_data_to_parent(
       const TagID& group_id,
-      const std::vector<std::byte>& reduce_message
+      const VersionID version,
+      const TagID& reduce_tag,
+      gsl::span<const PublishValueVariant> value
     ) noexcept;
 
     void send_reduce_data_to_children(
       const TagID& group_id,
-      const std::vector<std::byte>& reduce_message
+      const VersionID version,
+      const TagID& reduce_tag,
+      gsl::span<const PublishValueVariant> value
+    ) noexcept;
+
+    void send_report_disconnection(
+      const TagID& group_id,
+      const MachineID& initiating_machine,
+      const ReductionDisconnectID disconnect_id
     ) noexcept;
 
     /** \brief Handles a submit reduce value message
      */
     bool handle_submit_reduce_value(
       const internal::SubmitReduceValue& msg,
-      const internal::ExternalMaster& from
-    ) noexcept;
-
-    /** \brief Processes a finished reduce value
-     */
-    bool handle_report_reduce_result(
-      const internal::ReportReduceResult& msg,
       const internal::ExternalMaster& from
     ) noexcept;
 
