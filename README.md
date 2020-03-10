@@ -18,6 +18,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ## Dependencies Not Automatically Managed
  * meson (https://mesonbuild.com/)
+ * CMake (https://cmake.org/)
  * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
 
