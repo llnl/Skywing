@@ -18,7 +18,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ## Dependencies Not Automatically Managed
  * compiler that supports c++17 library
-   * tested: GCC/g++ (7.1.0, 8.3.0), LLVM/clang (6.0.0, 10.0.0, 11.0.0)
+   * tested: GCC/g++ (8.3.0), LLVM/clang (6.0.0, 10.0.0, 11.0.0)
  * meson (https://mesonbuild.com/)
    * requires Python >= 3.5.2
  * CMake (https://cmake.org/)
