@@ -151,13 +151,18 @@ namespace skynet
 #define SKYNET_SYNCHRONIZE_MACHINES(machine_count) \
   do \
   { \
-    static std::atomic<int> sync; \
-    if (sync.fetch_add(1) != static_cast<int>(machine_count - 1)) \
+    static int sync; \
+    static std::mutex m; \
+    static std::condition_variable cv; \
+    std::unique_lock lock{m}; \
+    ++sync; \
+    if (sync != static_cast<int>(machine_count)) \
     { \
-      while (sync != static_cast<int>(machine_count)) \
-      { \
-        std::this_thread::sleep_for(std::chrono::milliseconds{10}); \
-      } \
+      cv.wait(lock, [&]() { return sync == static_cast<int>(machine_count); }); \
+    } \
+    else \
+    { \
+      cv.notify_all(); \
     } \
   } \
   while (false)

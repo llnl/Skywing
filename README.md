@@ -29,18 +29,27 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 ## Dependencies for Simulation, Not Managed
  * ns3 (see subprojects/ns3/build_ns3)
 
-## Build instructions
+## Build Instructions
  * Build non-managed dependencies separately
  * Get dependencies
-   * git submodule update --init --recursive
+   * `git submodule update --init --recursive`
  * Create build files
-   * mkdir build
-   * meson build
+   * `mkdir build`
+   * `meson build`
  * Build Skynet
-   * cd build
-   * ninja
+   * `cd build`
+   * `ninja`
  * Run tests
-   * ninja test
+   * `ninja test`
+
+## Enabling Tests and Examples
+
+### Before creating the build directory
+ * `meson build -Dbuild_tests=true -Dbuild_examples=true`
+
+### After creating the build directory
+ * Move to the build directory
+ * `meson configure -Dbuild_tests=true -Dbuild_examples=true`
 
 ---
 

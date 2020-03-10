@@ -13,11 +13,15 @@ using namespace skynet::internal;
 
 constexpr std::uint16_t port = 40000;
 constexpr int value_to_send = 3871;
+std::mutex catch_mutex;
 
 void server()
 {
   SocketCommunicator conn;
-  REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
+  {
+    std::lock_guard<std::mutex> lock{catch_mutex};
+    REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
+  }
   // Twice for non-blocking/blocking connection
   for (int i = 0; i < 2; ++i)
   {
@@ -42,7 +46,10 @@ void server()
     // verify that it's the same
     int read_value;
     std::memcpy(&read_value, int_buffer.data(), sizeof(int));
-    REQUIRE(read_value == value_to_send);
+    {
+      std::lock_guard<std::mutex> lock{catch_mutex};
+      REQUIRE(read_value == value_to_send);
+    }
   }
 }
 
@@ -51,18 +58,27 @@ void client()
   const auto do_send = [](SocketCommunicator& conn) {
     std::array<std::byte, sizeof(value_to_send)> int_buffer;
     std::memcpy(int_buffer.data(), &value_to_send, sizeof(value_to_send));
+    std::lock_guard<std::mutex> lock{catch_mutex};
     REQUIRE(conn.send_message(int_buffer.data(), int_buffer.size()) == ConnectionError::no_error);
   };
   // Blocking
   {
     SocketCommunicator conn;
-    REQUIRE(conn.connect_to_server("127.0.0.1", port) == ConnectionError::no_error);
+    {
+      const auto res = conn.connect_to_server("127.0.0.1", port);
+      std::lock_guard<std::mutex> lock{catch_mutex};
+      REQUIRE(res == ConnectionError::no_error);
+    }
     do_send(conn);
   }
   // Non-blocking
   {
     SocketCommunicator conn;
-    REQUIRE(conn.connect_non_blocking("127.0.0.1", port) == ConnectionError::connection_in_progress);
+    {
+      const auto res = conn.connect_non_blocking("127.0.0.1", port);
+      std::lock_guard<std::mutex> lock{catch_mutex};
+      REQUIRE(res == ConnectionError::connection_in_progress);
+    }
     // Clunky work-around to actually be able to test the status
     // (This lambda in immediately invoked)
     [&]() {

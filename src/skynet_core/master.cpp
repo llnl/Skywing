@@ -579,24 +579,24 @@ namespace skynet
     while (!jobs_.empty())
     {
       const auto end_sleep_time = std::chrono::steady_clock::now() + 100us;
-      // Remove any finished jobs
-      for (auto iter = jobs_.begin(); iter != jobs_.end(); )
-      {
-        std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
-        if (lock.owns_lock() && iter->second.is_finished())
-        {
-          // Need to unlock before deallocation
-          lock.unlock();
-          iter = jobs_.erase(iter);
-        }
-        else
-        {
-          ++iter;
-        }
-      }
       {
         // Ensure there's no data race with jobs
         std::lock_guard lock{job_mut_};
+        // Remove any finished jobs
+        for (auto iter = jobs_.begin(); iter != jobs_.end(); )
+        {
+          std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
+          if (lock.owns_lock() && iter->second.is_finished())
+          {
+            // Need to unlock before deallocation
+            lock.unlock();
+            iter = jobs_.erase(iter);
+          }
+          else
+          {
+            ++iter;
+          }
+        }
         process_pending_conns();
         accept_pending_connections();
         handle_neighbor_messages();
@@ -622,20 +622,19 @@ namespace skynet
             neighbor.second.find_publishers_for_tags(tags_to_ask_for);
           }
         }
-      }
-      // Mutex has been released - notify CV's if requested
-      using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
-      std::array<cv_ref_pair, 3> cv_array{
-        cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
-        cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
-        cv_ref_pair{notify_connection_, connection_cv_}
-      };
-      for (auto& [notify, cv] : cv_array)
-      {
-        if (notify)
+        using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
+        std::array<cv_ref_pair, 3> cv_array{
+          cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
+          cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
+          cv_ref_pair{notify_connection_, connection_cv_}
+        };
+        for (auto& [notify, cv] : cv_array)
         {
-          cv.notify_all();
-          notify = false;
+          if (notify)
+          {
+            cv.notify_all();
+            notify = false;
+          }
         }
       }
       // Wait a bit for other messages

@@ -19,8 +19,7 @@ using Int64Tag = PublishTag<std::int64_t>;
 const Int64Tag value_tag{"value"};
 
 std::mutex catch_mutex;
-int values_published = 0;
-int values_retrieved = 0;
+std::atomic<int> values_retrieved = 0;
 
 void publish_once(int publish_number)
 {
