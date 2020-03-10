@@ -173,7 +173,7 @@ namespace skynet
       assert(tag_iter != buffers.cend());
       auto& tag_info = tag_iter->second;
       const auto tag_conn_id = tag_info.connection_id;
-      return internal::make_waiter(
+      return make_waiter(
         bufs_.mutex(),
         data_buffer_modified_cv_,
         [&tag_info, tag_conn_id]() {
@@ -421,7 +421,7 @@ namespace skynet
     auto get_subscribe_future(
       gsl::span<const internal::PublishTagBase> tags
     ) noexcept
-      -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>;
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
 
     void declare_publication_intent_impl(
       gsl::span<const internal::PublishTagBase> tags

@@ -426,7 +426,6 @@ namespace skynet
   ) noexcept
     : id_{id}
     , heartbeat_interval_{heartbeat_interval}
-    // , pub_channel_{static_cast<std::uint16_t>(port + publisher_port_offset)}
     , port_{port}
   {
     if (server_socket_.set_to_listen(port) != internal::ConnectionError::no_error)
@@ -495,7 +494,7 @@ namespace skynet
     const auto status = iter->second.conn.connect_non_blocking(address, port);
     // Ignore status - if this initially fails it will be handled later
     (void)status;
-    return internal::make_waiter(
+    return make_waiter(
       job_mut_,
       connection_cv_,
       internal::MasterConnectionIsComplete{*this, address, port},
@@ -825,7 +824,7 @@ namespace skynet
   }
 
   auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-    -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
     std::copy(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_));
@@ -835,7 +834,7 @@ namespace skynet
       neighbor.reset_backoff_counter();
       neighbor.find_publishers_for_tags(tag_ids);
     }
-    return internal::make_waiter(
+    return make_waiter(
       job_mut_,
       new_subscription_cv_,
       internal::MasterSubscribeIsDone{*this, tag_ids}
@@ -1147,7 +1146,7 @@ namespace skynet
     }
     // Notify reduce groups for when new tags are produced
     notify_reduce_group_ = true;
-    return internal::make_waiter(
+    return make_waiter(
       job_mut_,
       reduce_group_cv_,
       internal::MasterReduceGroupIsCreated{*this, group_id},
@@ -1158,7 +1157,7 @@ namespace skynet
   auto Master::rebuild_reduce_group(
     const TagID& group_id
   ) noexcept
-    -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
     const auto iter = reduce_tag_data_.find(group_id);
@@ -1177,7 +1176,7 @@ namespace skynet
         }
       }
     }
-    return internal::make_waiter(
+    return make_waiter(
       job_mut_,
       reduce_group_cv_,
       internal::MasterReduceGroupIsCreated{*this, group_id}

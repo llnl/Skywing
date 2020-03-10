@@ -143,7 +143,7 @@ namespace skynet::internal
   }
 
   auto ReduceGroupBase::rebuild() noexcept
-    -> Waiter<internal::MasterReduceGroupIsCreated, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>
   {
     // Reset the buffers
     {

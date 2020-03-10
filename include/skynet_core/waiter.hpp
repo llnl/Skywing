@@ -178,42 +178,39 @@ namespace skynet
     std::condition_variable* cv_;
   }; // class Waiter
 
-  namespace internal
+  struct WaiterGetNoOp
   {
-    struct WaiterGetNoOp
-    {
-      constexpr void operator()() const noexcept {}
-    }; // struct WaiterGetNoOp
+    constexpr void operator()() const noexcept {}
+  }; // struct WaiterGetNoOp
 
-    template<typename IsReadyCallable, typename GetValueCallable>
-    auto make_waiter(
-      std::mutex& mutex,
-      std::condition_variable& cv,
-      IsReadyCallable ready,
-      GetValueCallable get_value
-    ) noexcept
-      -> Waiter<IsReadyCallable, GetValueCallable>
-    {
-      return Waiter<IsReadyCallable, GetValueCallable>{
-        mutex,
-        cv,
-        std::move(ready),
-        std::move(get_value)
-      };
-    }
+  template<typename IsReadyCallable, typename GetValueCallable>
+  auto make_waiter(
+    std::mutex& mutex,
+    std::condition_variable& cv,
+    IsReadyCallable ready,
+    GetValueCallable get_value
+  ) noexcept
+    -> Waiter<IsReadyCallable, GetValueCallable>
+  {
+    return Waiter<IsReadyCallable, GetValueCallable>{
+      mutex,
+      cv,
+      std::move(ready),
+      std::move(get_value)
+    };
+  }
 
-    // Overload for void returning futures
-    template<typename IsReadyCallable>
-    auto make_waiter(
-      std::mutex& mutex,
-      std::condition_variable& cv,
-      IsReadyCallable ready
-    ) noexcept
-      -> Waiter<IsReadyCallable, WaiterGetNoOp>
-    {
-      return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
-    }
-  } // namespace skynet::internal
+  // Overload for void returning futures
+  template<typename IsReadyCallable>
+  auto make_waiter(
+    std::mutex& mutex,
+    std::condition_variable& cv,
+    IsReadyCallable ready
+  ) noexcept
+    -> Waiter<IsReadyCallable, WaiterGetNoOp>
+  {
+    return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
+  }
 
   /** \brief Class used to wait on multiple waiters.  Generally created using
    * when_all instead of directly

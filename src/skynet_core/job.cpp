@@ -208,7 +208,7 @@ namespace skynet
   auto Job::get_subscribe_future(
     const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
-    -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
   {
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
