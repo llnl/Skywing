@@ -78,15 +78,6 @@ namespace skynet::internal
     gsl::span<const PublishValueVariant> value
   ) noexcept;
 
-  /** \brief Create a message to report the result of a reduction to children nodes
-   */
-  std::vector<std::byte> make_report_reduce_result(
-    const TagID& reduce_tag,
-    const VersionID version,
-    const TagID& tag_id,
-    gsl::span<const PublishValueVariant> value
-  ) noexcept;
-
   /** \brief Create a message for sending a disconnection notification
    */
   std::vector<std::byte> make_report_reduce_disconnection(

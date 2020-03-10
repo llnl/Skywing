@@ -11,6 +11,7 @@ core_tests = {
     'heartbeat',
     'publish_data_wrapper',
     'publish_multiple_values',
+    'self_subscribe',
     'simple_reduce',
   ],
   'skynet_core/devices': [

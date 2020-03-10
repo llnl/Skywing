@@ -67,6 +67,26 @@ struct fmt::formatter<std::vector<T>>
   }
 };
 
+// Array support
+// TODO: Maybe just do support for any containers?  Would require restricting
+// the template, however...
+template<typename T, std::size_t N>
+struct fmt::formatter<std::array<T, N>>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) noexcept
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const std::array<T, N>& data, FormatContext& ctx) noexcept
+  {
+    using const_span = gsl::span<const T>;
+    return fmt::formatter<const_span>{}.format(const_span{data}, ctx);
+  }
+};
+
 // Support for logging of tag data
 template<>
 struct fmt::formatter<skynet::PublishValueVariant>

@@ -157,8 +157,21 @@ namespace skynet
   /// Address/port pair
   using AddrPortPair = std::pair<std::string, std::uint16_t>;
 
+  /** \brief Wrapper for returning void values in various situations
+   */
+  struct VoidWrapper{};
+
   namespace internal
   {
+    /// Wraps void values in VoidWrappers or returns the type unmodified
+    template<typename T>
+    using WrapVoidValue = std::conditional_t<
+      // don't care about cv-qualified void becuase those shouldn't really be a thing
+      std::is_same_v<T, void>,
+        VoidWrapper,
+        T
+    >;
+
     /// Structure for reporting reduce group building
     struct ReduceGroupNeighbors
     {

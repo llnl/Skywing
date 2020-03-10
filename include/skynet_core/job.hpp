@@ -21,7 +21,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
+              #include <iostream>
 namespace skynet
 {
   //  A Job needs to be able to communicate with the Master so forward declare it
@@ -167,7 +167,8 @@ namespace skynet
       // Can just capture the reference to the value as it
       // will never get invalidated except when the element is deleted
       // due to being in an unordered_map
-      auto& buffers = bufs_.unsafe_get();
+      auto [buffers, lock] = bufs_.get();
+      (void)lock;
       const auto tag_iter = buffers.find(tag.id());
       assert(tag_iter != buffers.cend());
       auto& tag_info = tag_iter->second;

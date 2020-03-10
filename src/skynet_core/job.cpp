@@ -45,52 +45,49 @@ namespace skynet
     const VersionID version
   ) noexcept
   {
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    const auto loc = buffers.find(tag_id);
+    // Not subscribed; don't do anything, but not an error
+    if (loc == buffers.cend())
     {
-      auto [buffers, lock] = bufs_.get();
-      (void)lock;
-      const auto loc = buffers.find(tag_id);
-      // Not subscribed; don't do anything, but not an error
-      if (loc == buffers.cend())
-      {
-        SKYNET_TRACE_LOG(
-          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
-          master_->id(),
-          id_,
-          tag_id,
-          version,
-          data
-        );
-        return true;
-      }
-      // If the types are wrong then something went wrong
-      const auto comparer = [](std::uint8_t lhs, const PublishValueVariant& rhs) { return lhs == rhs.index(); };
-      const auto& expected_types = loc->second.expected_types;
-      if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer))
-      {
-        SKYNET_WARN_LOG(
-          "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index",
-          master_->id(),
-          id_,
-          tag_id,
-          version,
-          data
-        );
-        loc->second.error_occurred = TagInfo::Error::incorrect_type;
-        data_buffer_modified_cv_.notify_all();
-        return false;
-      }
       SKYNET_TRACE_LOG(
-        "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}",
+        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
         master_->id(),
         id_,
         tag_id,
         version,
         data
       );
-      // Otherwise just make it the current value
-      loc->second.buffer->add(std::move(data), version);
+      return true;
     }
-    // Notify after making sure to release the mutex
+    // If the types are wrong then something went wrong
+    const auto comparer = [](std::uint8_t lhs, const PublishValueVariant& rhs) { return lhs == rhs.index(); };
+    const auto& expected_types = loc->second.expected_types;
+    if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer))
+    {
+      SKYNET_WARN_LOG(
+        "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index",
+        master_->id(),
+        id_,
+        tag_id,
+        version,
+        data
+      );
+      loc->second.error_occurred = TagInfo::Error::incorrect_type;
+      data_buffer_modified_cv_.notify_all();
+      return false;
+    }
+    SKYNET_TRACE_LOG(
+      "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}",
+      master_->id(),
+      id_,
+      tag_id,
+      version,
+      data
+    );
+    // Otherwise just make it the current value
+    loc->second.buffer->add(std::move(data), version);
     data_buffer_modified_cv_.notify_all();
     return true;
   }

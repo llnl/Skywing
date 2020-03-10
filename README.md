@@ -35,13 +35,22 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Get dependencies
    * git submodule update --init
  * Create build files
-   * mkdir build
-   * meson build
+   * `mkdir build`
+   * `meson build`
  * Build Skynet
-   * cd build
-   * ninja
+   * `cd build`
+   * `ninja`
  * Run tests
-   * ninja test
+   * `ninja test`
+
+## Enabling Tests and Examples
+
+### Before creating the build directory
+ * `meson build -Dbuild_tests=true -Dbuild_examples=true`
+
+### After creating the build directory
+ * Move to the build directory
+ * `meson configure -Dbuild_tests=true -Dbuild_examples=true`
 
 ---
 
