@@ -11,104 +11,52 @@
 
 namespace skynet
 {
-  template<typename IsReadyCallable, typename GetValueCallable, typename... Continuations>
-  class Waiter : public IsReadyCallable, public GetValueCallable, public Continuations...
+  template<typename Waiter, typename... Continuations>
+  class Continuation : public Continuations...
   {
   public:
-    /// The return type of get()
-    using ValueType = decltype(std::declval<GetValueCallable>()());
-
-    Waiter(
-      std::mutex& mutex_handle,
-      std::condition_variable& cv_handle,
-      IsReadyCallable ready,
-      GetValueCallable get_value,
-      Continuations... continuations
-    ) noexcept
-      : IsReadyCallable{std::move(ready)}
-      , GetValueCallable{std::move(get_value)}
-      , Continuations{std::move(continuations)}...
-      , mutex_{mutex_handle}
-      , cv_{cv_handle}
+    explicit Continuation(Waiter wait_on, Continuations... continuations) noexcept
+      : Continuations{std::move(continuations)}...
+      , to_wait_on_{std::move(wait_on)}
     {}
+
+    template<typename... NewContinuations>
+    auto then(NewContinuations... continuations) && noexcept
+      -> Continuation<Waiter, Continuations..., NewContinuations...>
+    {
+      return Continuation<Waiter, Continuations..., NewContinuations...>{
+        to_wait_on_,
+        std::move(static_cast<Continuations&>(*this))...,
+        std::move(continuations)...
+      };
+    }
 
     decltype(auto) get() noexcept
     {
-      // Have the value be returned from a lambda so that no temporaries are made
-      // but the lock will be released before calling the continuations
-      const auto get_value = [&]() noexcept -> decltype(auto) {
-        std::unique_lock<std::mutex> lock{mutex_};
-        if (!is_ready_no_lock())
-        {
-          cv_.wait(lock, [this]() noexcept { return is_ready_no_lock(); });
-        }
-        return GetValueCallable::operator()();
-      };
-      if constexpr (sizeof...(Continuations) == 0)
-      {
-        return get_value();
-      }
-      else
-      {
-        return handle_continuations(get_value, static_cast<Continuations&>(*this)...);
-      }
+      return handle_continuations(
+        [this]() noexcept -> decltype(auto) { return to_wait_on_.get(); },
+        static_cast<Continuations&>(*this)...
+      );
     }
 
     void wait() noexcept
     {
-      std::unique_lock<std::mutex> lock{mutex_};
-      if (is_ready_no_lock()) { return; }
-      cv_.wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+      to_wait_on_.wait();
     }
 
     template<class Rep, class Period>
     bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
     {
-      std::unique_lock<std::mutex> lock{mutex_};
-      if (is_ready_no_lock()) { return true; }
-      return cv_.wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
+      return to_wait_on_.wait_for(wait_time);
     }
 
     template<class Rep, class Period>
     bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
     {
-      std::unique_lock<std::mutex> lock{mutex_};
-      if (is_ready_no_lock()) { return true; }
-      return cv_.wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
-    }
-
-    bool is_ready() noexcept
-    {
-      std::lock_guard<std::mutex> lock{mutex_};
-      return is_ready_no_lock();
-    }
-
-    // For transforming the get type
-    template<typename... NewContinuations>
-    auto then(NewContinuations... continuations) && noexcept
-    {
-      using ret_type = Waiter<
-        IsReadyCallable,
-        GetValueCallable,
-        Continuations...,
-        NewContinuations...
-      >;
-      return ret_type{
-        mutex_,
-        cv_,
-        std::move(static_cast<IsReadyCallable&>(*this)),
-        std::move(static_cast<GetValueCallable&>(*this)),
-        std::move(static_cast<Continuations&>(*this))...,
-        std::move(continuations...)
-      };
+      return to_wait_on_.wait_until(end_time);
     }
 
   private:
-    bool is_ready_no_lock() noexcept
-    {
-      return IsReadyCallable::operator()();
-    }
-
     // The continuations are in the reverse order that they need to be called
     // so have to build up a function to return the result
     template<typename BuildUp, typename Next, typename... Rest>
@@ -144,8 +92,90 @@ namespace skynet
       }
     }
 
-    std::mutex& mutex_;
-    std::condition_variable& cv_;
+    Waiter to_wait_on_;
+  }; // class Continuation
+
+  template<typename IsReadyCallable, typename GetValueCallable>
+  class Waiter : public IsReadyCallable, public GetValueCallable
+  {
+  public:
+    /// The return type of get()
+    using ValueType = decltype(std::declval<GetValueCallable>()());
+
+    Waiter(
+      std::mutex& mutex_handle,
+      std::condition_variable& cv_handle,
+      IsReadyCallable ready,
+      GetValueCallable get_value
+    ) noexcept
+      : IsReadyCallable{std::move(ready)}
+      , GetValueCallable{std::move(get_value)}
+      , mutex_{&mutex_handle}
+      , cv_{&cv_handle}
+    {}
+
+    decltype(auto) get() noexcept
+    {
+      // Have the value be returned from a lambda so that no temporaries are made
+      // but the lock will be released before calling the continuations
+      const auto get_value = [&]() noexcept -> decltype(auto) {
+        std::unique_lock<std::mutex> lock{*mutex_};
+        if (!is_ready_no_lock())
+        {
+          cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+        }
+        return GetValueCallable::operator()();
+      };
+      return get_value();
+    }
+
+    void wait() noexcept
+    {
+      std::unique_lock<std::mutex> lock{*mutex_};
+      if (is_ready_no_lock()) { return; }
+      cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+    }
+
+    template<class Rep, class Period>
+    bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
+    {
+      std::unique_lock<std::mutex> lock{*mutex_};
+      if (is_ready_no_lock()) { return true; }
+      return cv_->wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
+    }
+
+    template<class Rep, class Period>
+    bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
+    {
+      std::unique_lock<std::mutex> lock{*mutex_};
+      if (is_ready_no_lock()) { return true; }
+      return cv_->wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
+    }
+
+    bool is_ready() noexcept
+    {
+      std::lock_guard<std::mutex> lock{*mutex_};
+      return is_ready_no_lock();
+    }
+
+    // For transforming the get type
+    template<typename... Continuations>
+    Continuation<Waiter, Continuations...> then(Continuations... continuations) && noexcept
+    {
+      return Continuation<Waiter, Continuations...>{
+        *this,
+        std::move(continuations)...
+      };
+    }
+
+  private:
+    bool is_ready_no_lock() noexcept
+    {
+      return IsReadyCallable::operator()();
+    }
+
+    std::mutex* mutex_;
+    std::condition_variable* cv_;
   }; // class Waiter
 
   namespace internal
@@ -155,22 +185,20 @@ namespace skynet
       constexpr void operator()() const noexcept {}
     }; // struct WaiterGetNoOp
 
-    template<typename IsReadyCallable, typename GetValueCallable, typename... Continuations>
+    template<typename IsReadyCallable, typename GetValueCallable>
     auto make_waiter(
       std::mutex& mutex,
       std::condition_variable& cv,
       IsReadyCallable ready,
-      GetValueCallable get_value,
-      Continuations... continuations
+      GetValueCallable get_value
     ) noexcept
-      -> Waiter<IsReadyCallable, GetValueCallable, Continuations...>
+      -> Waiter<IsReadyCallable, GetValueCallable>
     {
-      return Waiter<IsReadyCallable, GetValueCallable, Continuations...>{
+      return Waiter<IsReadyCallable, GetValueCallable>{
         mutex,
         cv,
         std::move(ready),
-        std::move(get_value),
-        std::move(continuations)...
+        std::move(get_value)
       };
     }
 
@@ -228,6 +256,15 @@ namespace skynet
     {
       const auto end_time = std::chrono::steady_clock::now() + wait_time;
       return wait_until(end_time);
+    }
+
+    template<typename... Continuations>
+    Continuation<AllWaiter, Continuations...> then(Continuations... continuations) && noexcept
+    {
+      return Continuation<AllWaiter, Continuations...>{
+        *this,
+        std::move(continuations)...
+      };
     }
 
   private:
