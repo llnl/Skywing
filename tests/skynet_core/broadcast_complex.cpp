@@ -117,7 +117,7 @@ void machine_task(const NetworkInfo* const info, const int index)
         job.subscribe(tag1, tag2, tag3).get();
       }
       const auto wait_for_subs = [&](const auto& tag) {
-        while (master_handle.num_subscriptions(tag) != num_machines - 1)
+        while (master_handle.number_of_subscribers(tag) != num_machines - 1)
         {
           std::this_thread::sleep_for(std::chrono::milliseconds{10});
         }

@@ -21,7 +21,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-              #include <iostream>
+
 namespace skynet
 {
   //  A Job needs to be able to communicate with the Master so forward declare it
@@ -209,6 +209,7 @@ namespace skynet
      */
     template<typename... Ts>
     auto subscribe(const Ts&... tags) noexcept
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
     //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
     {
       const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
@@ -234,12 +235,13 @@ namespace skynet
      */
     template<typename Range>
     auto subscribe_range(const Range& tags) noexcept
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
       // requires std::ranges::contiguous_range<Range>
     {
       using IterType = std::decay_t<decltype(tags.begin())>;
       using TagType = typename std::iterator_traits<IterType>::value_type;
       using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-      std::vector<BufferPtr> ptrs{tags.size()};
+      std::vector<BufferPtr> ptrs(static_cast<std::size_t>(tags.size()));
       std::generate(
         ptrs.begin(),
         ptrs.end(),
@@ -352,6 +354,7 @@ namespace skynet
      * \return A future for when the tags are re-connected
      */
     auto rebuild_missing_tag_connections() noexcept
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
     {
       // init_or_update_subscribe obtains a lock, so might as well just
       // init this in a lambda (since it can then be const)
@@ -378,7 +381,16 @@ namespace skynet
 
     /** \brief Check if a tag's subscription is valid or not
      */
-    bool tag_has_subscription(const internal::PublishTagBase& tag) noexcept;
+    bool tag_has_subscription(const internal::PublishTagBase& tag) const noexcept;
+
+    template<typename Range>
+    bool tags_have_subscriptions(const Range& tags) const noexcept
+    {
+      return tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase>{
+        tags.data(),
+        static_cast<gsl::index>(tags.size())
+      });
+    }
 
     /** \brief Returns the number of subscriptions that a tag has
      *
@@ -386,7 +398,7 @@ namespace skynet
      * add a way to do this and also only send data on tags which machines are
      * subscribed to.
      */
-    int num_subscriptions(const internal::PublishTagBase& tag) noexcept;
+    int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
 
   private:
     /** \brief Checks if a buffer has data without locking
@@ -445,6 +457,7 @@ namespace skynet
       -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
 
     bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
+    bool tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept;
 
     // The id of the job
     JobID id_;

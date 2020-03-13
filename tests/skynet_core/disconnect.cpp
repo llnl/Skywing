@@ -55,7 +55,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       }
       else
       {
-        while (master.num_subscriptions(publish_tag) != static_cast<int>(num_machines - 1))
+        while (master.number_of_subscribers(publish_tag) != static_cast<int>(num_machines - 1))
         {
           std::this_thread::sleep_for(10ms);
         }

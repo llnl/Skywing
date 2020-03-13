@@ -382,6 +382,7 @@ namespace skynet
             // when this happens
             return false;
           }
+          Master::ExternalMasterAccessor::notify_subscriptions(*master_);
           SKYNET_TRACE_LOG(
             "\"{}\" accepted subscription notice from \"{}\"",
             master_->id(),
@@ -623,7 +624,7 @@ namespace skynet
         }
         using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
         std::array<cv_ref_pair, 3> cv_array{
-          cv_ref_pair{notify_new_subscriptions_, new_subscription_cv_},
+          cv_ref_pair{notify_subscriptions_, subscription_cv_},
           cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
           cv_ref_pair{notify_connection_, connection_cv_}
         };
@@ -651,13 +652,15 @@ namespace skynet
     return id_;
   }
 
-  int Master::num_subscriptions(const internal::PublishTagBase& tag) const noexcept
+  int Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
   {
     std::lock_guard<std::mutex> lock{job_mut_};
+    const auto self_iter = self_sub_count_.find(tag.id());
+    const auto self_subs = self_iter == self_sub_count_.cend() ? 0 : self_iter->second;
     return std::accumulate(
       neighbors_.cbegin(),
       neighbors_.cend(),
-      0,
+      self_subs,
       [&](const int sum, const auto& neighbor_pair) noexcept {
         return sum + neighbor_pair.second.is_subscribed_to(tag.id());
       }
@@ -726,6 +729,8 @@ namespace skynet
     {
       if (it->second.is_dead())
       {
+        // This could affect subscriptions, so notify anything waiting on it
+        notify_subscriptions_ = true;
         SKYNET_TRACE_LOG("\"{}\" removing dead neighbor \"{}\"", id_, it->first);
         // TODO: Tell reduce groups when this happens
         send_to_neighbors(internal::make_remove_neighbor(it->first));
@@ -815,7 +820,7 @@ namespace skynet
   {
     for (const auto& tag : required_tags)
     {
-      if (produced_tags_.find(tag) != produced_tags_.cend()) { continue; }
+      if (self_sub_count_.find(tag) != self_sub_count_.cend()) { continue; }
       const auto iter = tag_to_machine_.find(tag);
       if (iter == tag_to_machine_.cend()) { return false; }
     }
@@ -836,7 +841,7 @@ namespace skynet
     }
     return make_waiter(
       job_mut_,
-      new_subscription_cv_,
+      subscription_cv_,
       internal::MasterSubscribeIsDone{*this, tag_ids}
     );
   }
@@ -951,7 +956,7 @@ namespace skynet
         [&](const TagID& id) {
           const auto loc = publishers_for_tag_.find(id);
           return loc == publishers_for_tag_.cend()
-            ? produced_tags_.find(id) != produced_tags_.cend()
+            ? self_sub_count_.find(id) != self_sub_count_.cend()
             : !loc->second.empty();
         }
       ),
@@ -1032,11 +1037,10 @@ namespace skynet
           addresses_to_send.emplace_back(addresses.cbegin(), addresses.cend());
         }
       }
-      const std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
       const auto to_send = internal::make_report_publishers(
         tags_to_send,
         addresses_to_send,
-        local_tags
+        local_tags()
       );
       // Send to the machines if they are present
       for (const auto& send_to : machines_to_send_to)
@@ -1049,7 +1053,7 @@ namespace skynet
             id_,
             send_to,
             tags_to_send,
-            local_tags
+            local_tags()
           );
           loc->second.send_message(to_send);
         }
@@ -1070,8 +1074,7 @@ namespace skynet
         addresses.emplace_back(publishers.cbegin(), publishers.cend());
       }
     }
-    const std::vector<TagID> local_tags(produced_tags_.cbegin(), produced_tags_.cend());
-    return internal::make_report_publishers(tags, addresses, local_tags);
+    return internal::make_report_publishers(tags, addresses, local_tags());
   }
 
   std::vector<std::string> Master::get_tags_for_publisher(const std::string_view publisher_address) const noexcept
@@ -1093,7 +1096,7 @@ namespace skynet
     // Mark the tags produced by this job
     for (const auto& tag : tags)
     {
-      const auto [iter, inserted] = produced_tags_.insert(tag);
+      const auto [iter, inserted] = self_sub_count_.emplace(tag, 0);
       (void)iter;
       if (!inserted)
       {
@@ -1103,7 +1106,7 @@ namespace skynet
       }
     }
     // Notify publish groups for self-subscribing
-    notify_new_subscriptions_ = true;
+    notify_subscriptions_ = true;
   }
 
   auto Master::create_reduce_group(
@@ -1114,7 +1117,7 @@ namespace skynet
     const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
     const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
     // Create an entry for the group
-    const auto [tag_iter, tag_inserted] = produced_tags_.insert(tag_produced);
+    const auto [tag_iter, tag_inserted] = self_sub_count_.emplace(tag_produced, 0);
     (void)tag_iter;
     if (!tag_inserted)
     {
@@ -1192,7 +1195,7 @@ namespace skynet
     const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
     if (!parent_tag.empty() && reduce_data.parent_machines.empty())
     {
-      if (produced_tags_.find(parent_tag) == produced_tags_.cend())
+      if (self_sub_count_.find(parent_tag) == self_sub_count_.cend())
       {
         SKYNET_TRACE_LOG(
           "\"{}\" - reduce group \"{}\" is not yet created as there is no parent connection",
@@ -1209,7 +1212,7 @@ namespace skynet
       const auto& neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group);
       if (!neighbors.tags[i + 1].empty() && reduce_data.child_machines[i].empty())
       {
-        if (produced_tags_.find(neighbors.tags[i + 1]) == produced_tags_.cend())
+        if (self_sub_count_.find(neighbors.tags[i + 1]) == self_sub_count_.cend())
         {
           SKYNET_TRACE_LOG(
             "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
@@ -1441,22 +1444,25 @@ namespace skynet
       const auto& tag = *tag_iter;
       const auto iter = publishers_for_tag_.find(tag);
       // Delete pending tags for self-published tags
-      if (produced_tags_.find(tag) != produced_tags_.cend())
+      if (const auto self_iter = self_sub_count_.find(tag); self_iter != self_sub_count_.cend())
       {
+        ++self_iter->second;
         SKYNET_TRACE_LOG("\"{}\" produces tag \"{}\", not creating connection", id_, tag);
         tag_iter = pending_tags_.erase(tag_iter);
+        // This counts as a subscription change, make sure to notify things
+        notify_subscriptions_ = true;
         continue;
       }
       if (iter == publishers_for_tag_.cend())
       {
-        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag \"{}\"", id_, tag);
+        SKYNET_TRACE_LOG("\"{}\" knows no publishers for tag \"{}\"", id_, tag);
         ++tag_iter;
         continue;
       }
       auto& publishers = iter->second;
       if (publishers.empty())
       {
-        SKYNET_TRACE_LOG("\"{}\" know no publishers for tag \"{}\"", id_, tag);
+        SKYNET_TRACE_LOG("\"{}\" knows no publishers for tag \"{}\"", id_, tag);
         ++tag_iter;
       }
       else
@@ -1806,7 +1812,7 @@ namespace skynet
     const auto& tags = msg.tags();
     for (const auto& tag : tags)
     {
-      if (produced_tags_.find(tag) == produced_tags_.cend())
+      if (self_sub_count_.find(tag) == self_sub_count_.cend())
       {
         return false;
       }
@@ -1871,7 +1877,7 @@ namespace skynet
     }
     const auto msg = internal::make_subscription_notice(tags_to_sub_to, false);
     source.send_message(msg);
-    notify_new_subscriptions_ = true;
+    notify_subscriptions_ = true;
   }
 
   void Master::find_publishers_for_pending_tags() noexcept
@@ -1897,5 +1903,17 @@ namespace skynet
         neighbor.second.find_publishers_for_tags(to_ask_for);
       }
     }
+  }
+
+  std::vector<TagID> Master::local_tags() const noexcept
+  {
+    std::vector<TagID> to_ret(self_sub_count_.size());
+    std::transform(
+      self_sub_count_.cbegin(),
+      self_sub_count_.cend(),
+      to_ret.begin(),
+      [](const auto& tag_pair) { return tag_pair.first; }
+    );
+    return to_ret;
   }
 } // namespace skynet

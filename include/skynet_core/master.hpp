@@ -357,6 +357,8 @@ namespace skynet
       {
         return m.handle_publish_data(msg, from);
       }
+
+      static void notify_subscriptions(Master& m) noexcept { m.notify_subscriptions_ = true; }
     }; // struct ExternalMasterAccessor
 
     struct ReduceGroupAccessor
@@ -451,8 +453,17 @@ namespace skynet
     auto connect_to_server(std::string_view address) noexcept
       -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
     int number_of_neighbors() const noexcept;
-    int number_of_subscribers() const noexcept;
-    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept;
+    int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+
+    template<typename IsReadyCallable>
+    Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
+    {
+      return make_waiter(
+        dummy_mutex_,
+        subscription_cv_,
+        std::forward<IsReadyCallable>(c)
+      );
+    }
 
     ///////////////////////////////////////
     // End Interface for MasterHandle
@@ -704,6 +715,10 @@ namespace skynet
      */
     void find_publishers_for_pending_tags() noexcept;
 
+    /** \brief Returns all locally produced tags as a vector
+     */
+    std::vector<TagID> local_tags() const noexcept;
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
@@ -743,6 +758,9 @@ namespace skynet
     // Only allow one job access to the master at a time
     mutable std::mutex job_mut_;
 
+    // Dummy mutex - only used for custom waiters created by users
+    mutable std::mutex dummy_mutex_;
+
     // List of machines that are waiting for information for producers of a certain tag
     // Uses MachineID's instead of pointers in case the remote machine disconnects and
     // the ExternalMaster is deleted between the time a request is started and a response
@@ -751,8 +769,8 @@ namespace skynet
     // Also potentially combine with tag_to_machine_ since they are tags into the same thing
     std::unordered_map<TagID, std::unordered_set<MachineID>> send_publisher_information_to_;
 
-    // The tags that this machine produces
-    std::unordered_set<TagID> produced_tags_;
+    // The tags that this machine produces and the self-subscription count
+    std::unordered_map<TagID, int> self_sub_count_;
 
     // The port used for communications
     std::uint16_t port_;
@@ -795,7 +813,7 @@ namespace skynet
     std::unordered_map<AddrPortPair, PendingInfo> pending_conns_;
 
     // Notification for when new subscriptions are created
-    std::condition_variable new_subscription_cv_;
+    std::condition_variable subscription_cv_;
 
     // Notification for when reduce group related connections are made
     std::condition_variable reduce_group_cv_;
@@ -805,7 +823,7 @@ namespace skynet
 
     // Booleans separate for if notifications should be raised so that
     // the CV's can use notifications while the mutex is released
-    bool notify_new_subscriptions_ = false;
+    bool notify_subscriptions_ = false;
     bool notify_reduce_group_ = false;
     bool notify_connection_ = false;
   }; // class Master
@@ -837,19 +855,24 @@ namespace skynet
      */
     int number_of_neighbors() const noexcept { return handle_->number_of_neighbors(); }
 
-    /** \brief Returns the number of subscribers
-     */
-    int number_of_subscribers() const noexcept { return handle_->number_of_subscribers(); }
-
     /** \brief Returns the id of the master
      */
     const std::string& id() const noexcept { return handle_->id(); }
 
-    /** \brief Returns the number of subscriptions a tag has
+    /** \brief Returns the number of subscribers that a tag has
      */
-    int num_subscriptions(const internal::PublishTagBase& tag) const noexcept
+    int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
     {
-      return handle_->num_subscriptions(tag);
+      return handle_->number_of_subscribers(tag);
+    }
+
+    /** \brief Creates a waiter that has a done condition that is run anytime
+     * anything with subscriptions happens
+     */
+    template<typename IsReadyCallable>
+    Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
+    {
+      return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c));
     }
 
   private:

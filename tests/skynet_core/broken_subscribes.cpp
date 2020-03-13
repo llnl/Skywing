@@ -31,7 +31,7 @@ void publish_once(int publish_number)
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */ }
     job.declare_publication_intent(value_tag);
-    while (master.num_subscriptions(value_tag) == 0)
+    while (master.number_of_subscribers(value_tag) == 0)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }

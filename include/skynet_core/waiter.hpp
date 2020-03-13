@@ -116,17 +116,12 @@ namespace skynet
 
     decltype(auto) get() noexcept
     {
-      // Have the value be returned from a lambda so that no temporaries are made
-      // but the lock will be released before calling the continuations
-      const auto get_value = [&]() noexcept -> decltype(auto) {
-        std::unique_lock<std::mutex> lock{*mutex_};
-        if (!is_ready_no_lock())
-        {
-          cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
-        }
-        return GetValueCallable::operator()();
-      };
-      return get_value();
+      std::unique_lock<std::mutex> lock{*mutex_};
+      if (!is_ready_no_lock())
+      {
+        cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+      }
+      return GetValueCallable::operator()();
     }
 
     void wait() noexcept
