@@ -60,8 +60,11 @@ void machine_task(const NetworkInfo* const info, const int index)
       iter_method.submit_values(values_to_publish[i]);
       {
         const auto values = iter_method.values();
-        std::lock_guard g{catch_mutex};
-        REQUIRE(values == expected_results(i));
+        {
+          std::lock_guard g{catch_mutex};
+          REQUIRE(values == expected_results(i));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
       }
     }
   });
