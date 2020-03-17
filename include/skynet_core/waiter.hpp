@@ -68,17 +68,17 @@ namespace skynet
     {
       const auto next_call = [&]() noexcept -> decltype(auto) {
         // Can't pass void so have to make a wrapper
-        if constexpr (std::is_same_v<decltype(build_up()), void>)
+        if constexpr (std::is_invocable_v<Next, decltype(build_up())>)
         {
           return [&]() noexcept -> decltype(auto) {
-            build_up();
-            return next();
+            return next(build_up());
           };
         }
         else
         {
           return [&]() noexcept -> decltype(auto) {
-            return next(build_up());
+            build_up();
+            return next();
           };
         }
       };
@@ -214,12 +214,17 @@ namespace skynet
   class AllWaiter
   {
   public:
+    using ValueType = std::conditional_t<
+      (... && std::is_same_v<void, typename Waiters::ValueType>),
+      void,
+      std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    >;
+
     explicit AllWaiter(Waiters&... waiters) noexcept
       : to_wait_on_{waiters...}
     {}
 
-    auto get() noexcept
-      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    ValueType get() noexcept
     {
       return for_each_waiter(
         [](auto& waiter) noexcept -> typename decltype(waiter)::ValueType {
@@ -238,7 +243,7 @@ namespace skynet
     {
       bool value_available = true;
       for_each_waiter([&](auto& waiter) noexcept {
-        value_available = value_available && waiter.wait_unti(end_time);
+        value_available = value_available && waiter.wait_until(end_time);
       });
       return value_available;
     }
@@ -261,15 +266,13 @@ namespace skynet
 
   private:
     template<typename Callable, std::size_t... Is>
-    auto for_each_waiter_impl(Callable&& c, std::index_sequence<Is...>) noexcept
-      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    ValueType for_each_waiter_impl(Callable&& c, std::index_sequence<Is...>) noexcept
     {
       return {c(std::get<Is>(to_wait_on_))...};
     }
 
     template<typename Callable>
-    auto for_each_waiter(Callable&& c) noexcept
-      -> std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>
+    ValueType for_each_waiter(Callable&& c) noexcept
     {
       return for_each_waiter_impl(std::forward<Callable>(c), std::index_sequence_for<Waiters...>{});
     }
@@ -279,12 +282,83 @@ namespace skynet
 
   /** \brief Returns an AllWaiter that can be used to wait for when multiple
    * waiters complete and return a tuple of the values, with void values represented
-   * as VoidWrapper instead
+   * as VoidWrapper instead.
    */
   template<typename... Waiters>
   AllWaiter<Waiters...> when_all(Waiters&... waiters) noexcept
   {
     return AllWaiter{waiters...};
+  }
+
+  /** \brief Class that can be used to wait on many waiters of the same type.
+   *
+   * Generally not created directly, but through when_all_same instead.
+   */
+  template<typename Waiter>
+  class AllWaiterSame
+  {
+  public:
+    using ValueType = std::vector<typename Waiter::ValueType>;
+
+    explicit AllWaiterSame(std::vector<Waiter> waiters) noexcept
+      : waiters_{std::move(waiters)}
+    {}
+
+    ValueType get() noexcept
+    {
+      ValueType to_ret;
+      to_ret.reserve(waiters_.size());
+      for (auto& waiter : waiters_)
+      {
+        to_ret.push_back(waiter.get());
+      }
+      return to_ret;
+    }
+
+    void wait() noexcept
+    {
+      for (auto& waiter : waiters_)
+      {
+        waiter.wait();
+      }
+    }
+
+    template<class Rep, class Period>
+    bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
+    {
+      for (auto& waiter : waiters_)
+      {
+        if (!waiter.wait_until(end_time)) { return false; }
+      }
+      return true;
+    }
+
+    template<class Rep, class Period>
+    bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
+    {
+      const auto end_time = std::chrono::steady_clock::now() + wait_time;
+      return wait_until(end_time);
+    }
+
+    template<typename... Continuations>
+    Continuation<AllWaiterSame, Continuations...> then(Continuations... continuations) && noexcept
+    {
+      return Continuation<AllWaiterSame, Continuations...>{
+        *this,
+        std::move(continuations)...
+      };
+    }
+
+  private:
+    std::vector<Waiter> waiters_;
+  };
+
+  /** \brief Returns an AllWaiterSame
+   */
+  template<typename Waiter>
+  AllWaiterSame<Waiter> when_all_same(std::vector<Waiter> waiters) noexcept
+  {
+    return AllWaiterSame{std::move(waiters)};
   }
 } // namespace skynet
 

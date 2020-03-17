@@ -59,12 +59,12 @@ void machine_task(const NetworkInfo* const info, const int index)
     {
       iter_method.submit_values(values_to_publish[i]);
       {
-        const auto values = iter_method.values();
+        const auto values = iter_method.values().get();
         {
           std::lock_guard g{catch_mutex};
           REQUIRE(values == expected_results(i));
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        std::this_thread::sleep_for(std::chrono::milliseconds{100});
       }
     }
   });

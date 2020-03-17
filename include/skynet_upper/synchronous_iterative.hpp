@@ -15,45 +15,59 @@ namespace skynet
   template<typename... TagValueTypes>
   class PendingSynchronousIterative;
 
-  /** \brief Method for recieving information from a specified set of tags
-   *
-   * TODO: Put this in a create function / future interface thing instead
-   * of having creation of them block
+  /** \brief Method for receiving information from a specified set of tags
+   * in a synchronous fashion
    */
   template<typename... TagValueTypes>
   class SynchronousIterative
   {
   public:
     using ValueType = ValueOrTuple<TagValueTypes...>;
-    /** \brief Retrieves the values from the other tags, blocking until it
-     * is available.
+
+    /** \brief Retrieves the values from the other tags, not being ready
+     * until all tags have received values or a tag has errored.
      *
-     * If a subscription for a tag become unavailable, this function will
+     * If a subscription for a tag become unavailable, the waiter will
      * return an empty vector.
      */
-    std::vector<ValueType> values() noexcept
+    auto values() noexcept
     {
-      std::vector<ValueType> to_ret;
-      to_ret.reserve(tags_.size());
-      for (int i = 0; i < static_cast<int>(tags_.size()); ++i)
+      using WaiterType = decltype(job_->get_waiter(tags_.front()));
+      std::vector<WaiterType> waiters;
+      waiters.reserve(tags_.size());
+      for (const auto& tag : tags_)
       {
-        if (const auto value = job_->get_waiter(tags_[i]).get())
-        {
-          to_ret.push_back(*value);
-        }
-        else
-        {
-          return {};
-        }
+        waiters.push_back(job_->get_waiter(tag));
       }
-      return to_ret;
+      return when_all_same(waiters)
+        .then([](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
+          std::vector<ValueType> values;
+          values.reserve(opt_values.size());
+          for (const auto& val : opt_values)
+          {
+            if (val)
+            {
+              values.push_back(*val);
+            }
+            else
+            {
+              return {};
+            }
+          }
+          return values;
+        });
     }
 
     /** \brief Submit a value to neighbors
      */
-    void submit_values(const ValueType& value) noexcept
+    template<typename... ArgTypes>
+    void submit_values(ArgTypes&&... values) noexcept
     {
-      job_->publish(produced_tag_, value);
+      job_->publish(produced_tag_, std::forward<ArgTypes>(values)...);
+    }
+    void submit_values(const std::tuple<TagValueTypes...>& values) noexcept
+    {
+      job_->publish(produced_tag_, values);
     }
 
   private:

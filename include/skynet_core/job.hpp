@@ -349,6 +349,20 @@ namespace skynet
       return tag_has_active_publisher_impl(tag.id());
     }
 
+    /** \brief Rebuilds connections for the specified tags
+     */
+    template<typename Range>
+    auto rebuild_tags(const Range& tags)
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+    {
+      std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
+      init_or_update_subscribe(
+        gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())},
+        gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs}
+      );
+      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
+    }
+
     /** \brief Rebuilds connections for any missing tags
      *
      * \return A future for when the tags are re-connected
@@ -371,12 +385,7 @@ namespace skynet
         }
         return tags;
       }();
-      std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
-      init_or_update_subscribe(
-        gsl::span<const internal::PublishTagBase>{tags},
-        gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs}
-      );
-      return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
+      return rebuild_tags(tags);
     }
 
     /** \brief Check if a tag's subscription is valid or not

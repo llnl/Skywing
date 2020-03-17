@@ -75,7 +75,7 @@ TEST_CASE("Reduce works", "[Skynet_SimpleReduce]")
     {
       std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
-    // Have to have be the 0-th machine because it will form any connections
+    // Have to be the 0-th machine because it will form any connections
     // needed as lower numbered machines connect to higher numbered ones
     const auto index = 0;
     Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
