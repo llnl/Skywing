@@ -135,7 +135,7 @@ namespace skynet
      */
     void drop_dead_tags()
     {
-      // TODO: Actually unsubscribe when that's a think that can happen
+      // TODO: Actually unsubscribe when that's a thing that can happen
       dead_tags_.clear();
     }
 
