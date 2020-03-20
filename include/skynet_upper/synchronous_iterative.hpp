@@ -25,7 +25,7 @@ namespace skynet
     using ValueType = ValueOrTuple<TagValueTypes...>;
 
     /** \brief Retrieves the values from the other tags, not being ready
-     * until all tags have received values or a tag has errored.
+     * until all tags have either received values or errored.
      *
      * If a subscription for a tag become unavailable, the waiter will
      * return an empty vector.
@@ -40,21 +40,67 @@ namespace skynet
         waiters.push_back(job_->get_waiter(tag));
       }
       return when_all_same(waiters)
-        .then([](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
+        .then([&](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
+          bool errored = false;
           std::vector<ValueType> values;
           values.reserve(opt_values.size());
+          auto tag_iter = tags_.begin();
+          for (const auto& val : opt_values)
+          {
+            if (val)
+            {
+              if (!errored)
+              {
+                values.push_back(*val);
+              }
+              ++tag_iter;
+            }
+            else
+            {
+              errored = true;
+              dead_tags_.push_back(std::move(*tag_iter));
+              tag_iter = tags_.erase(tag_iter);
+            }
+          }
+          return errored ? std::vector<ValueType>{} : values;
+        });
+    }
+
+    /** \brief Retrieves the values from other tags, not being ready
+     * until all tags have either received values or errored.
+     *
+     * The waiter return type is
+     * std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>&>
+     * The vector of tags indicate which tag each value is from.
+     */
+    auto values_ignore_errors() noexcept
+    {
+      using RetType = std::pair<
+        std::vector<ValueType>,
+        const std::vector<PublishTag<TagValueTypes...>>&
+      >;
+      using WaiterType = decltype(job_->get_waiter(tags_.front()));
+      std::vector<WaiterType> waiters;
+      waiters.reserve(tags_.size());
+      return when_all_same(waiters)
+        .then([this](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> RetType {
+          std::vector<ValueType> values;
+          values.reserve(opt_values.size());
+          auto tag_iter = tags_.begin();
           for (const auto& val : opt_values)
           {
             if (val)
             {
               values.push_back(*val);
+              ++tag_iter;
             }
             else
             {
-              return {};
+              dead_tags_.push_back(std::move(*tag_iter));
+              tag_iter = tags_.erase(tag_iter);
             }
           }
-          return values;
+          return {values, tags_};
         });
     }
 
@@ -68,6 +114,29 @@ namespace skynet
     void submit_values(const std::tuple<TagValueTypes...>& values) noexcept
     {
       job_->publish(produced_tag_, values);
+    }
+
+    /** \brief Rebuilds connections for dead tags
+     */
+    auto rebuild_dead_tags()
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+    {
+      auto to_ret = job_->rebuild_tags(dead_tags_);
+      std::move(
+        dead_tags_.begin(),
+        dead_tags_.end(),
+        std::back_inserter(tags_)
+      );
+      dead_tags_.clear();
+      return to_ret;
+    }
+
+    /** \brief Drops tracking for dead tags
+     */
+    void drop_dead_tags()
+    {
+      // TODO: Actually unsubscribe when that's a think that can happen
+      dead_tags_.clear();
     }
 
   private:
@@ -86,6 +155,7 @@ namespace skynet
     Job* job_;
     PublishTag<TagValueTypes...> produced_tag_;
     std::vector<PublishTag<TagValueTypes...>> tags_;
+    std::vector<PublishTag<TagValueTypes...>> dead_tags_;
   }; // class SynchronousIterative
 
   /** \brief Return type for creating synchronous iterative classes
