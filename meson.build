@@ -30,7 +30,7 @@ gsl_dep = declare_dependency(
   include_directories : include_directories('subprojects/gsl/include')
 )
 
-capnproto_dep = dependency('capnp')
+capnproto_dep = dependency('capnp', version : '>=0.7.0')
 
 subdir('generated_files/generated')
 
