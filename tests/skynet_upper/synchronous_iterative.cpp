@@ -57,9 +57,8 @@ void machine_task(const NetworkInfo* const info, const int index)
     auto iter_method = *opt_iter_method;
     for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i)
     {
-      iter_method.submit_values(values_to_publish[i]);
       {
-        const auto values = iter_method.values().get();
+        const auto values = iter_method.values(values_to_publish[i]).get();
         {
           std::lock_guard g{catch_mutex};
           REQUIRE(values == expected_results(i));

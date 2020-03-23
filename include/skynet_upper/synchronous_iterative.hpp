@@ -30,8 +30,10 @@ namespace skynet
      * If a subscription for a tag become unavailable, the waiter will
      * return an empty vector.
      */
-    auto values() noexcept
+    template<typename... ArgTypes>
+    auto values(ArgTypes&&... values) noexcept
     {
+      job_->publish(produced_tag_, std::forward<ArgTypes>(values)...);
       using WaiterType = decltype(job_->get_waiter(tags_.front()));
       std::vector<WaiterType> waiters;
       waiters.reserve(tags_.size());
@@ -73,8 +75,10 @@ namespace skynet
      * std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>&>
      * The vector of tags indicate which tag each value is from.
      */
-    auto values_ignore_errors() noexcept
+    template<typename... ArgTypes>
+    auto values_ignore_errors(ArgTypes&&... values) noexcept
     {
+      job_->publish(produced_tag_, std::forward<ArgTypes>(values)...);
       using RetType = std::pair<
         std::vector<ValueType>,
         const std::vector<PublishTag<TagValueTypes...>>&
@@ -102,18 +106,6 @@ namespace skynet
           }
           return {values, tags_};
         });
-    }
-
-    /** \brief Submit a value to neighbors
-     */
-    template<typename... ArgTypes>
-    void submit_values(ArgTypes&&... values) noexcept
-    {
-      job_->publish(produced_tag_, std::forward<ArgTypes>(values)...);
-    }
-    void submit_values(const std::tuple<TagValueTypes...>& values) noexcept
-    {
-      job_->publish(produced_tag_, values);
     }
 
     /** \brief Rebuilds connections for dead tags
