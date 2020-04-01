@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_upper/synchronous_iterative.hpp"
+#include "skynet_upper/asynchronous_iterative.hpp"
 #include "skynet_core/enable_logging.hpp"
 
 #include "utils.hpp"
@@ -43,7 +43,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
-    auto opt_iter_method = create_synchronous_iterative(
+    auto opt_iter_method = create_asynchronous_iterative(
       master,
       job_handle,
       tags[index],
@@ -57,12 +57,30 @@ void machine_task(const NetworkInfo* const info, const int index)
     auto iter_method = *opt_iter_method;
     for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i)
     {
-      const auto values = iter_method.values(values_to_publish[i]).get();
+      const auto expected_values = expected_results(i);
+      iter_method.submit_values(values_to_publish[i]);
+      int values_received = 0;
+      while (values_received != static_cast<int>(expected_values.size()))
       {
-        std::lock_guard g{catch_mutex};
-        REQUIRE(values == expected_results(i));
+        const auto& [values, alive_tags] = iter_method.values();
+        if (alive_tags.size() != expected_values.size())
+        {
+          std::cerr << "Unexpected connection drop!\n";
+          std::exit(1);
+        }
+        for (int received_index = 0; received_index < static_cast<int>(values.size()); ++received_index)
+        {
+          const auto& [received_value, updated] = values[received_index];
+          if (updated)
+          {
+            std::lock_guard g{catch_mutex};
+            ++values_received;
+            REQUIRE(received_value == expected_values[received_index]);
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{100});
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds{100});
+      SKYNET_SYNCHRONIZE_MACHINES(num_machines);
     }
   });
   base_master.run();
