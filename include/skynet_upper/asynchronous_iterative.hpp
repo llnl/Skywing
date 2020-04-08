@@ -305,6 +305,29 @@ namespace skynet
       job_->publish(produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
     }
 
+    /** \brief Rebuilds connections for dead tags
+     */
+    auto rebuild_dead_tags()
+      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+    {
+      auto to_ret = job_->rebuild_tags(dead_tags_);
+      std::move(
+        dead_tags_.begin(),
+        dead_tags_.end(),
+        std::back_inserter(tags_)
+      );
+      dead_tags_.clear();
+      return to_ret;
+    }
+
+    /** \brief Drops tracking for dead tags
+     */
+    void drop_dead_tags()
+    {
+      // TODO: Actually unsubscribe when that's a thing that can happen
+      dead_tags_.clear();
+    }
+
   private:
     friend class PendingIterativeMethod<AsynchronousIterative>;
 
@@ -317,7 +340,20 @@ namespace skynet
       , values_{tags.size()}
       , produced_tag_{produced_tag}
       , tags_{tags}
-    {}
+    {
+      for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();)
+      {
+        if (!job_->tag_has_active_publisher(*tag_iter))
+        {
+          dead_tags_.push_back(std::move(*tag_iter));
+          tag_iter = tags_.erase(tag_iter);
+        }
+        else
+        {
+          ++tag_iter;
+        }
+      }
+    }
 
     Job* job_;
     AsynchronousValues<ValueType> values_;
@@ -347,7 +383,7 @@ namespace skynet
     MasterHandle handle,
     Job& job,
     const PublishTag<TagValueTypes...>& produced_tag,
-    TagTypes... tags
+    const TagTypes&... tags
   ) noexcept
   {
     const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
@@ -356,6 +392,47 @@ namespace skynet
       job,
       produced_tag,
       gsl::make_span(tags_array.cbegin(), tags_array.cend())
+    );
+  }
+
+  template<typename... TagValueTypes, typename Range, typename Rep, typename Period>
+  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
+    const std::chrono::time_point<Rep, Period>& end_time,
+    IterativeInitErrorPolicy policy,
+    MasterHandle handle,
+    Job& job,
+    const PublishTag<TagValueTypes...>& produced_tag,
+    const Range& tags
+  ) noexcept
+  {
+    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
+      handle,
+      job,
+      produced_tag,
+      gsl::make_span(tags.cbegin(), tags.cend()),
+      end_time,
+      policy
+    );
+  }
+
+  template<typename... TagValueTypes, typename... TagTypes, typename Rep, typename Period>
+  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
+    const std::chrono::time_point<Rep, Period>& end_time,
+    IterativeInitErrorPolicy policy,
+    MasterHandle handle,
+    Job& job,
+    const PublishTag<TagValueTypes...>& produced_tag,
+    TagTypes&&... tags
+  ) noexcept
+  {
+    const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
+    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
+      handle,
+      job,
+      produced_tag,
+      gsl::make_span(tags_array.cbegin(), tags_array.cend()),
+      end_time,
+      policy
     );
   }
 } // namespace skynet

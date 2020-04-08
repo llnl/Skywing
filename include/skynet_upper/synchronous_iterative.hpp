@@ -136,7 +136,20 @@ namespace skynet
       : job_{&job}
       , produced_tag_{produced_tag}
       , tags_{tags}
-    {}
+    {
+      for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();)
+      {
+        if (!job_->tag_has_active_publisher(*tag_iter))
+        {
+          dead_tags_.push_back(std::move(*tag_iter));
+          tag_iter = tags_.erase(tag_iter);
+        }
+        else
+        {
+          ++tag_iter;
+        }
+      }
+    }
 
     Job* job_;
     PublishTag<TagValueTypes...> produced_tag_;
@@ -165,7 +178,7 @@ namespace skynet
     MasterHandle handle,
     Job& job,
     const PublishTag<TagValueTypes...>& produced_tag,
-    TagTypes... tags
+    const TagTypes&... tags
   ) noexcept
   {
     const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
