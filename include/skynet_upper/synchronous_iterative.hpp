@@ -3,6 +3,7 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
+#include "skynet_upper/internal/iterative_base.hpp"
 #include "skynet_upper/pending_iterative.hpp"
 
 #include <utility>
@@ -13,7 +14,7 @@ namespace skynet
    * in a synchronous fashion
    */
   template<typename... TagValueTypes>
-  class SynchronousIterative
+  class SynchronousIterative : public internal::IterativeBase<TagValueTypes...>
   {
   public:
     using ValueType = ValueOrTuple<TagValueTypes...>;
@@ -27,20 +28,20 @@ namespace skynet
     template<typename... ArgTypes>
     auto values(ArgTypes&&... submit_values) noexcept
     {
-      job_->publish(produced_tag_, std::forward<ArgTypes>(submit_values)...);
-      using WaiterType = decltype(job_->get_waiter(tags_.front()));
+      this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
+      using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
       std::vector<WaiterType> waiters;
-      waiters.reserve(tags_.size());
-      for (const auto& tag : tags_)
+      waiters.reserve(this->tags_.size());
+      for (const auto& tag : this->tags_)
       {
-        waiters.push_back(job_->get_waiter(tag));
+        waiters.push_back(this->job_->get_waiter(tag));
       }
       return when_all_same(waiters)
         .then([&](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
           bool errored = false;
           std::vector<ValueType> ret_values;
           ret_values.reserve(opt_values.size());
-          auto tag_iter = tags_.begin();
+          auto tag_iter = this->tags_.begin();
           for (const auto& val : opt_values)
           {
             if (val)
@@ -54,8 +55,8 @@ namespace skynet
             else
             {
               errored = true;
-              dead_tags_.push_back(std::move(*tag_iter));
-              tag_iter = tags_.erase(tag_iter);
+              this->dead_tags_.push_back(std::move(*tag_iter));
+              tag_iter = this->tags_.erase(tag_iter);
             }
           }
           return errored ? std::vector<ValueType>{} : ret_values;
@@ -72,19 +73,19 @@ namespace skynet
     template<typename... ArgTypes>
     auto values_ignore_errors(ArgTypes&&... submit_values) noexcept
     {
-      job_->publish(produced_tag_, std::forward<ArgTypes>(submit_values)...);
+      this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
       using RetType = std::pair<
         std::vector<ValueType>,
         const std::vector<PublishTag<TagValueTypes...>>&
       >;
-      using WaiterType = decltype(job_->get_waiter(tags_.front()));
+      using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
       std::vector<WaiterType> waiters;
-      waiters.reserve(tags_.size());
+      waiters.reserve(this->tags_.size());
       return when_all_same(waiters)
         .then([this](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> RetType {
           std::vector<ValueType> ret_values;
           ret_values.reserve(opt_values.size());
-          auto tag_iter = tags_.begin();
+          auto tag_iter = this->tags_.begin();
           for (const auto& val : opt_values)
           {
             if (val)
@@ -94,35 +95,12 @@ namespace skynet
             }
             else
             {
-              dead_tags_.push_back(std::move(*tag_iter));
-              tag_iter = tags_.erase(tag_iter);
+              this->dead_tags_.push_back(std::move(*tag_iter));
+              tag_iter = this->tags_.erase(tag_iter);
             }
           }
-          return {ret_values, tags_};
+          return {ret_values, this->tags_};
         });
-    }
-
-    /** \brief Rebuilds connections for dead tags
-     */
-    auto rebuild_dead_tags()
-      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
-    {
-      auto to_ret = job_->rebuild_tags(dead_tags_);
-      std::move(
-        dead_tags_.begin(),
-        dead_tags_.end(),
-        std::back_inserter(tags_)
-      );
-      dead_tags_.clear();
-      return to_ret;
-    }
-
-    /** \brief Drops tracking for dead tags
-     */
-    void drop_dead_tags()
-    {
-      // TODO: Actually unsubscribe when that's a thing that can happen
-      dead_tags_.clear();
     }
 
   private:
@@ -133,61 +111,14 @@ namespace skynet
       const PublishTag<TagValueTypes...>& produced_tag,
       const std::vector<PublishTag<TagValueTypes...>>& tags
     ) noexcept
-      : job_{&job}
-      , produced_tag_{produced_tag}
-      , tags_{tags}
-    {
-      for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();)
-      {
-        if (!job_->tag_has_active_publisher(*tag_iter))
-        {
-          dead_tags_.push_back(std::move(*tag_iter));
-          tag_iter = tags_.erase(tag_iter);
-        }
-        else
-        {
-          ++tag_iter;
-        }
-      }
-    }
-
-    Job* job_;
-    PublishTag<TagValueTypes...> produced_tag_;
-    std::vector<PublishTag<TagValueTypes...>> tags_;
-    std::vector<PublishTag<TagValueTypes...>> dead_tags_;
+      : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags}
+    {}
   }; // class SynchronousIterative
 
-  template<typename... TagValueTypes, typename Range>
-  PendingIterativeMethod<SynchronousIterative<TagValueTypes...>> create_synchronous_iterative(
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const Range& tags
-  ) noexcept
+  template<typename... Args>
+  auto create_synchronous_iterative(Args&&... args) noexcept
   {
-    return PendingIterativeMethod<SynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend())
-    );
-  }
-
-  template<typename... TagValueTypes, typename... TagTypes>
-  PendingIterativeMethod<SynchronousIterative<TagValueTypes...>> create_synchronous_iterative(
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const TagTypes&... tags
-  ) noexcept
-  {
-    const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-    return PendingIterativeMethod<SynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags_array.cbegin(), tags_array.cend())
-    );
+    return internal::create_iterative<SynchronousIterative>(std::forward<Args>(args)...);
   }
 } // namespace skynet
 

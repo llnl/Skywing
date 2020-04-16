@@ -3,6 +3,7 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
+#include "skynet_upper/internal/iterative_base.hpp"
 #include "skynet_upper/pending_iterative.hpp"
 
 #include <cstdlib>
@@ -241,7 +242,7 @@ namespace skynet
    * in an asynchronous fashion
    */
   template<typename... TagValueTypes>
-  class AsynchronousIterative
+  class AsynchronousIterative : public internal::IterativeBase<TagValueTypes...>
   {
   public:
     using ValueType = ValueOrTuple<TagValueTypes...>;
@@ -254,24 +255,24 @@ namespace skynet
     {
       auto updated_iter = values_.updated_.begin();
       auto value_iter = values_.values_.begin();
-      auto tag_iter = tags_.begin();
+      auto tag_iter = this->tags_.begin();
       const auto mark_current_as_dead = [&]() {
-        dead_tags_.push_back(std::move(*tag_iter));
+        this->dead_tags_.push_back(std::move(*tag_iter));
         value_iter = values_.values_.erase(value_iter);
         updated_iter = values_.updated_.erase(updated_iter);
-        tag_iter = tags_.erase(tag_iter);
+        tag_iter = this->tags_.erase(tag_iter);
       };
-      while (tag_iter != tags_.cend())
+      while (tag_iter != this->tags_.cend())
       {
         const auto& tag = *tag_iter;
-        if (!job_->tag_has_active_publisher(tag))
+        if (!this->job_->tag_has_active_publisher(tag))
         {
           mark_current_as_dead();
           continue;
         }
-        else if (job_->has_data(tag))
+        else if (this->job_->has_data(tag))
         {
-          const auto value_opt = job_->get_waiter(tag).get();
+          const auto value_opt = this->job_->get_waiter(tag).get();
           assert(value_opt);
           *updated_iter = true;
           *value_iter = *value_opt;
@@ -284,7 +285,7 @@ namespace skynet
         ++value_iter;
         ++tag_iter;
       }
-      return {values_, tags_};
+      return {values_, this->tags_};
     }
 
     /** \brief Returns values from all tags while submitting a value
@@ -302,30 +303,7 @@ namespace skynet
     template<typename... ArgTypes>
     auto submit_values(ArgTypes&&... values_to_submit) noexcept
     {
-      job_->publish(produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
-    }
-
-    /** \brief Rebuilds connections for dead tags
-     */
-    auto rebuild_dead_tags()
-      -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
-    {
-      auto to_ret = job_->rebuild_tags(dead_tags_);
-      std::move(
-        dead_tags_.begin(),
-        dead_tags_.end(),
-        std::back_inserter(tags_)
-      );
-      dead_tags_.clear();
-      return to_ret;
-    }
-
-    /** \brief Drops tracking for dead tags
-     */
-    void drop_dead_tags()
-    {
-      // TODO: Actually unsubscribe when that's a thing that can happen
-      dead_tags_.clear();
+      this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
     }
 
   private:
@@ -336,104 +314,17 @@ namespace skynet
       const PublishTag<TagValueTypes...>& produced_tag,
       const std::vector<PublishTag<TagValueTypes...>>& tags
     ) noexcept
-      : job_{&job}
+      : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags}
       , values_{tags.size()}
-      , produced_tag_{produced_tag}
-      , tags_{tags}
-    {
-      for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();)
-      {
-        if (!job_->tag_has_active_publisher(*tag_iter))
-        {
-          dead_tags_.push_back(std::move(*tag_iter));
-          tag_iter = tags_.erase(tag_iter);
-        }
-        else
-        {
-          ++tag_iter;
-        }
-      }
-    }
+    {}
 
-    Job* job_;
     AsynchronousValues<ValueType> values_;
-    PublishTag<TagValueTypes...> produced_tag_;
-    std::vector<PublishTag<TagValueTypes...>> tags_;
-    std::vector<PublishTag<TagValueTypes...>> dead_tags_;
   }; // class AsynchronousIterative
 
-  template<typename... TagValueTypes, typename Range>
-  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const Range& tags
-  ) noexcept
+  template<typename... Args>
+  auto create_asynchronous_iterative(Args&&... args) noexcept
   {
-    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend())
-    );
-  }
-
-  template<typename... TagValueTypes, typename... TagTypes>
-  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const TagTypes&... tags
-  ) noexcept
-  {
-    const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags_array.cbegin(), tags_array.cend())
-    );
-  }
-
-  template<typename... TagValueTypes, typename Range, typename Rep, typename Period>
-  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
-    const std::chrono::time_point<Rep, Period>& end_time,
-    IterativeInitErrorPolicy policy,
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const Range& tags
-  ) noexcept
-  {
-    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend()),
-      end_time,
-      policy
-    );
-  }
-
-  template<typename... TagValueTypes, typename... TagTypes, typename Rep, typename Period>
-  PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>> create_asynchronous_iterative(
-    const std::chrono::time_point<Rep, Period>& end_time,
-    IterativeInitErrorPolicy policy,
-    MasterHandle handle,
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    TagTypes&&... tags
-  ) noexcept
-  {
-    const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-    return PendingIterativeMethod<AsynchronousIterative<TagValueTypes...>>::create(
-      handle,
-      job,
-      produced_tag,
-      gsl::make_span(tags_array.cbegin(), tags_array.cend()),
-      end_time,
-      policy
-    );
+    return internal::create_iterative<AsynchronousIterative>(std::forward<Args>(args)...);
   }
 } // namespace skynet
 
