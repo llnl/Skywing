@@ -89,6 +89,15 @@ namespace skynet::internal
     const TagID& id() const noexcept { return id_; }
     const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
 
+    friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
+    {
+      return lhs.id_ == rhs.id_ && lhs.expected_types_ == rhs.expected_types_;
+    }
+    friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept
+    {
+      return !(lhs == rhs);
+    }
+
   private:
     TagID id_;
     gsl::span<const std::uint8_t> expected_types_;

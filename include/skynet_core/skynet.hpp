@@ -3,9 +3,9 @@
 
 // Just include all of the common files here
 #include "enable_logging.hpp"
-#include "waiter.hpp"
 #include "job.hpp"
 #include "master.hpp"
 #include "types.hpp"
+#include "waiter.hpp"
 
 #endif // SKYNET_SKYNET_HPP

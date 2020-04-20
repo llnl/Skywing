@@ -10,11 +10,11 @@
 A high-reliability, real-time, decentralized platform for collaborative autonomy.
 
 ## Development team
- * Adam Harter <harter8@llnl.gov>
  * Aly Fox <fox33@llnl.gov>
  * Corey McNeish <mcneish1@llnl.gov>
  * Colin Ponce <ponce11@llnl.gov>
  * Chris Vogl <vogl2@llnl.gov>
+ * Kendall Harter <harter8@llnl.gov>
 
 ## Dependencies Not Automatically Managed
  * compiler that supports c++17 library

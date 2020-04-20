@@ -28,13 +28,10 @@ constexpr std::array<std::array<int, 2>, 3> publish_values{
   std::array<int, 2>{2, 30}
 };
 
-constexpr std::tuple<int, int> expected_results(const int index, const int iter)
+std::vector<int> expected_results(const int iter)
 {
   assert(iter == 0 || iter == 1);
-  if      (index == 0) { return {publish_values[1][iter], publish_values[2][iter]}; }
-  else if (index == 1) { return {publish_values[0][iter], publish_values[2][iter]}; }
-  else if (index == 2) { return {publish_values[0][iter], publish_values[1][iter]}; }
-  else                 { assert(false); return {0, 0}; }
+  return {publish_values[0][iter], publish_values[1][iter], publish_values[2][iter]};
 }
 
 std::mutex catch_mutex;
@@ -46,33 +43,28 @@ void machine_task(const NetworkInfo* const info, const int index)
     connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
-    const auto& to_publish = publish_values[index];
-    SynchronousIterative iter_method = [&]() {
-      if (index == 0)
-      {
-        return SynchronousIterative{job_handle, tags[0], to_publish[0], tags[1], tags[2]};
-      }
-      else if (index == 1)
-      {
-        return SynchronousIterative{job_handle, tags[1], to_publish[0], tags[0], tags[2]};
-      }
-      else
-      {
-        return SynchronousIterative{job_handle, tags[2], to_publish[0], tags[0], tags[1]};
-      }
-    }();
-    // Test that the initial values are okay
+    auto opt_iter_method = create_synchronous_iterative(
+      master,
+      job_handle,
+      tags[index],
+      tags
+    ).get();
     {
-      std::lock_guard g{catch_mutex};
-      REQUIRE(iter_method.values() == expected_results(index, 0));
+      std::lock_guard<std::mutex> g{catch_mutex};
+      REQUIRE(opt_iter_method);
     }
-    // Wait to not overwrite other values
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    // Submit next values and then test second array
-    iter_method.submit_value(to_publish[1]);
+    const auto& values_to_publish = publish_values[index];
+    auto iter_method = *opt_iter_method;
+    for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i)
     {
-      std::lock_guard g{catch_mutex};
-      REQUIRE(iter_method.values() == expected_results(index, 1));
+      {
+        const auto values = iter_method.values(values_to_publish[i]).get();
+        {
+          std::lock_guard g{catch_mutex};
+          REQUIRE(values == expected_results(i));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+      }
     }
   });
   base_master.run();

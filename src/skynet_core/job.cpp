@@ -92,7 +92,7 @@ namespace skynet
     return true;
   }
 
-  bool Job::tag_has_subscription(const internal::PublishTagBase& tag) noexcept
+  bool Job::tag_has_subscription(const internal::PublishTagBase& tag) const noexcept
   {
     auto [buffers, lock] = bufs_.get();
     (void)lock;
@@ -100,9 +100,24 @@ namespace skynet
     return iter != buffers.cend() && iter->second.error_occurred == TagInfo::Error::no_error;
   }
 
-  int Job::num_subscriptions(const internal::PublishTagBase& tag) noexcept
+  bool Job::tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept
   {
-    return MasterHandle{*master_}.num_subscriptions(tag);
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    for (const auto& tag : tags)
+    {
+      const auto iter = buffers.find(tag.id());
+      if (iter == buffers.cend() || iter->second.error_occurred != TagInfo::Error::no_error)
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int Job::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+  {
+    return MasterHandle{*master_}.number_of_subscribers(tag);
   }
 
   void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
@@ -208,7 +223,7 @@ namespace skynet
   auto Job::get_subscribe_future(
     const gsl::span<const internal::PublishTagBase> tags
   ) noexcept
-    -> Waiter<internal::MasterSubscribeIsDone, internal::WaiterGetNoOp>
+    -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
   {
     std::vector<TagID> tag_ids(tags.size());
     std::transform(

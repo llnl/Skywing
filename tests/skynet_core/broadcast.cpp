@@ -88,7 +88,7 @@ void machine_task(const std::size_t index)
       }
       else
       {
-        while (master.num_subscriptions(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
+        while (master.number_of_subscribers(Uint64Tag{tag_names[index]}) != machine_counts.size() - 1)
         {
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
