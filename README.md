@@ -17,23 +17,23 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Kendall Harter <harter8@llnl.gov>
 
 ## Dependencies Not Automatically Managed
+ * compiler that supports c++17 library
+   * tested: GCC/g++ (8.3.0), LLVM/clang (6.0.0, 10.0.0, 11.0.0)
  * meson (https://mesonbuild.com/)
+   * requires Python >= 3.5.2
  * CMake (https://cmake.org/)
  * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
 
 ## Dependencies Managed as Git Submodules
  * Catch2
- * zmqcpp
+ * spdlog
  * Guidelines Support Library (GSL)
 
-## Dependencies for Simulation, Not Managed
- * ns3 (see subprojects/ns3/build_ns3)
-
-## Build Instructions
+## Build instructions
  * Build non-managed dependencies separately
  * Get dependencies
-   * `git submodule update --init --recursive`
+   * git submodule update --init
  * Create build files
    * `mkdir build`
    * `meson build`

@@ -834,7 +834,6 @@ namespace skynet
     std::copy(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_));
     for (auto& [name, neighbor] : neighbors_)
     {
-      (void)name;
       neighbor.reset_backoff_counter();
       neighbor.find_publishers_for_tags(tag_ids);
     }
