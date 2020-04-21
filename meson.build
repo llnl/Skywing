@@ -32,6 +32,11 @@ gsl_dep = declare_dependency(
 
 capnproto_dep = dependency('capnp', version : '>=0.7.0')
 
+use_helics = get_option('use_helics')
+if use_helics
+  helics_dep = dependency('helicsSharedLib')
+endif
+
 subdir('generated_files/generated')
 
 skynet_core_inc = include_directories('include', 'generated_files')
