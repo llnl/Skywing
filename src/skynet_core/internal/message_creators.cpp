@@ -9,6 +9,7 @@
 
 #include <capnp/serialize.h>
 
+#include <cassert>
 #include <cstring>
 #include <string>
 #include <type_traits>
@@ -129,9 +130,11 @@ namespace skynet::internal
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
     const std::vector<std::vector<std::string>>& addresses,
+    const std::vector<std::vector<MachineID>>& machines,
     const std::vector<TagID>& locally_produced_tags
   ) noexcept
   {
+    assert(tags.size() == addresses.size() && tags.size() == machines.size());
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initReportPublishers();
     auto msg_tags = message.initTags(tags.size());
@@ -146,6 +149,15 @@ namespace skynet::internal
       for (std::size_t j = 0; j < addresses[i].size(); ++j)
       {
         address_to_set.set(j, addresses[i][j]);
+      }
+    }
+    auto msg_machines = message.initMachines(machines.size());
+    for (std::size_t i = 0; i < tags.size(); ++i)
+    {
+      auto machines_to_set = msg_machines.init(i, machines[i].size());
+      for (std::size_t j = 0; j < machines[i].size(); ++j)
+      {
+        machines_to_set.set(j, machines[i][j]);
       }
     }
     auto msg_local_tags = message.initLocallyProducedTags(locally_produced_tags.size());

@@ -601,26 +601,10 @@ namespace skynet
         accept_pending_connections();
         handle_neighbor_messages();
         remove_dead_neighbors();
+        find_publishers_for_pending_tags();
         for (auto&& neighbor : neighbors_)
         {
           neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
-          if (!pending_tags_.empty() && neighbor.second.should_ask_for_tags())
-          {
-            std::vector<TagID> tags_to_ask_for;
-            // Only ask for tags without known producers
-            std::copy_if(
-              pending_tags_.cbegin(),
-              pending_tags_.cend(),
-              std::back_inserter(tags_to_ask_for),
-              [&](const TagID& tag) {
-                const auto iter = publishers_for_tag_.find(tag);
-                if (iter == publishers_for_tag_.cend()) { return true; }
-                return iter->second.empty();
-              }
-            );
-            neighbor.second.increase_backoff_counter();
-            neighbor.second.find_publishers_for_tags(tags_to_ask_for);
-          }
         }
         using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
         std::array<cv_ref_pair, 3> cv_array{
@@ -968,10 +952,25 @@ namespace skynet
     const internal::ExternalMaster& from
   ) noexcept
   {
+    const auto insert_publisher_infos = [](
+      decltype(publishers_for_tag_)::iterator iter,
+      const std::vector<std::string>& addresses,
+      const std::vector<MachineID>& machines
+    ) noexcept
+    {
+      assert(addresses.size() == machines.size());
+      const auto num_iters = addresses.size();
+      for (std::size_t i = 0; i < num_iters; ++i)
+      {
+        iter->second.emplace(internal::PublisherInfo{addresses[i], machines[i]});
+      }
+    };
     const auto tags = msg.tags();
     const auto publishers_list = msg.addresses();
-    if (tags.size() != publishers_list.size())
+    const auto machines_list = msg.machines();
+    if (tags.size() != publishers_list.size() || tags.size() != machines_list.size())
     {
+      // TODO: Propagate this information back and disconnect from the neighbor
       SKYNET_WARN_LOG("\"{}\" received tag/publisher list size mismatch from \"{}\"", id_, from.id());
       return;
     }
@@ -980,33 +979,38 @@ namespace skynet
     {
       const auto& tag = tags[i];
       const auto& publishers = publishers_list[i];
+      const auto& machines = machines_list[i];
       // Find or create the tag
-      const auto loc = publishers_for_tag_.find(tag);
-      if (loc == publishers_for_tag_.end())
-      {
-        publishers_for_tag_.try_emplace(tag, publishers.cbegin(), publishers.cend());
-      }
-      else
-      {
-        loc->second.insert(publishers.cbegin(), publishers.cend());
-      }
+      decltype(publishers_for_tag_)::iterator iter = [&]() noexcept {
+        const auto loc = publishers_for_tag_.find(tag);
+        if (loc == publishers_for_tag_.end())
+        {
+          const auto [iter, inserted] = publishers_for_tag_.try_emplace(tag);
+          (void)inserted;
+          return iter;
+        }
+        else
+        {
+          return loc;
+        }
+      }();
+      insert_publisher_infos(iter, publishers, machines);
     }
     // Add the tags that the external master produced
     const auto external_tags = msg.locally_produced_tags();
     for (const auto& tag : external_tags)
     {
-      const auto loc = publishers_for_tag_.find(tag);
-      if (loc == publishers_for_tag_.end())
-      {
-        publishers_for_tag_.emplace(
-          tag,
-          std::initializer_list<std::string>{from.address()}
-        );
-      }
-      else
-      {
-        loc->second.insert(from.address());
-      }
+      const decltype(publishers_for_tag_)::iterator iter = [&]() noexcept {
+        const auto loc = publishers_for_tag_.find(tag);
+        if (loc == publishers_for_tag_.end())
+        {
+          using SecondType = decltype(publishers_for_tag_)::value_type::second_type;
+          const auto [iter, inserted] = publishers_for_tag_.insert_or_assign(tag, SecondType{});
+          return iter;
+        }
+        return loc;
+      }();
+      iter->second.insert(internal::PublisherInfo{from.address(), from.id()});
     }
     // Propagate to any machines that need this information, marking them
     // as no longer needing propagation as well
@@ -1023,23 +1027,7 @@ namespace skynet
     }
     if (!machines_to_send_to.empty())
     {
-      // Produce vectors for the machines and tags
-      std::vector<TagID> tags_to_send;
-      std::vector<std::vector<std::string>> addresses_to_send;
-      for (const auto& [tag, addresses] : publishers_for_tag_)
-      {
-        // Don't send data for tags that don't have any known publishers
-        if (!addresses.empty())
-        {
-          tags_to_send.push_back(tag);
-          addresses_to_send.emplace_back(addresses.cbegin(), addresses.cend());
-        }
-      }
-      const auto to_send = internal::make_report_publishers(
-        tags_to_send,
-        addresses_to_send,
-        local_tags()
-      );
+      const auto to_send = make_known_tag_publisher_message();
       // Send to the machines if they are present
       for (const auto& send_to : machines_to_send_to)
       {
@@ -1047,10 +1035,9 @@ namespace skynet
         if (loc != neighbors_.end())
         {
           SKYNET_TRACE_LOG(
-            "\"{}\" propagating back to \"{}\" for remote tags {} and local tags {}",
+            "\"{}\" propagating back to \"{}\" with local tags {}",
             id_,
             send_to,
-            tags_to_send,
             local_tags()
           );
           loc->second.send_message(to_send);
@@ -1062,30 +1049,33 @@ namespace skynet
 
   std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
   {
-    std::vector<TagID> tags;
-    std::vector<std::vector<std::string>> addresses;
-    for (const auto& [tag, publishers] : publishers_for_tag_)
+    // Produce vectors for the machines and tags
+    std::vector<TagID> tags_to_send;
+    std::vector<std::vector<std::string>> addresses_to_send;
+    std::vector<std::vector<MachineID>> machines_to_send;
+    for (const auto& [tag, infos] : publishers_for_tag_)
     {
-      if (!publishers.empty())
+      // Don't send data for tags that don't have any known publishers
+      if (!infos.empty())
       {
-        tags.push_back(tag);
-        addresses.emplace_back(publishers.cbegin(), publishers.cend());
+        auto& new_addrs = addresses_to_send.emplace_back();
+        auto& new_machines = machines_to_send.emplace_back();
+        new_addrs.reserve(infos.size());
+        new_machines.reserve(infos.size());
+        for (const auto& [addr, machine] : infos)
+        {
+          new_addrs.push_back(addr);
+          new_machines.push_back(machine);
+        }
+        tags_to_send.push_back(tag);
       }
     }
-    return internal::make_report_publishers(tags, addresses, local_tags());
-  }
-
-  std::vector<std::string> Master::get_tags_for_publisher(const std::string_view publisher_address) const noexcept
-  {
-    std::vector<std::string> tags_produced;
-    for (const auto& [tag, publishers] : publishers_for_tag_)
-    {
-      if (std::find(publishers.cbegin(), publishers.cend(), publisher_address) != publishers.cend())
-      {
-        tags_produced.push_back(tag);
-      }
-    }
-    return tags_produced;
+    return internal::make_report_publishers(
+      tags_to_send,
+      addresses_to_send,
+      machines_to_send,
+      local_tags()
+    );
   }
 
   void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
@@ -1465,29 +1455,44 @@ namespace skynet
       }
       else
       {
-        const auto& addr = *publishers.begin();
+        const auto& [addr, connect_to_id] = *publishers.begin();
         // Check if the machine is already a neighbor, and handle it if so
         const auto neighbor_iter = addr_to_machine_.find(internal::split_address(addr));
         if (neighbor_iter != addr_to_machine_.cend())
         {
           SKYNET_TRACE_LOG("\"{}\" already has connection for tag \"{}\"", id_, tag);
           assert(neighbor_iter->second);
-          if (tag[0] == internal::publish_tag_marker)
+          // Make sure the address matches the id
+          if (neighbor_iter->second->id() != connect_to_id)
           {
-            finalize_subscription(
-              tag,
-              *neighbor_iter->second
+            SKYNET_WARN_LOG(
+              "\"{}\" was told id for address \"{}\" is \"{}\", locally id is \"{}\"",
+              id_,
+              addr,
+              connect_to_id,
+              neighbor_iter->second->id()
             );
+            ++tag_iter;
           }
           else
           {
-            // Reduce group
-            finalize_reduce_group(
-              neighbor_iter->second->id(),
-              group_from_parent_tag(tag).first
-            );
+            if (tag[0] == internal::publish_tag_marker)
+            {
+              finalize_subscription(
+                tag,
+                *neighbor_iter->second
+              );
+            }
+            else
+            {
+              // Reduce group
+              finalize_reduce_group(
+                neighbor_iter->second->id(),
+                group_from_parent_tag(tag).first
+              );
+            }
+            tag_iter = pending_tags_.erase(tag_iter);
           }
-          tag_iter = pending_tags_.erase(tag_iter);
         }
         else
         {
@@ -1880,7 +1885,7 @@ namespace skynet
 
   void Master::find_publishers_for_pending_tags() noexcept
   {
-    const auto copy_criteria = [&](const TagID& tag) noexcept {
+    const auto no_known_publishers = [&](const TagID& tag) noexcept {
       if (tag_to_machine_.find(tag) != tag_to_machine_.cend()) { return false; }
       const auto iter = publishers_for_tag_.find(tag);
       if (iter == publishers_for_tag_.cend()) { return true; }
@@ -1891,14 +1896,17 @@ namespace skynet
       pending_tags_.cbegin(),
       pending_tags_.cend(),
       std::back_inserter(to_ask_for),
-      copy_criteria
+      no_known_publishers
     );
     if (!to_ask_for.empty())
     {
       for (auto& neighbor : neighbors_)
       {
-        neighbor.second.reset_backoff_counter();
-        neighbor.second.find_publishers_for_tags(to_ask_for);
+        if (neighbor.second.should_ask_for_tags())
+        {
+          neighbor.second.reset_backoff_counter();
+          neighbor.second.find_publishers_for_tags(to_ask_for);
+        }
       }
     }
   }

@@ -210,18 +210,14 @@ namespace skynet
   } // namespace skynet::internal
 } // namespace skynet
 
-// Hashing support for addr/pair
-namespace std
+// Hashing support
+template<>
+struct std::hash<skynet::AddrPortPair>
 {
-  template<>
-  struct hash<skynet::AddrPortPair>
+  std::size_t operator()(const skynet::AddrPortPair& val) const noexcept
   {
-    std::size_t operator()(const skynet::AddrPortPair& val) const noexcept
-    {
-      const std::size_t str_hash = std::hash<std::string>{}(val.first);
-      return str_hash ^ val.second;
-    }
-  };
-}
+    return std::hash<std::string>{}(val.first) ^ std::hash<std::uint16_t>{}(val.second);
+  }
+};
 
 #endif // SKYNET_TYPES_HPP

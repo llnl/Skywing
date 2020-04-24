@@ -61,7 +61,8 @@ struct RemoveNeighbor {
 struct ReportPublishers {
   tags                @0 : List(Text);
   addresses           @1 : List(List(Text));
-  locallyProducedTags @2 : List(Text);
+  machines            @2 : List(List(Text));
+  locallyProducedTags @3 : List(Text);
 }
 
 struct GetPublishers {

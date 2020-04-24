@@ -26,6 +26,34 @@
 #include <unordered_set>
 #include <vector>
 
+// This has to be separate due to requiring hashing support for the structure
+namespace skynet::internal
+{
+  /** \brief Class for publisher names / addresses; would be a local structure inside
+   * the master class, but hashing support is needed
+   */
+  struct PublisherInfo
+  {
+    std::string address;
+    MachineID machine_id;
+
+    // Hidden friend idiom - will only be found via ADL
+    friend bool operator==(const PublisherInfo& lhs, const PublisherInfo& rhs) noexcept
+    {
+      return lhs.address == rhs.address && lhs.machine_id == rhs.machine_id;
+    }
+  }; // struct PublisherInfo
+} // namespace skynet::internal
+
+template<>
+struct std::hash<skynet::internal::PublisherInfo>
+{
+  std::size_t operator()(const skynet::internal::PublisherInfo& i) const noexcept
+  {
+    return std::hash<std::string>{}(i.address) ^ std::hash<skynet::MachineID>{}(i.machine_id);
+  }
+}; // struct std::hash
+
 namespace skynet
 {
   class Master;
@@ -556,10 +584,6 @@ namespace skynet
      */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
 
-    /** \brief Returns the list of tags that a publisher is known to produce
-     */
-    std::vector<std::string> get_tags_for_publisher(std::string_view publisher_address) const noexcept;
-
     /** \brief Reports when new tags are being produced
      */
     void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
@@ -729,7 +753,7 @@ namespace skynet
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
     // List of publishers that are known for each tag
-    std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
+    std::unordered_map<TagID, std::unordered_set<internal::PublisherInfo>> publishers_for_tag_;
 
     // A list of tags that still need to have publishers found
     std::vector<std::string> pending_tags_;
