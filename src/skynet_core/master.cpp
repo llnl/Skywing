@@ -732,7 +732,6 @@ namespace skynet
         // This could affect subscriptions, so notify anything waiting on it
         notify_subscriptions_ = true;
         SKYNET_TRACE_LOG("\"{}\" removing dead neighbor \"{}\"", id_, it->first);
-        // TODO: Tell reduce groups when this happens
         send_to_neighbors(internal::make_remove_neighbor(it->first));
         // Find any reduce groups that this machine is a part of and
         // notify them of the disconnection

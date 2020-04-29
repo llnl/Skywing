@@ -151,14 +151,14 @@ namespace skynet
 #define SKYNET_SYNCHRONIZE_MACHINES(machine_count) \
   do \
   { \
-    static int sync; \
+    static std::size_t sync{0}; \
     static std::mutex m; \
     static std::condition_variable cv; \
     std::unique_lock lock{m}; \
     ++sync; \
-    if (sync != static_cast<int>(machine_count)) \
+    if (sync % static_cast<std::size_t>(machine_count) != 0) \
     { \
-      cv.wait(lock, [&]() { return sync == static_cast<int>(machine_count); }); \
+      cv.wait(lock, [&]() { return sync % static_cast<std::size_t>(machine_count) == 0; }); \
     } \
     else \
     { \
