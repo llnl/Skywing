@@ -50,7 +50,6 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
-    const std::vector<std::uint8_t>& counts,
     const std::vector<std::vector<std::string>>& addresses,
     const std::vector<std::vector<MachineID>>& machines,
     const std::vector<TagID>& locally_produced_tags
@@ -60,6 +59,7 @@ namespace skynet::internal
    */
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
+    const std::vector<std::uint8_t>& publishers_needed,
     bool ignore_cache
   ) noexcept;
 

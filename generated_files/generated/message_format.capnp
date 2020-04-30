@@ -60,15 +60,15 @@ struct RemoveNeighbor {
 # Additionally, a list of tags that are produced by the machine that sent the message
 struct ReportPublishers {
   tags                @0 : List(Text);
-  remainingNeeded     @1 : List(UInt8);
-  addresses           @2 : List(List(Text));
-  machines            @3 : List(List(Text));
-  locallyProducedTags @4 : List(Text);
+  addresses           @1 : List(List(Text));
+  machines            @2 : List(List(Text));
+  locallyProducedTags @3 : List(Text);
 }
 
 struct GetPublishers {
-  tags        @0 : List(Text);
-  ignoreCache @1 : Bool;
+  tags             @0 : List(Text);
+  publishersNeeded @1 : List(UInt8);
+  ignoreCache      @2 : Bool;
 }
 
 struct JoinReduceGroup {

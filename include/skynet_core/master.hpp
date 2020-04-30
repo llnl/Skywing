@@ -119,7 +119,10 @@ namespace skynet
 
       /** \brief Begins the search process for the specified tags
        */
-      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
+      void find_publishers_for_tags(
+        const std::vector<TagID>& tags,
+        const std::vector<std::uint8_t>& publishers_needed
+      ) noexcept;
 
       /** \brief The address for communication with the external master
        */
@@ -567,9 +570,11 @@ namespace skynet
       internal::ExternalMaster& from
     ) noexcept;
 
-    /** \brief Removes any tags that have known publishers
+    /** \brief Removes any tags that have enough publishers, returning the tags that
+     * remain and the number of publishers that they need
      */
-    std::vector<TagID> remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept;
+    auto remove_tags_with_enough_publishers(const internal::GetPublishers& msg) noexcept
+      -> std::pair<std::vector<TagID>, std::vector<std::uint8_t>>;
 
     /** \brief Adds the publishers and propagate the information is required
      *

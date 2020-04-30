@@ -166,11 +166,28 @@ namespace skynet
     /// Wraps void values in VoidWrappers or returns the type unmodified
     template<typename T>
     using WrapVoidValue = std::conditional_t<
-      // don't care about cv-qualified void becuase those shouldn't really be a thing
+      // don't care about cv-qualified void because those shouldn't really be a thing
       std::is_same_v<T, void>,
         VoidWrapper,
         T
     >;
+
+    /// Wraps void returning functions into returning VoidWrapper instead
+    template<typename Callable, typename... Args>
+    auto wrap_void_func(Callable&& c, Args&&... args) noexcept
+      -> WrapVoidValue<decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>
+    {
+      using RetType = WrapVoidValue<decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>;
+      if constexpr (std::is_same_v<RetType, VoidWrapper>)
+      {
+        ::std::forward<Callable>(c)(::std::forward<Args>(args)...);
+        return VoidWrapper{};
+      }
+      else
+      {
+        return ::std::forward<Callable>(c)(::std::forward<Args>(args)...);
+      }
+    }
 
     /// Structure for reporting reduce group building
     struct ReduceGroupNeighbors

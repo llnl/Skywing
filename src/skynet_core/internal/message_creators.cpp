@@ -140,7 +140,6 @@ namespace skynet::internal
 
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
-    const std::vector<std::uint8_t>& counts,
     const std::vector<std::vector<std::string>>& addresses,
     const std::vector<std::vector<MachineID>>& machines,
     const std::vector<TagID>& locally_produced_tags
@@ -156,12 +155,11 @@ namespace skynet::internal
         }
       }
     };
-    assert(tags.size() == addresses.size() && tags.size() == machines.size() && tags.size() == counts.size());
+    assert(tags.size() == addresses.size() && tags.size() == machines.size());
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initReportPublishers();
     using MType = decltype(message);
     set_vector(&MType::initTags, message, tags);
-    set_vector(&MType::initRemainingNeeded, message, counts);
     set_nested_vector(message.initAddresses(tags.size()), addresses);
     set_nested_vector(message.initMachines(tags.size()), machines);
     auto msg_local_tags = message.initLocallyProducedTags(locally_produced_tags.size());
@@ -175,12 +173,15 @@ namespace skynet::internal
 
   std::vector<std::byte> make_get_publishers(
     const std::vector<TagID>& tags,
+    const std::vector<std::uint8_t>& publishers_needed,
     const bool ignore_cache
   ) noexcept
   {
+    assert(tags.size() == publishers_needed.size());
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initGetPublishers();
     set_vector(&decltype(message)::initTags, message, tags);
+    set_vector(&decltype(message)::initPublishersNeeded, message, publishers_needed);
     message.setIgnoreCache(ignore_cache);
     return finalize_message(builder);
   }

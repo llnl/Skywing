@@ -9,6 +9,15 @@
 
 namespace skynet
 {
+  namespace
+  {
+    // This is more of a stop-gap than anything
+    std::vector<std::uint8_t> make_need_one_pub(const std::vector<TagID>& tags) noexcept
+    {
+      return std::vector<std::uint8_t>(tags.size(), 1);
+    }
+  } // namespace skynet::{anonymous}
+
   namespace internal
   {
     ExternalMaster::ExternalMaster(
@@ -107,7 +116,10 @@ namespace skynet
       }
     }
 
-    void ExternalMaster::find_publishers_for_tags(const std::vector<TagID>& tags) noexcept
+    void ExternalMaster::find_publishers_for_tags(
+      const std::vector<TagID>& tags,
+      const std::vector<std::uint8_t>& publishers_needed
+    ) noexcept
     {
       SKYNET_TRACE_LOG(
         "\"{}\" asking \"{}\" for tags {}{}",
@@ -118,7 +130,7 @@ namespace skynet
       );
       if (!pending_tag_request_)
       {
-        send_message(make_get_publishers(tags, ignore_cache_on_next_request_));
+        send_message(make_get_publishers(tags, publishers_needed, ignore_cache_on_next_request_));
         ignore_cache_on_next_request_ = false;
         pending_tag_request_ = true;
       }
@@ -819,7 +831,7 @@ namespace skynet
     for (auto& [name, neighbor] : neighbors_)
     {
       neighbor.reset_backoff_counter();
-      neighbor.find_publishers_for_tags(tag_ids);
+      neighbor.find_publishers_for_tags(tag_ids, make_need_one_pub(tag_ids));
     }
     return make_waiter(
       job_mut_,
@@ -834,7 +846,7 @@ namespace skynet
   ) noexcept
   {
     // If all of the tag requirements are fulfilled then
-    const auto remaining_tags = remove_tags_with_known_publishers(msg);
+    const auto [remaining_tags, num_left] = remove_tags_with_enough_publishers(msg);
     if (remaining_tags.empty())
     {
       SKYNET_TRACE_LOG(
@@ -920,31 +932,40 @@ namespace skynet
           if (&neighbor.second != &from)
           {
             neighbor.second.reset_backoff_counter();
-            neighbor.second.find_publishers_for_tags(remaining_tags);
+            neighbor.second.find_publishers_for_tags(remaining_tags, num_left);
           }
         }
       }
     }
   }
 
-  std::vector<TagID> Master::remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept
+  auto Master::remove_tags_with_enough_publishers(const internal::GetPublishers& msg) noexcept
+    -> std::pair<std::vector<TagID>, std::vector<std::uint8_t>>
   {
     auto tags_left = msg.tags();
+    auto publishers_needed = msg.publishers_needed();
     // Remove tags that either have a known producer or are known locally
-    tags_left.erase(
+    const auto [tag_iter, num_iter] =
       std::remove_if(
-        tags_left.begin(),
-        tags_left.end(),
-        [&](const TagID& id) {
-          const auto loc = publishers_for_tag_.find(id);
-          return loc == publishers_for_tag_.cend()
-            ? self_sub_count_.find(id) != self_sub_count_.cend()
-            : !loc->second.empty();
+        internal::zip_iter_equal_len(tags_left.begin(), publishers_needed.begin()),
+        internal::zip_iter_equal_len(tags_left.end(), publishers_needed.end()),
+        [&](const auto& id_left) {
+          const auto& [tag, num_left] = id_left;
+          // TODO: How to handle self-subscription with this?
+          // Just count it as an additional source for now, but presumably just having it
+          // be valid no matter what is the best option going forward (why would you not
+          // trust yourself?)
+          const auto self_subscribed = self_sub_count_.find(tag) != self_sub_count_.cend();
+          const auto loc = publishers_for_tag_.find(tag);
+          const auto num_external_pubs = loc == publishers_for_tag_.cend()
+            ? 0
+            : loc->second.size();
+          return num_external_pubs + self_subscribed >= num_left;
         }
-      ),
-      tags_left.end()
-    );
-    return tags_left;
+      ).underlying_iters();
+    tags_left.erase(tag_iter, tags_left.end());
+    publishers_needed.erase(num_iter, publishers_needed.end());
+    return {tags_left, publishers_needed};
   }
 
   void Master::add_publishers_and_propagate(
@@ -1072,7 +1093,6 @@ namespace skynet
     }
     return internal::make_report_publishers(
       tags_to_send,
-      std::vector<std::uint8_t>(tags_to_send.size(), 1),
       addresses_to_send,
       machines_to_send,
       local_tags()
@@ -1133,7 +1153,7 @@ namespace skynet
       for (auto& neighbor : neighbors_)
       {
         neighbor.second.reset_backoff_counter();
-        neighbor.second.find_publishers_for_tags({parent_tag});
+        neighbor.second.find_publishers_for_tags({parent_tag}, std::vector<std::uint8_t>{1});
       }
     }
     // Notify reduce groups for when new tags are produced
@@ -1164,7 +1184,7 @@ namespace skynet
         for (auto& neighbor : neighbors_)
         {
           neighbor.second.reset_backoff_counter();
-          neighbor.second.find_publishers_for_tags({parent_tag});
+          neighbor.second.find_publishers_for_tags({parent_tag}, std::vector<std::uint8_t>{1});
         }
       }
     }
@@ -1906,7 +1926,7 @@ namespace skynet
         if (neighbor.second.should_ask_for_tags())
         {
           neighbor.second.reset_backoff_counter();
-          neighbor.second.find_publishers_for_tags(to_ask_for);
+          neighbor.second.find_publishers_for_tags(to_ask_for, make_need_one_pub(to_ask_for));
         }
       }
     }

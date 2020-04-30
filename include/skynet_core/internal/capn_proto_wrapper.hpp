@@ -105,7 +105,6 @@ namespace skynet::internal
   {
   public:
     std::vector<TagID> tags() const noexcept;
-    std::vector<std::uint8_t> remaining_needed() const noexcept;
     std::vector<std::vector<std::string>> addresses() const noexcept;
     std::vector<std::vector<MachineID>> machines() const noexcept;
     std::vector<TagID> locally_produced_tags() const noexcept;
@@ -123,6 +122,7 @@ namespace skynet::internal
   {
   public:
     std::vector<TagID> tags() const noexcept;
+    std::vector<std::uint8_t> publishers_needed() const noexcept;
     bool ignore_cache() const noexcept;
 
   private:
