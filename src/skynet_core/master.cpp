@@ -59,8 +59,6 @@ namespace skynet
 
     void ExternalMaster::mark_as_dead() noexcept { dead_ = true; }
 
-    void ExternalMaster::ignore_cache_on_next_request() noexcept { ignore_cache_on_next_request_ = true; }
-
     bool ExternalMaster::is_subscribed_to(const TagID& tag) const noexcept
     {
       return remote_subscriptions_.find(tag) != remote_subscriptions_.cend();
@@ -118,8 +116,7 @@ namespace skynet
       );
       if (!pending_tag_request_)
       {
-        send_message(make_get_publishers(tags, ignore_cache_on_next_request_));
-        ignore_cache_on_next_request_ = false;
+        send_message(make_get_publishers(tags));
         pending_tag_request_ = true;
       }
     }
@@ -854,12 +851,7 @@ namespace skynet
       // they are now invalid
       for (const auto& tag : remaining_tags)
       {
-        const auto& [iter, inserted] = publishers_for_tag_.try_emplace(tag);
-        (void)inserted;
-        if (msg.ignore_cache())
-        {
-          iter->second.clear();
-        }
+        publishers_for_tag_.try_emplace(tag);
       }
       // If there are no other neighbors, just answer right away so
       // it doesn't stall
@@ -1072,6 +1064,7 @@ namespace skynet
     }
     return internal::make_report_publishers(
       tags_to_send,
+      std::vector<std::uint8_t>(tags_to_send.size(), 1),
       addresses_to_send,
       machines_to_send,
       local_tags()
@@ -1577,10 +1570,6 @@ namespace skynet
             id_,
             info.tag
           );
-          for (auto&& neighbor : neighbors_)
-          {
-            neighbor.second.ignore_cache_on_next_request();
-          }
         }
         else
         {

@@ -65,6 +65,21 @@ namespace skynet::internal
         );
       }
     }
+
+    template<typename InitFunc, typename MessageType, typename VecValueType>
+    void set_vector(
+      const InitFunc& init_func,
+      MessageType msg,
+      const std::vector<VecValueType>& values
+    ) noexcept
+    {
+      const std::size_t size = values.size();
+      auto to_set = (msg.*init_func)(size);
+      for (std::size_t i = 0; i < size; ++i)
+      {
+        to_set.set(i, values[i]);
+      }
+    }
   } // namespace {anonymous}
 
   std::vector<std::byte> make_publish(
@@ -88,11 +103,7 @@ namespace skynet::internal
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initGreeting();
     message.setFrom(from);
-    auto to_set = message.initNeighbors(neighbors.size());
-    for (std::size_t i = 0; i < neighbors.size(); ++i)
-    {
-      to_set.set(i, neighbors[i]);
-    }
+    set_vector(&decltype(message)::initNeighbors, message, neighbors);
     message.setPort(port);
     return finalize_message(builder);
   }
@@ -129,58 +140,46 @@ namespace skynet::internal
 
   std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
+    const std::vector<std::uint8_t>& counts,
     const std::vector<std::vector<std::string>>& addresses,
     const std::vector<std::vector<MachineID>>& machines,
     const std::vector<TagID>& locally_produced_tags
   ) noexcept
   {
-    assert(tags.size() == addresses.size() && tags.size() == machines.size());
+    const auto set_nested_vector = [&](auto builder, const auto& set_to) noexcept {
+      for (std::size_t i = 0; i < tags.size(); ++i)
+      {
+        auto msg = builder.init(i, set_to[i].size());
+        for (std::size_t j = 0; j < set_to[i].size(); ++j)
+        {
+          msg.set(j, set_to[i][j]);
+        }
+      }
+    };
+    assert(tags.size() == addresses.size() && tags.size() == machines.size() && tags.size() == counts.size());
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initReportPublishers();
-    auto msg_tags = message.initTags(tags.size());
-    for (std::size_t i = 0; i < tags.size(); ++i)
-    {
-      msg_tags.set(i, tags[i]);
-    }
-    auto msg_addresses = message.initAddresses(addresses.size());
-    for (std::size_t i = 0; i < tags.size(); ++i)
-    {
-      auto address_to_set = msg_addresses.init(i, addresses[i].size());
-      for (std::size_t j = 0; j < addresses[i].size(); ++j)
-      {
-        address_to_set.set(j, addresses[i][j]);
-      }
-    }
-    auto msg_machines = message.initMachines(machines.size());
-    for (std::size_t i = 0; i < tags.size(); ++i)
-    {
-      auto machines_to_set = msg_machines.init(i, machines[i].size());
-      for (std::size_t j = 0; j < machines[i].size(); ++j)
-      {
-        machines_to_set.set(j, machines[i][j]);
-      }
-    }
+    using MType = decltype(message);
+    set_vector(&MType::initTags, message, tags);
+    set_vector(&MType::initRemainingNeeded, message, counts);
+    set_nested_vector(message.initAddresses(tags.size()), addresses);
+    set_nested_vector(message.initMachines(tags.size()), machines);
     auto msg_local_tags = message.initLocallyProducedTags(locally_produced_tags.size());
     for (std::size_t i = 0; i < locally_produced_tags.size(); ++i)
     {
       msg_local_tags.set(i, locally_produced_tags[i]);
     }
+    set_vector(&MType::initLocallyProducedTags, message, locally_produced_tags);
     return finalize_message(builder);
   }
 
   std::vector<std::byte> make_get_publishers(
-    const std::vector<TagID>& tags,
-    const bool ignore_cache
+    const std::vector<TagID>& tags
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initGetPublishers();
-    auto msg_tags = message.initTags(tags.size());
-    for (std::size_t i = 0; i < tags.size(); ++i)
-    {
-      msg_tags.set(i, tags[i]);
-    }
-    message.setIgnoreCache(ignore_cache);
+    set_vector(&decltype(message)::initTags, message, tags);
     return finalize_message(builder);
   }
 
@@ -232,11 +231,7 @@ namespace skynet::internal
   {
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initSubscriptionNotice();
-    auto msg_tags = message.initTags(tags.size());
-    for (std::size_t i = 0; i < tags.size(); ++i)
-    {
-      msg_tags.set(i, tags[i]);
-    }
+    set_vector(&decltype(message)::initTags, message, tags);
     message.setIsUnsubscribe(is_unsubscribe);
     return finalize_message(builder);
   }
