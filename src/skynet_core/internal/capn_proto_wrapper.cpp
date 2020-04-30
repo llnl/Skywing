@@ -167,6 +167,7 @@ namespace skynet::internal
   /////////////////////////////////////////////////////
 
   std::vector<std::string> GetPublishers::tags() const noexcept { return detail::list_to_vector<TagID>(r.getTags()); }
+  bool GetPublishers::ignore_cache() const noexcept { return r.getIgnoreCache(); }
   GetPublishers::GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept
     : r{std::move(reader)}
   {}

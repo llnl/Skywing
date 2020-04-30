@@ -129,6 +129,11 @@ namespace skynet
        */
       AddrPortPair address_pair() const noexcept;
 
+      /** \brief Sets the external master to ignore the cache on the next request
+       * for publishers
+       */
+      void ignore_cache_on_next_request() noexcept;
+
       /** \brief Returns true if the external master is subscribed to the tag,
        * returns false if it is not.
        */
@@ -194,6 +199,9 @@ namespace skynet
 
       // The number of times requests have been unfulfilled
       std::uint8_t backoff_counter_ = 0;
+
+      // If the next request for tags should ignore the cache or not
+      bool ignore_cache_on_next_request_ = false;
 
       // If the connection is dead or not
       bool dead_ = false;

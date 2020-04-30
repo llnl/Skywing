@@ -67,7 +67,8 @@ struct ReportPublishers {
 }
 
 struct GetPublishers {
-  tags             @0 : List(Text);
+  tags        @0 : List(Text);
+  ignoreCache @1 : Bool;
 }
 
 struct JoinReduceGroup {

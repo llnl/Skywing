@@ -59,6 +59,8 @@ namespace skynet
 
     void ExternalMaster::mark_as_dead() noexcept { dead_ = true; }
 
+    void ExternalMaster::ignore_cache_on_next_request() noexcept { ignore_cache_on_next_request_ = true; }
+
     bool ExternalMaster::is_subscribed_to(const TagID& tag) const noexcept
     {
       return remote_subscriptions_.find(tag) != remote_subscriptions_.cend();
@@ -116,7 +118,8 @@ namespace skynet
       );
       if (!pending_tag_request_)
       {
-        send_message(make_get_publishers(tags));
+        send_message(make_get_publishers(tags, ignore_cache_on_next_request_));
+        ignore_cache_on_next_request_ = false;
         pending_tag_request_ = true;
       }
     }
@@ -851,7 +854,12 @@ namespace skynet
       // they are now invalid
       for (const auto& tag : remaining_tags)
       {
-        publishers_for_tag_.try_emplace(tag);
+        const auto& [iter, inserted] = publishers_for_tag_.try_emplace(tag);
+        (void)inserted;
+        if (msg.ignore_cache())
+        {
+          iter->second.clear();
+        }
       }
       // If there are no other neighbors, just answer right away so
       // it doesn't stall
@@ -1570,6 +1578,10 @@ namespace skynet
             id_,
             info.tag
           );
+          for (auto&& neighbor : neighbors_)
+          {
+            neighbor.second.ignore_cache_on_next_request();
+          }
         }
         else
         {

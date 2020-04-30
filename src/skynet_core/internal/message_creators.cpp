@@ -174,12 +174,14 @@ namespace skynet::internal
   }
 
   std::vector<std::byte> make_get_publishers(
-    const std::vector<TagID>& tags
+    const std::vector<TagID>& tags,
+    const bool ignore_cache
   ) noexcept
   {
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initGetPublishers();
     set_vector(&decltype(message)::initTags, message, tags);
+    message.setIgnoreCache(ignore_cache);
     return finalize_message(builder);
   }
 

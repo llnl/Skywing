@@ -123,6 +123,7 @@ namespace skynet::internal
   {
   public:
     std::vector<TagID> tags() const noexcept;
+    bool ignore_cache() const noexcept;
 
   private:
     cpnpro::GetPublishers::Reader r;
