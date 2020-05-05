@@ -330,14 +330,15 @@ namespace skynet
 
 // Support needed for structured bindings
 template<typename T>
-struct std::tuple_size<skynet::AsynchronousElement<T>>
-  : std::integral_constant<std::size_t, 2> {};
+class std::tuple_size<skynet::AsynchronousElement<T>>
+  : public std::integral_constant<std::size_t, 2> {};
 
 template<std::size_t I, typename T>
-struct std::tuple_element<I, skynet::AsynchronousElement<T>>
+class std::tuple_element<I, skynet::AsynchronousElement<T>>
 {
   static_assert(I == 0 || I == 1);
-  using type = decltype(std::declval<skynet::AsynchronousElement<T>>().template get<I>());
+  public:
+    using type = decltype(std::declval<skynet::AsynchronousElement<T>>().template get<I>());
 };
 
 #endif // SKYNET_UPPER_ASYNCHRONOUS_ITERATIVE_HPP
