@@ -7,6 +7,15 @@ project('skynet', 'cpp',
   ]
 )
 
+# This isn't a useful warning and is impossible to get correct when specializing
+# things in the std namespace as anything can either be a struct or class
+if meson.get_compiler('cpp').has_argument('-Wmismatched-tags')
+  add_project_arguments(
+    '-Wno-mismatched-tags',
+    language : 'cpp'
+  )
+endif
+
 add_project_arguments(
   '-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_' + get_option('logging_level').to_upper(),
   language : 'cpp'
