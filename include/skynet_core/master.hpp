@@ -742,7 +742,7 @@ namespace skynet
 
     /** \brief Asks neighbors for publishers for pending tags with no know publishers
      */
-    void find_publishers_for_pending_tags() noexcept;
+    void find_publishers_for_pending_tags(bool force_ask = false) noexcept;
 
     /** \brief Returns all locally produced tags as a vector
      */
@@ -831,6 +831,7 @@ namespace skynet
       subscription,
       reduce_group
     };
+    static constexpr const char* to_c_str(ConnType type) noexcept;
     // Pending connections for all types
     struct PendingInfo
     {

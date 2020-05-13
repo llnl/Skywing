@@ -443,7 +443,6 @@ namespace skynet
   {
     if (server_socket_.set_to_listen(port) != internal::ConnectionError::no_error)
     {
-      std::cerr << "Master::Master failed to set port to listening!\n";
       std::exit(1);
     }
   }
@@ -789,7 +788,8 @@ namespace skynet
     // Do this after removing the neighbors so that the dead neighbors won't be considered
     if (new_tags)
     {
-      find_publishers_for_pending_tags();
+      SKYNET_TRACE_LOG("\"{}\" finding publishers for new tag after neighbor removal", id_);
+      find_publishers_for_pending_tags(true);
     }
   }
 
@@ -827,11 +827,24 @@ namespace skynet
     -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
   {
     SKYNET_TRACE_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
-    std::copy(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_));
-    for (auto& [name, neighbor] : neighbors_)
+    std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
+      if (tag_to_machine_.find(to_find) != tag_to_machine_.cend())
+      {
+        return false;
+      }
+      if (std::find(pending_tags_.cbegin(), pending_tags_.cend(), to_find) != pending_tags_.cend())
+      {
+        return false;
+      }
+      return true;
+    });
+    if (!pending_tags_.empty())
     {
-      neighbor.reset_backoff_counter();
-      neighbor.find_publishers_for_tags(tag_ids, make_need_one_pub(tag_ids));
+      for (auto& [name, neighbor] : neighbors_)
+      {
+        neighbor.reset_backoff_counter();
+        neighbor.find_publishers_for_tags(tag_ids, make_need_one_pub(tag_ids));
+      }
     }
     return make_waiter(
       job_mut_,
@@ -1580,6 +1593,20 @@ namespace skynet
     return !iter->second->is_dead();
   }
 
+  constexpr const char* Master::to_c_str(ConnType type) noexcept
+  {
+    switch (type)
+    {
+    case ConnType::user_requested: return "user_requested";
+    case ConnType::by_accept: return "by_accept";
+    case ConnType::subscription: return "subscription";
+    case ConnType::reduce_group: return "reduce_group";
+    }
+    // This should never be reached
+    assert(false);
+    return "unknown type";
+  }
+
   void Master::process_pending_conns() noexcept
   {
     bool new_pending_tags = false;
@@ -1679,9 +1706,10 @@ namespace skynet
         // Anything else is an error
         default:
           SKYNET_WARN_LOG(
-            "\"{}\" errored trying to connect to {}",
+            "\"{}\" errored trying to connect to {}, type {}",
             id_,
-            iter->first
+            iter->first,
+            to_c_str(iter->second.type)
           );
           handle_error(info);
           notify_connection_ = true;
@@ -1850,7 +1878,7 @@ namespace skynet
   ) noexcept
   {
     (void)from;
-    if (auto value = msg.value())
+    if (const auto value = msg.value())
     {
       SKYNET_TRACE_LOG(
         "\"{}\" received data on tag \"{}\" from \"{}\", version {}, data: {}",
@@ -1904,29 +1932,40 @@ namespace skynet
     notify_subscriptions_ = true;
   }
 
-  void Master::find_publishers_for_pending_tags() noexcept
+  void Master::find_publishers_for_pending_tags(const bool force_ask) noexcept
   {
-    const auto no_known_publishers = [&](const TagID& tag) noexcept {
-      if (tag_to_machine_.find(tag) != tag_to_machine_.cend()) { return false; }
-      const auto iter = publishers_for_tag_.find(tag);
-      if (iter == publishers_for_tag_.cend()) { return true; }
-      return iter->second.empty();
-    };
-    std::vector<TagID> to_ask_for;
-    std::copy_if(
-      pending_tags_.cbegin(),
-      pending_tags_.cend(),
-      std::back_inserter(to_ask_for),
-      no_known_publishers
-    );
-    if (!to_ask_for.empty())
+    if (force_ask)
     {
       for (auto& neighbor : neighbors_)
       {
-        if (neighbor.second.should_ask_for_tags())
+        neighbor.second.reset_backoff_counter();
+        neighbor.second.find_publishers_for_tags(pending_tags_, make_need_one_pub(pending_tags_));
+      }
+    }
+    else
+    {
+      const auto no_known_publishers = [&](const TagID& tag) noexcept {
+        if (tag_to_machine_.find(tag) != tag_to_machine_.cend()) { return false; }
+        const auto iter = publishers_for_tag_.find(tag);
+        if (iter == publishers_for_tag_.cend()) { return true; }
+        return iter->second.empty();
+      };
+      std::vector<TagID> to_ask_for;
+      std::copy_if(
+        pending_tags_.cbegin(),
+        pending_tags_.cend(),
+        std::back_inserter(to_ask_for),
+        no_known_publishers
+      );
+      if (!to_ask_for.empty())
+      {
+        for (auto& neighbor : neighbors_)
         {
-          neighbor.second.reset_backoff_counter();
-          neighbor.second.find_publishers_for_tags(to_ask_for, make_need_one_pub(to_ask_for));
+          if (neighbor.second.should_ask_for_tags())
+          {
+            neighbor.second.increase_backoff_counter();
+            neighbor.second.find_publishers_for_tags(to_ask_for, make_need_one_pub(to_ask_for));
+          }
         }
       }
     }
