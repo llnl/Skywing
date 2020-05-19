@@ -724,7 +724,7 @@ namespace skynet
     {
       if (it->second.is_dead())
       {
-        // This could affect subscriptions, so notify anything waiting on it
+        // This could affect subscriptions, so notify anything waiting on them
         notify_subscriptions_ = true;
         SKYNET_TRACE_LOG("\"{}\" removing dead neighbor \"{}\"", id_, it->first);
         send_to_neighbors(internal::make_remove_neighbor(it->first));
@@ -846,6 +846,8 @@ namespace skynet
         neighbor.find_publishers_for_tags(tag_ids, make_need_one_pub(tag_ids));
       }
     }
+    // Can potentially finish subscribing right away, so notify things
+    notify_subscriptions_ = true;
     return make_waiter(
       job_mut_,
       subscription_cv_,
@@ -1936,6 +1938,7 @@ namespace skynet
   {
     if (force_ask)
     {
+      SKYNET_TRACE_LOG("\"{}\" forcefully asking for {}", id_, pending_tags_);
       for (auto& neighbor : neighbors_)
       {
         neighbor.second.reset_backoff_counter();

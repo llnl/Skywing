@@ -48,7 +48,6 @@ const std::array<std::tuple<Tag0, Tag1, Tag2>, 2> tags{
 template<std::size_t TagIndex, std::size_t ValueIndex>
 void test_tag(
   Job& job,
-  MasterHandle master_handle,
   const int machine_index,
   const int job_index
 ) noexcept
@@ -56,18 +55,30 @@ void test_tag(
   using TagType = std::tuple_element_t<TagIndex, decltype(tags)::value_type>;
   constexpr auto value_to_publish = ExpectedTagValue<TagType>::value();
   const auto& tag = std::get<TagIndex>(tags[ValueIndex]);
+  static std::atomic<bool> need_publishing = false;
+  static std::atomic<int> num_done = 0;
   if (machine_index == TagIndex && job_index == ValueIndex)
   {
-    // As there are two jobs, each machine will end up subscribing to itself
-    while (master_handle.number_of_subscribers(tag) != num_machines)
+    // Can't just base on the number of subscribers as that can fail
+    int last = num_done;
+    while (num_done != num_machines * 2 - 1)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds{10});
+      if (need_publishing.exchange(false))
+      {
+        job.publish(tag, value_to_publish);
+      }
+      if (last != num_done) {
+        last = num_done;
+      }
     }
-    job.publish(tag, value_to_publish);
   }
   else
   {
     job.subscribe(tag).get();
+    // wait a bit for the subscribe message to send...
+    std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    need_publishing = true;
     while (true)
     {
       const auto opt_value = job.get_waiter(tag).get();
@@ -81,9 +92,11 @@ void test_tag(
       else
       {
         job.rebuild_missing_tag_connections().get();
+        need_publishing = true;
       }
     }
   }
+  ++num_done;
   SKYNET_SYNCHRONIZE_MACHINES(num_machines * 2);
 }
 
@@ -108,12 +121,12 @@ void machine_task(const NetworkInfo* const info, const int index)
         case 1: job.declare_publication_intent(std::get<Tag1>(tags[i])); break;
         case 2: job.declare_publication_intent(std::get<Tag2>(tags[i])); break;
       }
-      test_tag<0, 0>(job, handle, index, i);
-      test_tag<0, 1>(job, handle, index, i);
-      test_tag<1, 0>(job, handle, index, i);
-      test_tag<1, 1>(job, handle, index, i);
-      test_tag<2, 0>(job, handle, index, i);
-      test_tag<2, 1>(job, handle, index, i);
+      test_tag<0, 0>(job, index, i);
+      test_tag<0, 1>(job, index, i);
+      test_tag<1, 0>(job, index, i);
+      test_tag<1, 1>(job, index, i);
+      test_tag<2, 0>(job, index, i);
+      test_tag<2, 1>(job, index, i);
     };
   };
   master.submit_job("job 0", make_job_task(0));
