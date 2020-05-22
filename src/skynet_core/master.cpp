@@ -285,7 +285,7 @@ namespace skynet
               if (!tag_name_okay(tag))
               {
                 SKYNET_WARN_LOG(
-                  "\"{}\" dropping connection with \"{}\" due to bad tag \"{}\" in report.",
+                  "\"{}\" dropping connection with \"{}\" due to bad tag \"{}\" in report publishers.",
                   master_->id(),
                   id_,
                   tag
@@ -1522,10 +1522,14 @@ namespace skynet
             else
             {
               // Reduce group
-              finalize_reduce_group(
-                neighbor_iter->second->id(),
-                group_from_parent_tag(tag).first
-              );
+              const auto tags_str_view = internal::split(tag, '\0');
+              for (const auto str_view : tags_str_view)
+              {
+                finalize_reduce_group(
+                  neighbor_iter->second->id(),
+                  group_from_parent_tag(TagID{str_view}).first
+                );
+              }
             }
             tag_iter = pending_tags_.erase(tag_iter);
           }
@@ -1663,11 +1667,16 @@ namespace skynet
 
       case ConnType::reduce_group:
         {
-          auto& [group_id, reduce_data] = group_from_parent_tag(info.tag);
-          (void)group_id;
-          const auto& parent_tag =
-            internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
-          handle_tag(parent_tag, info.tag);
+          const auto tag_str_view = internal::split(info.tag, '\0');
+          for (const auto tag_view : tag_str_view)
+          {
+            const TagID tag{tag_view};
+            auto& [group_id, reduce_data] = group_from_parent_tag(tag);
+            (void)group_id;
+            const auto& parent_tag =
+              internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
+            handle_tag(parent_tag, tag);
+          }
         }
         break;
       }
@@ -1789,10 +1798,16 @@ namespace skynet
                   break;
 
                 case ConnType::reduce_group:
-                  finalize_reduce_group(
-                    new_neighbor_iter->first,
-                    group_from_parent_tag(info.tag).first
-                  );
+                  {
+                    const auto tag_str_view = internal::split(info.tag, '\0');
+                    for (const auto tag : tag_str_view)
+                    {
+                      finalize_reduce_group(
+                        new_neighbor_iter->first,
+                        group_from_parent_tag(TagID{tag}).first
+                      );
+                    }
+                  }
                   break;
 
                 case ConnType::subscription:
@@ -1984,5 +1999,15 @@ namespace skynet
       [](const auto& tag_pair) { return tag_pair.first; }
     );
     return to_ret;
+  }
+
+
+  void Master::__DEBUG() const
+  {
+    std::vector<char> heck;
+    for (const auto& n : neighbors_) {
+      heck.push_back('0' + n.second.has_pending_tag_request());
+    }
+    SKYNET_CRITICAL_LOG("\"{}\" __DEBUG: {}", id_, heck);
   }
 } // namespace skynet

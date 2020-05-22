@@ -856,6 +856,9 @@ namespace skynet
     bool notify_subscriptions_ = false;
     bool notify_reduce_group_ = false;
     bool notify_connection_ = false;
+
+
+    void __DEBUG() const;
   }; // class Master
 
   class MasterHandle
@@ -904,6 +907,8 @@ namespace skynet
     {
       return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c));
     }
+
+    void __DEBUG() const { handle_->__DEBUG(); }
 
   private:
     friend class Job;

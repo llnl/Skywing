@@ -16,8 +16,8 @@
 
 using namespace skynet;
 
-constexpr int num_machines = 10;
-constexpr int num_connections = num_machines * 2;
+constexpr int num_machines = 4;
+constexpr int num_connections = num_machines;
 constexpr std::uint16_t base_port = 30000;
 
 using Tag0 = PublishTag<std::int32_t>;

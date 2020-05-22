@@ -11,6 +11,7 @@ core_tests = {
     'heartbeat',
     'publish_data_wrapper',
     'publish_multiple_values',
+    'reduce_tag_bug',
     'self_subscribe',
     'simple_reduce',
   ],
