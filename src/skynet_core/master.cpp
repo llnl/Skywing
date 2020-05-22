@@ -2000,14 +2000,4 @@ namespace skynet
     );
     return to_ret;
   }
-
-
-  void Master::__DEBUG() const
-  {
-    std::vector<char> heck;
-    for (const auto& n : neighbors_) {
-      heck.push_back('0' + n.second.has_pending_tag_request());
-    }
-    SKYNET_CRITICAL_LOG("\"{}\" __DEBUG: {}", id_, heck);
-  }
 } // namespace skynet
