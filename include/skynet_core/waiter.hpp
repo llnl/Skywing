@@ -67,20 +67,32 @@ namespace skynet
     ) noexcept
     {
       const auto next_call = [&]() noexcept -> decltype(auto) {
-        // Can't pass void so have to make a wrapper
-        if constexpr (std::is_invocable_v<Next, decltype(build_up())>)
-        {
-          return [&]() noexcept -> decltype(auto) {
-            return next(build_up());
-          };
-        }
-        else
-        {
-          return [&]() noexcept -> decltype(auto) {
-            build_up();
-            return next();
-          };
-        }
+	// Tried to make this it's own function to make this tidier but it didn't
+	// work for some reason?  So some repetition is unavoidable it seems
+	// Can't pass void so have to make a wrapper
+	if constexpr (std::is_same_v<decltype(build_up()), void>)
+	{
+	  return [&]() noexcept -> decltype(auto) {
+	    build_up();
+	    return next();
+	  };
+	}
+	else
+	  {
+	    if constexpr (std::is_invocable_v<Next, decltype(build_up())>)
+	    {
+	      return [&]() noexcept -> decltype(auto) {
+		return next(build_up());
+	      };
+	    }
+	    else
+	      {
+		return [&]() noexcept -> decltype(auto) {
+		  build_up();
+		  return next();
+		};
+	      }
+	  }
       };
       if constexpr (sizeof...(Rest) == 0)
       {
