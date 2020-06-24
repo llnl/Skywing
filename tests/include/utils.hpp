@@ -149,7 +149,7 @@ namespace skynet
 
 // Macro to synchronize all machines
 #define SKYNET_SYNCHRONIZE_MACHINES(machine_count) \
-  do \
+  []() noexcept \
   { \
     static std::size_t sync{0}; \
     static std::mutex m; \
@@ -164,7 +164,6 @@ namespace skynet
     { \
       cv.notify_all(); \
     } \
-  } \
-  while (false)
+  }()
 
 #endif // SKYNET_TEST_UTILS_HPP

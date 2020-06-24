@@ -41,7 +41,7 @@ namespace skynet
 
   bool Job::process_data(
     const TagID& tag_id,
-    gsl::span<PublishValueVariant> data,
+    gsl::span<const PublishValueVariant> data,
     const VersionID version
   ) noexcept
   {
@@ -87,7 +87,7 @@ namespace skynet
       data
     );
     // Otherwise just make it the current value
-    loc->second.buffer->add(std::move(data), version);
+    loc->second.buffer->add(data, version);
     data_buffer_modified_cv_.notify_all();
     return true;
   }
