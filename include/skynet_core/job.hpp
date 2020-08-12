@@ -92,7 +92,7 @@ namespace skynet
       static bool process_data(
         Job& j,
         const TagID& tag,
-        gsl::span<PublishValueVariant> data,
+        gsl::span<const PublishValueVariant> data,
         const VersionID version
       ) noexcept
       {
@@ -157,6 +157,7 @@ namespace skynet
      * is specified
      *
      * \return A Waiter for the value
+     * \pre The tag is subscribed to
      */
     template<typename... Ts>
     auto get_waiter(
@@ -378,10 +379,13 @@ namespace skynet
         std::vector<internal::PublishTagBase> tags;
         for (const auto& tag_pair : buffers)
         {
-          // The expected type here doesn't matter
-          // Also have to remove the first letter as it identifies the type of
-          // tag, but it will just get added again later
-          tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
+          if (tag_pair.second.error_occurred != TagInfo::Error::no_error)
+          {
+            // The expected type here doesn't matter
+            // Also have to remove the first letter as it identifies the type of
+            // tag, but it will just get added again later
+            tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
+          }
         }
         return tags;
       }();
@@ -421,7 +425,7 @@ namespace skynet
      * \param version The version of the data
      * \return True if processing went fine, false if there was an error
      */
-    bool process_data(const TagID& tag_id, gsl::span<PublishValueVariant> data, VersionID version) noexcept;
+    bool process_data(const TagID& tag_id, gsl::span<const PublishValueVariant> data, VersionID version) noexcept;
 
     /** \brief Marks a tag as dead due to connection issues
      *

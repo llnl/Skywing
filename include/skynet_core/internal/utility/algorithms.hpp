@@ -4,8 +4,10 @@
 #include <iterator>
 #include <string_view>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
+#include <utility>
 
 namespace skynet::internal
 {
@@ -50,7 +52,7 @@ namespace skynet::internal
     using ::std::cbegin;
     using ::std::cend;
     // Allocate enough space for all the data at the start
-    ::std::vector<::std::common_type_t<typename Ts::value_type...>> to_ret((size(containers) + ...));
+    std::vector<std::common_type_t<typename Ts::value_type...>> to_ret((size(containers) + ...));
     // Copy all of the data
     auto copy_loc = begin(to_ret);
     (..., (copy_loc = ::std::copy(cbegin(containers), cend(containers), copy_loc)));
@@ -64,7 +66,7 @@ namespace skynet::internal
   template<typename T>
   void merge_associative_containers(T& lhs, T& rhs) noexcept
   {
-    return detail::merge_impl(lhs, rhs, detail::PriorityTag<1>{});
+    return ::skynet::internal::detail::merge_impl(lhs, rhs, detail::PriorityTag<1>{});
   }
 
   /** \brief Split a string based on a character
@@ -83,6 +85,78 @@ namespace skynet::internal
     // to_ret.emplace_back(to_split.data() + last_pos, to_split.data() + to_split.size());
     to_ret.emplace_back(to_split.data() + last_pos, to_split.size() - last_pos);
     return to_ret;
+  }
+
+  /** \brief Class representing zipped iterators
+   *
+   * The two iterators passed must be of the same length
+   */
+  template<typename... Iters>
+  class ZippedIterEqualLength
+  {
+  public:
+    constexpr ZippedIterEqualLength(Iters... iters)
+      : iters_{iters...}
+    {}
+
+    constexpr std::tuple<Iters...> underlying_iters() const noexcept { return iters_; }
+
+    // STL compatible iterator stuff
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = std::tuple<typename Iters::value_type...>;
+    using reference = std::tuple<typename Iters::reference...>;
+    using pointer = value_type*;
+
+    // Iterator operators
+    constexpr reference operator*() noexcept
+    {
+      return for_each_iter([](auto& iter) noexcept -> decltype(auto) { return *iter; });
+    }
+    constexpr const reference& operator*() const noexcept
+    {
+      return for_each_iter([](const auto& iter) noexcept -> decltype(auto) { return *iter; });
+    }
+    constexpr ZippedIterEqualLength& operator++() noexcept
+    {
+      for_each_iter([](auto& iter) noexcept -> decltype(auto) { return ++iter; });
+      return *this;
+    }
+    friend constexpr bool operator==(const ZippedIterEqualLength& lhs, const ZippedIterEqualLength& rhs) noexcept
+    {
+      return lhs.iters_ == rhs.iters_;
+    }
+    friend constexpr bool operator!=(const ZippedIterEqualLength& lhs, const ZippedIterEqualLength& rhs) noexcept
+    {
+      return !(lhs == rhs);
+    }
+
+  private:
+    template<typename Callable>
+    constexpr auto for_each_iter(Callable&& c) noexcept
+    {
+      return for_each_iter_impl(std::forward<Callable>(c), std::index_sequence_for<Iters...>{});
+    }
+
+    template<typename Callable, std::size_t... Is>
+    constexpr auto for_each_iter_impl(Callable&& c, std::index_sequence<Is...>) noexcept
+    {
+      // make_tuple will remove references, which we don't want
+      // this is so ugly though...
+      return std::tuple<decltype(wrap_void_func(c, std::get<Is>(iters_)))...>{wrap_void_func(c, std::get<Is>(iters_))...};
+    }
+
+    std::tuple<Iters...> iters_;
+  };
+
+  /** \brief Zips iterators together, all of which must be equal length
+   *
+   * Regardless of the underlying iterator types, the returned iterator is always a forward read-only iterator
+   */
+  template<typename... Iters>
+  auto zip_iter_equal_len(Iters... iters) noexcept
+  {
+    return ZippedIterEqualLength<Iters...>{iters...};
   }
 } // namespace skynet::internal
 

@@ -26,6 +26,34 @@
 #include <unordered_set>
 #include <vector>
 
+// This has to be separate due to requiring hashing support for the structure
+namespace skynet::internal
+{
+  /** \brief Class for publisher names / addresses; would be a local structure inside
+   * the master class, but hashing support is needed
+   */
+  struct PublisherInfo
+  {
+    std::string address;
+    MachineID machine_id;
+
+    // Hidden friend idiom - will only be found via ADL
+    friend bool operator==(const PublisherInfo& lhs, const PublisherInfo& rhs) noexcept
+    {
+      return lhs.address == rhs.address && lhs.machine_id == rhs.machine_id;
+    }
+  }; // struct PublisherInfo
+} // namespace skynet::internal
+
+template<>
+struct std::hash<skynet::internal::PublisherInfo>
+{
+  std::size_t operator()(const skynet::internal::PublisherInfo& i) const noexcept
+  {
+    return std::hash<std::string>{}(i.address) ^ std::hash<skynet::MachineID>{}(i.machine_id);
+  }
+}; // struct std::hash
+
 namespace skynet
 {
   class Master;
@@ -91,7 +119,10 @@ namespace skynet
 
       /** \brief Begins the search process for the specified tags
        */
-      void find_publishers_for_tags(const std::vector<TagID>& tags) noexcept;
+      void find_publishers_for_tags(
+        const std::vector<TagID>& tags,
+        const std::vector<std::uint8_t>& publishers_needed
+      ) noexcept;
 
       /** \brief The address for communication with the external master
        */
@@ -539,9 +570,11 @@ namespace skynet
       internal::ExternalMaster& from
     ) noexcept;
 
-    /** \brief Removes any tags that have known publishers
+    /** \brief Removes any tags that have enough publishers, returning the tags that
+     * remain and the number of publishers that they need
      */
-    std::vector<TagID> remove_tags_with_known_publishers(const internal::GetPublishers& msg) noexcept;
+    auto remove_tags_with_enough_publishers(const internal::GetPublishers& msg) noexcept
+      -> std::pair<std::vector<TagID>, std::vector<std::uint8_t>>;
 
     /** \brief Adds the publishers and propagate the information is required
      *
@@ -555,10 +588,6 @@ namespace skynet
     /** \brief Produce a message containing the known publishers and tags
      */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
-
-    /** \brief Returns the list of tags that a publisher is known to produce
-     */
-    std::vector<std::string> get_tags_for_publisher(std::string_view publisher_address) const noexcept;
 
     /** \brief Reports when new tags are being produced
      */
@@ -713,7 +742,7 @@ namespace skynet
 
     /** \brief Asks neighbors for publishers for pending tags with no know publishers
      */
-    void find_publishers_for_pending_tags() noexcept;
+    void find_publishers_for_pending_tags(bool force_ask = false) noexcept;
 
     /** \brief Returns all locally produced tags as a vector
      */
@@ -729,7 +758,7 @@ namespace skynet
     std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
 
     // List of publishers that are known for each tag
-    std::unordered_map<TagID, std::unordered_set<std::string>> publishers_for_tag_;
+    std::unordered_map<TagID, std::unordered_set<internal::PublisherInfo>> publishers_for_tag_;
 
     // A list of tags that still need to have publishers found
     std::vector<std::string> pending_tags_;
@@ -802,6 +831,7 @@ namespace skynet
       subscription,
       reduce_group
     };
+    static constexpr const char* to_c_str(ConnType type) noexcept;
     // Pending connections for all types
     struct PendingInfo
     {

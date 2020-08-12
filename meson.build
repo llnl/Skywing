@@ -7,6 +7,15 @@ project('skynet', 'cpp',
   ]
 )
 
+# This isn't a useful warning and is impossible to get correct when specializing
+# things in the std namespace as anything can either be a struct or class
+if meson.get_compiler('cpp').has_argument('-Wmismatched-tags')
+  add_project_arguments(
+    '-Wno-mismatched-tags',
+    language : 'cpp'
+  )
+endif
+
 add_project_arguments(
   '-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_' + get_option('logging_level').to_upper(),
   language : 'cpp'
@@ -30,7 +39,12 @@ gsl_dep = declare_dependency(
   include_directories : include_directories('subprojects/gsl/include')
 )
 
-capnproto_dep = dependency('capnp')
+capnproto_dep = dependency('capnp', version : '>=0.7.0')
+
+use_helics = get_option('use_helics')
+if use_helics
+  helics_dep = dependency('helicsSharedLib')
+endif
 
 subdir('generated_files/generated')
 

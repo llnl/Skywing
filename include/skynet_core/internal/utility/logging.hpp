@@ -10,7 +10,11 @@
 #include <cstdint>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
+
+// TODO: Maybe TMP to support basically all iterables, but that's a lot of work,
+//       so it might just work as it is
 
 // Macro to wrap logging since I don't know if we're doing runtime or what and this
 // can easily be searched for or changed later on
@@ -83,6 +87,41 @@ struct fmt::formatter<std::array<T, N>>
   auto format(const std::array<T, N>& data, FormatContext& ctx) noexcept
   {
     using const_span = gsl::span<const T>;
+    return fmt::formatter<const_span>{}.format(const_span{data}, ctx);
+  }
+};
+
+// Pair objects
+template<typename V1, typename V2>
+struct fmt::formatter<std::pair<V1, V2>>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) noexcept
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const std::pair<V1, V2>& data, FormatContext& ctx) noexcept
+  {
+    return format_to(ctx.out(), "{}, {}", data.first, data.second);
+  }
+};
+
+// Unordered map
+template<typename Key, typename Value, typename... Rest>
+struct fmt::formatter<std::unordered_map<Key, Value, Rest...>>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) noexcept
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const std::unordered_map<Key, Value, Rest...>& data, FormatContext& ctx) noexcept
+  {
+    using const_span = gsl::span<const typename std::unordered_map<Key, Value, Rest...>::value_type>;
     return fmt::formatter<const_span>{}.format(const_span{data}, ctx);
   }
 };

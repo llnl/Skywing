@@ -18,12 +18,13 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ## Dependencies Not Automatically Managed
  * compiler that supports c++17 library
-   * tested: GCC/g++ (8.3.0), LLVM/clang (6.0.0, 10.0.0, 11.0.0)
+   * tested: GCC/g++ (8.3.0) and LLVM/clang (6.0.0, 10.0.0, 11.0.0)
  * meson (https://mesonbuild.com/)
    * requires Python >= 3.5.2
  * CMake (https://cmake.org/)
  * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
+   * requires version 0.7.0 or newer
 
 ## Dependencies Managed as Git Submodules
  * Catch2

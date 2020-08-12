@@ -17,6 +17,7 @@ TEST_CASE("Split", "[Skynet_Split]")
   REQUIRE(split("test string"s, ' ') == vec{"test"sv, "string"sv});
   REQUIRE(split("weird\1char", '\1') == vec{"weird"sv, "char"sv});
   REQUIRE(split("null\0embed"s, '\0') == vec{"null"sv, "embed"sv});
+  REQUIRE(split("nothing to split"s, '\n') == vec{"nothing to split"sv});
 }
 
 TEST_CASE("Concatenate", "[Skynet_Concatenate]")
