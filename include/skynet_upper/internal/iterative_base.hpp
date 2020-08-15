@@ -136,11 +136,13 @@ namespace skynet::internal
     const Range& tags
   ) noexcept
   {
+    // std::cout<< "here" << std::endl;
     return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>>::create(
       handle,
       job,
       produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend())
+      // gsl::make_span(tags.cbegin(), tags.cend())
+      gsl::make_span(tags.data(), tags.size())
     );
   }
 
@@ -158,6 +160,8 @@ namespace skynet::internal
       job,
       produced_tag,
       gsl::make_span(tags_array.cbegin(), tags_array.cend())
+      // gsl::make_span(tags.data(), tags.size()) //unexpanded parameter error; this was changed in the other constructors in order to pass tags as vectos instead of arrays
+
     );
   }
 
@@ -181,7 +185,8 @@ namespace skynet::internal
       handle,
       job,
       produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend()),
+      // gsl::make_span(tags.cbegin(), tags.cend()),
+      gsl::make_span(tags.data(), tags.size()),
       end_time,
       policy
     );
@@ -209,6 +214,7 @@ namespace skynet::internal
       job,
       produced_tag,
       gsl::make_span(tags_array.cbegin(), tags_array.cend()),
+      // gsl::make_span(tags.data(), tags.size()),  //unexpanded parameter error; this was changed in the other constructors in order to pass tags as vectos instead of arrays
       end_time,
       policy
     );
