@@ -66,7 +66,7 @@ void simulate_machine(const int machine_number)
     // one, just advance to the job so the connection can be accepted.
     // This must be done in the job, as it is an asynchronous operation, which requires
     // the master to be running as well.
-    if (machine_number != node_ports.size() - 1)
+    if (machine_number != static_cast<int>(node_ports.size() - 1))
     {
       // Connecting to the server is an asynchronous operation and can fail.
       // Wait for the result each time and keep attempting to connect until it does
