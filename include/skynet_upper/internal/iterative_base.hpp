@@ -140,7 +140,7 @@ namespace skynet::internal
       handle,
       job,
       produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend())
+      gsl::make_span(tags) //gsl::make_span(tags.cbegin(), tags.cend())
     );
   }
 
@@ -181,7 +181,7 @@ namespace skynet::internal
       handle,
       job,
       produced_tag,
-      gsl::make_span(tags.cbegin(), tags.cend()),
+      gsl::make_span(tags), //gsl::make_span(tags.cbegin(), tags.cend()),
       end_time,
       policy
     );
