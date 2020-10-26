@@ -14,8 +14,7 @@
 
 using DataTag = skynet::PublishTag<double>;
 
-struct MachineConfig
-{
+struct MachineConfig {
   std::string name;
   std::string remote_address;
   std::vector<DataTag> tags_produced;
@@ -27,16 +26,9 @@ struct MachineConfig
   static void read_until_dash(std::istream& in, std::vector<T>& read_into)
   {
     std::string temp;
-    while(std::getline(in, temp))
-    {
-      if (temp.empty())
-      {
-        continue;
-      }
-      if (!in || temp.front() == '-')
-      {
-        break;
-      }
+    while (std::getline(in, temp)) {
+      if (temp.empty()) { continue; }
+      if (!in || temp.front() == '-') { break; }
       read_into.push_back(std::move(temp));
     }
   }
@@ -60,33 +52,24 @@ void asynchronous_iterative(
   const MachineConfig& config,
   const std::unordered_map<std::string, MachineConfig>& machines,
   const double initial_value,
-  Callable act_on
-)
+  Callable act_on)
 {
   skynet::Master master(config.port, config.name);
-  if (config.tags_produced.empty())
-  {
+  if (config.tags_produced.empty()) {
     std::cerr << config.name << ": Must produce at least one tag\n";
     std::exit(1);
   }
   master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle master_handle) {
-    for (const auto& connect_to_name : config.machines_to_connect_to)
-    {
+    for (const auto& connect_to_name : config.machines_to_connect_to) {
       const auto conn_to_iter = machines.find(connect_to_name);
-      if (conn_to_iter == machines.cend())
-      {
+      if (conn_to_iter == machines.cend()) {
         std::cerr << "Could not find machine \"" << connect_to_name << "\" to connect to.\n";
       }
       const auto time_limit = std::chrono::steady_clock::now() + std::chrono::seconds{10};
-      while (!master_handle.connect_to_server("127.0.0.1", conn_to_iter->second.port).get())
-      {
-        if (std::chrono::steady_clock::now() > time_limit)
-        {
-          std::cerr
-            << config.name << ": Took too long to connect to "
-              << conn_to_iter->second.remote_address
-              << ":"
-              << conn_to_iter->second.port << '\n';
+      while (!master_handle.connect_to_server("127.0.0.1", conn_to_iter->second.port).get()) {
+        if (std::chrono::steady_clock::now() > time_limit) {
+          std::cerr << config.name << ": Took too long to connect to " << conn_to_iter->second.remote_address << ":"
+                    << conn_to_iter->second.port << '\n';
           return;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
@@ -95,8 +78,7 @@ void asynchronous_iterative(
     job.declare_publication_intent_range(config.tags_produced);
     // Subscribe to all the relevant tags
     auto fut = job.subscribe_range(config.tags_to_subscribe_to);
-    if (!fut.wait_for(std::chrono::seconds(10)))
-    {
+    if (!fut.wait_for(std::chrono::seconds(10))) {
       std::cerr << config.name << ": Took too long to subscribe to tags\n";
       std::exit(1);
     }
@@ -105,54 +87,33 @@ void asynchronous_iterative(
     double own_value = initial_value;
     job.publish(config.tags_produced.front(), own_value);
     std::ranlux48 prng{std::random_device{}()};
-    while (true)
-    {
+    while (true) {
       // Gather data from subscriptions
-      for (const auto& sub_tag : config.tags_to_subscribe_to)
-      {
-        if (job.has_data(sub_tag))
-        {
-          neighbor_values[sub_tag.id()] = *job.get_waiter(sub_tag).get();
-        }
+      for (const auto& sub_tag : config.tags_to_subscribe_to) {
+        if (job.has_data(sub_tag)) { neighbor_values[sub_tag.id()] = *job.get_waiter(sub_tag).get(); }
       }
       // Only call the function if there's any data that's been seen
-      if (neighbor_values.empty())
-      {
+      if (neighbor_values.empty()) {
         // No values seen - check if all subscriptions are gone and exit if so
         const bool should_exit = [&]() {
-          for (const auto& sub_tag : config.tags_to_subscribe_to)
-          {
-            if (job.tag_has_subscription(sub_tag))
-            {
-              return false;
-            }
+          for (const auto& sub_tag : config.tags_to_subscribe_to) {
+            if (job.tag_has_subscription(sub_tag)) { return false; }
           }
           // All tags failed
           return true;
         }();
-        if (should_exit)
-        {
-          break;
-        }
+        if (should_exit) { break; }
       }
-      else
-      {
+      else {
         std::vector<double> other_values;
         std::transform(
-          neighbor_values.cbegin(),
-          neighbor_values.cend(),
-          std::back_inserter(other_values),
-          [](const auto& value) {
+          neighbor_values.cbegin(), neighbor_values.cend(), std::back_inserter(other_values), [](const auto& value) {
             return value.second;
-          }
-        );
+          });
         bool should_exit = false;
         std::tie(own_value, should_exit) = act_on(own_value, other_values);
         job.publish(config.tags_produced.front(), own_value);
-        if (should_exit)
-        {
-          break;
-        }
+        if (should_exit) { break; }
       }
       // Sleep for a random amount of time
       const auto sleep_ms = std::uniform_int_distribution<int>{1, 5}(prng);
@@ -167,32 +128,26 @@ int main(const int argc, const char* const argv[])
 {
   // Explicitly disable logging as the output is too noisy otherwise
   SKYNET_SET_LOG_LEVEL_TO_WARN();
-  if (argc != 3)
-  {
-    std::cerr
-      << "Usage:\n"
-      << argv[0] << " config_file machine_name\n";
+  if (argc != 3) {
+    std::cerr << "Usage:\n" << argv[0] << " config_file machine_name\n";
     return 1;
   }
   std::ifstream fin(argv[1]);
   const char* machine_name = argv[2];
-  if (!fin)
-  {
+  if (!fin) {
     std::cerr << "Error opening config file \"" << argv[1] << "\"\n";
     return 1;
   }
   const std::unordered_map<std::string, MachineConfig> configurations = [&]() {
     MachineConfig temp;
     std::unordered_map<std::string, MachineConfig> to_ret;
-    while (fin >> temp)
-    {
+    while (fin >> temp) {
       to_ret[temp.name] = std::move(temp);
     }
     return to_ret;
   }();
   const auto config_iter = configurations.find(machine_name);
-  if (config_iter == configurations.cend())
-  {
+  if (config_iter == configurations.cend()) {
     std::cerr << "Could not find configuration for machine \"" << machine_name << "\"\n";
     return 1;
   }
@@ -205,13 +160,11 @@ int main(const int argc, const char* const argv[])
     config_iter->second,
     configurations,
     value,
-    [iter=0](const double& self_value, const std::vector<double>& other_values) mutable {
+    [iter = 0](const double& self_value, const std::vector<double>& other_values) mutable {
       constexpr int num_iters = 5'000;
-      const auto new_value =
-        std::accumulate(other_values.cbegin(), other_values.cend(), self_value)
-        / (other_values.size() + 1);
+      const auto new_value
+        = std::accumulate(other_values.cbegin(), other_values.cend(), self_value) / (other_values.size() + 1);
       ++iter;
       return std::make_pair(new_value, iter > num_iters);
-    }
-  );
+    });
 }
