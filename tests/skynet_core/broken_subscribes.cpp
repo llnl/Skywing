@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_core/master.hpp"
 #include "skynet_core/enable_logging.hpp"
+#include "skynet_core/master.hpp"
 
 #include <thread>
 
@@ -29,16 +29,15 @@ void publish_once(int publish_number)
   Master base_master{publisher_port, publisher_id};
   base_master.submit_job("job", [&](Job& job, MasterHandle master) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */ }
+    while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */
+    }
     job.declare_publication_intent(value_tag);
-    while (master.number_of_subscribers(value_tag) == 0)
-    {
+    while (master.number_of_subscribers(value_tag) == 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     job.publish(value_tag, value_to_publish);
     // Wait for the value to be retrieved
-    while (values_retrieved <= publish_number)
-    {
+    while (values_retrieved <= publish_number) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
@@ -50,10 +49,8 @@ void subscriber()
   Master base_master{subscriber_port, subscriber_id};
   base_master.submit_job("job", [&](Job& job, MasterHandle) {
     job.subscribe(value_tag).get();
-    while (values_retrieved != num_values_to_publish)
-    {
-      if (values_retrieved != 0)
-      {
+    while (values_retrieved != num_values_to_publish) {
+      if (values_retrieved != 0) {
         // wait a bit so the publisher can disconnect
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         job.rebuild_missing_tag_connections().wait();
@@ -75,8 +72,7 @@ void subscriber()
 TEST_CASE("Subscribe channels breaking is fine", "[Skynet_BrokenSubscribe]")
 {
   std::thread subscriber_thread{subscriber};
-  for (int i = 0; i < num_values_to_publish; ++i)
-  {
+  for (int i = 0; i < num_values_to_publish; ++i) {
     std::thread publish_thread{publish_once, i};
     publish_thread.join();
   }

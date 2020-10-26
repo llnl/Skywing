@@ -1,8 +1,8 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_core/master.hpp"
-#include "skynet_core/job.hpp"
 #include "skynet_core/enable_logging.hpp"
+#include "skynet_core/job.hpp"
+#include "skynet_core/master.hpp"
 
 #include "utils.hpp"
 
@@ -32,65 +32,55 @@ constexpr const char* tag3_value = "test a string";
 template<typename T>
 struct ExpectedTagValue;
 template<>
-struct ExpectedTagValue<Tag0> { static constexpr auto value() { return tag1_value; } };
+struct ExpectedTagValue<Tag0> {
+  static constexpr auto value() { return tag1_value; }
+};
 template<>
-struct ExpectedTagValue<Tag1> { static constexpr auto value() { return tag2_value; } };
+struct ExpectedTagValue<Tag1> {
+  static constexpr auto value() { return tag2_value; }
+};
 template<>
-struct ExpectedTagValue<Tag2> { static constexpr auto value() { return tag3_value; } };
+struct ExpectedTagValue<Tag2> {
+  static constexpr auto value() { return tag3_value; }
+};
 
 std::mutex catch_mutex;
 
 const std::array<std::tuple<Tag0, Tag1, Tag2>, 2> tags{
   std::make_tuple(Tag0{"job0tag0"}, Tag1{"job0tag1"}, Tag2{"job0tag2"}),
-  std::make_tuple(Tag0{"job1tag0"}, Tag1{"job1tag1"}, Tag2{"job1tag2"})
-};
+  std::make_tuple(Tag0{"job1tag0"}, Tag1{"job1tag1"}, Tag2{"job1tag2"})};
 
 template<std::size_t TagIndex, std::size_t ValueIndex>
-void test_tag(
-  Job& job,
-  const int machine_index,
-  const int job_index
-) noexcept
+void test_tag(Job& job, const int machine_index, const int job_index) noexcept
 {
   using TagType = std::tuple_element_t<TagIndex, decltype(tags)::value_type>;
   constexpr auto value_to_publish = ExpectedTagValue<TagType>::value();
   const auto& tag = std::get<TagIndex>(tags[ValueIndex]);
   static std::atomic<bool> need_publishing = false;
   static std::atomic<int> num_done = 0;
-  if (machine_index == TagIndex && job_index == ValueIndex)
-  {
+  if (machine_index == TagIndex && job_index == ValueIndex) {
     // Can't just base on the number of subscribers as that can fail
     int last = num_done;
-    while (num_done != num_machines * 2 - 1)
-    {
+    while (num_done != num_machines * 2 - 1) {
       std::this_thread::sleep_for(std::chrono::milliseconds{10});
-      if (need_publishing.exchange(false))
-      {
-        job.publish(tag, value_to_publish);
-      }
-      if (last != num_done) {
-        last = num_done;
-      }
+      if (need_publishing.exchange(false)) { job.publish(tag, value_to_publish); }
+      if (last != num_done) { last = num_done; }
     }
   }
-  else
-  {
+  else {
     job.subscribe(tag).get();
     // wait a bit for the subscribe message to send...
     std::this_thread::sleep_for(std::chrono::milliseconds{10});
     need_publishing = true;
-    while (true)
-    {
+    while (true) {
       const auto opt_value = job.get_waiter(tag).get();
-      if (opt_value)
-      {
+      if (opt_value) {
         // Catch2's macros are not thread safe
         std::lock_guard g{catch_mutex};
         REQUIRE(*opt_value == value_to_publish);
         break;
       }
-      else
-      {
+      else {
         job.rebuild_missing_tag_connections().get();
         need_publishing = true;
       }
@@ -108,18 +98,22 @@ void machine_task(const NetworkInfo* const info, const int index)
   // Function to create a job task
   const auto make_job_task = [&](std::size_t i) {
     return [index, info, i](Job& job, MasterHandle handle) {
-      if (i == 0)
-      {
+      if (i == 0) {
         connect_network(*info, handle, index, [](MasterHandle& m, const int num) {
           return m.connect_to_server("127.0.0.1", base_port + num).get();
         });
       }
       SKYNET_SYNCHRONIZE_MACHINES(num_machines * 2);
-      switch (index)
-      {
-        case 0: job.declare_publication_intent(std::get<Tag0>(tags[i])); break;
-        case 1: job.declare_publication_intent(std::get<Tag1>(tags[i])); break;
-        case 2: job.declare_publication_intent(std::get<Tag2>(tags[i])); break;
+      switch (index) {
+      case 0:
+        job.declare_publication_intent(std::get<Tag0>(tags[i]));
+        break;
+      case 1:
+        job.declare_publication_intent(std::get<Tag1>(tags[i]));
+        break;
+      case 2:
+        job.declare_publication_intent(std::get<Tag2>(tags[i]));
+        break;
       }
       test_tag<0, 0>(job, index, i);
       test_tag<0, 1>(job, index, i);
@@ -139,12 +133,10 @@ TEST_CASE("Broadcast works on complex networks", "[Skynet_BroadcastComplex]")
   SKYNET_SET_LOG_LEVEL_TO_TRACE();
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
-  for (auto i = 0; i < num_machines; ++i)
-  {
+  for (auto i = 0; i < num_machines; ++i) {
     threads.emplace_back(machine_task, &network_info, i);
   }
-  for (auto&& thread : threads)
-  {
+  for (auto&& thread : threads) {
     thread.join();
   }
 }

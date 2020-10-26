@@ -23,15 +23,10 @@ void server()
     REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
   }
   // Twice for non-blocking/blocking connection
-  for (int i = 0; i < 2; ++i)
-  {
+  for (int i = 0; i < 2; ++i) {
     const auto get_client = [&]() {
-      while (true)
-      {
-        if (auto val = conn.accept())
-        {
-          return std::move(*val);
-        }
+      while (true) {
+        if (auto val = conn.accept()) { return std::move(*val); }
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
       }
     };
@@ -39,8 +34,7 @@ void server()
     SocketCommunicator with_client = get_client();
     // Wait for an int to be send
     std::array<std::byte, sizeof(value_to_send)> int_buffer;
-    while (with_client.read_message(int_buffer.data(), int_buffer.size()) != ConnectionError::no_error)
-    {
+    while (with_client.read_message(int_buffer.data(), int_buffer.size()) != ConnectionError::no_error) {
       // empty
     }
     // verify that it's the same
@@ -82,11 +76,9 @@ void client()
     // Clunky work-around to actually be able to test the status
     // (This lambda in immediately invoked)
     [&]() {
-      while (true)
-      {
+      while (true) {
         const auto status = conn.connection_progress_status();
-        switch (status)
-        {
+        switch (status) {
         case ConnectionError::connection_in_progress:
           std::this_thread::sleep_for(std::chrono::milliseconds{1});
           break;

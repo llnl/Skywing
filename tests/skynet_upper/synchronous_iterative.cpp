@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_upper/synchronous_iterative.hpp"
 #include "skynet_core/enable_logging.hpp"
+#include "skynet_upper/synchronous_iterative.hpp"
 
 #include "utils.hpp"
 
@@ -14,19 +14,12 @@ constexpr int num_connections = 1;
 
 using ValueTag = skynet::PublishTag<int>;
 
-const std::array<ValueTag, 3> tags{
-  ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}
-};
+const std::array<ValueTag, 3> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
 
-const std::array<std::uint16_t, 3> ports{
-  10000, 20000, 30000
-};
+const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
 
 constexpr std::array<std::array<int, 2>, 3> publish_values{
-  std::array<int, 2>{0, 10},
-  std::array<int, 2>{1, 20},
-  std::array<int, 2>{2, 30}
-};
+  std::array<int, 2>{0, 10}, std::array<int, 2>{1, 20}, std::array<int, 2>{2, 30}};
 
 std::vector<int> expected_results(const int iter)
 {
@@ -43,20 +36,14 @@ void machine_task(const NetworkInfo* const info, const int index)
     connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
-    auto opt_iter_method = create_synchronous_iterative(
-      master,
-      job_handle,
-      tags[index],
-      tags
-    ).get();
+    auto opt_iter_method = create_synchronous_iterative(master, job_handle, tags[index], tags).get();
     {
       std::lock_guard<std::mutex> g{catch_mutex};
       REQUIRE(opt_iter_method);
     }
     const auto& values_to_publish = publish_values[index];
     auto iter_method = *opt_iter_method;
-    for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i)
-    {
+    for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i) {
       const auto values = iter_method.values(values_to_publish[i]).get();
       {
         std::lock_guard g{catch_mutex};
@@ -72,12 +59,10 @@ TEST_CASE("Synchronous Iterative", "[Skynet_SynchronousIterative]")
 {
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
-  for (auto i = 0; i < num_machines; ++i)
-  {
+  for (auto i = 0; i < num_machines; ++i) {
     threads.emplace_back(machine_task, &network_info, i);
   }
-  for (auto&& thread : threads)
-  {
+  for (auto&& thread : threads) {
     thread.join();
   }
 }

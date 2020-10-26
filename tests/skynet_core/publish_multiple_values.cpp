@@ -17,13 +17,9 @@ using namespace skynet;
 using ValueTag = PublishTag<int, double>;
 using NotifyTag = PublishTag<>;
 
-constexpr auto reduce_op = [](const std::tuple<int, double>& lhs, const std::tuple<int, double>& rhs) noexcept
-  -> std::tuple<int, double>
-{
-  return std::tuple<int, double>{
-    std::get<0>(lhs) + std::get<0>(rhs),
-    std::get<1>(lhs) + std::get<1>(rhs)
-  };
+constexpr auto reduce_op
+  = [](const std::tuple<int, double>& lhs, const std::tuple<int, double>& rhs) noexcept -> std::tuple<int, double> {
+  return std::tuple<int, double>{std::get<0>(lhs) + std::get<0>(rhs), std::get<1>(lhs) + std::get<1>(rhs)};
 };
 
 constexpr std::tuple<int, double> publish_value{10, 3.14159};
@@ -32,25 +28,18 @@ const ValueTag tag0{"tag 0"};
 const NotifyTag tag1{"tag 1"};
 
 using ReduceTag = ReduceValueTag<int, double>;
-const std::vector<ReduceTag> reduce_tags {
-  ReduceTag{"tag 0"},
-  ReduceTag{"tag 1"}
-};
+const std::vector<ReduceTag> reduce_tags{ReduceTag{"tag 0"}, ReduceTag{"tag 1"}};
 
 const ReduceGroupTag<int, double> reduce_group_name{"reduce"};
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master base_master{
-    static_cast<std::uint16_t>(base_port + index),
-    std::to_string(index)
-  };
+  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   base_master.submit_job("job", [&](Job& job, MasterHandle master) {
     connect_network(*info, master, index, [](MasterHandle& m, const int i) {
       return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
-    if (index == 0)
-    {
+    if (index == 0) {
       job.subscribe(tag1).get();
       // Declare publication intent after subscribing so that the other
       // machine won't publish too early
@@ -58,8 +47,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       job.get_waiter(tag1).get();
       job.publish(tag0, publish_value);
     }
-    else
-    {
+    else {
       job.declare_publication_intent(tag1);
       job.subscribe(tag0).get();
       job.publish(tag1);
@@ -82,12 +70,10 @@ TEST_CASE("Publishing multiple values works", "[Skynet_MultiplePublish]")
   using namespace std::chrono_literals;
   const auto network_info = make_network(num_machines, 1);
   std::vector<std::thread> threads;
-  for (auto i = 0; i < num_machines; ++i)
-  {
+  for (auto i = 0; i < num_machines; ++i) {
     threads.emplace_back(machine_task, &network_info, i);
   }
-  for (auto&& thread : threads)
-  {
+  for (auto&& thread : threads) {
     thread.join();
   }
 }
