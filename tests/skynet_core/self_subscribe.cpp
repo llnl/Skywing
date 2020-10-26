@@ -8,15 +8,9 @@ using PubTag = PublishTag<std::int32_t>;
 using GroupTag = ReduceGroupTag<std::int32_t>;
 using ValueTag = ReduceValueTag<std::int32_t>;
 
-const std::array<ValueTag, 2> tags{
-  ValueTag{"Tag 0"},
-  ValueTag{"Tag 1"}
-};
+const std::array<ValueTag, 2> tags{ValueTag{"Tag 0"}, ValueTag{"Tag 1"}};
 
-std::int32_t reduce_op(std::int32_t a, std::int32_t b)
-{
-  return a + b;
-}
+std::int32_t reduce_op(std::int32_t a, std::int32_t b) { return a + b; }
 
 constexpr std::chrono::milliseconds wait_time{1000};
 

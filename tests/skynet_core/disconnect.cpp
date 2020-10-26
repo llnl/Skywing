@@ -1,8 +1,8 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_core/master.hpp"
-#include "skynet_core/job.hpp"
 #include "skynet_core/enable_logging.hpp"
+#include "skynet_core/job.hpp"
+#include "skynet_core/master.hpp"
 
 #include "utils.hpp"
 
@@ -26,12 +26,11 @@ void setup_network(const int index, MasterHandle master)
   std::this_thread::sleep_for(10ms);
   // Fully connect the network to ensure that at any point all machines can have a
   // broadcast reach every other machine
-  for (int i = 0; i < index; ++i)
-  {
-    while (!master.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */ }
+  for (int i = 0; i < index; ++i) {
+    while (!master.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */
+    }
   }
-  while (master.number_of_neighbors() != num_machines - 1)
-  {
+  while (master.number_of_neighbors() != num_machines - 1) {
     std::this_thread::sleep_for(1ms);
   }
 }
@@ -47,41 +46,30 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     setup_network(index, master);
     my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
-    for (int i = 0; i < num_machines; ++i)
-    {
-      if (i != publish_num)
-      {
-        my_job.subscribe(Int32Tag{std::to_string(i)}).wait();
-      }
-      else
-      {
-        while (master.number_of_subscribers(publish_tag) != static_cast<int>(num_machines - 1))
-        {
+    for (int i = 0; i < num_machines; ++i) {
+      if (i != publish_num) { my_job.subscribe(Int32Tag{std::to_string(i)}).wait(); }
+      else {
+        while (master.number_of_subscribers(publish_tag) != static_cast<int>(num_machines - 1)) {
           std::this_thread::sleep_for(10ms);
         }
       }
     }
     SKYNET_SYNCHRONIZE_MACHINES(num_machines);
     static std::atomic<int> ready_count{0};
-    if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1))
-    {
-      while (ready_count != static_cast<int>(num_machines))
-      {
+    if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1)) {
+      while (ready_count != static_cast<int>(num_machines)) {
         std::this_thread::sleep_for(10ms);
       }
     }
     my_job.publish(publish_tag, index);
-    for (std::size_t i = 0; i < disconnect_order.size(); ++i)
-    {
+    for (std::size_t i = 0; i < disconnect_order.size(); ++i) {
       const auto to_remove = disconnect_order[i];
-      if (to_remove == index)
-      {
+      if (to_remove == index) {
         // Leaving the loop will cause the master to destruct, automatically
         // disconnecting
         break;
       }
-      else
-      {
+      else {
         const Int32Tag get_tag{std::to_string(disconnect_order[i])};
         static std::mutex m;
         std::lock_guard g{m};
@@ -101,12 +89,10 @@ TEST_CASE("Disconnecting machines don't break commuincations.", "[Skynet_Disconn
   std::iota(disconnect_order.begin(), disconnect_order.end(), 0);
   std::shuffle(disconnect_order.begin(), disconnect_order.end(), make_prng());
   std::vector<std::thread> threads;
-  for (int i = 0; i < num_machines; ++i)
-  {
+  for (int i = 0; i < num_machines; ++i) {
     threads.emplace_back(machine_task, i, &disconnect_order);
   }
-  for (auto&& thread : threads)
-  {
+  for (auto&& thread : threads) {
     thread.join();
   }
 }

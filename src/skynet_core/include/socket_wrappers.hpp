@@ -11,15 +11,14 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-namespace skynet::internal
-{
-  /** \brief Creates a socket in non-blocking mode
-   */
-  int create_non_blocking() noexcept;
+namespace skynet::internal {
+/** \brief Creates a socket in non-blocking mode
+ */
+int create_non_blocking() noexcept;
 
-  /** \brief Accepts on a socket and puts the connection in non-blocking mode
-   */
-  int accept_make_non_blocking(const int sockfd, sockaddr* addr, socklen_t* addrlen) noexcept;
+/** \brief Accepts on a socket and puts the connection in non-blocking mode
+ */
+int accept_make_non_blocking(const int sockfd, sockaddr* addr, socklen_t* addrlen) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_SRC_SOCKET_WRAPPERS_HPP

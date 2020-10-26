@@ -9,8 +9,7 @@
  * only one class can access it at a time
  */
 template<typename T>
-class MutexGuarded
-{
+class MutexGuarded {
 public:
   /** \brief Construct a guarded object with the passed parameters
    */
@@ -21,28 +20,20 @@ public:
 
   /** \brief Returns the object, locking if it is not available
    */
-  std::pair<T&, std::unique_lock<std::mutex>> get() noexcept
-  {
-    return {value_, std::unique_lock{mutex_}};
-  }
+  std::pair<T&, std::unique_lock<std::mutex>> get() noexcept { return {value_, std::unique_lock{mutex_}}; }
 
-  std::pair<const T&, std::unique_lock<std::mutex>> get() const noexcept
-  {
-    return {value_, std::unique_lock{mutex_}};
-  }
+  std::pair<const T&, std::unique_lock<std::mutex>> get() const noexcept { return {value_, std::unique_lock{mutex_}}; }
 
   /** \brief Trys to lock the object, returns nullptr for the object
    * if it failed to do so
    */
   std::pair<T*, std::unique_lock<std::mutex>> try_get() noexcept
   {
-    if (mutex_.try_lock())
-    {
+    if (mutex_.try_lock()) {
       // Lock worked
       return {&value_, {mutex_, std::adopt_lock}};
     }
-    else
-    {
+    else {
       // Lock failed
       return {nullptr, {}};
     }
@@ -50,12 +41,8 @@ public:
 
   std::pair<const T*, std::unique_lock<std::mutex>> try_get() const noexcept
   {
-    if (mutex_.try_lock())
-    {
-      return {&value_, {mutex_, std::adopt_lock}};
-    }
-    else
-    {
+    if (mutex_.try_lock()) { return {&value_, {mutex_, std::adopt_lock}}; }
+    else {
       return {nullptr, {}};
     }
   }

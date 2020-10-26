@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
-#include "skynet_core/skynet.hpp"
 #include "skynet_core/enable_logging.hpp"
+#include "skynet_core/skynet.hpp"
 #include <iostream>
 
 using namespace skynet;
@@ -31,8 +31,12 @@ TEST_CASE("Reduce groups with same machines work", "[Skynet_ReduceTagBug]")
   Master master_base{30000, "glue"};
   master_base.submit_job("job", [&](Job&, MasterHandle master) {
     std::cout << "Henlo\n";
-    while (true) { if (master.connect_to_server("127.0.0.1", 10000).get()) { break; } }
-    while (true) { if (master.connect_to_server("127.0.0.1", 20000).get()) { break; } }
+    while (true) {
+      if (master.connect_to_server("127.0.0.1", 10000).get()) { break; }
+    }
+    while (true) {
+      if (master.connect_to_server("127.0.0.1", 20000).get()) { break; }
+    }
     // sleep to allow information to exchange
     std::this_thread::sleep_for(std::chrono::milliseconds{500});
   });
