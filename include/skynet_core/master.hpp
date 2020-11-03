@@ -724,7 +724,7 @@ private:
     subscription,
     reduce_group
   };
-  static constexpr const char* to_c_str(ConnType type) noexcept;
+  static const char* to_c_str(ConnType type) noexcept;
   // Pending connections for all types
   struct PendingInfo {
     internal::SocketCommunicator conn;

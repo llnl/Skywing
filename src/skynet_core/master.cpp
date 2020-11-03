@@ -1224,7 +1224,7 @@ bool Master::addr_is_connected(const AddrPortPair& address) const noexcept
   return !iter->second->is_dead();
 }
 
-constexpr const char* Master::to_c_str(ConnType type) noexcept
+const char* Master::to_c_str(ConnType type) noexcept
 {
   switch (type) {
   case ConnType::user_requested:
