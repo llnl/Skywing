@@ -1166,7 +1166,7 @@ void Master::init_connections_for_pending_tags() noexcept
           else {
             // Reduce group
             const auto tags_str_view = internal::split(tag, '\0');
-            for (const auto str_view : tags_str_view) {
+            for (const auto& str_view : tags_str_view) {
               finalize_reduce_group(neighbor_iter->second->id(), group_from_parent_tag(TagID{str_view}).first);
             }
           }
@@ -1280,7 +1280,7 @@ void Master::process_pending_conns() noexcept
 
     case ConnType::reduce_group: {
       const auto tag_str_view = internal::split(info.tag, '\0');
-      for (const auto tag_view : tag_str_view) {
+      for (const auto& tag_view : tag_str_view) {
         const TagID tag{tag_view};
         auto& [group_id, reduce_data] = group_from_parent_tag(tag);
         (void)group_id;
@@ -1367,7 +1367,7 @@ void Master::process_pending_conns() noexcept
 
               case ConnType::reduce_group: {
                 const auto tag_str_view = internal::split(info.tag, '\0');
-                for (const auto tag : tag_str_view) {
+                for (const auto& tag : tag_str_view) {
                   finalize_reduce_group(new_neighbor_iter->first, group_from_parent_tag(TagID{tag}).first);
                 }
               } break;
