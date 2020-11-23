@@ -7,6 +7,8 @@ project('skynet', 'cpp',
   ]
 )
 
+python = import('python').find_installation('python3')
+
 # This isn't a useful warning and is impossible to get correct when specializing
 # things in the std namespace as anything can either be a struct or class
 if meson.get_compiler('cpp').has_argument('-Wmismatched-tags')

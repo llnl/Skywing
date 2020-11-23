@@ -176,19 +176,38 @@ struct ReduceGroupNeighbors {
 };
 
 // Marker prepended to mark tags as publish tags
-constexpr char publish_tag_marker = 'p';
+inline constexpr char publish_tag_marker = 'p';
 
 // Marker prepended to mark tags as begin for reduce groups
-constexpr char reduce_value_marker = 'r';
+inline constexpr char reduce_value_marker = 'r';
 
-// Marker preprended to mark tags as reduce group tags
-constexpr char reduce_group_marker = 'g';
+// Marker prepended to mark tags as reduce group tags
+inline constexpr char reduce_group_marker = 'g';
+
+// Marker prepended to mark tags as private tags
+inline constexpr char private_tag_marker = 'x';
+
+/// Structure for testing if a value is any of the supplied values
+template<typename T, T... Values>
+struct any_of {
+  template<typename U>
+  friend constexpr bool operator==(const U& comp, any_of) noexcept
+  {
+    return ((comp == Values) || ...);
+  }
+
+  template<typename U>
+  friend constexpr bool operator==(any_of, const U& comp) noexcept
+  {
+    return comp == any_of{};
+  }
+};
 
 // Checks if a tag name is bad
 inline bool tag_name_okay(const std::string& tag) noexcept
 {
   return !tag.empty()
-      && (tag[0] == publish_tag_marker || tag[0] == reduce_value_marker || tag[0] == reduce_group_marker);
+      && (tag[0] == any_of<char, publish_tag_marker, reduce_value_marker, reduce_group_marker, private_tag_marker>{});
 }
 } // namespace internal
 } // namespace skynet

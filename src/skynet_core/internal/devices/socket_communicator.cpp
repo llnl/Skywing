@@ -33,7 +33,7 @@ SocketCommunicator::SocketCommunicator() noexcept : handle_{create_non_blocking(
 {
   if (handle_ == invalid_handle) {
     std::perror("SocketCommunicator::SocketCommunicator - socket");
-    std::exit(-1);
+    std::exit(4);
   }
 }
 
@@ -70,7 +70,7 @@ std::optional<SocketCommunicator> SocketCommunicator::accept() noexcept
     // Not 100% sure how to handle it, but forcefully quitting with a message
     // seems to be fine for now
     std::perror("SocketCommunicator::accept - accept");
-    std::exit(-1);
+    std::exit(4);
   }
 
   // Read the address

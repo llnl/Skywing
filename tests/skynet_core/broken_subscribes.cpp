@@ -3,12 +3,14 @@
 #include "skynet_core/enable_logging.hpp"
 #include "skynet_core/master.hpp"
 
+#include "utils.hpp"
+
 #include <thread>
 
 using namespace skynet;
 
-constexpr std::uint16_t publisher_port = 10000;
-constexpr std::uint16_t subscriber_port = 20000;
+const std::uint16_t publisher_port = get_starting_port();
+const std::uint16_t subscriber_port = publisher_port + 1;
 constexpr const char* publisher_id = "publisher";
 constexpr const char* subscriber_id = "subscriber";
 

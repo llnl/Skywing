@@ -63,6 +63,29 @@ private:
   Master* master_;
   AddrPortPair address_;
 }; // class MasterGetConnectionSuccess
+
+class MasterIPSubscribeComplete {
+public:
+  MasterIPSubscribeComplete(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept;
+  bool operator()() const noexcept;
+
+private:
+  Master* master_;
+  AddrPortPair address_;
+  std::vector<TagID> tags_;
+  mutable bool conn_pending_ = true;
+};
+
+class MasterIPSubscribeSuccess {
+public:
+  MasterIPSubscribeSuccess(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept;
+  bool operator()() const noexcept;
+
+private:
+  Master* master_;
+  AddrPortPair address_;
+  std::vector<TagID> tags_;
+};
 } // namespace internal
 } // namespace skynet
 

@@ -630,6 +630,8 @@ auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
     if (tag_to_machine_.find(to_find) != tag_to_machine_.cend()) { return false; }
     if (std::find(pending_tags_.cbegin(), pending_tags_.cend(), to_find) != pending_tags_.cend()) { return false; }
+    // Ignore private tags
+    if (to_find[0] == internal::private_tag_marker) { return false; }
     return true;
   });
   if (!pending_tags_.empty()) {
@@ -641,6 +643,30 @@ auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   // Can potentially finish subscribing right away, so notify things
   notify_subscriptions_ = true;
   return make_waiter(job_mut_, subscription_cv_, internal::MasterSubscribeIsDone{*this, tag_ids});
+}
+
+auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
+  -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
+{
+  const auto iter = addr_to_machine_.find(addr);
+  if (iter != addr_to_machine_.cend()) {
+    iter->second->send_message(internal::make_subscription_notice(tag_ids, false));
+    notify_subscriptions_ = true;
+  }
+  else {
+    const std::string tag_list = std::accumulate(
+      std::next(tag_ids.cbegin()),
+      tag_ids.cend(),
+      tag_ids.front(),
+      [](const std::string& so_far, const std::string& next) { return so_far + "0" + next; });
+    pending_conns_.try_emplace(
+      addr, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
+  }
+  return make_waiter(
+    job_mut_,
+    subscription_cv_,
+    internal::MasterIPSubscribeComplete{*this, addr, tag_ids},
+    internal::MasterIPSubscribeSuccess{*this, addr, tag_ids});
 }
 
 void Master::handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept
@@ -848,7 +874,7 @@ void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
     if (!inserted) {
       // Two jobs on the same master can't produce the same tag; fail loudly
       std::cerr << "The tag " << std::quoted(tag) << " was reported for publication more than once!\n";
-      std::terminate();
+      std::exit(1);
     }
   }
   // Notify publish groups for self-subscribing
@@ -866,7 +892,7 @@ auto Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> grou
   if (!tag_inserted) {
     std::cerr << "The tag " << std::quoted(tag_produced)
               << " was attempted to be produced for more than one reduce group!\n";
-    std::exit(2);
+    std::exit(1);
   }
   const auto [iter, inserted] = reduce_tag_data_.try_emplace(group_id, std::move(group_ptr));
   // Allow creating the same group twice as tags can be reused
@@ -1235,6 +1261,8 @@ const char* Master::to_c_str(ConnType type) noexcept
     return "subscription";
   case ConnType::reduce_group:
     return "reduce_group";
+  case ConnType::specific_ip:
+    return "specific_ip";
   }
   // This should never be reached
   assert(false);
@@ -1267,6 +1295,7 @@ void Master::process_pending_conns() noexcept
     switch (info.type) {
     case ConnType::by_accept:
     case ConnType::user_requested:
+    case ConnType::specific_ip:
       // nothing special needs to happen
       break;
 
@@ -1375,6 +1404,28 @@ void Master::process_pending_conns() noexcept
               case ConnType::subscription:
                 finalize_subscription(info.tag, new_neighbor_iter->second);
                 break;
+
+              case ConnType::specific_ip: {
+                auto& new_neighbor = new_neighbor_iter->second;
+                // Erroring is different here because the tag shouldn't be marked as being wanted
+                // Furthermore, specific IP uses the subscription CV, not the connection one
+                const auto on_error = [&]() {
+                  new_neighbor.mark_as_dead();
+                  iter = pending_conns_.erase(iter);
+                  notify_subscriptions_ = true;
+                };
+                const auto ip_and_tag = internal::split(info.tag, '\0', 2);
+                assert(ip_and_tag.size() == 2);
+                const auto expected_ip = ip_and_tag[0];
+                const auto tags = ip_and_tag[1];
+                if (new_neighbor.address() != expected_ip) {
+                  SKYNET_ERROR_LOG(
+                    "Neighbor IP \"{}\" didn't match with expected IP \"{}\"!", neighbor_ip, expected_ip);
+                  on_error();
+                  continue;
+                }
+                finalize_subscription(std::string{tags}, new_neighbor);
+              } break;
               }
               // These will always happen at the end
               notify_of_new_neighbor(new_neighbor_iter->first);

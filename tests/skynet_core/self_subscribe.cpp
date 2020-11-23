@@ -2,6 +2,8 @@
 
 #include "skynet_core/skynet.hpp"
 
+#include "utils.hpp"
+
 using namespace skynet;
 
 using PubTag = PublishTag<std::int32_t>;
@@ -16,7 +18,7 @@ constexpr std::chrono::milliseconds wait_time{1000};
 
 TEST_CASE("Self-subscription works", "[Skynet_SelfSubscribe]")
 {
-  Master base_master{15000, "Lonely"};
+  Master base_master{get_starting_port(), "Lonely"};
 
   base_master.submit_job("job", [&](Job& job, MasterHandle) {
     // Publish/Subscribe

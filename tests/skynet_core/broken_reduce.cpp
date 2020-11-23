@@ -12,7 +12,7 @@ using namespace skynet;
 
 constexpr int num_machines = 5;
 constexpr int num_connections = 1;
-constexpr std::uint16_t base_port = 25000;
+const std::uint16_t base_port = get_starting_port();
 
 using ValueTag = ReduceValueTag<std::int32_t>;
 

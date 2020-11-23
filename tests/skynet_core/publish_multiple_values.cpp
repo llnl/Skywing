@@ -9,10 +9,10 @@
 #include <iostream>
 #include <sstream>
 
-constexpr int num_machines = 2;
-constexpr std::uint16_t base_port = 30000;
-
 using namespace skynet;
+
+constexpr int num_machines = 2;
+const std::uint16_t base_port = get_starting_port();
 
 using ValueTag = PublishTag<int, double>;
 using NotifyTag = PublishTag<>;

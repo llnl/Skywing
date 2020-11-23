@@ -286,6 +286,12 @@ public:
       std::lock_guard lock{m.job_mut_};
       return m.create_reduce_group(std::move(group_ptr));
     }
+
+    static auto ip_subscribe(Master& m, const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
+    {
+      std::lock_guard lock{m.job_mut_};
+      return m.ip_subscribe(addr, tag_ids);
+    }
   }; // struct JobAccessor
 
   // Accessor for the ExternalMaster class
@@ -384,6 +390,8 @@ public:
     friend class internal::MasterGetReduceGroup;
     friend class internal::MasterConnectionIsComplete;
     friend class internal::MasterGetConnectionSuccess;
+    friend class internal::MasterIPSubscribeComplete;
+    friend class internal::MasterIPSubscribeSuccess;
 
     static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
     {
@@ -487,6 +495,11 @@ private:
    */
   auto subscribe(const std::vector<TagID>& tag_ids) noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
 
+  /** \brief Subscribes to the passed tags only on a specific IP
+   */
+  auto ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
+    -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
+
   /** \brief Handles the get_publishers message
    */
   void handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept;
@@ -588,7 +601,7 @@ private:
   /** \brief Returns true if the connection was successful, false otherwise
    *
    * More accurately, checks if an address is currently connected, which may
-   * be usedful to expose at some point?
+   * be useful to expose at some point?
    */
   bool addr_is_connected(const AddrPortPair& address) const noexcept;
 
@@ -722,7 +735,8 @@ private:
     user_requested,
     by_accept,
     subscription,
-    reduce_group
+    reduce_group,
+    specific_ip
   };
   static const char* to_c_str(ConnType type) noexcept;
   // Pending connections for all types

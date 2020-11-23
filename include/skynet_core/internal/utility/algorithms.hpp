@@ -68,13 +68,21 @@ void merge_associative_containers(T& lhs, T& rhs) noexcept
 }
 
 /** \brief Split a string based on a character
+ *
+ * \param to_split The string to split
+ * \param split_char The char to split on
+ * \param max_count The maximum number of times to split
  */
-std::vector<std::string_view> split(const std::string& to_split, const char split_char) noexcept
+std::vector<std::string_view>
+  split(const std::string& to_split, const char split_char, const std::size_t max_count = 0) noexcept
 {
   std::vector<std::string_view> to_ret;
   auto start_pos = to_split.find(split_char);
   auto last_pos = 0;
   for (auto pos = start_pos; pos != std::string::npos; pos = to_split.find(split_char, pos + 1)) {
+    // Add one as there's always one string appended at the end
+    // This also makes a max_count of 0
+    if (to_ret.size() + 1 == max_count) { break; }
     // to_ret.emplace_back(to_split.data() + last_pos, to_split.data() + pos);
     to_ret.emplace_back(to_split.data() + last_pos, pos - last_pos);
     last_pos = pos + 1;

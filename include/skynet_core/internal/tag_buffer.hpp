@@ -56,30 +56,39 @@ enum class TagType : char
 {
   publish_tag = publish_tag_marker,
   reduce_value = reduce_value_marker,
-  reduce_group = reduce_group_marker
+  reduce_group = reduce_group_marker,
+  private_tag = private_tag_marker
 };
 
-// The implementation for all tags would be the same,
-// so abstract it into a base
-template<TagType BaseTagType>
-class TagBase {
+// Universal tag base for the rare use cases where more than one type of tag is allowed
+class UniversalTagBase {
 public:
-  TagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
-    : id_{static_cast<char>(BaseTagType) + id}, expected_types_{expected_types}
+  UniversalTagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+    : id_{id}, expected_types_{expected_types}
   {}
 
   const TagID& id() const noexcept { return id_; }
   const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
 
-  friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
-  {
-    return lhs.id_ == rhs.id_ && lhs.expected_types_ == rhs.expected_types_;
-  }
-  friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept { return !(lhs == rhs); }
-
 private:
   TagID id_;
   gsl::span<const std::uint8_t> expected_types_;
+};
+
+// The implementation for all tags would be the same,
+// so abstract it into a base
+template<TagType BaseTagType>
+class TagBase : public UniversalTagBase {
+public:
+  TagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+    : UniversalTagBase{static_cast<char>(BaseTagType) + id, expected_types}
+  {}
+
+  friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
+  {
+    return lhs.id() == rhs.id() && lhs.expected_types() == rhs.expected_types();
+  }
+  friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept { return !(lhs == rhs); }
 }; // class TagBase
 
 template<typename... Ts>
@@ -90,6 +99,7 @@ inline static constexpr std::array<std::uint8_t, sizeof...(Ts)> expected_type_fo
 using PublishTagBase = internal::TagBase<TagType::publish_tag>;
 using ReduceValueTagBase = internal::TagBase<TagType::reduce_value>;
 using ReduceGroupTagBase = internal::TagBase<TagType::reduce_group>;
+using PrivateTagBase = internal::TagBase<TagType::private_tag>;
 
 inline static constexpr VersionID tag_no_data = -1;
 
