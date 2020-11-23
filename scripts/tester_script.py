@@ -42,7 +42,7 @@ port_index = 0
 for i, command in enumerate(commands):
     start_time = time.monotonic()
     for attempt_no in range(NUM_TRIES):
-        print(f'Running "{command["name"]}"; {attempt_no + 1:>{NUM_TRIES_LEN}}/{NUM_TRIES:>{NUM_TRIES_LEN}}', end='')
+        print(f'Running "{command["name"]}"; {attempt_no + 1:>{NUM_TRIES_LEN}}/{NUM_TRIES:>{NUM_TRIES_LEN}}', end='', flush=True)
         try:
             completed = subprocess.run(
                 command['command'],

@@ -59,9 +59,7 @@ bool MasterIPSubscribeComplete::operator()() const noexcept
 {
   // Wait first to see if the connection has finished processing
   if (conn_pending_) {
-    if (Master::WaiterAccessor::conn_is_complete(*master_, address_)) {
-      conn_pending_ = false;
-    }
+    if (Master::WaiterAccessor::conn_is_complete(*master_, address_)) { conn_pending_ = false; }
     else {
       return false;
     }
@@ -83,7 +81,8 @@ MasterIPSubscribeSuccess::MasterIPSubscribeSuccess(
 
 bool MasterIPSubscribeSuccess::operator()() const noexcept
 {
-  return Master::WaiterAccessor::conn_get_success(*master_, address_) && Master::WaiterAccessor::conn_get_success(*master_, address_);
+  return Master::WaiterAccessor::conn_get_success(*master_, address_)
+      && Master::WaiterAccessor::conn_get_success(*master_, address_);
 }
 
 } // namespace skynet::internal

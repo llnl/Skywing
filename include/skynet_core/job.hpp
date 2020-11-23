@@ -70,6 +70,20 @@ public:
   using ValueType = ValueOrTuple<Ts...>;
 }; // class ReduceGroupTag
 
+/** \brief Private tag
+ */
+template<typename... Ts>
+class PrivateTag : public internal::PrivateTagBase {
+// requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
+public:
+  PrivateTag(const TagID& id) noexcept : internal::PrivateTagBase{id, internal::expected_type_for<Ts...>}
+  {
+    assert(!id.empty());
+  }
+
+  using ValueType = ValueOrTuple<Ts...>;
+};
+
 /** \brief Job with known tags
  */
 class Job {
@@ -286,6 +300,23 @@ public:
     const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
     std::apply(apply_to, value_tuple);
   }
+  template<typename... PublishTagTypes, typename... ArgTypes>
+  void publish(const PrivateTag<PublishTagTypes...>& tag, ArgTypes&&... values) noexcept
+  {
+    static_assert(
+      sizeof...(PublishTagTypes) == sizeof...(ArgTypes) && (... && std::is_convertible_v<ArgTypes, PublishTagTypes>),
+      "Argument values can not be converted to tag types!");
+    std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
+      static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
+    publish_impl(tag, gsl::span<PublishValueVariant>{variants});
+  }
+
+  template<typename... PublishTagTypes, typename... TupleTypes>
+  void publish(const PrivateTag<PublishTagTypes...>& tag, const std::tuple<TupleTypes...>& value_tuple) noexcept
+  {
+    const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
+    std::apply(apply_to, value_tuple);
+  }
 
   /** \brief Returns true if the job is finished, false if it is not
    */
@@ -395,7 +426,8 @@ private:
   auto get_subscribe_future(gsl::span<const internal::UniversalTagBase> tags) noexcept
     -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
 
-  auto get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
+  auto
+    get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
     -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
 
   void declare_publication_intent_impl(gsl::span<const internal::UniversalTagBase> tags) noexcept;

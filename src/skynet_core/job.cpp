@@ -183,7 +183,8 @@ auto Job::get_subscribe_future(const gsl::span<const internal::UniversalTagBase>
   return Master::JobAccessor::subscribe(*master_, tag_ids);
 }
 
-auto Job::get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
+auto Job::get_ip_subscribe_future(
+  const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
   -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
 {
   std::vector<TagID> tag_ids(tags.size());
@@ -191,7 +192,8 @@ auto Job::get_ip_subscribe_future(const std::string& address, const gsl::span<co
     tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::UniversalTagBase& t) { return t.id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
-    std::cerr << fmt::format("Invalid address \"{}\" for Job::ip_subscribe!  Note that a port must be specified.\n", address);
+    std::cerr << fmt::format(
+      "Invalid address \"{}\" for Job::ip_subscribe!  Note that a port must be specified.\n", address);
     std::exit(1);
   }
   return Master::JobAccessor::ip_subscribe(*master_, addr_pair, tag_ids);

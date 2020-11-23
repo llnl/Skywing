@@ -654,13 +654,17 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
     notify_subscriptions_ = true;
   }
   else {
+    // Put together IP address/port and tags
     const std::string tag_list = std::accumulate(
-      std::next(tag_ids.cbegin()),
+      tag_ids.cbegin(),
       tag_ids.cend(),
-      tag_ids.front(),
-      [](const std::string& so_far, const std::string& next) { return so_far + "0" + next; });
-    pending_conns_.try_emplace(
+      addr.first + ':' + std::to_string(addr.second),
+      [](const std::string& so_far, const std::string& next) { return so_far + '\0' + next; });
+    const auto [iter, inserted] = pending_conns_.try_emplace(
       addr, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
+    assert(inserted);
+    // Ignore the status - it is handeled later
+    (void)iter->second.conn.connect_non_blocking(addr.first.c_str(), addr.second);
   }
   return make_waiter(
     job_mut_,
@@ -1420,7 +1424,7 @@ void Master::process_pending_conns() noexcept
                 const auto tags = ip_and_tag[1];
                 if (new_neighbor.address() != expected_ip) {
                   SKYNET_ERROR_LOG(
-                    "Neighbor IP \"{}\" didn't match with expected IP \"{}\"!", neighbor_ip, expected_ip);
+                    "Neighbor IP \"{}\" didn't match with expected IP \"{}\"!", new_neighbor.address(), expected_ip);
                   on_error();
                   continue;
                 }

@@ -7,6 +7,7 @@ core_tests = {
     'broken_subscribes',
     'disconnect',
     'heartbeat',
+    'ip_subscribe',
     'publish_data_wrapper',
     'publish_multiple_values',
     'reduce_tag_bug',
