@@ -19,37 +19,39 @@ std::atomic<bool> ready_for_publication = false;
 
 void publisher()
 {
-    Master master{publisher_port, std::to_string(publisher_port)};
-    master.submit_job("publisher", [&](Job& job, MasterHandle handle) {
-        job.declare_publication_intent(tag);
-        ready_for_subscription = true;
-        handle.waiter_on_subscription_change([&]() {
-            return handle.number_of_subscribers(tag) > 0;
-        }).wait();
-        while (!ready_for_publication) { std::this_thread::sleep_for(std::chrono::milliseconds{1}); }
-        job.publish(tag, tag_value);
-    });
-    master.run();
+  Master master{publisher_port, std::to_string(publisher_port)};
+  master.submit_job("publisher", [&](Job& job, MasterHandle handle) {
+    job.declare_publication_intent(tag);
+    ready_for_subscription = true;
+    handle.waiter_on_subscription_change([&]() { return handle.number_of_subscribers(tag) > 0; }).wait();
+    while (!ready_for_publication) {
+      std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    job.publish(tag, tag_value);
+  });
+  master.run();
 }
 
 void subscriber()
 {
-    Master master{subscriber_port, std::to_string(subscriber_port)};
-    master.submit_job("subscriber", [&](Job& job, MasterHandle) {
-        while (!ready_for_subscription) { std::this_thread::sleep_for(std::chrono::milliseconds{1}); }
-        job.ip_subscribe("127.0.0.1:" + std::to_string(publisher_port), tag).wait();
-        ready_for_publication = true;
-        const auto value = job.get_waiter(tag).get();
-        REQUIRE(value);
-        REQUIRE(*value == tag_value);
-    });
-    master.run();
+  Master master{subscriber_port, std::to_string(subscriber_port)};
+  master.submit_job("subscriber", [&](Job& job, MasterHandle) {
+    while (!ready_for_subscription) {
+      std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    job.ip_subscribe("127.0.0.1:" + std::to_string(publisher_port), tag).wait();
+    ready_for_publication = true;
+    const auto value = job.get_waiter(tag).get();
+    REQUIRE(value);
+    REQUIRE(*value == tag_value);
+  });
+  master.run();
 }
 
 TEST_CASE("Subscribe to specific IP works", "[Skynet_IPSubscribe]")
 {
-    std::thread t1{publisher};
-    std::thread t2{subscriber};
-    t1.join();
-    t2.join();
+  std::thread t1{publisher};
+  std::thread t2{subscriber};
+  t1.join();
+  t2.join();
 }

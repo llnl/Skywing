@@ -74,7 +74,7 @@ public:
  */
 template<typename... Ts>
 class PrivateTag : public internal::PrivateTagBase {
-// requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
+  // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 public:
   PrivateTag(const TagID& id) noexcept : internal::PrivateTagBase{id, internal::expected_type_for<Ts...>}
   {

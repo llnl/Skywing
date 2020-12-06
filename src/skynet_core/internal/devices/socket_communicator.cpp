@@ -11,6 +11,9 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include <cstdio>
 #include <cstring>
@@ -20,11 +23,21 @@ constexpr int invalid_handle = -1;
 
 int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
 {
-  sockaddr_in servaddr;
-  servaddr.sin_family = AF_INET;
-  inet_pton(AF_INET, address, &servaddr.sin_addr);
-  servaddr.sin_port = ntohs(port);
-  return connect(sockfd, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr));
+  // This isn't super robust, but I'm not sure how to handle looking up a bunch of different
+  // address in an asynchronous context
+  addrinfo* result;
+  addrinfo hints;
+  std::memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_IP;
+  const auto port_str = std::to_string(port);
+  const auto resaddr = getaddrinfo(address, port_str.c_str(), &hints, &result);
+  if (resaddr != 0) {
+    std::perror("init_connection - resaddr");
+    std::exit(4);
+  }
+  return connect(sockfd, result->ai_addr, static_cast<int>(result->ai_addrlen));
 }
 } // namespace
 
