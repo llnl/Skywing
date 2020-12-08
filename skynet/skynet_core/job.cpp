@@ -187,8 +187,7 @@ auto Job::get_ip_subscribe_future(
   -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(
-    tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
+  std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(

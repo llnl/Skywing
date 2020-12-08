@@ -50,21 +50,21 @@ endif
 
 subdir('generated_files/generated')
 
-skynet_core_inc = include_directories('include', 'generated_files')
+skynet_core_inc = include_directories('skynet', 'generated_files')
 skynet_core_internal_dep = declare_dependency(
   include_directories : skynet_core_inc,
   dependencies : [thread_dep, capnproto_dep, spdlog_dep, gsl_dep],
   sources : [generated_sources]
 )
 
-subdir('src/skynet_core')
+subdir('skynet/skynet_core')
 
 skynet_core_dep = declare_dependency(
   dependencies : skynet_core_internal_dep,
   link_with : skynet_core_lib
 )
 
-subdir('src/skynet_upper')
+subdir('skynet/skynet_upper')
 skynet_upper_dep = declare_dependency(
   dependencies : skynet_core_dep
 )

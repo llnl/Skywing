@@ -44,7 +44,8 @@ public:
 protected:
   using OverridePrefix = internal::PublishTagBase::OverridePrefix;
   // For PrivateTag
-  PublishTag(OverridePrefix, const TagID& id) : internal::PublishTagBase{OverridePrefix{}, id, internal::expected_type_for<Ts...>}
+  PublishTag(OverridePrefix, const TagID& id)
+    : internal::PublishTagBase{OverridePrefix{}, id, internal::expected_type_for<Ts...>}
   {}
 }; // class PublishTag
 
@@ -54,7 +55,8 @@ template<typename... Ts>
 // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 class ReduceValueTag : public internal::ReduceValueTagBase {
 public:
-  explicit ReduceValueTag(const TagID& id) noexcept : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
+  explicit ReduceValueTag(const TagID& id) noexcept
+    : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
   {
     assert(!id.empty());
   }
@@ -68,7 +70,8 @@ template<typename... Ts>
 // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 class ReduceGroupTag : public internal::ReduceGroupTagBase {
 public:
-  explicit ReduceGroupTag(const TagID& id) noexcept : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
+  explicit ReduceGroupTag(const TagID& id) noexcept
+    : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
   {
     assert(!id.empty());
   }
@@ -79,7 +82,9 @@ public:
 /** \brief Tag for private publish tags
  */
 template<typename... Ts>
-class PrivateTag : public internal::PrivateTagBase, public PublishTag<Ts...> {
+class PrivateTag
+  : public internal::PrivateTagBase
+  , public PublishTag<Ts...> {
 private:
   using Base = PublishTag<Ts...>;
   using OverridePrefix = typename Base::OverridePrefix;
@@ -412,7 +417,8 @@ private:
   auto get_subscribe_future(gsl::span<const internal::PublishTagBase> tags) noexcept
     -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
 
-  auto get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
+  auto
+    get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
     -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
 
   void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept;
