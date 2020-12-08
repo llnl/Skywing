@@ -9,7 +9,7 @@
 
 using namespace skynet;
 
-using ValueTag = PublishTag<std::int32_t>;
+using ValueTag = PrivateTag<std::int32_t>;
 const ValueTag tag{"Test IP Tag"};
 const std::int32_t tag_value = 10;
 const std::uint16_t subscriber_port = get_starting_port();

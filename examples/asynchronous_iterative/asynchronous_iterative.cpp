@@ -29,7 +29,7 @@ struct MachineConfig {
     while (std::getline(in, temp)) {
       if (temp.empty()) { continue; }
       if (!in || temp.front() == '-') { break; }
-      read_into.push_back(std::move(temp));
+      read_into.push_back(T{std::move(temp)});
     }
   }
 

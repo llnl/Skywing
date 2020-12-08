@@ -56,39 +56,37 @@ enum class TagType : char
 {
   publish_tag = publish_tag_marker,
   reduce_value = reduce_value_marker,
-  reduce_group = reduce_group_marker,
-  private_tag = private_tag_marker
-};
-
-// Universal tag base for the rare use cases where more than one type of tag is allowed
-class UniversalTagBase {
-public:
-  UniversalTagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
-    : id_{id}, expected_types_{expected_types}
-  {}
-
-  const TagID& id() const noexcept { return id_; }
-  const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
-
-private:
-  TagID id_;
-  gsl::span<const std::uint8_t> expected_types_;
+  reduce_group = reduce_group_marker
 };
 
 // The implementation for all tags would be the same,
 // so abstract it into a base
 template<TagType BaseTagType>
-class TagBase : public UniversalTagBase {
+class TagBase {
 public:
   TagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
-    : UniversalTagBase{static_cast<char>(BaseTagType) + id, expected_types}
+    : id_{static_cast<char>(BaseTagType) + id}, expected_types_{expected_types}
   {}
+
+  const TagID& id() const noexcept { return id_; }
+  const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
 
   friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
   {
-    return lhs.id() == rhs.id() && lhs.expected_types() == rhs.expected_types();
+    return lhs.id_ == rhs.id_ && lhs.expected_types_ == rhs.expected_types_;
   }
   friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept { return !(lhs == rhs); }
+
+protected:
+  // Allow private being a publish tag support
+  struct OverridePrefix {};
+  TagBase(OverridePrefix, const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+    : id_{id}, expected_types_{expected_types}
+  {}
+
+private:
+  TagID id_;
+  gsl::span<const std::uint8_t> expected_types_;
 }; // class TagBase
 
 template<typename... Ts>
@@ -99,7 +97,9 @@ inline static constexpr std::array<std::uint8_t, sizeof...(Ts)> expected_type_fo
 using PublishTagBase = internal::TagBase<TagType::publish_tag>;
 using ReduceValueTagBase = internal::TagBase<TagType::reduce_value>;
 using ReduceGroupTagBase = internal::TagBase<TagType::reduce_group>;
-using PrivateTagBase = internal::TagBase<TagType::private_tag>;
+
+// Empty class for determining if something is a private tag at compile-time
+class PrivateTagBase {};
 
 inline static constexpr VersionID tag_no_data = -1;
 

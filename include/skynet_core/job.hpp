@@ -33,13 +33,19 @@ template<typename... Ts>
 // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 class PublishTag : public internal::PublishTagBase {
 public:
-  PublishTag(const TagID& id) noexcept : internal::PublishTagBase{id, internal::expected_type_for<Ts...>}
+  explicit PublishTag(const TagID& id) noexcept : internal::PublishTagBase{id, internal::expected_type_for<Ts...>}
   {
     assert(!id.empty());
   }
 
   using ValueType = ValueOrTuple<Ts...>;
   using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
+
+protected:
+  using OverridePrefix = internal::PublishTagBase::OverridePrefix;
+  // For PrivateTag
+  PublishTag(OverridePrefix, const TagID& id) : internal::PublishTagBase{OverridePrefix{}, id, internal::expected_type_for<Ts...>}
+  {}
 }; // class PublishTag
 
 /** \brief Tag for reduce values
@@ -48,7 +54,7 @@ template<typename... Ts>
 // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 class ReduceValueTag : public internal::ReduceValueTagBase {
 public:
-  ReduceValueTag(const TagID& id) noexcept : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
+  explicit ReduceValueTag(const TagID& id) noexcept : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
   {
     assert(!id.empty());
   }
@@ -62,7 +68,7 @@ template<typename... Ts>
 // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
 class ReduceGroupTag : public internal::ReduceGroupTagBase {
 public:
-  ReduceGroupTag(const TagID& id) noexcept : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
+  explicit ReduceGroupTag(const TagID& id) noexcept : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
   {
     assert(!id.empty());
   }
@@ -70,18 +76,22 @@ public:
   using ValueType = ValueOrTuple<Ts...>;
 }; // class ReduceGroupTag
 
-/** \brief Private tag
+/** \brief Tag for private publish tags
  */
 template<typename... Ts>
-class PrivateTag : public internal::PrivateTagBase {
-  // requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
+class PrivateTag : public internal::PrivateTagBase, public PublishTag<Ts...> {
+private:
+  using Base = PublishTag<Ts...>;
+  using OverridePrefix = typename Base::OverridePrefix;
+
 public:
-  PrivateTag(const TagID& id) noexcept : internal::PrivateTagBase{id, internal::expected_type_for<Ts...>}
+  explicit PrivateTag(const TagID& id) noexcept : Base{OverridePrefix{}, skynet::internal::private_tag_marker + id}
   {
     assert(!id.empty());
   }
 
   using ValueType = ValueOrTuple<Ts...>;
+  using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
 };
 
 /** \brief Job with known tags
@@ -129,10 +139,9 @@ public:
   //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
   void declare_publication_intent(const Ts&... tags) noexcept
   {
-    static_assert((... && std::is_base_of_v<internal::PublishTagBase, Ts>));
-    const std::array<const internal::UniversalTagBase*, sizeof...(Ts)> tag_ptrs{&tags...};
+    const std::array<const internal::PublishTagBase*, sizeof...(Ts)> tag_ptrs{&tags...};
     declare_publication_intent_impl(
-      gsl::span<const internal::UniversalTagBase* const>{tag_ptrs.data(), static_cast<gsl::index>(tag_ptrs.size())});
+      gsl::span<const internal::PublishTagBase* const>{tag_ptrs.data(), static_cast<gsl::index>(tag_ptrs.size())});
   }
 
   /** \brief Declare publication intent for a range
@@ -142,7 +151,7 @@ public:
   // requires std::ranges::contiguous_range<Range>
   {
     declare_publication_intent_impl(
-      gsl::span<const internal::UniversalTagBase>{tags.data(), static_cast<gsl::index>(tags.size())});
+      gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())});
   }
 
   /** \brief Retrieves the specified version for the tag, or latest if no version
@@ -184,7 +193,6 @@ public:
   /** \brief Checks if a tag buffer has data or not
    */
   bool has_data(const internal::PublishTagBase& tag) noexcept;
-  bool has_data(const internal::PrivateTagBase& tag) noexcept;
 
   /** \brief Subscribe to all tags passed into the vector.
    *
@@ -195,7 +203,6 @@ public:
   auto subscribe(const Ts&... tags) noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
   //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
   {
-    static_assert((... && std::is_base_of_v<internal::PublishTagBase, Ts>), "Can only subscribe to publish tags!");
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
       const auto [buffers, lock] = bufs_.get();
       (void)lock;
@@ -204,10 +211,10 @@ public:
     // TODO: Make this std::terminate or something instead?
     assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    const std::array<internal::UniversalTagBase, sizeof...(Ts)> tag_array{tags...};
+    const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    init_or_update_subscribe(gsl::span<const internal::UniversalTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
-    return get_subscribe_future(gsl::span<const internal::UniversalTagBase>{tag_array});
+    init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
+    return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tag_array});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -221,8 +228,7 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     std::vector<BufferPtr> ptrs(static_cast<std::size_t>(tags.size()));
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<typename TagType::BufferType>(); });
-    const auto tag_span
-      = gsl::span<const internal::UniversalTagBase>{tags.data(), static_cast<gsl::index>(tags.size())};
+    const auto tag_span = gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())};
     init_or_update_subscribe(tag_span, gsl::span<BufferPtr>{ptrs});
     return get_subscribe_future(tag_span);
   }
@@ -235,10 +241,10 @@ public:
   // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    const std::array<internal::UniversalTagBase, sizeof...(Ts)> tag_array{tags...};
+    const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    init_or_update_subscribe(gsl::span<const internal::UniversalTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
-    return get_ip_subscribe_future(address, gsl::span<const internal::UniversalTagBase>{tag_array});
+    init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
+    return get_ip_subscribe_future(address, gsl::span<const internal::PublishTagBase>{tag_array});
   }
 
   /** \brief Create a reduce group over the specified tags
@@ -300,23 +306,6 @@ public:
     const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
     std::apply(apply_to, value_tuple);
   }
-  template<typename... PublishTagTypes, typename... ArgTypes>
-  void publish(const PrivateTag<PublishTagTypes...>& tag, ArgTypes&&... values) noexcept
-  {
-    static_assert(
-      sizeof...(PublishTagTypes) == sizeof...(ArgTypes) && (... && std::is_convertible_v<ArgTypes, PublishTagTypes>),
-      "Argument values can not be converted to tag types!");
-    std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
-      static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
-    publish_impl(tag, gsl::span<PublishValueVariant>{variants});
-  }
-
-  template<typename... PublishTagTypes, typename... TupleTypes>
-  void publish(const PrivateTag<PublishTagTypes...>& tag, const std::tuple<TupleTypes...>& value_tuple) noexcept
-  {
-    const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
-    std::apply(apply_to, value_tuple);
-  }
 
   /** \brief Returns true if the job is finished, false if it is not
    */
@@ -345,9 +334,9 @@ public:
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
     init_or_update_subscribe(
-      gsl::span<const internal::UniversalTagBase>{tags.data(), static_cast<gsl::index>(tags.size())},
+      gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())},
       gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
-    return get_subscribe_future(gsl::span<const internal::UniversalTagBase>{tags});
+    return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
   }
 
   /** \brief Rebuilds connections for any missing tags
@@ -364,13 +353,10 @@ public:
       std::vector<internal::PublishTagBase> tags;
       for (const auto& tag_pair : buffers) {
         if (tag_pair.second.error_occurred != TagInfo::Error::no_error) {
-          // Ignore private tags
-          if (tag_pair.first[0] != internal::private_tag_marker) {
-            // The expected type here doesn't matter
-            // Also have to remove the first letter as it identifies the type of
-            // tag, but it will just get added again later
-            tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
-          }
+          // The expected type here doesn't matter
+          // Also have to remove the first letter as it identifies the type of
+          // tag, but it will just get added again later
+          tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
         }
       }
       return tags;
@@ -420,18 +406,17 @@ private:
   void publish_impl(const internal::PublishTagBase& tag, gsl::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    gsl::span<const internal::UniversalTagBase> tags,
+    gsl::span<const internal::PublishTagBase> tags,
     gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  auto get_subscribe_future(gsl::span<const internal::UniversalTagBase> tags) noexcept
+  auto get_subscribe_future(gsl::span<const internal::PublishTagBase> tags) noexcept
     -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
 
-  auto
-    get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
+  auto get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
     -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
 
-  void declare_publication_intent_impl(gsl::span<const internal::UniversalTagBase> tags) noexcept;
-  void declare_publication_intent_impl(gsl::span<const internal::UniversalTagBase* const> tags) noexcept;
+  void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept;
+  void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const> tags) noexcept;
 
   // void unsubscribe_impl(const TagID& tag_id) noexcept;
 

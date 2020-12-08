@@ -291,16 +291,26 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
         id_,
         msg.tags(),
         msg.is_unsubscribe());
+      const auto reject_notice = [this](const std::string& why) {
+        SKYNET_TRACE_LOG("\"{}\" rejected subscription notice from \"{}\" as {}", master_->id(), id_, why);
+      };
       for (const auto& tag : msg.tags()) {
-        if (!tag_name_okay(tag)) { return false; }
+        if (!tag_name_okay(tag)) {
+          reject_notice(fmt::format("invalid tag name \"{}\" given", tag));
+          return false;
+        }
         const auto [iter, inserted] = remote_subscriptions_.emplace(tag);
         (void)iter;
         // Shouldn't receive multiple subscriptions to the same tag
-        if (!inserted) { return false; }
+        if (!inserted) {
+          reject_notice(fmt::format("repeated tag subscription to {}", tag));
+          return false;
+        }
       }
       if (!Master::ExternalMasterAccessor::subscription_tags_are_produced(*master_, msg)) {
         // TODO: Send a cancellation notice instead for the tags that aren't there
         // when this happens
+        reject_notice(fmt::format("machine does not produce asked for tags {}", msg.tags()));
         return false;
       }
       Master::ExternalMasterAccessor::notify_subscriptions(*master_);

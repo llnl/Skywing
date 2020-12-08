@@ -144,7 +144,7 @@ bool Job::has_data_no_lock(const internal::PublishTagBase& tag) noexcept
 const JobID& Job::id() const noexcept { return id_; }
 
 void Job::init_or_update_subscribe(
-  const gsl::span<const internal::UniversalTagBase> tags,
+  const gsl::span<const internal::PublishTagBase> tags,
   gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
 {
   assert(tags.size() == ptrs.size());
@@ -174,22 +174,21 @@ void Job::init_or_update_subscribe(
   }
 }
 
-auto Job::get_subscribe_future(const gsl::span<const internal::UniversalTagBase> tags) noexcept
+auto Job::get_subscribe_future(const gsl::span<const internal::PublishTagBase> tags) noexcept
   -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(
-    tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::UniversalTagBase& t) { return t.id(); });
+  std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   return Master::JobAccessor::subscribe(*master_, tag_ids);
 }
 
 auto Job::get_ip_subscribe_future(
-  const std::string& address, const gsl::span<const internal::UniversalTagBase> tags) noexcept
+  const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
   -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::UniversalTagBase& t) { return t.id(); });
+    tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(
@@ -199,7 +198,7 @@ auto Job::get_ip_subscribe_future(
   return Master::JobAccessor::ip_subscribe(*master_, addr_pair, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(gsl::span<const internal::UniversalTagBase> tags) noexcept
+void Job::declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -208,13 +207,13 @@ void Job::declare_publication_intent_impl(gsl::span<const internal::UniversalTag
     }
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
-      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::UniversalTagBase& t) { return t.id(); });
+      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase& t) { return t.id(); });
     return tag_ids;
   }();
   Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(const gsl::span<const internal::UniversalTagBase* const> tags) noexcept
+void Job::declare_publication_intent_impl(const gsl::span<const internal::PublishTagBase* const> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -223,7 +222,7 @@ void Job::declare_publication_intent_impl(const gsl::span<const internal::Univer
     }
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
-      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::UniversalTagBase* t) { return t->id(); });
+      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase* t) { return t->id(); });
     return tag_ids;
   }();
   Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);

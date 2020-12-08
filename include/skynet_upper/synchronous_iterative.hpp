@@ -104,6 +104,7 @@ auto create_synchronous_iterative(Args&&... args) noexcept
 {
   return internal::create_iterative<SynchronousIterative>(std::forward<Args>(args)...);
 }
+
 } // namespace skynet
 
 #endif // SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
