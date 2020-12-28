@@ -53,6 +53,26 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Move to the build directory
  * `meson configure -Dbuild_tests=true -Dbuild_examples=true`
 
+## Guidance for building on LC
+
+### Building capnp
+ * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must build to a local directory. To do this, on the configure step, use
+   * `./configure --prefix=capnp_build_dir`
+   * This will create subdirectories capnp_build_dir/bin, capnp_build_dir/include, and capnp_build_dir/lib
+
+### Building Skynet
+ * Switch to more recent version of gcc
+   * `ml gcc/8.3.1`
+ * Add capnp pkgconfig directory to PKG_CONFIG_PATH
+   * `export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:capnp_build_dir/lib/pkgconfig`
+ * Follow build instructions as normal
+
+### Running Skynet
+ * Add capnp shared library to LD_LIBRARY_PATH
+   * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib
+ * Run as normal for running on login node. Note: can't run long jobs on login nodes!
+
+
 ---
 
 The skynet_upper name is a temporary placeholder name for higher parts of the library that build on the lower parts, which are in skynet_core.
