@@ -15,9 +15,10 @@ TEST_CASE("Split", "[Skynet_Split]")
   using vec = std::vector<std::string_view>;
   std::string test_string{"test string"};
   REQUIRE(split("test string"s, ' ') == vec{"test"sv, "string"sv});
-  REQUIRE(split("weird\1char", '\1') == vec{"weird"sv, "char"sv});
+  REQUIRE(split("weird\1char"s, '\1') == vec{"weird"sv, "char"sv});
   REQUIRE(split("null\0embed"s, '\0') == vec{"null"sv, "embed"sv});
   REQUIRE(split("nothing to split"s, '\n') == vec{"nothing to split"sv});
+  REQUIRE(split("test limit of 2"s, ' ', 2) == vec{"test"sv, "limit of 2"sv});
 }
 
 TEST_CASE("Concatenate", "[Skynet_Concatenate]")

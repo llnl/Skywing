@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <iostream>
 #include <numeric>
 #include <random>
@@ -23,6 +24,36 @@ std::mt19937_64 make_prng() noexcept
   // Seed the PRNG with the values
   std::seed_seq seq(values.begin(), values.end());
   return std::mt19937_64{seq};
+}
+
+// Reads the starting port number from the environment, exiting the program on failure
+std::uint16_t get_starting_port() noexcept
+{
+  const auto port_str = std::getenv("START_PORT");
+  if (!port_str) {
+    std::cerr << "Could not find environment variable START_PORT\n";
+    std::exit(1);
+  }
+  char* end_ptr;
+  const auto port = std::strtol(port_str, &end_ptr, 10);
+  if (end_ptr == port_str) {
+    std::cerr << "Error parsing START_PORT (value is \"" << port_str << "\")\n";
+    std::exit(1);
+  }
+  if (port > 0xFFFF) {
+    std::cerr << "START_PORT value is too high (value is \"" << port_str << "\")\n";
+    std::exit(1);
+  }
+  return port;
+}
+
+// Creates a container of the specified type for ports to connect to
+std::vector<std::uint16_t> create_ports(std::size_t num) noexcept
+{
+  const auto start_port = get_starting_port();
+  std::vector<std::uint16_t> ports(num);
+  std::iota(ports.begin(), ports.end(), start_port);
+  return ports;
 }
 
 // A structure representing information to construct a randomly generated network
