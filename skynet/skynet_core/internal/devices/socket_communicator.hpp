@@ -127,6 +127,14 @@ AddrPortPair split_address(const std::string_view address) noexcept;
  * Returns either the network size or the error that occurred
  */
 std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunicator& conn) noexcept;
+
+/** \brief Returns an "IP:Port" string from a given address
+ */
+std::string to_ip_port(const AddrPortPair& addr) noexcept;
+
+/** \brief Converts an AddrPortPair to the canonical representation
+ */
+AddrPortPair to_canonical(const AddrPortPair& addr) noexcept;
 } // namespace skynet::internal
 
 #endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

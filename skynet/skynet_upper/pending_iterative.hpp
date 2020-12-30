@@ -13,7 +13,7 @@
 // Also, tests for the deadlines and such
 
 namespace skynet {
-template<typename IterativeMethod>
+template<typename IterativeMethod, typename WaiterType>
 class PendingIterativeMethod;
 
 /** \brief Policy for how to handle an errored connection during initialization
@@ -29,16 +29,70 @@ enum class IterativeInitErrorPolicy : char
 
 /** \brief Return type for creating synchronous iterative classes
  */
-template<template<typename...> typename IterativeMethod, typename... TagValueTypes>
-class PendingIterativeMethod<IterativeMethod<TagValueTypes...>> {
+template<template<typename...> typename IterativeMethod, typename WaiterType, typename... TagValueTypes>
+class PendingIterativeMethod<IterativeMethod<TagValueTypes...>, WaiterType> {
 private:
   struct IsReady;
   struct GetIterativeOpt;
   static inline constexpr auto no_deadline = std::chrono::steady_clock::time_point::min();
 
 public:
-  PendingIterativeMethod(const PendingIterativeMethod&) = delete;
-  PendingIterativeMethod& operator=(const PendingIterativeMethod&) = delete;
+  PendingIterativeMethod(const PendingIterativeMethod& rhs)
+    : error_occurred_{rhs.error_occurred_}
+    , subscribe_done_{rhs.subscribe_done_}
+    , error_policy_{rhs.error_policy_}
+    , handle_{rhs.handle_}
+    , subscribe_waiter_{rhs.subscribe_waiter_}
+    , is_ready_waiter_{handle_.waiter_on_subscription_change(IsReady{this}).then(GetIterativeOpt{this})}
+    , tags_{rhs.tags_}
+    , produced_tag_{rhs.produced_tag_}
+    , job_{rhs.job_}
+    , deadline_{rhs.deadline_}
+  {}
+
+  PendingIterativeMethod& operator=(const PendingIterativeMethod& rhs)
+  {
+    error_occurred_ = rhs.error_occurred_;
+    subscribe_done_ = rhs.subscribe_done_;
+    error_policy_ = rhs.error_policy_;
+    handle_ = rhs.handle_;
+    subscribe_waiter_ = rhs.subscribe_waiter_;
+    is_ready_waiter_ = handle_.waiter_on_subscription_change(IsReady{this}).then(GetIterativeOpt{this});
+    tags_ = rhs.tags_;
+    produced_tag_ = rhs.produced_tag_;
+    job_ = rhs.job_;
+    deadline_ = rhs.deadline_;
+    return *this;
+  }
+
+  // Movable, but need to make sure the pointers are pointing to the right place
+  PendingIterativeMethod(PendingIterativeMethod&& rhs) noexcept
+    : error_occurred_{rhs.error_occurred_}
+    , subscribe_done_{rhs.subscribe_done_}
+    , error_policy_{rhs.error_policy_}
+    , handle_{rhs.handle_}
+    , subscribe_waiter_{std::move(rhs.subscribe_waiter_)}
+    , is_ready_waiter_{handle_.waiter_on_subscription_change(IsReady{this}).then(GetIterativeOpt{this})}
+    , tags_{std::move(rhs.tags_)}
+    , produced_tag_{std::move(rhs.produced_tag_)}
+    , job_{rhs.job_}
+    , deadline_{rhs.deadline_}
+  {}
+
+  PendingIterativeMethod& operator=(PendingIterativeMethod&& rhs) noexcept
+  {
+    error_occurred_ = rhs.error_occurred_;
+    subscribe_done_ = rhs.subscribe_done_;
+    error_policy_ = rhs.error_policy_;
+    handle_ = rhs.handle_;
+    subscribe_waiter_ = std::move(rhs.subscribe_waiter_);
+    is_ready_waiter_ = handle_.waiter_on_subscription_change(IsReady{this}).then(GetIterativeOpt{this});
+    tags_ = std::move(rhs.tags_);
+    produced_tag_ = std::move(rhs.produced_tag_);
+    job_ = rhs.job_;
+    deadline_ = rhs.deadline_;
+    return *this;
+  }
 
   std::optional<IterativeMethod<TagValueTypes...>> get() noexcept
   {
@@ -71,7 +125,9 @@ public:
   /** \brief Create a pending IterativeMethod class - generally not intended to be
    * called directly, create_synchronous_iterative should be called instead.
    */
+  template<typename Waiter>
   static PendingIterativeMethod create(
+    Waiter waiter,
     MasterHandle handle,
     Job& job,
     const PublishTag<TagValueTypes...>& produced_tag,
@@ -82,8 +138,16 @@ public:
       std::cerr << "Produced tag for SynchronousIterative not found in the tag list!\n";
       std::exit(2);
     }
-    job.declare_publication_intent(produced_tag);
-    return PendingIterativeMethod{handle, job, produced_tag, tags};
+    return PendingIterativeMethod{waiter, handle, job, produced_tag, tags};
+  }
+
+  template<typename... Continuations>
+  Continuation<PendingIterativeMethod, Continuations...> then(Continuations... continuations) && noexcept
+  {
+    return Continuation<PendingIterativeMethod, Continuations...>{
+      *this,
+      std::move(continuations)...
+    };
   }
 
 private:
@@ -113,13 +177,16 @@ private:
   }; // struct GetIterativeOpt
 
   PendingIterativeMethod(
+    WaiterType waiter,
     MasterHandle handle,
     Job& job,
     const PublishTag<TagValueTypes...>& produced_tag,
     const gsl::span<const PublishTag<TagValueTypes...>> tags,
     std::chrono::steady_clock::time_point deadline = no_deadline,
-    IterativeInitErrorPolicy = IterativeInitErrorPolicy::fail_on_connection_error) noexcept
-    : subscribe_waiter_{job.subscribe_range(tags)}
+    IterativeInitErrorPolicy error_policy = IterativeInitErrorPolicy::fail_on_connection_error) noexcept
+    : error_policy_{error_policy}
+    , handle_{handle}
+    , subscribe_waiter_{std::move(waiter)}
     , is_ready_waiter_{handle.waiter_on_subscription_change(IsReady{this}).then(GetIterativeOpt{this})}
     , tags_(tags.cbegin(), tags.cend())
     , produced_tag_{produced_tag}
@@ -130,7 +197,8 @@ private:
   bool error_occurred_ = false;
   bool subscribe_done_ = false;
   IterativeInitErrorPolicy error_policy_;
-  Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp> subscribe_waiter_;
+  MasterHandle handle_;
+  WaiterType subscribe_waiter_;
   Continuation<Waiter<IsReady, WaiterGetNoOp>, GetIterativeOpt> is_ready_waiter_;
   std::vector<PublishTag<TagValueTypes...>> tags_;
   PublishTag<TagValueTypes...> produced_tag_;

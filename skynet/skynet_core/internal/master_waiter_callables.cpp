@@ -51,38 +51,27 @@ bool MasterGetConnectionSuccess::operator()() const noexcept
 }
 
 MasterIPSubscribeComplete::MasterIPSubscribeComplete(
-  Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept
-  : master_{&master}, address_{address}, tags_{tags}
+  Master& master, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept
+  : master_{&master}, address_{address}, tags_{tags}, is_self_sub_{is_self_sub}
 {}
 
 bool MasterIPSubscribeComplete::operator()() const noexcept
 {
+  if (is_self_sub_) { return true; }
   // Wait first to see if the connection has finished processing
-  if (conn_pending_) {
-    if (Master::WaiterAccessor::conn_is_complete(*master_, address_)) { conn_pending_ = false; }
-    else {
-      return false;
-    }
-  }
-  // If the connection has finished processing, this is complete if either
-  // the connection has failed or the subscription has completed
-  if (!conn_pending_) {
-    if (!Master::WaiterAccessor::conn_get_success(*master_, address_)) { return false; }
-    return Master::WaiterAccessor::subscribe_is_done(*master_, tags_);
-  }
-  // This won't ever actually be hit, just need it to quiet an erroneous warning
-  return false;
+  return Master::WaiterAccessor::conn_is_complete(*master_, address_);
 }
 
 MasterIPSubscribeSuccess::MasterIPSubscribeSuccess(
-  Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept
-  : master_{&master}, address_{address}, tags_{tags}
+  Master& master, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept
+  : master_{&master}, address_{address}, tags_{tags}, is_self_sub_{is_self_sub}
 {}
 
 bool MasterIPSubscribeSuccess::operator()() const noexcept
 {
-  return Master::WaiterAccessor::conn_get_success(*master_, address_)
-      && Master::WaiterAccessor::conn_get_success(*master_, address_);
+  return is_self_sub_
+      || (Master::WaiterAccessor::conn_get_success(*master_, address_)
+      && Master::WaiterAccessor::subscribe_is_done(*master_, tags_));
 }
 
 } // namespace skynet::internal

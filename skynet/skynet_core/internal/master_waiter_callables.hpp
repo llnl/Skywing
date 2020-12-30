@@ -66,25 +66,26 @@ private:
 
 class MasterIPSubscribeComplete {
 public:
-  MasterIPSubscribeComplete(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept;
+  MasterIPSubscribeComplete(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept;
   bool operator()() const noexcept;
 
 private:
   Master* master_;
   AddrPortPair address_;
   std::vector<TagID> tags_;
-  mutable bool conn_pending_ = true;
+  bool is_self_sub_;
 };
 
 class MasterIPSubscribeSuccess {
 public:
-  MasterIPSubscribeSuccess(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags) noexcept;
+  MasterIPSubscribeSuccess(Master& master, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept;
   bool operator()() const noexcept;
 
 private:
   Master* master_;
   AddrPortPair address_;
   std::vector<TagID> tags_;
+  bool is_self_sub_;
 };
 } // namespace internal
 } // namespace skynet

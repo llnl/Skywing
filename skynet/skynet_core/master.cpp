@@ -388,7 +388,7 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto [iter, inserted] = pending_conns_.try_emplace(
-    AddrPortPair{address, port},
+    internal::to_canonical(AddrPortPair{address, port}),
     PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
   if (!inserted) {
     std::cerr << "Address " << address << ':' << port << " attempted to be connected to twice!\n";
@@ -658,8 +658,23 @@ auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
 auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
   -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
 {
-  const auto iter = addr_to_machine_.find(addr);
-  if (iter != addr_to_machine_.cend()) {
+  const auto canonical_addr = internal::to_canonical(addr);
+  const auto iter = addr_to_machine_.find(canonical_addr);
+  // Handle self-subscription
+  bool is_self_sub = false;
+  if(internal::to_ip_port(canonical_addr) == internal::to_ip_port({"localhost", port_})) {
+    for (const auto& tag : tag_ids) {
+      is_self_sub = true;
+      const auto iter = self_sub_count_.find(tag);
+      if (iter == self_sub_count_.cend()) {
+        std::cerr << "Tag \"" << tag << "\" was attempted to be self-subscribed but it isn't produced!\n";
+        std::exit(4);
+      }
+      iter->second += 1;
+    }
+    notify_subscriptions_ = true;
+  }
+  else if (iter != addr_to_machine_.cend()) {
     iter->second->send_message(internal::make_subscription_notice(tag_ids, false));
     notify_subscriptions_ = true;
   }
@@ -668,19 +683,19 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
     const std::string tag_list = std::accumulate(
       tag_ids.cbegin(),
       tag_ids.cend(),
-      addr.first + ':' + std::to_string(addr.second),
+      canonical_addr.first + ':' + std::to_string(canonical_addr.second),
       [](const std::string& so_far, const std::string& next) { return so_far + '\0' + next; });
     const auto [iter, inserted] = pending_conns_.try_emplace(
-      addr, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
+      canonical_addr, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
     assert(inserted);
     // Ignore the status - it is handeled later
-    (void)iter->second.conn.connect_non_blocking(addr.first.c_str(), addr.second);
+    (void)iter->second.conn.connect_non_blocking(canonical_addr.first.c_str(), canonical_addr.second);
   }
   return make_waiter(
     job_mut_,
     subscription_cv_,
-    internal::MasterIPSubscribeComplete{*this, addr, tag_ids},
-    internal::MasterIPSubscribeSuccess{*this, addr, tag_ids});
+    internal::MasterIPSubscribeComplete{*this, canonical_addr, tag_ids, is_self_sub},
+    internal::MasterIPSubscribeSuccess{*this, canonical_addr, tag_ids, is_self_sub});
 }
 
 void Master::handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept

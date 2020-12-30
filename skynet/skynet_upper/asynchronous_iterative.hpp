@@ -256,7 +256,8 @@ public:
   }
 
 private:
-  friend class PendingIterativeMethod<AsynchronousIterative>;
+  template<typename, typename>
+  friend class PendingIterativeMethod;
 
   AsynchronousIterative(
     Job& job,
@@ -268,10 +269,82 @@ private:
   AsynchronousValues<ValueType> values_;
 }; // class AsynchronousIterative
 
-template<typename... Args>
-auto create_asynchronous_iterative(Args&&... args) noexcept
+template<typename... TagValueTypes, typename Range>
+auto create_asynchronous_iterative(
+  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
 {
-  return internal::create_iterative<AsynchronousIterative>(std::forward<Args>(args)...);
+  job.declare_publication_intent(produced_tag);
+  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
+    job.subscribe_range(tags),
+    handle,
+    job,
+    produced_tag,
+    tags
+  );
+}
+
+template<typename... TagValueTypes, typename... TagTypes>
+auto create_asynchronous_iterative(
+  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const TagTypes&... tags) noexcept
+{
+  job.declare_publication_intent(produced_tag);
+  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
+    job.subscribe(tags...),
+    handle,
+    job,
+    produced_tag,
+    tags...
+  );
+}
+
+template<
+  typename... TagValueTypes,
+  typename Range,
+  typename Rep,
+  typename Period>
+auto create_asynchronous_iterative(
+  const std::chrono::time_point<Rep, Period>& end_time,
+  IterativeInitErrorPolicy policy,
+  MasterHandle handle,
+  Job& job,
+  const PublishTag<TagValueTypes...>& produced_tag,
+  const Range& tags) noexcept
+{
+  job.declare_publication_intent(produced_tag);
+  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
+    job.subscribe_range(tags),
+    end_time,
+    policy,
+    handle,
+    job,
+    produced_tag,
+    tags
+  );
+}
+
+template<
+  typename... TagValueTypes,
+  typename... TagTypes,
+  typename Rep,
+  typename Period>
+auto create_asynchronous_iterative(
+  const std::chrono::time_point<Rep, Period>& end_time,
+  IterativeInitErrorPolicy policy,
+  MasterHandle handle,
+  Job& job,
+  const PublishTag<TagValueTypes...>& produced_tag,
+  const TagTypes&... tags) noexcept
+{
+  job.declare_publication_intent(produced_tag);
+  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
+    job.subscribe(tags...),
+    end_time,
+    policy,
+    handle,
+    job,
+    produced_tag,
+    tags...
+  );
 }
 } // namespace skynet
 

@@ -105,11 +105,13 @@ protected:
   std::vector<PublishTag<TagValueTypes...>> dead_tags_;
 }; // class IterativeBase
 
-template<template<typename...> typename IterativeTemplate, typename... TagValueTypes, typename Range>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
+template<template<typename...> typename IterativeTemplate, typename WaiterType, typename... TagValueTypes, typename Range>
+PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
+  WaiterType waiter,
   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
 {
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>>::create(
+  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
+    waiter,
     handle,
     job,
     produced_tag,
@@ -117,23 +119,26 @@ PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
   );
 }
 
-template<template<typename...> typename IterativeTemplate, typename... TagValueTypes, typename... TagTypes>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
+template<template<typename...> typename IterativeTemplate, typename WaiterType, typename... TagValueTypes, typename... TagTypes>
+PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
+  WaiterType waiter,
   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const TagTypes&... tags) noexcept
 {
   const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>>::create(
-    handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()));
+  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
+    waiter, handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()));
 }
 
 template<
   template<typename...>
   typename IterativeTemplate,
+  typename WaiterType,
   typename... TagValueTypes,
   typename Range,
   typename Rep,
   typename Period>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
+PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
+  WaiterType waiter,
   const std::chrono::time_point<Rep, Period>& end_time,
   IterativeInitErrorPolicy policy,
   MasterHandle handle,
@@ -141,7 +146,8 @@ PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
   const PublishTag<TagValueTypes...>& produced_tag,
   const Range& tags) noexcept
 {
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>>::create(
+  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
+    waiter,
     handle,
     job,
     produced_tag,
@@ -153,11 +159,13 @@ PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
 template<
   template<typename...>
   typename IterativeTemplate,
+  typename WaiterType,
   typename... TagValueTypes,
   typename... TagTypes,
   typename Rep,
   typename Period>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
+PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
+  WaiterType waiter,
   const std::chrono::time_point<Rep, Period>& end_time,
   IterativeInitErrorPolicy policy,
   MasterHandle handle,
@@ -166,8 +174,8 @@ PendingIterativeMethod<IterativeTemplate<TagValueTypes...>> create_iterative(
   TagTypes&&... tags) noexcept
 {
   const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>>::create(
-    handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()), end_time, policy);
+  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
+    waiter, handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()), end_time, policy);
 }
 } // namespace skynet::internal
 

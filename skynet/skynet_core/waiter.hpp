@@ -8,7 +8,7 @@
 #include <type_traits>
 
 #include "skynet_core/types.hpp"
-
+#include <iostream>
 namespace skynet {
 template<typename Waiter, typename... Continuations>
 class Continuation : public Continuations... {
@@ -282,6 +282,16 @@ public:
   {
     const auto end_time = std::chrono::steady_clock::now() + wait_time;
     return wait_until(end_time);
+  }
+
+  bool is_ready() noexcept
+  {
+    for (auto&& waiter : waiters_) {
+      if (!waiter.is_ready()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   template<typename... Continuations>

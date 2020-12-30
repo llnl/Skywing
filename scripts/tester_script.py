@@ -60,7 +60,7 @@ for i, command in enumerate(commands):
             return_code = 1
             status_str = 'TIMEOUT'
             # Wait a tiny bit
-            time.sleep(.5)
+            time.sleep(1)
             break
         finally:
             print(MOVE_TO_START_OF_ROW, end='')

@@ -21,10 +21,9 @@
 namespace {
 constexpr int invalid_handle = -1;
 
-int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
+// TODO: I think this leaks memory, need to call freeaddrinfo, so use unique_ptr
+addrinfo* resolve_addr(const char* const address, const std::uint16_t port) noexcept
 {
-  // This isn't super robust, but I'm not sure how to handle looking up a bunch of different
-  // address in an asynchronous context
   addrinfo* result;
   addrinfo hints;
   std::memset(&hints, 0, sizeof(hints));
@@ -34,9 +33,17 @@ int init_connection(const int sockfd, const char* const address, const std::uint
   const auto port_str = std::to_string(port);
   const auto resaddr = getaddrinfo(address, port_str.c_str(), &hints, &result);
   if (resaddr != 0) {
-    std::perror("init_connection - resaddr");
+    std::perror("resolve_addr - resaddr");
     std::exit(4);
   }
+  return result;
+}
+
+int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
+{
+  // This isn't super robust, but I'm not sure how to handle looking up a bunch of different
+  // address in an asynchronous context
+  const auto result = resolve_addr(address, port);
   return connect(sockfd, result->ai_addr, static_cast<int>(result->ai_addrlen));
 }
 } // namespace
@@ -266,5 +273,24 @@ std::variant<NetworkSizeType, ConnectionError> read_network_size(SocketCommunica
   const auto err = conn.read_message(size_buffer.data(), size_buffer.size());
   if (err == ConnectionError::no_error) { return from_network_bytes(size_buffer); }
   return err;
+}
+
+std::string to_ip_port(const AddrPortPair& addr) noexcept
+{
+  const auto& [name, port] = to_canonical(addr);
+  return name + ':' + std::to_string(port);
+}
+
+AddrPortPair to_canonical(const AddrPortPair& addr) noexcept
+{
+  const auto result = resolve_addr(addr.first.c_str(), addr.second);
+  sockaddr_in* info = reinterpret_cast<sockaddr_in*>(result->ai_addr);
+  const std::string to_ret
+    = std::to_string((info->sin_addr.s_addr & 0x000000FF) >>  0) + '.'
+    + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >>  8) + '.'
+    + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
+    + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
+  freeaddrinfo(result);
+  return {to_ret, addr.second};
 }
 } // namespace skynet::internal

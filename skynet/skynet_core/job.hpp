@@ -95,6 +95,11 @@ public:
     assert(!id.empty());
   }
 
+  friend bool operator<(const PrivateTag& lhs, const PrivateTag& rhs) noexcept
+  {
+    return lhs.id() < rhs.id();
+  }
+
   using ValueType = ValueOrTuple<Ts...>;
   using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
 };
@@ -479,5 +484,14 @@ private:
   std::condition_variable data_buffer_modified_cv_;
 }; // Class Job
 } // namespace skynet
+
+// Probably want to add hashing/less than support for all tag types
+template<typename... Ts>
+struct std::hash<skynet::PrivateTag<Ts...>> {
+  std::size_t operator()(const skynet::PrivateTag<Ts...>& tag) const noexcept
+  {
+    return std::hash<std::string>{}(tag.id());
+  }
+};
 
 #endif // SKYNET_JOB_HPP
