@@ -1,0 +1,4 @@
+#!/bin/bash
+
+chmod u+x call_executable.sh
+sbatch sbatch_script.sh

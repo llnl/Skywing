@@ -58,7 +58,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 ### Building capnp
  * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must build to a local directory. To do this, on the configure step, use
    * `./configure --prefix=capnp_build_dir`
-   * This will create subdirectories capnp_build_dir/bin, capnp_build_dir/include, and capnp_build_dir/lib
+   * This will create subdirectories `capnp_build_dir/bin`, `capnp_build_dir/include`, and `capnp_build_dir/lib`
 
 ### Building Skynet
  * Switch to more recent version of gcc
@@ -69,7 +69,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ### Running Skynet
  * Add capnp shared library to LD_LIBRARY_PATH
-   * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib
+   * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib`
  * Run as normal for running on login node. Note: can't run long jobs on login nodes!
 
 

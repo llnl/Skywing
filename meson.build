@@ -72,6 +72,7 @@ if build_tests
 endif
 
 build_examples = get_option('build_examples')
+build_lc_examples = get_option('build_lc_examples')
 if build_examples
   subdir('examples')
 endif
