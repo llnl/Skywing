@@ -63,6 +63,7 @@ void runJob(
   unsigned num_total_agents
 )
 {
+  std::cout << "Agent " << config.name << " is listening on port " << config.port << std::endl;
   skynet::Master master(config.port, config.name);
   master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle masterHandle){
     std::cout << "Agent " << agent_id << " beginning the job." << std::endl;
@@ -75,7 +76,7 @@ void runJob(
       {
         std::cerr << "Could not find machine \"" << serverMachineName << "\" to connect to.\n";
       }
-      const auto timeLimit = std::chrono::steady_clock::now() + std::chrono::seconds{10};
+      const auto timeLimit = std::chrono::steady_clock::now() + std::chrono::seconds{30};
       while (!masterHandle.connect_to_server(serverMachineNameIter->second.remoteAddress.c_str(),
                                              serverMachineNameIter->second.port).get())
       {

@@ -27,8 +27,11 @@ def read_args(args):
     return params_dict
 
 
-def parse_node_list(node_list):
-    cluster_name, node_inds_list = node_list.split('[')
+def parse_node_list(node_list_string):
+    if '[' not in node_list_string:
+        assert(',' not in node_list_string)
+        return [node_list_string]
+    cluster_name, node_inds_list = node_list_string.split('[')
     node_inds_list = node_inds_list.split(']')[0].split(',')
     node_names_list = []
     for n in node_inds_list:
@@ -55,7 +58,7 @@ def generate_config_file(num_agents, node_names_list, filename, port_start):
         for j in range(num_agents_per_node):
             agent_num = num_agents_per_node * i + j
             f.write("agent{0}\n".format(str(agent_num)))
-            f.write("{0}\n".format(name))
+            f.write("{0}.llnl.gov\n".format(name))
             f.write(str(port_start + j) + "\n")
             if agent_num < num_agents - 1:
                 f.write("agent{0}\n".format(str(agent_num+1)))
