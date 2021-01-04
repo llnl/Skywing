@@ -54,7 +54,9 @@ void machine_task(const NetworkInfo* const info, const int index)
     connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
+    ///////////////////////////////
     // Normal iterative method
+    ///////////////////////////////
     auto opt_iter_method = create_synchronous_iterative(master, job_handle, tags[index], tags).get();
     {
       std::lock_guard<std::mutex> g{catch_mutex};
@@ -70,7 +72,10 @@ void machine_task(const NetworkInfo* const info, const int index)
       }
       std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
+
+    ///////////////////////////////////
     // Supernode iterative method
+    ///////////////////////////////////
     auto super_opt_iter_method = create_supernode_synchronous_iterative(master, job_handle, private_tags[index / 2], nodes).get();
     {
       std::lock_guard<std::mutex> g{catch_mutex};

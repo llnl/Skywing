@@ -1,6 +1,7 @@
 #ifndef SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
 #define SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
 
+#include "skynet_core/internal/devices/socket_communicator.hpp"
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 #include "skynet_upper/internal/iterative_base.hpp"
@@ -124,9 +125,6 @@ public:
   auto values(ArgTypes&&... submit_values) noexcept
   {
     return sync_iter_.values(std::forward<ArgTypes>(submit_values)...).then([this](const auto& base_vals) -> std::vector<ValueType> {
-      std::string doot = "*** [";
-      for (const auto& val : base_vals) { doot += std::to_string(val); }
-      std::cout << doot + "]\n";
       if (base_vals.empty()) { return {}; }
       std::vector<ValueType> ret_values;
       ret_values.reserve(nodes_.size());
@@ -160,21 +158,30 @@ auto create_supernode_synchronous_iterative(
   MasterHandle handle, Job& job, const PrivateTag<TagValueTypes...>& produced_tag, const std::map<PrivateTag<TagValueTypes...>, std::vector<std::string>>& nodes)
 {
   using ProducedType = std::optional<SupernodeSynchronousIterative<TagValueTypes...>>;
-  job.declare_publication_intent(produced_tag);
   using BaseWaiter = Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
   std::vector<BaseWaiter> waiters;
   std::vector<PublishTag<TagValueTypes...>> all_tags;
+  const auto make_new_tag = [&](const auto& tag, const std::string_view addr) {
+    const auto canonical_addr = internal::to_canonical(internal::split_address(addr));
+    return PrivateTag<TagValueTypes...>{tag.id() + canonical_addr.first + std::to_string(canonical_addr.second)};
+  };
+  const auto self_addr = "localhost:" + std::to_string(handle.port());
+  const auto self_tag = make_new_tag(produced_tag, self_addr);
   for (const auto& [tag, addresses] : nodes) {
-    for (const auto& addr : addresses) {
-      waiters.push_back(job.ip_subscribe(addr, tag));
+    if (tag == produced_tag) {
+      job.declare_publication_intent(self_tag);
     }
-    all_tags.push_back(tag);
+    for (const auto& addr : addresses) {
+      const auto new_tag = make_new_tag(tag, addr);
+      waiters.push_back(job.ip_subscribe(addr, new_tag));
+      all_tags.push_back(new_tag);
+    }
   }
   return internal::create_iterative<SynchronousIterative, AllWaiterSame<BaseWaiter>>(
     when_all_same(waiters),
     handle,
     job,
-    PrivateTag<TagValueTypes...>{produced_tag},
+    self_tag,
     all_tags
     ).then([nodes](auto sync_iter) -> ProducedType {
       if (sync_iter) {

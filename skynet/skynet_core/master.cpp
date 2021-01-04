@@ -515,6 +515,8 @@ int Master::number_of_subscribers(const internal::PublishTagBase& tag) const noe
     });
 }
 
+std::uint16_t Master::port() const noexcept { return port_; }
+
 void Master::handle_neighbor_messages() noexcept
 {
   for (auto&& neighbor : neighbors_) {
