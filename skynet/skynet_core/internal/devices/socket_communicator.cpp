@@ -27,7 +27,7 @@ addrinfo* resolve_addr(const char* const address, const std::uint16_t port) noex
   addrinfo* result;
   addrinfo hints;
   std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = IPPROTO_IP;
   const auto port_str = std::to_string(port);

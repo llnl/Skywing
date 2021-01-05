@@ -167,10 +167,8 @@ auto create_supernode_synchronous_iterative(
   };
   const auto self_addr = "localhost:" + std::to_string(handle.port());
   const auto self_tag = make_new_tag(produced_tag, self_addr);
+  job.declare_publication_intent(self_tag);
   for (const auto& [tag, addresses] : nodes) {
-    if (tag == produced_tag) {
-      job.declare_publication_intent(self_tag);
-    }
     for (const auto& addr : addresses) {
       const auto new_tag = make_new_tag(tag, addr);
       waiters.push_back(job.ip_subscribe(addr, new_tag));
