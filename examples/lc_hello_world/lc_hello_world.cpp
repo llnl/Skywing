@@ -77,7 +77,7 @@ void runJob(
         std::cerr << "Could not find machine \"" << serverMachineName << "\" to connect to.\n";
       }
       const auto timeLimit = std::chrono::steady_clock::now() + std::chrono::seconds{30};
-      while (!masterHandle.connect_to_server(serverMachineNameIter->second.remoteAddress.c_str(),
+      while (!masterHandle.connect_to_server("localhost", //serverMachineNameIter->second.remoteAddress.c_str(),
                                              serverMachineNameIter->second.port).get())
       {
         if (std::chrono::steady_clock::now() > timeLimit)
