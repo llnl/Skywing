@@ -430,6 +430,7 @@ private:
     -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
   int number_of_neighbors() const noexcept;
   int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  std::uint16_t port() const noexcept;
 
   template<typename IsReadyCallable>
   Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
@@ -809,6 +810,10 @@ public:
   {
     return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c));
   }
+
+  /** \brief Returns the port the master is listening on
+   */
+  std::uint16_t port() const noexcept { return handle_->port(); }
 
 private:
   friend class Job;
