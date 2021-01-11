@@ -58,7 +58,7 @@ void simulate_machine(const int machine_number)
     if (machine_number != static_cast<int>(node_ports.size() - 1)) {
       // Connecting to the server is an asynchronous operation and can fail.
       // Wait for the result each time and keep attempting to connect until it does
-      while (!master_handle.connect_to_server("127.0.0.1", node_ports[machine_number + 1]).get()) {
+      while (!master_handle.connect_to_server("localhost", node_ports[machine_number + 1]).get()) {
         // Empty
       }
     }

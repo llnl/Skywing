@@ -387,21 +387,22 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
   -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
 {
   std::lock_guard<std::mutex> lock{job_mut_};
+  const auto canonical = internal::to_canonical(AddrPortPair{address, port});
   const auto [iter, inserted] = pending_conns_.try_emplace(
-    internal::to_canonical(AddrPortPair{address, port}),
+    canonical,
     PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
   if (!inserted) {
     std::cerr << "Address " << address << ':' << port << " attempted to be connected to twice!\n";
     std::exit(1);
   }
-  const auto status = iter->second.conn.connect_non_blocking(address, port);
+  const auto status = iter->second.conn.connect_non_blocking(canonical.first.c_str(), canonical.second);
   // Ignore status - if this initially fails it will be handled later
   (void)status;
   return make_waiter(
     job_mut_,
     connection_cv_,
-    internal::MasterConnectionIsComplete{*this, address, port},
-    internal::MasterGetConnectionSuccess{*this, address, port});
+    internal::MasterConnectionIsComplete{*this, canonical.first, canonical.second},
+    internal::MasterGetConnectionSuccess{*this, canonical.first, canonical.second});
 }
 
 auto Master::connect_to_server(std::string_view address) noexcept
