@@ -12,21 +12,22 @@ size_of_system=4
 matrix_file_name=toy_matrix.mtx
 rhs_file_name=toy_rhs.mtx
 sol_file_name=toy_sol.mtx
+root_pathway=/Users/barrett26/lc_repos
 number_of_updated_components=2
 
 counter=0
 
-trap kill_progs EXIT
-kill_progs() {
-  for i in 0 1 2 3; do
-    var="erase${i}"
-    kill -9 ${!var} > /dev/null 2> /dev/null
-  done
-}
+# trap kill_progs EXIT
+# kill_progs() {
+#   for i in 0 1 2 3; do
+#     var="erase${i}"
+#     kill -9 ${!var} > /dev/null 2> /dev/null
+#   done
+# }
 
 while [[ ${counter} < ${size_of_system} ]];do
-  echo "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components}
-  "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} &
+  echo "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway}
+  "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway} &
   declare "erase${i}=$!"
   let counter++;
   # "@sync_jacobi_header_general_exe@" ${i} > /dev/null 2> /dev/null &

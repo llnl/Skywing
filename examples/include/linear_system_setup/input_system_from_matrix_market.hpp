@@ -1,6 +1,6 @@
 #include<fstream>
 //This reads in the appropriate row of the matrix A that a specific process needs from a matrix market format.
-std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector<int> row_indices, std::string matrix_file_name)
+std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector<int> row_indices, std::string matrix_file_name, std::string root_pathway)
 {
 
   std::vector<std::vector<double>> A;
@@ -10,7 +10,7 @@ std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector
   //   A[i].resize(size_of_system);
   // }
 
-  std::string filePath = "/Users/barrett26/lc_repos/skynet/examples/include/system_hold_folder/matrix_hold_folder/" + matrix_file_name;
+  std::string filePath = root_pathway + "/skynet/examples/include/system_hold_folder/matrix_hold_folder/" + matrix_file_name;
 
   // std::string filePath "/g/g20/aaronb/test_redundant_parallel_jacobi/matrix_hold_folder/"+matrix_file_name;
 
@@ -77,12 +77,12 @@ return A;
 }
 
 //This reads in the appropriate entries of b that a specific process needs from a matrix market format.
-std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_indices, std::string rhs_file_name)
+std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_indices, std::string rhs_file_name, std::string root_pathway)
 {
 
   std::vector<double> b_values(static_cast<int>(row_indices.size()),0.0);
 
-  std::string filePath = "/Users/barrett26/lc_repos/skynet/examples/include/system_hold_folder/rhs_hold_folder/" + rhs_file_name;
+  std::string filePath = root_pathway + "/skynet/examples/include/system_hold_folder/rhs_hold_folder/" + rhs_file_name;
 
   // std::string filePath "/g/g20/aaronb/test_redundant_parallel_jacobi/matrix_hold_folder/"+rhs_file_name_name;
 
@@ -145,12 +145,12 @@ return b_values;
 
 
 //This reads in the appropriate entries of b that a specific process needs from a matrix market format.
-std::vector<double> obtain_local_ans_vector(int size_of_system, std::vector<int> row_indices, std::string sol_file_name)
+std::vector<double> obtain_local_ans_vector(int size_of_system, std::vector<int> row_indices, std::string sol_file_name, std::string root_pathway)
 {
 
   std::vector<double> x_local_answer(static_cast<int>(row_indices.size()),0.0);
 
-  std::string filePath = "/Users/barrett26/lc_repos/skynet/examples/include/system_hold_folder/sol_hold_folder/" + sol_file_name;
+  std::string filePath = root_pathway + "/skynet/examples/include/system_hold_folder/sol_hold_folder/" + sol_file_name;
 
   // std::string filePath "/g/g20/aaronb/test_redundant_parallel_jacobi/matrix_hold_folder/"+rhs_file_name_name;
 
