@@ -21,13 +21,21 @@
 namespace {
 constexpr int invalid_handle = -1;
 
-// TODO: I think this leaks memory, need to call freeaddrinfo, so use unique_ptr
-addrinfo* resolve_addr(const char* const address, const std::uint16_t port) noexcept
+struct addrinfo_deleter {
+  void operator()(addrinfo* info) const noexcept
+  {
+    freeaddrinfo(info);
+  }
+};
+
+using addrinfo_ptr = std::unique_ptr<addrinfo, addrinfo_deleter>;
+
+addrinfo_ptr resolve_addr(const char* const address, const std::uint16_t port) noexcept
 {
   addrinfo* result;
   addrinfo hints;
   std::memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = IPPROTO_IP;
   const auto port_str = std::to_string(port);
@@ -36,7 +44,7 @@ addrinfo* resolve_addr(const char* const address, const std::uint16_t port) noex
     std::perror("resolve_addr - resaddr");
     std::exit(4);
   }
-  return result;
+  return {result, {}};
 }
 
 int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
@@ -290,7 +298,6 @@ AddrPortPair to_canonical(const AddrPortPair& addr) noexcept
     + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >>  8) + '.'
     + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
     + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
-  freeaddrinfo(result);
   return {to_ret, addr.second};
 }
 } // namespace skynet::internal
