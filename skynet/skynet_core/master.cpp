@@ -291,10 +291,7 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
         id_,
         msg.tags(),
         msg.is_unsubscribe());
-<<<<<<< HEAD
         // AB: I took out the //this in the lambda below due to an error on mac where it wouldn't pay attention to [[maybe_unused]].
-=======
->>>>>>> 3ad0658d24bff3d1a589cd4368b9eddb84ed20d5
       const auto reject_notice = []([[maybe_unused]] const std::string& why) {
         SKYNET_TRACE_LOG("\"{}\" rejected subscription notice from \"{}\" as {}", master_->id(), id_, why);
       };

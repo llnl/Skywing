@@ -6,12 +6,7 @@
 #include <cstddef>
 #include <cstring>
 #include <vector>
-<<<<<<< HEAD
 #include <optional>//AB: I added this in for compiling locally on my mac using Clang. It couldn't find optionals otherwise.
-=======
-#include <optional>
-
->>>>>>> 3ad0658d24bff3d1a589cd4368b9eddb84ed20d5
 namespace skynet::internal::detail {
 // For recursing below, I feel like there's a better way of doing this, but I can't think of it.
 template<typename T>
