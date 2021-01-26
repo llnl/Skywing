@@ -72,6 +72,9 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib`
  * Run as normal for running on login node. Note: can't run long jobs on login nodes!
 
+Note that Skynet configurations that involve many connections between agents can run into a file descriptor limit.
+The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)
+
 
 ---
 
