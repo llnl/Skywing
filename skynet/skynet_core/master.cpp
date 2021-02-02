@@ -389,8 +389,7 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto canonical = internal::to_canonical(AddrPortPair{address, port});
   const auto [iter, inserted] = pending_conns_.try_emplace(
-    canonical,
-    PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
+    canonical, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
   if (!inserted) {
     std::cerr << "Address " << address << ':' << port << " attempted to be connected to twice!\n";
     std::exit(1);
@@ -665,7 +664,7 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
   const auto iter = addr_to_machine_.find(canonical_addr);
   // Handle self-subscription
   bool is_self_sub = false;
-  if(internal::to_ip_port(canonical_addr) == internal::to_ip_port({"localhost", port_})) {
+  if (internal::to_ip_port(canonical_addr) == internal::to_ip_port({"localhost", port_})) {
     for (const auto& tag : tag_ids) {
       is_self_sub = true;
       const auto iter = self_sub_count_.find(tag);
@@ -689,7 +688,8 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
       canonical_addr.first + ':' + std::to_string(canonical_addr.second),
       [](const std::string& so_far, const std::string& next) { return so_far + '\0' + next; });
     const auto [iter, inserted] = pending_conns_.try_emplace(
-      canonical_addr, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
+      canonical_addr,
+      PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::specific_ip, tag_list});
     assert(inserted);
     // Ignore the status - it is handeled later
     (void)iter->second.conn.connect_non_blocking(canonical_addr.first.c_str(), canonical_addr.second);
