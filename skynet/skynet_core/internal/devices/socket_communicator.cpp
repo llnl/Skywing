@@ -285,11 +285,10 @@ AddrPortPair to_canonical(const AddrPortPair& addr) noexcept
 {
   const auto result = resolve_addr(addr.first.c_str(), addr.second);
   sockaddr_in* info = reinterpret_cast<sockaddr_in*>(result->ai_addr);
-  const std::string to_ret
-    = std::to_string((info->sin_addr.s_addr & 0x000000FF) >>  0) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >>  8) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
+  const std::string to_ret = std::to_string((info->sin_addr.s_addr & 0x000000FF) >> 0) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >> 8) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
   freeaddrinfo(result);
   return {to_ret, addr.second};
 }
