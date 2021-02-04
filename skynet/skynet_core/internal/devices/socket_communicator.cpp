@@ -22,10 +22,7 @@ namespace {
 constexpr int invalid_handle = -1;
 
 struct addrinfo_deleter {
-  void operator()(addrinfo* info) const noexcept
-  {
-    freeaddrinfo(info);
-  }
+  void operator()(addrinfo* info) const noexcept { freeaddrinfo(info); }
 };
 
 using addrinfo_ptr = std::unique_ptr<addrinfo, addrinfo_deleter>;
@@ -293,11 +290,10 @@ AddrPortPair to_canonical(const AddrPortPair& addr) noexcept
 {
   const auto result = resolve_addr(addr.first.c_str(), addr.second);
   sockaddr_in* info = reinterpret_cast<sockaddr_in*>(result->ai_addr);
-  const std::string to_ret
-    = std::to_string((info->sin_addr.s_addr & 0x000000FF) >>  0) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >>  8) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
-    + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
+  const std::string to_ret = std::to_string((info->sin_addr.s_addr & 0x000000FF) >> 0) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >> 8) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
+                           + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
   return {to_ret, addr.second};
 }
 } // namespace skynet::internal

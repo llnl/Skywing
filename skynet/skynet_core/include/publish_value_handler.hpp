@@ -5,8 +5,8 @@
 
 #include <cstddef>
 #include <cstring>
-#include <vector>
 #include <optional>
+#include <vector>
 
 namespace skynet::internal::detail {
 // For recursing below, I feel like there's a better way of doing this, but I can't think of it.
