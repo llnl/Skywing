@@ -21,9 +21,7 @@ const std::uint16_t base_port = get_starting_port();
 bool try_conn(MasterHandle master, int connecting_index)
 {
   for (int i = 0; i < max_conn_attempts; ++i) {
-    if (master.connect_to_server("localhost", base_port + connecting_index).get()) {
-      return true;
-    }
+    if (master.connect_to_server("localhost", base_port + connecting_index).get()) { return true; }
     std::this_thread::sleep_for(wait_period);
   }
   return false;
@@ -31,7 +29,8 @@ bool try_conn(MasterHandle master, int connecting_index)
 
 void machine_task(const int index)
 {
-  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index), std::chrono::milliseconds{100}};
+  Master base_master{
+    static_cast<std::uint16_t>(base_port + index), std::to_string(index), std::chrono::milliseconds{100}};
   base_master.submit_job("job", [&](Job&, MasterHandle master) {
     std::ranlux48 prng{std::random_device{}()};
     for (int i = 0; i < num_conns; ++i) {

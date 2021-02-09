@@ -391,7 +391,8 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
   // Only actually try the connection if it doesn't already exist
   if (addr_to_machine_.find(canonical) == addr_to_machine_.cend()) {
     const auto [iter, inserted] = pending_conns_.try_emplace(
-      canonical, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
+      canonical,
+      PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
     if (inserted) {
       const auto status = iter->second.conn.connect_non_blocking(canonical.first.c_str(), canonical.second);
       // Ignore status - if this initially fails it will be handled later
