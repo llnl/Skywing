@@ -217,7 +217,7 @@ AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
 {
   sockaddr_in client_address;
   socklen_t len = sizeof(client_address);
-  getsockname(handle_, reinterpret_cast<sockaddr*>(&client_address), &len);
+  getpeername(handle_, reinterpret_cast<sockaddr*>(&client_address), &len);
   return {inet_ntoa(client_address.sin_addr), client_address.sin_port};
 }
 

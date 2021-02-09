@@ -11,6 +11,7 @@ core_tests = {
     'publish_data_wrapper',
     'publish_multiple_values',
     'reduce_tag_bug',
+    'repeat_connection',
     'self_subscribe',
     'simple_reduce',
   ],

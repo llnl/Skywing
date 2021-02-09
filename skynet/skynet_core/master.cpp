@@ -391,14 +391,13 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
   // Only actually try the connection if it doesn't already exist
   if (addr_to_machine_.find(canonical) == addr_to_machine_.cend()) {
     const auto [iter, inserted] = pending_conns_.try_emplace(
-      canonical, PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
-    if (!inserted) {
-      std::cerr << "Address " << address << ':' << port << " attempted to be connected to twice!\n";
-      std::exit(1);
+      canonical,
+      PendingInfo{internal::SocketCommunicator{}, ConnStatus::waiting_for_conn, ConnType::user_requested, ""});
+    if (inserted) {
+      const auto status = iter->second.conn.connect_non_blocking(canonical.first.c_str(), canonical.second);
+      // Ignore status - if this initially fails it will be handled later
+      (void)status;
     }
-    const auto status = iter->second.conn.connect_non_blocking(canonical.first.c_str(), canonical.second);
-    // Ignore status - if this initially fails it will be handled later
-    (void)status;
   }
   return make_waiter(
     job_mut_,
