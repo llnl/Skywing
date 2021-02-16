@@ -66,6 +66,8 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Add capnp pkgconfig directory to PKG_CONFIG_PATH
    * `export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:capnp_build_dir/lib/pkgconfig`
  * Follow build instructions as normal
+ * To build the LC Hello World example, also include `-Dbuild_lc_examples=true` in the meson options.
+ * To run the LC example, go to `(skyent_root)/build/examples/lc_hello_world/` and execute `source run.sh`.
 
 ### Running Skynet
  * Add capnp shared library to LD_LIBRARY_PATH
