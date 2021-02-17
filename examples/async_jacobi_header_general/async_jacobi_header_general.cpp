@@ -34,7 +34,7 @@ void print_exact_solution(int machine_number, int number_of_updated_components, 
     std::cout << x_local_answer[i] << " ";
   }
    std::cout << std::endl;
-};
+}
 
 // All of the Skynet specific code is located in this function.
 void machine_task(int machine_number, int number_of_updated_components, std::vector<std::vector<double>> matrix_rows, std::vector<double> b_values, std::vector<double> x_local_answer, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags)
