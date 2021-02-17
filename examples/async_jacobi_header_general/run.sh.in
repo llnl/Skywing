@@ -12,24 +12,38 @@ size_of_system=4
 matrix_file_name=toy_matrix.mtx
 rhs_file_name=toy_rhs.mtx
 sol_file_name=toy_sol.mtx
-root_pathway=/Users/barrett26/lc_repos
+root_pathway=/Users/barrett26/lc_repos/skynet_4
 number_of_updated_components=2
+number_of_trials=2
 
-counter=0
+counter_for_network_elements=0
+counter_for_trials=1
+trap kill_progs EXIT
+kill_progs() {
+  for i in 0 1 2 3; do
+    var="erase${i}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
 
-# trap kill_progs EXIT
-# kill_progs() {
-#   for i in 0 1 2 3; do
-#     var="erase${i}"
-#     kill -9 ${!var} > /dev/null 2> /dev/null
-#   done
-# }
-
-while [[ ${counter} < ${size_of_system} ]];do
-  echo "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway}
-  "@async_jacobi_header_general_exe@" ${counter} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway} &
-  declare "erase${i}=$!"
-  let counter++;
-  # "@sync_jacobi_header_general_exe@" ${i} > /dev/null 2> /dev/null &
-  # declare "erase${i}=$!"
+while [[ ${counter_for_trials} -le ${number_of_trials} ]]; do
+  echo Trial ${counter_for_trials} Begins
+  while [[ ${counter_for_network_elements} < ${size_of_system} ]];do
+    # echo "@async_jacobi_header_general_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway}
+    if [[ ${counter_for_network_elements} < $((size_of_system-1)) ]]
+    then
+      "@async_jacobi_header_general_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway} &
+    else
+      "@async_jacobi_header_general_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway}
+    fi
+    # declare "erase${counter_for_network_elements}=$!"
+    let counter_for_network_elements++
+    # "@sync_jacobi_header_general_exe@" ${i} > /dev/null 2> /dev/null &
+    # declare "erase${counter_for_network_elements}=$!"
+  done
+  sleep 1
+  echo After Trial $counter_for_trials
+  counter_for_network_elements=0
+  let counter_for_trials++
+  STARTING_PORT=$((STARTING_PORT+size_of_system))
 done
