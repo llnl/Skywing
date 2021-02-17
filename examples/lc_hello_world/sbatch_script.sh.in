@@ -3,7 +3,6 @@
 #SBATCH -J skynet_LC_hello_world
 #SBATCH -t 00:05:00
 #SBATCH -p pbatch
-#SBATCH -A stargazr
 #SBATCH -o lc_hello_world_out.txt
 
 #### Shell commands
