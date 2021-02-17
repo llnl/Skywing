@@ -13,7 +13,7 @@ std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector
   std::string filePath = "hold";
   if(lc==1)
   {
-    filePath "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/matrix_hold_folder/" + matrix_file_name;
+    filePath = "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/matrix_hold_folder/" + matrix_file_name;
   }
   else
   {
@@ -92,7 +92,7 @@ std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_i
   std::string filePath = "hold";
   if(lc==1)
   {
-    filePath "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/rhs_hold_folder/" + rhs_file_name;;
+    filePath = "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/rhs_hold_folder/" + rhs_file_name;
   }
   else
   {
@@ -169,7 +169,7 @@ std::vector<double> obtain_local_ans_vector(int size_of_system, std::vector<int>
   std::string filePath = "hold";
   if(lc==1)
   {
-    filePath "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/sol_hold_folder/" + sol_file_name;;
+    filePath = "/g/g20/aaronb/repos/skynet/examples/include/system_hold_folder/sol_hold_folder/" + sol_file_name;
   }
   else
   {
