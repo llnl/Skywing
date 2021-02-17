@@ -163,6 +163,7 @@ int main(int argc, char* argv[])
   std::string sol_file_name = argv[6];
   int number_of_updated_components = std::stoi(argv[7]);
   std::string root_pathway = argv[8];
+  int lc = std::stoi(argv[9]);
   //This creates the relevent vectors needed to interact with skynet.
   auto ports = set_port(starting_port_number, size_of_system);
   auto machine_names = obtain_machine_names(size_of_system);
@@ -173,11 +174,11 @@ int main(int argc, char* argv[])
   {
     row_indices.push_back((machine_number + i) % size_of_system);
   }
-  auto matrix_rows_hold = obtain_A_matrix(size_of_system, row_indices, matrix_file_name, root_pathway);
+  auto matrix_rows_hold = obtain_A_matrix(size_of_system, row_indices, matrix_file_name, root_pathway, lc);
 
-  auto b_values = obtain_rhs_vector(size_of_system, row_indices, rhs_file_name, root_pathway);
+  auto b_values = obtain_rhs_vector(size_of_system, row_indices, rhs_file_name, root_pathway, lc);
 
-  auto x_local_answer = obtain_local_ans_vector(size_of_system, row_indices, sol_file_name, root_pathway);
+  auto x_local_answer = obtain_local_ans_vector(size_of_system, row_indices, sol_file_name, root_pathway, lc);
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
   {
