@@ -100,6 +100,13 @@ int main(int argc, char* argv[])
     std::cerr << "Usage: Note Enough Arguments: " << argc << std::endl;
     return 1;
   }
+  // Terminal output to see command line arguments.
+  // std::cout<< "Command Line Arguments: ";
+  // for(int i =1 ; i< argc; i++)
+  // {
+  //   std::cout << argv[i] << " ";
+  // }
+  // std::cout << std::endl;
 
   // Parse the machine number, starting_port_number, and size_of_system that was passed in
   // Do this in a lambda so that if there's an exception a dummy value can be
