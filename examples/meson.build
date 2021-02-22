@@ -8,6 +8,7 @@ endif
 
 #subdir('sync_jacobi_header_general')
 subdir('async_jacobi_header_general')
+subdir('csv_example')
 
 if use_helics
   subdir('helics_hello_world')

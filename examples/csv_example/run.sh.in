@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#This is a shell script generates the csv_example
+
+if [[ $# < 1 ]]; then
+  echo "usage: @exe@ starting_port_number"
+  exit 1
+fi
+
+STARTING_PORT=$1
+
+size_of_system=10
+matrix_file_name=toy_matrix.mtx
+rhs_file_name=toy_rhs.mtx
+sol_file_name=toy_sol.mtx
+
+root_pathway=/Users/barrett26/lc_repos/skynet_4
+number_of_updated_components=2
+number_of_trials=1
+lc=1
+
+counter_for_network_elements=0
+counter_for_trials=1
+
+
+while [[ ${counter_for_trials} -le ${number_of_trials} ]]; do
+  echo Trial ${counter_for_trials} Begins
+  while [[ ${counter_for_network_elements} < ${size_of_system} ]];do
+    # echo "@csv_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway}
+    if [[ ${counter_for_network_elements} < $((size_of_system-1)) ]]
+    then
+      "@csv_example_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway} ${lc} &
+    else
+      # This else simply leaves out the "&" so the terminal returns after the trial(s) are completed.
+      "@csv_example_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} $matrix_file_name ${rhs_file_name} ${sol_file_name} ${number_of_updated_components} ${root_pathway} ${lc}
+    fi
+    let counter_for_network_elements++
+  done
+  sleep 1
+  echo After Trial $counter_for_trials
+  counter_for_network_elements=0
+  let counter_for_trials++
+  STARTING_PORT=$((STARTING_PORT+size_of_system))
+done
