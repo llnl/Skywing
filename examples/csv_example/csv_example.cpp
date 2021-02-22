@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
   // Do this in a lambda so that if there's an exception a dummy value can be
   // returned which will always trigger an error
   // Machine number is the
-    int machine_number = [&]() {
+  int machine_number = [&]() {
     try
     {
       return std::stoi(argv[1]);
@@ -76,29 +76,6 @@ int main(int argc, char* argv[])
       return -1;
     }
   }();
-  // std::string matrix_file_name = [&]() {
-  //   try
-  //   {
-  //     return argv[4];
-  //   }
-  //   catch (...)
-  //   {
-  //     std::string hold = "";
-  //     return " ";
-  //   }
-  // }();
-  //
-  // std::string rhs_file_name = [&]() {
-  //   try
-  //   {
-  //     return argv[5];
-  //   }
-  //   catch (...)
-  //   {
-  //     std::string hold = "";
-  //     return &hold;
-  //   }
-  // }();
   std::string matrix_file_name = argv[4];
   std::string rhs_file_name = argv[5];
   std::string sol_file_name = argv[6];
@@ -111,7 +88,8 @@ int main(int argc, char* argv[])
   auto machine_names = obtain_machine_names(size_of_system);
   auto tags = obtain_tags<ValueTag>(size_of_system);
 
-
+  // This is the actual csv creation.
+  // The only variables passed in this are the machine_number and the number of updated components, just to pass something else. Additionally, the machine_number, which is unique to each agent, is used in the creation of each file.
   std::string my_file_name_local_forward_error="LocalIterateForwardErrorInformation" + std::to_string(machine_number) + ".csv";
   std::ofstream my_file_local_forward_error;
   my_file_local_forward_error.open(my_file_name_local_forward_error);
