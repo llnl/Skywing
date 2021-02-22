@@ -20,7 +20,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * compiler that supports c++17 library
    * tested: GCC/g++ (8.3.0) and LLVM/clang (6.0.0, 10.0.0, 11.0.0)
  * meson (https://mesonbuild.com/)
-   * requires Python >= 3.5.2
+   * requires Python >= 3.8.0
  * CMake (https://cmake.org/)
  * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
