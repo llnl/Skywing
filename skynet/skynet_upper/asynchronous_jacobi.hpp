@@ -345,7 +345,7 @@ void print_all_received_information(skynet::AsynchronousValues<std::vector<doubl
 
 }; // end asynchronous_jacobi
 
-
+// This is the continuation that makes this class possible as this implementation depends upon the asynchronous_iterative class. 
 template<typename... Args>
 auto create_asynchronous_jacobi(int row_number, int number_of_updated_components, std::vector<std::vector<double>> matrix_rows, std::vector<double> b_values, std::vector<int> row_indices, std::vector<ValueTag> tags, Args&&... args) noexcept
 {

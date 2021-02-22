@@ -81,6 +81,22 @@ void machine_task(int machine_number, int number_of_updated_components, std::vec
     async_jaco.create_iteration(count);
   }
 
+    std::string my_file_name_local_forward_error="LocalIterateForwardErrorInformation" + std::to_string(machine_number) + ".csv";
+  std::ofstream my_file_local_forward_error;
+  my_file_local_forward_error.open(my_file_name_local_forward_error);
+
+  //my_file_local_forward_error.precision(dbl::max_digits10);
+
+  my_file_local_forward_error << "My rank ";
+  my_file_local_forward_error << ",";
+  my_file_local_forward_error << machine_number;
+  my_file_local_forward_error << "\n";
+  my_file_local_forward_error << "Local Forward Error ";
+  my_file_local_forward_error << ",";
+  // my_file_local_forward_error << local_forward_error;
+  my_file_local_forward_error << "\n";
+  my_file_local_forward_error.close();
+
   std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
   async_jaco.print_solution();

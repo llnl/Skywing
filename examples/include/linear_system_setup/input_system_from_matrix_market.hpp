@@ -97,7 +97,6 @@ std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_i
   else
   {
     filePath = root_pathway + "/skynet/examples/include/system_hold_folder/rhs_hold_folder/" + rhs_file_name;
-
   }
 
   // std::string filePath "/g/g20/aaronb/test_redundant_parallel_jacobi/matrix_hold_folder/"+rhs_file_name_name;
