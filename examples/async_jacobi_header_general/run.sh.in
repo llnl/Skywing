@@ -21,8 +21,8 @@ sol_file_name=x_sol_randomInteger_10_diagDom_100.mtx
 
 root_pathway=/Users/barrett26/lc_repos/skynet_4
 number_of_updated_components=2
-number_of_trials=2
-lc=1
+number_of_trials=1
+lc=0
 
 counter_for_network_elements=0
 counter_for_trials=1
