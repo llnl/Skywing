@@ -13,11 +13,11 @@
 //       actually having multiple (virtual) machines to test so that
 //       a machine can be killed without sending out a goodbye message
 
+using namespace skynet;
+
 constexpr int num_machines = 5;
 constexpr std::chrono::milliseconds heartbeat_interval{100};
-constexpr std::uint16_t base_port = 30000;
-
-using namespace skynet;
+const std::uint16_t base_port = get_starting_port();
 
 void machine_task(const NetworkInfo* const info, const int index)
 {

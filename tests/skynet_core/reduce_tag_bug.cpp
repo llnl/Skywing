@@ -2,6 +2,9 @@
 
 #include "skynet_core/enable_logging.hpp"
 #include "skynet_core/skynet.hpp"
+
+#include "utils.hpp"
+
 #include <iostream>
 
 using namespace skynet;
@@ -26,16 +29,16 @@ TEST_CASE("Reduce groups with same machines work", "[Skynet_ReduceTagBug]")
       master_base.run();
     }};
   };
-  make_task(0, 10000).detach();
-  make_task(1, 20000).detach();
-  Master master_base{30000, "glue"};
+  const auto start_port = get_starting_port();
+  make_task(0, start_port).detach();
+  make_task(1, start_port + 1).detach();
+  Master master_base{static_cast<std::uint16_t>(start_port + 2), "glue"};
   master_base.submit_job("job", [&](Job&, MasterHandle master) {
-    std::cout << "Henlo\n";
     while (true) {
-      if (master.connect_to_server("127.0.0.1", 10000).get()) { break; }
+      if (master.connect_to_server("127.0.0.1", start_port + 1).get()) { break; }
     }
     while (true) {
-      if (master.connect_to_server("127.0.0.1", 20000).get()) { break; }
+      if (master.connect_to_server("127.0.0.1", start_port + 2).get()) { break; }
     }
     // sleep to allow information to exchange
     std::this_thread::sleep_for(std::chrono::milliseconds{500});

@@ -2,9 +2,12 @@
 
 #include "skynet_core/skynet.hpp"
 
+#include "utils.hpp"
+
 using namespace skynet;
 
 using PubTag = PublishTag<std::int32_t>;
+using PrivatePubTag = PrivateTag<std::int32_t>;
 using GroupTag = ReduceGroupTag<std::int32_t>;
 using ValueTag = ReduceValueTag<std::int32_t>;
 
@@ -16,7 +19,7 @@ constexpr std::chrono::milliseconds wait_time{1000};
 
 TEST_CASE("Self-subscription works", "[Skynet_SelfSubscribe]")
 {
-  Master base_master{15000, "Lonely"};
+  Master base_master{get_starting_port(), "Lonely"};
 
   base_master.submit_job("job", [&](Job& job, MasterHandle) {
     // Publish/Subscribe
@@ -27,6 +30,15 @@ TEST_CASE("Self-subscription works", "[Skynet_SelfSubscribe]")
     auto pub_fut = job.get_waiter(pub_tag);
     REQUIRE(pub_fut.wait_for(wait_time));
     REQUIRE(pub_fut.get() == 10);
+
+    // IP Publish/Subscribe
+    const PrivatePubTag private_pub_tag{"integer"};
+    job.declare_publication_intent(private_pub_tag);
+    REQUIRE(job.ip_subscribe("localhost:" + std::to_string(get_starting_port()), private_pub_tag).wait_for(wait_time));
+    job.publish(private_pub_tag, 30);
+    auto private_pub_fut = job.get_waiter(private_pub_tag);
+    REQUIRE(private_pub_fut.wait_for(wait_time));
+    REQUIRE(private_pub_fut.get() == 30);
 
     // Reduce operation
     // This is not yet supported - need to discuss if this is wanted as this is a

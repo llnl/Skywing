@@ -15,4 +15,5 @@ option(
 )
 option('build_tests', type: 'boolean', value: false, description: 'Build tests')
 option('build_examples', type: 'boolean', value: false, description: 'Build the example programs')
+option('build_lc_examples', type: 'boolean', value: false, description: 'Build LC example programs')
 option('use_helics', type: 'boolean', value: false, description: 'Link the HELICS library')

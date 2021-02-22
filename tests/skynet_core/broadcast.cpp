@@ -4,6 +4,8 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 
+#include "utils.hpp"
+
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -31,7 +33,7 @@ constexpr std::array<const char*, 5> machine_names{"m0", "m1", "m2", "m3", "m4"}
 constexpr std::array<const char*, 5> tag_names{"t0", "t1", "t2", "t3", "t4"};
 
 // The port each machine is on
-std::array<std::uint16_t, 5> ports{15000, 16000, 17000, 18000, 19000};
+auto ports = create_ports(5);
 
 // machine connections to make
 constexpr std::array<std::array<int, 3>, 5> to_connect{
