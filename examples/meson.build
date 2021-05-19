@@ -6,8 +6,8 @@ if build_lc_examples
    subdir('lc_hello_world')
 endif
 
-#subdir('sync_jacobi_header_general')
-subdir('async_jacobi_header_general')
+subdir('sync_jacobi')
+subdir('async_jacobi')
 subdir('csv_example')
 
 if use_helics

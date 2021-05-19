@@ -11,9 +11,9 @@
 // #include "utils.hpp"
 
 // #include "typeinfo"
-#include "../include/linear_system_setup/skynet_jacobi_setup.hpp"
-#include "../include/linear_system_setup/input_system_from_matrix_market.hpp"
-// #include "../include/data_collection/local_consolidation.hpp"
+#include "../jacobi_include/linear_system_setup/skynet_jacobi_setup.hpp"
+#include "../jacobi_include/linear_system_setup/input_system_from_matrix_market.hpp"
+// #include "../jacobi_include/data_collection/local_consolidation.hpp"
 #include <array>
 #include <chrono>
 #include <iomanip>
@@ -29,7 +29,7 @@ using ValueTag = skynet::PublishTag<std::vector<double>>;
 
 int main(int argc, char* argv[])
 {
-  if (argc < 7)
+  if (argc < 6)
   {
     std::cerr << "Usage: Note Enough Arguments: " << argc << std::endl;
     return 1;
@@ -76,11 +76,9 @@ int main(int argc, char* argv[])
       return -1;
     }
   }();
-  std::string matrix_file_name = argv[4];
-  std::string rhs_file_name = argv[5];
-  std::string sol_file_name = argv[6];
-  int number_of_updated_components = std::stoi(argv[7]);
-  std::string root_pathway = argv[8];
+  std::string matrix_name = argv[4];
+  int number_of_updated_components = std::stoi(argv[5]);
+
 
   // This creates the relevent vectors needed to interact with skynet.
   // In this example, these are useless.

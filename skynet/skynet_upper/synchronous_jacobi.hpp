@@ -125,6 +125,11 @@ public:
   {
     return x_iter[row_number];
   };
+  std::vector<double> return_solution_as_vec()
+  {
+    std::vector<double> return_vec(1,x_iter[row_number]);
+    return return_vec;
+  };
   std::vector<double> return_full_x_iter()
   {
     return x_iter;

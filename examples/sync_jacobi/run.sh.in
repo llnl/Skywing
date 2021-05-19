@@ -1,0 +1,47 @@
+#!/bin/bash
+
+#This is a shell script which calls sync_jacobi
+
+if [[ $# < 1 ]]; then
+  echo "usage: @exe@ starting_port_number"
+  exit 1
+fi
+
+STARTING_PORT=$1
+
+number_of_trials=1
+# size_of_system=4
+# matrix_name=toy.mtx
+
+size_of_system=10
+matrix_name=randomInteger_10_diagDom_100.mtx
+
+echo $STARTING_PORT $number_of_trials $size_of_system $starting_redundancy $ending_redundancy $matrix_name
+
+# trap kill_progs EXIT
+# kill_progs() {
+#    for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
+#     var="erase${counter_for_network_elements}"
+#     kill -9 ${!var} > /dev/null 2> /dev/null
+#   done
+# }
+
+# folder which stores results for aggregation.
+rm -r data_hold/
+mkdir data_hold
+
+for (( counter_for_trials=1 ; counter_for_trials<number_of_trials+1 ; counter_for_trials++ )); do
+  for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
+    if [[ ${counter_for_network_elements} < $((size_of_system-1)) ]]
+    then
+      echo "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} ${matrix_name} ${counter_for_trials}
+      "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} ${matrix_name} ${counter_for_trials} &
+    else
+      echo "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} ${matrix_name} ${counter_for_trials}
+      "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} ${matrix_name} ${counter_for_trials}
+    fi
+    # declare "erase${i}=$!"
+    # "@sync_jacobi_exe@" ${i} > /dev/null 2> /dev/null &
+    # declare "erase${counter_for_network_elements}=$!"
+  done
+done

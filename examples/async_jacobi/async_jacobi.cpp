@@ -11,11 +11,11 @@
 
 // #include "utils.hpp"
 // #include "typeinfo"
-#include "../include/linear_system_setup/skynet_jacobi_setup.hpp"
-#include "../include/linear_system_setup/input_system_from_matrix_market_v2.hpp"
+#include "../jacobi_include/linear_system_setup/skynet_jacobi_setup.hpp"
+#include "../jacobi_include/linear_system_setup/input_system_from_matrix_market_v2.hpp"
 // #include "../include/data_collection/local_consolidation.hpp"
-#include "../include/data_collection/save_async_sync_jacobi_data.hpp"
-#include "../include/data_collection/jacobi_error_residual_functions.hpp"
+#include "../jacobi_include/data_collection/save_async_sync_jacobi_data.hpp"
+#include "../jacobi_include/data_collection/jacobi_error_residual_functions.hpp"
 #include <array>
 #include <chrono>
 #include <iomanip>
@@ -110,10 +110,10 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
 int main(int argc, char* argv[])
 {
   // Error checking for the number of arguments
-  if (argc < 7)
+  if (argc < 6)
   {
-    std::cerr << "Usage: Note Enough Arguments: " << argc << std::endl;
-    return 1;
+    std::cout << "Usage: Note Enough Arguments: " << argc << std::endl;
+    // return 1;
   }
   // Terminal output to see command line arguments.
   // std::cout<< "Command Line Arguments: ";

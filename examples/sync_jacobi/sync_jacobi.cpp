@@ -8,8 +8,11 @@
 #include "skynet_core/master.hpp"
 
 // #include "typeinfo"
-#include "/Users/barrett26/lc_repos/skynet/examples/include/linear_system_setup/skynet_jacobi_setup.hpp"
-#include "/Users/barrett26/lc_repos/skynet/examples/include/linear_system_setup/input_system_from_matrix_market.hpp"
+#include "../jacobi_include/linear_system_setup/skynet_jacobi_setup.hpp"
+#include "../jacobi_include/linear_system_setup/input_system_from_matrix_market_v2.hpp"
+#include "../jacobi_include/data_collection/save_async_sync_jacobi_data.hpp"
+#include "../jacobi_include/data_collection/jacobi_error_residual_functions.hpp"
+
 #include <array>
 #include <chrono>
 #include <iomanip>
@@ -30,9 +33,18 @@ using ValueTag = skynet::PublishTag<double>;
 //   1.0, 2.0, 3.0, 4.0
 // };
 
+void print_exact_solution(int machine_number, int number_of_updated_components, std::vector<double> x_local_solution)
+{
+  std::cout << "The exact solution for " << machine_number << " is ";
+  for(int i = 0 ; i < number_of_updated_components; i ++)
+  {
+    std::cout << x_local_solution[i] << " ";
+  }
+   std::cout << std::endl;
+}
 
 // All of the Skynet specific code is located in this function.
-void machine_task(const int machine_number, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::vector<std::vector<double>> matrix_row_hold, std::vector<double> b_values, std::vector<double> x_local_answer)
+void machine_task(const int machine_number, int trial, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::vector<std::vector<double>> matrix_row_hold, std::vector<double> b_values, std::vector<double> x_local_solution)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
@@ -54,8 +66,8 @@ void machine_task(const int machine_number, std::vector<std::uint16_t> ports, st
 
     // This is the user defined stopping criteria.
     // For the sake of simplicity this is defined as max iterations outside of the header filoe, atm.
-    int count = 0 ;
-    int max_itr = 100;
+    int iteration_count = 0 ;
+    int max_itr = 50;
 
     // For the synchronous_jacobi class to work, one needs to send the information for the computation, whichs is the row of the matrix used for computation, which is at this point the same as the machine_number.
     auto opt_iter_method = create_synchronous_jacobi(
@@ -70,15 +82,31 @@ void machine_task(const int machine_number, std::vector<std::uint16_t> ports, st
 
     auto sync_jaco = *opt_iter_method;
 
-    while(count <= max_itr)
+    auto start_jacobi = std::chrono::high_resolution_clock::now();
+    while(iteration_count <= max_itr)
     {
-      count++;
+      // std::cout << "in iteration" << std::endl;
+      iteration_count++;
       sync_jaco.create_iteration();
     }
 
+    auto stop_jacobi = std::chrono::high_resolution_clock::now();
+    auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
+
+    auto x_local_estimate = sync_jaco.return_full_x_iter();
+    auto x_partition_estimate = sync_jaco.return_solution_as_vec();
+
+
+
+    double partial_residual = calculate_partial_residual(1, x_local_estimate, b_values, matrix_row_hold);
+    double partial_forward_error = calculate_partial_forward_error(1, x_partition_estimate, x_local_solution);
+
+    collect_data_each_component(machine_number, 1, trial, partial_forward_error, partial_residual, iteration_count, run_time.count());
+
+
     std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
-    std::cout<<"machine " << machine_number << " has answer: " << sync_jaco.return_solution() << " compared to exact value: " << x_local_answer[0] << std::endl;
+    std::cout<<"machine " << machine_number << " has answer: " << sync_jaco.return_solution() << " compared to exact value: " << x_local_solution[0] << std::endl;
 
     std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
@@ -92,8 +120,8 @@ int main(int argc, char* argv[])
   // Error checking for the number of arguments
   if (argc < 5)
   {
-    std::cerr << "Usage: Note Enough Arguments: " << argc << std::endl;
-    return 1;
+    std::cout<< "Usage: Note Enough Arguments: " << argc << std::endl;
+    // return 1;
   }
 
   // Parse the machine number, starting_port_number, and size_of_system that was passed in
@@ -153,10 +181,14 @@ int main(int argc, char* argv[])
   //     return &hold;
   //   }
   // }();
-  std::string matrix_file_name = argv[4];
-  std::string rhs_file_name = argv[5];
-  std::string sol_file_name = argv[6];
-  std::string root_pathway = argv[7];
+  std::string matrix_name = argv[4];
+  // std::string rhs_file_name = argv[5];
+  // std::string sol_file_name = argv[6];
+  // std::string root_pathway = argv[7];
+  // int lc = std::stoi(argv[8]);
+  int trial = std::stoi(argv[5]);
+  // For using the asynchronous data aggregation.
+  // int number_of_updated_components = 1;
 
   //This creates the relevent vectors needed to interact with skynet.
   auto ports = set_port(starting_port_number, size_of_system);
@@ -165,11 +197,11 @@ int main(int argc, char* argv[])
 
   std::vector<int> row_indices = {machine_number};
 
-  auto matrix_row_hold = obtain_A_matrix(size_of_system, row_indices, matrix_file_name, root_pathway);
+  auto matrix_row_hold = obtain_A_matrix(size_of_system, row_indices, matrix_name);
 
-  auto b_values = obtain_rhs_vector(size_of_system, row_indices, rhs_file_name, root_pathway);
+  auto b_values = obtain_rhs_vector(size_of_system, row_indices, matrix_name);
 
-  auto x_local_answer = obtain_local_ans_vector(size_of_system, row_indices, sol_file_name, root_pathway);
+  auto x_local_solution = obtain_local_solution_vector(size_of_system, row_indices, matrix_name);
 
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
@@ -192,10 +224,9 @@ int main(int argc, char* argv[])
   //     << "Invalid dimension size.\n";
   //   return -1;
   // }
-  std::cout << "Setup Sucessful: " << machine_number  << std::endl;
-
+  std::cout << "After setup for: " << machine_number << std::endl;
   // This runs the actual skynet code.
-  machine_task(machine_number,  ports, machine_names, tags, matrix_row_hold, b_values, x_local_answer);
+  machine_task(machine_number, trial, ports, machine_names, tags, matrix_row_hold, b_values, x_local_solution);
 
   return 0;
 }
