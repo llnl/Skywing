@@ -197,11 +197,11 @@ int main(int argc, char* argv[])
 
   std::vector<int> row_indices = {machine_number};
 
-  auto matrix_row_hold = obtain_A_matrix(size_of_system, row_indices, matrix_name);
+  auto matrix_row_hold = obtain_A_matrix(machine_number, size_of_system, row_indices, matrix_name);
 
-  auto b_values = obtain_rhs_vector(size_of_system, row_indices, matrix_name);
+  auto b_values = obtain_rhs_vector(machine_number, size_of_system, row_indices, matrix_name);
 
-  auto x_local_solution = obtain_local_solution_vector(size_of_system, row_indices, matrix_name);
+  auto x_local_solution = obtain_local_solution_vector(machine_number, size_of_system, row_indices, matrix_name);
 
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))

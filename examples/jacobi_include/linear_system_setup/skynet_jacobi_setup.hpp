@@ -15,7 +15,7 @@ std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::ui
 
   for(std::uint16_t i = 0; i < size_of_system; i++)
   {
-    ports.push_back(starting_port_number + (i * 100));
+    ports.push_back(starting_port_number + (i * 1));
   }
   return ports;
 }

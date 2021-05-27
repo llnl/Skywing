@@ -12,10 +12,10 @@ STARTING_PORT=$1
 number_of_trials=2
 
 # size_of_system=4
-# matrix_name=toy.mtx
+# matrix_name=toy
 
 size_of_system=10
-matrix_name=randomInteger_10_diagDom_100.mtx
+matrix_name=randomInteger_10_diagDom_100
 
 starting_redundancy=1;
 ending_redundancy=2;
@@ -34,8 +34,10 @@ echo $STARTING_PORT $number_of_trials $size_of_system $starting_redundancy $endi
 rm -r data_hold/
 mkdir data_hold
 
-for (( redundancy_counter=starting_redundancy ; redundancy_counter <ending_redundancy+1 ; redundancy_counter++ )); do
-  for (( counter_for_trials = 1 ; counter_for_trials < number_of_trials+1 ; counter_for_trials++ )); do
+endcounter=ending_redundancy+1
+
+for (( redundancy_counter=starting_redundancy ; redundancy_counter<${endcounter} ; redundancy_counter++ )); do
+  for (( counter_for_trials = 1 ; counter_for_trials < $((number_of_trials+1)) ; counter_for_trials++ )); do
       echo Start Redundancy ${redundancy_counter} Trial ${counter_for_trials}
       for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
         # echo "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} ${matrix_name} ${number_of_updated_components} ${root_pathway}
@@ -50,7 +52,8 @@ for (( redundancy_counter=starting_redundancy ; redundancy_counter <ending_redun
       done
       echo After Redundancy ${redundancy_counter} Trial ${counter_for_trials}
       killall async_jacobi
-      STARTING_PORT=$((STARTING_PORT+size_of_system))
+      sleep 10
+      STARTING_PORT=$((STARTING_PORT+size_of_system+100))
     done
 done
 

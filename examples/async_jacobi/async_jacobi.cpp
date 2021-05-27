@@ -75,6 +75,7 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
     tags
   ).get();
 
+  std::cout << "starting to iterate: " << machine_number << std::endl;
   auto async_jaco = *opt_iter_method;
 
   auto start_jacobi = std::chrono::high_resolution_clock::now();
@@ -100,6 +101,7 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
 
   async_jaco.print_solution();
   print_exact_solution(machine_number,number_of_updated_components,  x_local_solution);
+  
   // std::this_thread::sleep_for(std::chrono::milliseconds{100});
   // std::cout << "This is at the end of master.run() before return 0 for " << machine_number << std::endl;
   });
@@ -194,13 +196,15 @@ int main(int argc, char* argv[])
   {
     row_indices.push_back((machine_number + i) % size_of_system);
   }
-  auto matrix_rows_hold = obtain_A_matrix(size_of_system, row_indices, matrix_name);
+  auto matrix_rows_hold = obtain_A_matrix(machine_number, size_of_system, row_indices, matrix_name);
 
-  auto b_values = obtain_rhs_vector(size_of_system, row_indices, matrix_name);
+  auto b_values = obtain_rhs_vector(machine_number, size_of_system, row_indices, matrix_name);
 
-  auto x_local_solution = obtain_local_solution_vector(size_of_system, row_indices, matrix_name);
+  auto x_local_solution = obtain_local_solution_vector(machine_number, size_of_system, row_indices, matrix_name);
 
-  auto x_full_solution = obtain_full_solution_vector(size_of_system, matrix_name);
+  auto x_full_solution = obtain_full_solution_vector(machine_number, size_of_system, matrix_name);
+
+  std::cout << "here is my machine number: " << machine_number << std::endl;
 
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
@@ -231,38 +235,7 @@ int main(int argc, char* argv[])
   //               << "relative path " << p.relative_path() << '\n';
   // This runs the actual skynet code.
 
-  machine_task(machine_number, number_of_updated_components, trial, matrix_rows_hold, b_values,  x_local_solution,  row_indices, ports, machine_names, tags);
-
-
+  machine_task(machine_number, number_of_updated_components, trial, matrix_rows_hold, b_values, x_local_solution, row_indices, ports, machine_names, tags);
 
   return 0;
 }
-
-
-// void collect_data_each_component(int machine_number, double local_forward_error, double residual, double time, int iteration_count)
-// {
-//   forwardErrorOutput(machine_number, local_forward_error);
-//   timeOutput(machine_number, time);
-//   residualOutput(machine_number, residual);
-//   iterationCountOutput(machine_number, iteration_count);
-// }
-
-// Sample for saving csv file output
-// std::string my_file_name_local_forward_error="LocalIterateForwardErrorInformation" + std::to_string(machine_number) + ".csv";
-// std::ofstream my_file_local_forward_error;
-// my_file_local_forward_error.open(my_file_name_local_forward_error);
-// std::cout << "This is my file name: " << my_file_name_local_forward_error << std::endl;
-// if(my_file_local_forward_error.is_open()==false)
-// {
-// std::cout<<"This file is not open: "<<my_file_name_local_forward_error<<"."<<std::endl;
-// assert(my_file_local_forward_error.is_open()==true);
-// }
-// my_file_local_forward_error << "My rank ";
-// my_file_local_forward_error << ",";
-// my_file_local_forward_error << machine_number;
-// my_file_local_forward_error << "\n";
-// my_file_local_forward_error << "Local Forward Error ";
-// my_file_local_forward_error << ",";
-// // my_file_local_forward_error << local_forward_error;
-// my_file_local_forward_error << "\n";
-// my_file_local_forward_error.close();

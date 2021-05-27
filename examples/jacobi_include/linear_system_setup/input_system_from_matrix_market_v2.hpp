@@ -1,6 +1,6 @@
 #include<fstream>
 //This reads in the appropriate row of the matrix A that a specific process needs from a matrix market format.
-std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector<int> row_indices, std::string matrix_name)
+std::vector<std::vector<double>> obtain_A_matrix(int rank, int size_of_system, std::vector<int> row_indices, std::string matrix_name)
 {
 
   std::vector<std::vector<double>> A;
@@ -10,7 +10,7 @@ std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector
   //   A[i].resize(size_of_system);
   // }
 
-  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/matrix_hold_folder/" + matrix_name;
+  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/matrix_hold_folder/" + matrix_name + "_rank_" + std::to_string(rank) + ".mtx";
 
 
   // This is used to input a matrix in matrix Market Format
@@ -72,16 +72,17 @@ std::vector<std::vector<double>> obtain_A_matrix(int size_of_system, std::vector
   //     }
   // }
 
+fin.close();
 return A;
 }
 
 //This reads in the appropriate entries of b that a specific process needs from a matrix market format.
-std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_indices, std::string matrix_name)
+std::vector<double> obtain_rhs_vector(int rank, int size_of_system, std::vector<int> row_indices, std::string matrix_name)
 {
 
   std::vector<double> b_values(static_cast<int>(row_indices.size()),0.0);
 
-  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/rhs_hold_folder/rhs_" + matrix_name;
+  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/rhs_hold_folder/rhs_" + matrix_name + "_rank_" + std::to_string(rank) + ".mtx";
 
 
   // This is used to input a matrix in matrix Market Format
@@ -137,18 +138,18 @@ std::vector<double> obtain_rhs_vector(int size_of_system, std::vector<int> row_i
       // }
       // std::cout << std::endl;
   // }
-
+fin.close();
 return b_values;
 }
 
 
 //This reads in the appropriate entries of b that a specific process needs from a matrix market format.
-std::vector<double> obtain_local_solution_vector(int size_of_system, std::vector<int> row_indices, std::string matrix_name)
+std::vector<double> obtain_local_solution_vector(int rank, int size_of_system, std::vector<int> row_indices, std::string matrix_name)
 {
 
   std::vector<double> x_local_answer(static_cast<int>(row_indices.size()),0.0);
 
-  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/sol_hold_folder/x_sol_" + matrix_name;
+  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/sol_hold_folder/x_sol_" + matrix_name + "_rank_" + std::to_string(rank) + ".mtx";
 
   // This is used to input a matrix in matrix Market Format
   std::ifstream fin(file_path, std::ifstream::in);
@@ -203,16 +204,16 @@ std::vector<double> obtain_local_solution_vector(int size_of_system, std::vector
       // }
       // std::cout << std::endl;
   // }
-
+fin.close();
 return x_local_answer;
 }
 
-std::vector<double> obtain_full_solution_vector(int size_of_system, std::string matrix_name)
+std::vector<double> obtain_full_solution_vector(int rank, int size_of_system, std::string matrix_name)
 {
 
   std::vector<double> x_full_solution(size_of_system, 0.0);
 
-  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/sol_hold_folder/x_sol_" + matrix_name;
+  std::string file_path = "../../../examples/jacobi_include//system_hold_folder/sol_hold_folder/x_sol_" + matrix_name + "_rank_" + std::to_string(rank) + ".mtx";
 
   // This is used to input a matrix in matrix Market Format
   std::ifstream fin(file_path, std::ifstream::in);
@@ -258,6 +259,6 @@ std::vector<double> obtain_full_solution_vector(int size_of_system, std::string 
       // }
       // std::cout << std::endl;
   // }
-
+fin.close();
 return x_full_solution;
 }
