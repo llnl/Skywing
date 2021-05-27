@@ -56,10 +56,14 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
       // Empty
     }
   }
+  std::cout << "after network connection: " << machine_number << std::endl;
+
   // This is the user defined stopping criteria.
   // For the sake of simplicity this is defined as max iterations outside of the header filoe, atm.
   int iteration_count = 0 ;
   int max_itr = 20;
+
+  std::cout << "starting to iterate: " << machine_number << std::endl;
 
   // For the synchronous_jacobi class to work, one needs to send the information for the computation, whichs is the row of the matrix used for computation, which is at this point the same as the machine_number.
   auto opt_iter_method = create_asynchronous_jacobi(
@@ -88,6 +92,8 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
   auto stop_jacobi = std::chrono::high_resolution_clock::now();
   auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
 
+  std::cout << "after iteration: " << machine_number << std::endl;
+
   auto x_local_estimate = async_jaco.return_full_x_iter();
   auto x_partition_estimate = async_jaco.return_solution();
 
@@ -101,7 +107,7 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
 
   async_jaco.print_solution();
   print_exact_solution(machine_number,number_of_updated_components,  x_local_solution);
-  
+
   // std::this_thread::sleep_for(std::chrono::milliseconds{100});
   // std::cout << "This is at the end of master.run() before return 0 for " << machine_number << std::endl;
   });
@@ -204,7 +210,7 @@ int main(int argc, char* argv[])
 
   auto x_full_solution = obtain_full_solution_vector(machine_number, size_of_system, matrix_name);
 
-  std::cout << "here is my machine number: " << machine_number << std::endl;
+  std::cout << "here after setup: " << machine_number << std::endl;
 
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
@@ -234,7 +240,7 @@ int main(int argc, char* argv[])
   //               << "root-path " << p.root_path() << '\n'
   //               << "relative path " << p.relative_path() << '\n';
   // This runs the actual skynet code.
-
+  std::cout << "before machine task: " << machine_number << std::endl;
   machine_task(machine_number, number_of_updated_components, trial, matrix_rows_hold, b_values, x_local_solution, row_indices, ports, machine_names, tags);
 
   return 0;
