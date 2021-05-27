@@ -210,7 +210,7 @@ int main(int argc, char* argv[])
 
   auto x_full_solution = obtain_full_solution_vector(machine_number, size_of_system, matrix_name);
 
-  std::cout << "here after setup: " << machine_number << std::endl;
+  std::cout << "after setup: " << machine_number << std::endl;
 
   // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))

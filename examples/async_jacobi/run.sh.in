@@ -62,4 +62,4 @@ sync_comparison_results_directory="../sync_jacobi/data_hold/"
 solution_vector_filename="../../../examples/jacobi_include/system_hold_folder/sol_hold_folder/x_sol_"${matrix_name}
 rhs_vector_filename="../../../examples/jacobi_include/system_hold_folder/rhs_hold_folder/rhs_"${matrix_name}
 
-python3 ../../../examples/jacobi_include/data_aggregation/asynchronous_jacobi_post_processing.py ${starting_redundancy} ${ending_redundancy} ${size_of_system} ${number_of_trials} ${sync_comparison_results_directory} ${solution_vector_filename} ${rhs_vector_filename}
+# python3 ../../../examples/jacobi_include/data_aggregation/asynchronous_jacobi_post_processing.py ${starting_redundancy} ${ending_redundancy} ${size_of_system} ${number_of_trials} ${sync_comparison_results_directory} ${solution_vector_filename} ${rhs_vector_filename}
