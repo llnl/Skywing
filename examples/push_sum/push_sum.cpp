@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
   auto machine_names = obtain_machine_names(size_of_system);
   auto tags = obtain_tags<ValueTag>(size_of_system);
   // Push vars
-  double starting_value = (machine_number+1)*1.0; 
+  double starting_value = (machine_number+1)*1.0;
   int number_of_neighbors = size_of_system - 1;
   // This makes sure that the machine number and size_of_system is valid
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
