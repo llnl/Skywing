@@ -8,6 +8,7 @@ endif
 
 subdir('sync_jacobi')
 subdir('async_jacobi')
+subdir('push_sum')
 subdir('csv_example')
 
 if use_helics

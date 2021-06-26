@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#This is a shell script which calls push_sum
+
+if [[ $# < 1 ]]; then
+  echo "usage: @exe@ starting_port_number"
+  exit 1
+fi
+
+STARTING_PORT=$1
+
+# trap kill_progs EXIT
+# kill_progs() {
+#    for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
+#     kill -9 ${!var} > /dev/null 2> /dev/null
+#     let counter_for_network_elements++
+#   done
+# }
+size_of_system=4
+
+number_of_trials=1
+for (( redundancy_counter=starting_number_of_updated_components ; redundancy_counter<$((ending_number_of_updated_components+1)) ; redundancy_counter++ )); do
+  for (( counter_for_trials = 1 ; counter_for_trials < $((number_of_trials+1)) ; counter_for_trials++ )); do
+      for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
+        echo "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} 
+        if [[ ${counter_for_network_elements} < $((size_of_system-1)) ]]
+        then
+          "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system}  &
+        else
+          "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system}
+        fi
+        # "@sync_jacobi_exe@" ${i} > /dev/null 2> /dev/null &
+        # declare "erase${counter_for_network_elements}=$!"
+      done
+      sleep 2
+      STARTING_PORT=$((STARTING_PORT+size_of_system+100))
+    done
+done
