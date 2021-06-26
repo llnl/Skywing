@@ -157,7 +157,11 @@ int main(int argc, char* argv[])
   auto machine_names = obtain_machine_names(size_of_system);
   auto tags = obtain_tags<ValueTag>(size_of_system);
   // Push vars
+<<<<<<< HEAD
   double starting_value = (machine_number+1)*1.0; 
+=======
+  double starting_value = (machine_number+1)*1.0;
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
   int number_of_neighbors = size_of_system - 1;
   // This makes sure that the machine number and size_of_system is valid
   if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
@@ -178,4 +182,8 @@ int main(int argc, char* argv[])
   machine_task(machine_number, size_of_system, number_of_neighbors, starting_value, ports, machine_names, tags);
   return 0;
 }
+<<<<<<< HEAD
 // std::this_thread::sleep_for(std::chrono::milliseconds{100});
+=======
+// std::this_thread::sleep_for(std::chrono::milliseconds{100});
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c

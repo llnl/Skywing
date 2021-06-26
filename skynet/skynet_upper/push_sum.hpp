@@ -49,10 +49,17 @@ public:
     tags_vector(tags_vector),
     iter_method(it)
   {
+<<<<<<< HEAD
     rho_x.resize(size_of_system, 0.0);
     rho_y.resize(size_of_system, 0.0);
     rho_x_previous.resize(size_of_system, 0.0);
     rho_y_previous.resize(size_of_system, 0.0);
+=======
+    rho_x.resize(number_of_neighbors, 0.0);
+    rho_y.resize(number_of_neighbors, 0.0);
+    rho_x_previous.resize(number_of_neighbors, 0.0);
+    rho_y_previous.resize(number_of_neighbors, 0.0);
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
     in_nodes_plus_one = number_of_neighbors + 1.0;
     // Local weights.
     sigma_x = sigma_x + (x_value / in_nodes_plus_one);
@@ -169,7 +176,11 @@ public:
 
   // void print_diagnostic()
   // {
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
   // }
 
   // void print_all_received_information(skynet::AsynchronousValues<std::vector<double>> values)
@@ -177,7 +188,11 @@ public:
 
   // }
 
+<<<<<<< HEAD
 };
+=======
+}; 
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
 
 // This is the continuation that makes this class possible as this implementation depends upon the asynchronous_iterative class.
 template<typename... Args>
@@ -190,4 +205,8 @@ auto create_push_sum(int machine_number, int size_of_system, int number_of_neigh
 }
 
 
+<<<<<<< HEAD
 #endif
+=======
+#endif
+>>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
