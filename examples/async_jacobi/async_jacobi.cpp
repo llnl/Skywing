@@ -71,29 +71,29 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
     tags
   ).get();
 
-  std::cout << "\t starting to iterate: " << machine_number << std::endl;
+  std::cout << "\t starting to iterate: " << machine_number << " trial: " << trial << std::endl;
   auto async_jaco = *opt_iter_method;
   // For calculating runtime.
-  auto start_jacobi = std::chrono::high_resolution_clock::now();
+  // auto start_jacobi = std::chrono::high_resolution_clock::now();
   // Iteration block.
-  while(iteration_count <= max_itr)
-  {
-    iteration_count++;
-    async_jaco.create_iteration(iteration_count);
-  }
+  // while(iteration_count <= max_itr)
+  // {
+  //   iteration_count++;
+  //   async_jaco.create_iteration(iteration_count);
+  // }
 
-  auto stop_jacobi = std::chrono::high_resolution_clock::now();
-  auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
-
+  // auto stop_jacobi = std::chrono::high_resolution_clock::now();
+  // auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
+  std::cout << iteration_count << " " << max_itr << std::endl;
   std::cout << "\t after iteration: " << machine_number << std::endl;
 
-  auto x_local_estimate = async_jaco.return_full_x_iter();
-  auto x_partition_estimate = async_jaco.return_solution();
-  double partial_residual = calculate_partial_residual(number_of_updated_components, x_local_estimate, b_values, matrix_rows);
-  double partial_forward_error = calculate_partial_forward_error(number_of_updated_components, x_partition_estimate, x_local_solution);
+  // auto x_local_estimate = async_jaco.return_full_x_iter();
+  // auto x_partition_estimate = async_jaco.return_solution();
+  // double partial_residual = calculate_partial_residual(number_of_updated_components, x_local_estimate, b_values, matrix_rows);
+  // double partial_forward_error = calculate_partial_forward_error(number_of_updated_components, x_partition_estimate, x_local_solution);
 
   // This block is for computing the information from each process for each experiment for each trial.
-  collect_data_each_component(machine_number, number_of_updated_components, trial, partial_forward_error, partial_residual, iteration_count, run_time.count());
+  // collect_data_each_component(machine_number, number_of_updated_components, trial, partial_forward_error, partial_residual, iteration_count, run_time.count());
 
   async_jaco.print_solution();
   print_exact_solution(machine_number,number_of_updated_components,  x_local_solution);

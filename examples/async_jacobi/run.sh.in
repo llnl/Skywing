@@ -9,7 +9,7 @@ fi
 
 STARTING_PORT=$1
 
-number_of_trials=1
+number_of_trials=2
 
 # This is the basic 4x4 example. This usually works.
 matrix_name=toy
