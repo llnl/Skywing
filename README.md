@@ -61,7 +61,8 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * This will create subdirectories `capnp_build_dir/bin`, `capnp_build_dir/include`, and `capnp_build_dir/lib`
 
 ### Building Skynet
- * Load ninja and switch to more recent version of gcc
+ * Load meson (python), ninja, and switch to more recent version of gcc
+   * 'ml python/3.8.2`
    * `ml ninja`
    * `ml gcc/8.3.1`
  * Add capnp pkgconfig directory to PKG_CONFIG_PATH
