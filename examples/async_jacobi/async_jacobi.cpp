@@ -194,12 +194,11 @@ int main(int argc, char* argv[])
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
   auto tags = obtain_tags<ValueTag>(size_of_network);
-  std::cout << machine_number << " before index input. " << std::endl;
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_indices_" + matrix_name ;
   std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
-  std::cout << machine_number << " after index input. " << std::endl;
+
   std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_" + matrix_name ;
   std::vector<std::vector<double>> matrix_rows_hold = input_matrix_from_matrix_market<double>(directory, matrix_partition_name);
 
