@@ -19,18 +19,18 @@ kill_progs() {
 }
 
 # For this implementation, the number of rows in the matrix has to correspond to the size of the network.
-# size_of_network=4
-# matrix_name="toy.mtx"
+size_of_network=4
+matrix_name="toy.mtx"
 
-matrix_name=randomInteger_10_diagDom_100
-size_of_network=10
+# matrix_name="randomInteger_10_diagDom_100.mtx"
+# size_of_network=10
 
 number_of_trials=1
 
 # Number of components each process updates from a row-wise partitioned matrix.
 # This implementation allows for overlapping computations.
 starting_number_of_rows=1;
-ending_number_of_rows=3;
+ending_number_of_rows=1;
 
 directory="../../../examples/async_jacobi/system/partition"
 # TODO: Add preprocessing step here to work from on .mtx file for each matrix/vector

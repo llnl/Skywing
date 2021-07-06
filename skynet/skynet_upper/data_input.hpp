@@ -7,8 +7,8 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-// This function inputs a vector or matrix from an unstructured and dense matrix market format. 
-// In the future, this functionality may be expanded to other types and formats. 
+// This function inputs a vector or matrix from an unstructured and dense matrix market format.
+// In the future, this functionality may be expanded to other types and formats.
 // This is the auto format since we want to return either a vector<double> or vector<vector<double>>
 // There's scenarios in which we want to force the output as a vector<vector<>>, which is the default parameter.
 template <typename T>
@@ -17,7 +17,12 @@ std::vector<std::vector<T>> input_matrix_from_matrix_market(std::string director
   std::vector<std::vector<T>> return_mat;
   std::string file_path =  directory + "/" + matrix_name;
   std::ifstream fin(file_path, std::ifstream::in);
-  assert(fin.is_open() == 1);
+  // assert(fin.is_open() == 1);
+  if(fin.is_open() == 0)
+  {
+    std::cout << "File: "<< file_path << " is not open." << std::endl;
+    throw "Cannot open file!";
+  }
   int input_rows = 0;
   int input_cols = 0;
   // Ignore headers and comments in matrix market format.
@@ -39,7 +44,7 @@ std::vector<std::vector<T>> input_matrix_from_matrix_market(std::string director
       for(int j = 0 ; j < input_rows; j++)
       {
           // in_file >> data;
-          fin >> hold;        
+          fin >> hold;
           return_mat[j][i] = hold;
       }
       hold =0.0;
@@ -55,7 +60,12 @@ std::vector<T> input_vector_from_matrix_market(std::string directory, std::strin
   std::string file_path =  directory + "/" + vector_name;
 
   std::ifstream fin(file_path, std::ifstream::in);
-  assert(fin.is_open() == 1);
+  // assert(fin.is_open() == 1);
+  if(fin.is_open() == 0)
+  {
+    std::cout << "File: "<< file_path << " is not open." << std::endl;
+    throw "Cannot open file!";
+  }
   int input_rows = 0;
   int input_cols = 0;
   // Ignore headers and comments in matrix market format.

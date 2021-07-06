@@ -183,8 +183,8 @@ int main(int argc, char* argv[])
   if(matrix_name == "")
   {
     std::cerr
-      << "Linear system not specified. " << std::quoted(argv[4]) << ".\n"; 
-    return -1; 
+      << "Linear system not specified. " << std::quoted(argv[4]) << ".\n";
+    return -1;
   }
 
   int number_of_updated_components = std::stoi(argv[5]);
@@ -194,11 +194,12 @@ int main(int argc, char* argv[])
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
   auto tags = obtain_tags<ValueTag>(size_of_network);
+  std::cout << machine_number << " before index input. " << std::endl;
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_indices_" + matrix_name ;
   std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
-
+  std::cout << machine_number << " after index input. " << std::endl;
   std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_" + matrix_name ;
   std::vector<std::vector<double>> matrix_rows_hold = input_matrix_from_matrix_market<double>(directory, matrix_partition_name);
 
@@ -207,7 +208,7 @@ int main(int argc, char* argv[])
 
   std::string x_sol_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_x_sol_" + matrix_name ;
   std::vector<double> x_sol_partition = input_vector_from_matrix_market<double>(directory, x_sol_partition_name);
-  
+
   // This is contrived since we know the solution.
   std::string x_sol_name =  "x_sol_" + matrix_name ;
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/async_jacobi/system", x_sol_name);
