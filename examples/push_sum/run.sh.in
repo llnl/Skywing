@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#This is a shell script which calls push_sum
-
 if [[ $# < 1 ]]; then
   echo "usage: @exe@ starting_port_number"
   exit 1
@@ -9,30 +7,34 @@ fi
 
 STARTING_PORT=$1
 
-# trap kill_progs EXIT
-# kill_progs() {
-#    for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
-#     kill -9 ${!var} > /dev/null 2> /dev/null
-#     let counter_for_network_elements++
-#   done
-# }
-size_of_system=4
+trap kill_progs EXIT
+kill_progs() {
+  for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
+  do
+      var="erase${counter_for_network_elements}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
 
+# For this example, one can specify the size of the system as well as the number of trials. 
+size_of_network=4
 number_of_trials=1
-for (( redundancy_counter=starting_number_of_updated_components ; redundancy_counter<$((ending_number_of_updated_components+1)) ; redundancy_counter++ )); do
-  for (( counter_for_trials = 1 ; counter_for_trials < $((number_of_trials+1)) ; counter_for_trials++ )); do
-      for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_system ; counter_for_network_elements++ )); do
-        echo "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system} 
-        if [[ ${counter_for_network_elements} < $((size_of_system-1)) ]]
-        then
-          "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system}  &
-        else
-          "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_system}
-        fi
-        # "@sync_jacobi_exe@" ${i} > /dev/null 2> /dev/null &
-        # declare "erase${counter_for_network_elements}=$!"
-      done
-      sleep 2
-      STARTING_PORT=$((STARTING_PORT+size_of_system+100))
-    done
+
+for (( counter_for_trials = 1 ; counter_for_trials <= $number_of_trials ; counter_for_trials++ )) 
+do
+  echo "Trial: " $counter_for_trials
+  for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
+  do
+    if [[ ${counter_for_network_elements} < $((size_of_network-1)) ]]
+    then
+      "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} &
+    else
+      # Forces the terminal to return after the trial is finished.
+      "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network}
+    fi
+    declare "erase${counter_for_network_elements}=$!"
+  done
+  # sleep allows terminal diagnostics to output before the kill command.
+  sleep 1
+  STARTING_PORT=$((STARTING_PORT+100))
 done

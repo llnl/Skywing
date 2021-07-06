@@ -1,6 +1,8 @@
 #include "skynet_core/skynet.hpp"
-#include "skynet_upper/asynchronous_jacobi.hpp"
 #include "skynet_core/master.hpp"
+#include "skynet_upper/asynchronous_jacobi.hpp"
+#include "skynet_upper/data_input.hpp"
+
 #include <array>
 #include <chrono>
 #include <iomanip>
@@ -10,53 +12,75 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+// #include "typeinfo"
 
 // all jacobi_include files for matrix input and data aggregation.
-// #include "typeinfo"
-#include "../jacobi_include/linear_system_setup/skynet_jacobi_setup.hpp"
-#include "../jacobi_include/linear_system_setup/input_system_from_matrix_market_v2.hpp"
-#include "../jacobi_include/data_collection/save_async_sync_jacobi_data.hpp"
-#include "../jacobi_include/data_collection/jacobi_error_residual_functions.hpp"
+#include "jacobi_data_output.hpp"
 
 using namespace skynet;
-
-// Generic print function for sanity check at terminal.
 using ValueTag = skynet::PublishTag<std::vector<double>>;
-void print_exact_solution(int machine_number, int number_of_updated_components, std::vector<double> x_local_solution)
+// First three functions are for the Skynet setup step.
+std::vector<std::string> obtain_machine_names(std::uint16_t size_of_network)
+{
+  std::vector<std::string > machine_names;
+  machine_names.resize(size_of_network);
+  for(int i = 0 ; i < size_of_network; i++)
+  {
+    machine_names[i] = "node" + std::to_string(i+1);
+  }
+return machine_names;
+}
+
+std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::uint16_t size_of_network)
+{
+  std::vector<std::uint16_t> ports;
+
+  for(std::uint16_t i = 0; i < size_of_network; i++)
+  {
+    ports.push_back(starting_port_number + (i * 1));
+  }
+  return ports;
+}
+
+template <class TagType>
+std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
+{
+  std::vector<TagType> tags;
+  for(int i = 0; i < size_of_network; i++)
+  {
+    std::string hold = "tag" +  std::to_string(i);
+    tags.push_back(TagType{hold});
+  }
+  return tags;
+}
+
+// Terminal Diagnostic for exact solution.
+void print_exact_solution(int machine_number, std::vector<double> x_sol_partition)
 {
   std::cout << "\t The exact solution for " << machine_number << " is ";
-  for(int i = 0 ; i < number_of_updated_components; i ++)
+  for(auto entry :  x_sol_partition)
   {
-    std::cout << x_local_solution[i] << " ";
+    std::cout << entry << " ";
   }
    std::cout << std::endl;
 }
 
 // All of the Skynet specific code is located in this function.
-void machine_task(int machine_number, int number_of_updated_components, int trial, std::vector<std::vector<double>> matrix_rows, std::vector<double> b_values, std::vector<double> x_local_solution, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags)
+void machine_task(int machine_number, int number_of_updated_components, __attribute__((unused)) int trial, std::vector<std::vector<double>> matrix_rows, std::vector<double> b_values, __attribute__((unused))std::vector<double> x_sol_partition, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
 
   master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle) {
 
-  //So this only affects macines 0,1,2
   if (machine_number != static_cast<int>((ports.size()) - 1) )
   {
     // Connecting to the server is an asynchronous operation and can fail.
-    // Wait for the result each time and keep attempting to connect until it does
     while (!master_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
     {
       // Empty
     }
   }
-  std::cout << "\t after network connection: " << machine_number << std::endl;
-
-  // This is the user defined stopping criteria.
-  // For the sake of simplicity this is defined as max iterations outside of the header filoe, atm.
-  int iteration_count = 0 ;
-  int max_itr = 20;
-
   // For the synchronous_jacobi class to work, one needs to send the information for the computation, whichs is the row of the matrix used for computation, which is at this point the same as the machine_number.
   auto opt_iter_method = create_asynchronous_jacobi(
     machine_number,
@@ -71,32 +95,18 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
     tags
   ).get();
 
-  std::cout << "\t starting to iterate: " << machine_number << " trial: " << trial << std::endl;
-  auto async_jaco = *opt_iter_method;
-  // For calculating runtime.
-  // auto start_jacobi = std::chrono::high_resolution_clock::now();
-  // Iteration block.
-  // while(iteration_count <= max_itr)
-  // {
-  //   iteration_count++;
-  //   async_jaco.create_iteration(iteration_count);
-  // }
+  auto async_jacobi = *opt_iter_method;
+  async_jacobi.run();
 
-  // auto stop_jacobi = std::chrono::high_resolution_clock::now();
-  // auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
-  std::cout << iteration_count << " " << max_itr << std::endl;
-  std::cout << "\t after iteration: " << machine_number << std::endl;
-
-  // auto x_local_estimate = async_jaco.return_full_x_iter();
-  // auto x_partition_estimate = async_jaco.return_solution();
+  auto x_local_estimate = async_jacobi.return_x_iter();
+  auto x_partition_estimate = async_jacobi.return_solution();
   // double partial_residual = calculate_partial_residual(number_of_updated_components, x_local_estimate, b_values, matrix_rows);
-  // double partial_forward_error = calculate_partial_forward_error(number_of_updated_components, x_partition_estimate, x_local_solution);
-
+  // double partial_forward_error = calculate_partial_forward_error(number_of_updated_components, x_partition_estimate, x_sol_partition);
   // This block is for computing the information from each process for each experiment for each trial.
   // collect_data_each_component(machine_number, number_of_updated_components, trial, partial_forward_error, partial_residual, iteration_count, run_time.count());
 
-  async_jaco.print_solution();
-  print_exact_solution(machine_number,number_of_updated_components,  x_local_solution);
+  async_jacobi.print_solution();
+  print_exact_solution(machine_number, x_sol_partition);
 
   });
   master.run();
@@ -106,20 +116,13 @@ void machine_task(int machine_number, int number_of_updated_components, int tria
 int main(int argc, char* argv[])
 {
   // Error checking for the number of arguments
-  if (argc < 6)
+  if (argc != 8)
   {
     std::cout << "Usage: Note Enough Arguments: " << argc << std::endl;
-    // return 1;
+    return 1;
   }
-  // Terminal output to see command line arguments.
-  // std::cout<< "Command Line Arguments: ";
-  // for(int i =1 ; i< argc; i++)
-  // {
-  //   std::cout << argv[i] << " ";
-  // }
-  // std::cout << std::endl;
 
-  // Parse the machine number, starting_port_number, and size_of_system that was passed in
+  // Parse the machine number, starting_port_number, and size_of_network that was passed in
   // Do this in a lambda so that if there's an exception a dummy value can be
   // returned which will always trigger an error
     int machine_number = [&]() {
@@ -142,7 +145,7 @@ int main(int argc, char* argv[])
       return -1;
     }
   }();
-   int size_of_system = [&]() {
+   int size_of_network = [&]() {
     try
     {
       return std::stoi(argv[3]);
@@ -152,85 +155,74 @@ int main(int argc, char* argv[])
       return -1;
     }
   }();
-  // std::string matrix_file_name = [&]() {
-  //   try
-  //   {
-  //     return argv[4];
-  //   }
-  //   catch (...)
-  //   {
-  //     std::string hold = "";
-  //     return " ";
-  //   }
-  // }();
-  //
-  // std::string rhs_file_name = [&]() {
-  //   try
-  //   {
-  //     return argv[5];
-  //   }
-  //   catch (...)
-  //   {
-  //     std::string hold = "";
-  //     return &hold;
-  //   }
-  // }();
-  std::string matrix_name = argv[4];
-  int number_of_updated_components = std::stoi(argv[5]);
-  int trial = std::stoi(argv[6]);
-  //This creates the relevent vectors needed to interact with skynet.
-  auto ports = set_port(starting_port_number, size_of_system);
-  auto machine_names = obtain_machine_names(size_of_system);
-  auto tags = obtain_tags<ValueTag>(size_of_system);
-
-  // Clockwise matrix row partition. "First" row to be updated is "machine_number" and counts forward mod size_of_system.
-  std::vector<int> row_indices;
-  for(int i = 0 ; i < number_of_updated_components; i++)
-  {
-    row_indices.push_back((machine_number + i) % size_of_system);
-  }
-
-  // This collects the matrices and vectors for the function.
-  auto matrix_rows_hold = obtain_A_matrix(machine_number, size_of_system, row_indices, matrix_name);
-  auto b_values = obtain_rhs_vector(machine_number, size_of_system, row_indices, matrix_name);
-  auto x_local_solution = obtain_local_solution_vector(machine_number, size_of_system, row_indices, matrix_name);
-  auto x_full_solution = obtain_full_solution_vector(machine_number, size_of_system, matrix_name);
-
-  std::cout << "\t after setup: " << machine_number << std::endl;
-
-  // This makes sure that the machine number and size_of_system is valid, and the dimension of the distributed b vector and matrix A match, outputting an error message if not.
-  if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
+  std::string matrix_name = [&]() {
+    try
+    {
+      return argv[4];
+    }
+    catch (...)
+    {
+      char *hold ;
+      return hold;
+    }
+  }();
+  if (machine_number < 0 || machine_number >= size_of_network)
   {
     std::cerr
       << "Invalid machine_number of " << std::quoted(argv[1]) << ".\n"
-      << "Must be an integer between 0 and " << size_of_system - 1 << '\n';
+      << "Must be an integer between 0 and " << size_of_network - 1 << '\n';
     return -1;
   }
-  if (size_of_system <= 0)
+  if (size_of_network <= 0)
   {
     std::cerr
-      << "Invalid size_of_system of " << std::quoted(argv[1]) << ".\n"
+      << "Invalid size_of_network of " << std::quoted(argv[3]) << ".\n"
       << "Must be an integer greater than 0 and  match the number of threads created. \n";
     return -1;
   }
+  if(matrix_name == "")
+  {
+    std::cerr
+      << "Linear system not specified. " << std::quoted(argv[4]) << ".\n"; 
+    return -1; 
+  }
 
-  // Old Debugging/Error Block.
-  // if (static_cast<int>(b_values.size()) != static_cast<int>(matrix_row_hold.size()))
+  int number_of_updated_components = std::stoi(argv[5]);
+  std::string directory = argv[6];
+  int trial = std::stoi(argv[7]);
+  //This creates the relevant vectors needed to interact with skynet.
+  auto ports = set_port(starting_port_number, size_of_network);
+  auto machine_names = obtain_machine_names(size_of_network);
+  auto tags = obtain_tags<ValueTag>(size_of_network);
+
+  // This collects the matrices and vectors for the function.
+  std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_indices_" + matrix_name ;
+  std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
+
+  std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_" + matrix_name ;
+  std::vector<std::vector<double>> matrix_rows_hold = input_matrix_from_matrix_market<double>(directory, matrix_partition_name);
+
+  std::string rhs_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_rhs_" + matrix_name ;
+  std::vector<double> b_values = input_vector_from_matrix_market<double>(directory, rhs_partition_name);
+
+  std::string x_sol_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_updated_components)  + "_x_sol_" + matrix_name ;
+  std::vector<double> x_sol_partition = input_vector_from_matrix_market<double>(directory, x_sol_partition_name);
+  
+  // This is contrived since we know the solution.
+  std::string x_sol_name =  "x_sol_" + matrix_name ;
+  std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/async_jacobi/system", x_sol_name);
+
+  // if(machine_number == 0 )
   // {
-  //   std::cerr
-  //     << "Invalid dimension size.\n";
-  //   return -1;
+  //   print_mat(matrix_rows_hold);
+  //   print_vec(b_values);
+  //   print_vec(x_sol_partition);
+  //   // print_vec(x_full_solution);
+  //   print_vec(row_indices);
   // }
-  // std::filesystem::path p = std::filesystem::current_path();
-  //
-  //     std::cout << "The current path " << p << " decomposes into:\n"
-  //               << "root-path " << p.root_path() << '\n'
-  //               << "relative path " << p.relative_path() << '\n';
 
   // Skynet code call.
-  // std::cout << "\t before machine task: " << machine_number << std::endl;
-  machine_task(machine_number, number_of_updated_components, trial, matrix_rows_hold, b_values, x_local_solution, row_indices, ports, machine_names, tags);
+  machine_task(machine_number, number_of_updated_components, trial, matrix_rows_hold, b_values, x_sol_partition, row_indices, ports, machine_names, tags);
 
   return 0;
 }
-// std::this_thread::sleep_for(std::chrono::milliseconds{100});

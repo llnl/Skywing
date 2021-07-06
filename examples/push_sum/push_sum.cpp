@@ -8,9 +8,8 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-// #include <random>
 #include <thread>
-// #include "typeinfo"
+// #include <typeinfo>
 
 using namespace skynet;
 using ValueTag = skynet::PublishTag<std::vector<double>>;
@@ -38,17 +37,18 @@ std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::ui
 }
 
 template <class TagType>
-std::vector<TagType> obtain_tags(std::uint16_t size_of_system)
+std::vector<TagType> obtain_tags(int size_of_system)
 {
   std::vector<TagType> tags;
   for(int i = 0; i < size_of_system; i++)
   {
-    std::string hold = "tag" +  std::to_string(i);
-    tags.push_back(TagType{hold});
+      std::string hold = "push_sum_tag" +  std::to_string(i);
+      tags.push_back(TagType{hold});
   }
   return tags;
 }
 
+// For this example, the exact average can be computed by inputting the system size.
 double obtain_exact_average(int size_of_system)
 {
   double average = 0.0;
@@ -60,7 +60,7 @@ double obtain_exact_average(int size_of_system)
   return average;
 }
 
-void machine_task(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags)
+void machine_task(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, ValueTag pubTag, std::vector<ValueTag> subTags)
 {
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
 
@@ -76,37 +76,29 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  // This is the user defined stopping criteria.
-  int iteration_count = 0 ;
-  int max_itr = 10;
-
   auto opt_iter_method = create_push_sum(
     machine_number,
     size_of_system,
     number_of_neighbors,
     starting_value,
-    tags,
+    pubTag,
+    subTags,
     master_handle,
     job,
-    tags[machine_number],
-    tags
+    pubTag,
+    subTags
   ).get();
 
   auto push_sum = *opt_iter_method;
-  auto start_push_sum = std::chrono::high_resolution_clock::now();
-  while(iteration_count <= max_itr)
-  {
-    iteration_count++;
-    push_sum.create_iteration();
-  }
-  auto stop_push_sum = std::chrono::high_resolution_clock::now();
-  auto run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_push_sum - start_push_sum);
+  // This is the actual iterative scheme.
+  push_sum.run();
+
   double consensus_value = push_sum.return_solution();
   double exact_solution = obtain_exact_average(size_of_system);
-  double run_time_count = run_time.count();
+  double run_time_count = push_sum.return_run_time();
   double new_information_count = push_sum.return_new_information_count();
 
-  std::cout << "machine_number: " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution <<  "\truntime: " << run_time_count << "\tnew_information_count: " << new_information_count << std::endl;
+  std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;
   // This block is for computing the information from each process for each experiment for each trial.
   // collect_data(machine_number, consensus_value, exact_solution, iteration_count, run_time.count());
   });
@@ -152,19 +144,7 @@ int main(int argc, char* argv[])
       return -1;
     }
   }();
-  // Skynet setup
-  auto ports = set_port(starting_port_number, size_of_system);
-  auto machine_names = obtain_machine_names(size_of_system);
-  auto tags = obtain_tags<ValueTag>(size_of_system);
-  // Push vars
-<<<<<<< HEAD
-  double starting_value = (machine_number+1)*1.0; 
-=======
-  double starting_value = (machine_number+1)*1.0;
->>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
-  int number_of_neighbors = size_of_system - 1;
-  // This makes sure that the machine number and size_of_system is valid
-  if (machine_number < 0 || machine_number >= static_cast<int>(ports.size()))
+  if(machine_number > size_of_system - 1  || machine_number < 0)
   {
     std::cerr
       << "Invalid machine_number of " << std::quoted(argv[1]) << ".\n"
@@ -178,12 +158,17 @@ int main(int argc, char* argv[])
       << "Must be an integer greater than 0 and  match the number of threads created. \n";
     return -1;
   }
+  // Skynet setup
+  auto ports = set_port(starting_port_number, size_of_system);
+  auto machine_names = obtain_machine_names(size_of_system);
+  auto subTags = obtain_tags<ValueTag>(size_of_system);
+  // This pubTag is exists in subTags[machine_number] which is needed for initialization, but its declared separately here mainly to highlight how the creator works for the push_sum class.
+  ValueTag pubTag("push_sum_tag" +  std::to_string(machine_number)) ;
+  // Push sum variables -> initialized by user
+  double starting_value = (machine_number+1)*1.0;
+  int number_of_neighbors = size_of_system - 1;
+
   // Skynet job
-  machine_task(machine_number, size_of_system, number_of_neighbors, starting_value, ports, machine_names, tags);
+  machine_task(machine_number, size_of_system, number_of_neighbors, starting_value, ports, machine_names, pubTag, subTags);
   return 0;
 }
-<<<<<<< HEAD
-// std::this_thread::sleep_for(std::chrono::milliseconds{100});
-=======
-// std::this_thread::sleep_for(std::chrono::milliseconds{100});
->>>>>>> 24093c89bb6bfb70a142cb6df55f265829d6476c
