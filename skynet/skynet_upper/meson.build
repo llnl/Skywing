@@ -1,6 +1,6 @@
 skynet_upper_lib = static_library('skynet_upper',
   [
-    # No sources yet
+    'inipp.h'
   ],
   dependencies : skynet_core_dep
 )
