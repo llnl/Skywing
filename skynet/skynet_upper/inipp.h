@@ -169,6 +169,42 @@ public:
   Ini() : format(std::make_shared<Format<CharT>>()) {};
   Ini(std::shared_ptr<Format<CharT>> fmt) : format(fmt) {};
 
+  template<typename RetType>
+  RetType get_value(std::string sec_name, std::string key) {
+    auto sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) throw std::out_of_range();
+    try {
+      RetType ret;
+      auto success = extract(it->second, ret);
+      if (success) {
+        return ret;
+      } 
+      throw std::exception();
+    } catch(...) {
+      return {it->second};
+    }
+  }
+  template<typename RetType>
+  std::vector<RetType> get_value(std::string sec, std::string key) {
+    auto sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) throw std::out_of_range();
+    std::vector<RetType> retVector;
+    std::istringstream list(it->second);
+    std::string valStr;
+    while (list >> valStr) {
+      RetType value;
+      auto success = extract(it->second, value);
+      if (success) {
+        retVector.emplace_back(value);
+      } else {
+        throw std::exception();
+      }
+    }
+
+  }
+
   void generate(std::basic_ostream<CharT>& os) const {
     for (auto const & sec : sections) {
       os << format->char_section_start << sec.first << format->char_section_end << std::endl;
