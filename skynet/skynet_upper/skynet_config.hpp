@@ -188,16 +188,13 @@ public:
     auto sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found.");
-    try {
-      DataType ret;
-      auto success = extract(it->second, ret);
-      if (success) {
-        return ret;
-      } 
+    DataType ret;
+    auto success = extract(it->second, ret);
+    if (success) {
+      return ret;
+    } else {
       throw std::exception();
-    } catch(...) {
-      return {it->second};
-    }
+    } 
   };
 
   template<typename DataType>
