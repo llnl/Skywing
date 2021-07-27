@@ -41,7 +41,7 @@ SOFTWARE.
 #include <vector>
 
 
-namespace skynet_config {
+namespace skynet::config {
 
 namespace detail {
 
@@ -354,6 +354,6 @@ private:
   }
 };
 
-}; // namespace skynet_config
+}; // namespace skynet::config
 
 #endif
