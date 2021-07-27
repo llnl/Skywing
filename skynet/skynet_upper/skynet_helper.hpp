@@ -11,7 +11,7 @@ namespace skynet::helper
   constexpr std::chrono::milliseconds LOOP_DELAY =
     std::chrono::milliseconds(10);
 
-  inline void connectToNeighbors(const std::vector<uint16_t>& neighbor_ports,
+  inline void connect_to_neighbors(const std::vector<uint16_t>& neighbor_ports,
     skynet::MasterHandle master_handle, std::chrono::seconds timeout)
   {
     std::chrono::time_point<std::chrono::steady_clock> time_limit
@@ -31,7 +31,7 @@ namespace skynet::helper
   }
 
   template<typename T>
-  void subscribeToTag(skynet::Job& job, const T& tag, std::chrono::seconds timeout)
+  void subscribe_to_tag(skynet::Job& job, const T& tag, std::chrono::seconds timeout)
   {
     auto waiter = job.subscribe(tag);
     if (!waiter.wait_for(timeout))
@@ -42,7 +42,7 @@ namespace skynet::helper
   }
 
   template<typename T>
-  void waitForData(skynet::Job& job, const T& tag)
+  void wait_for_data(skynet::Job& job, const T& tag)
   {
     unsigned count = 0;
     while (!job.has_data(tag))
@@ -54,20 +54,16 @@ namespace skynet::helper
     }
   }
 
-  template<typename TagType>
-  auto& await_reduce_group(skynet::Job& job, const skynet_config::ReduceGroupConfig<TagType>& reduce_group_config) {
-    auto fut = job.create_reduce_group(
-        reduce_group_config.reduce_group_tag, 
-        reduce_group_config.reduce_value_tag, 
-        reduce_group_config.reduce_value_tags
-    );
-    auto& group = fut.get();
-    return group;
-  }
-
-
-
-  
+  //template<typename TagType>
+  //auto& await_reduce_group(skynet::Job& job, const skynet::config::ReduceGroupConfig<TagType>& reduce_group_config) {
+  //  auto fut = job.create_reduce_group(
+  //      reduce_group_config.reduce_group_tag, 
+  //      reduce_group_config.reduce_value_tag, 
+  //      reduce_group_config.reduce_value_tags
+  //  );
+  //  auto& group = fut.get();
+  //  return group;
+  //}
 
 } // namespace skynet::helper
 
