@@ -25,11 +25,7 @@ SOFTWARE.
 #ifndef SKYNET_UPPER_MACHINE_CONFIG_HPP
 #define SKYNET_UPPER_MACHINE_CONFIG_HPP
 
-#include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
-#include "skynet_upper/internal/iterative_base.hpp"
-#include "skynet_upper/pending_iterative.hpp"
-//include "skynet_core/skynet.hpp"
+#include "skynet_core/skynet.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -45,31 +41,31 @@ SOFTWARE.
 #include <vector>
 
 
-namespace skynet {
+namespace skynet_config {
 
 namespace detail {
 
   // trim functions based on http://stackoverflow.com/a/217605
-
+  
   inline void ltrim(std::string & s, const std::locale & loc) {
     s.erase(s.begin(),
                   std::find_if(s.begin(), s.end(),
-                              [&loc](char ch) { return !std::isspace(ch, loc); }));
+                               [&loc](char ch) { return !std::isspace(ch, loc); }));
   }
-
+  
   inline void rtrim(std::string & s, const std::locale & loc) {
     s.erase(std::find_if(s.rbegin(), s.rend(),
-                              [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
+                               [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
                   s.end());
   }
-
+  
   template <class UnaryPredicate>
   inline void rtrim2(std::string& s, UnaryPredicate pred) {
     s.erase(std::find_if(s.begin(), s.end(), pred), s.end());
   }
-
+  
   // string replacement function based on http://stackoverflow.com/a/3418285
-
+  
   inline bool replace(std::string & str, const std::string & from, const std::string & to) {
     auto changed = false;
     size_t start_pos = 0;
@@ -80,13 +76,13 @@ namespace detail {
     }
     return changed;
   }
-
+  
 } // namespace detail
 
 template <typename T>
 inline bool extract(const std::string & value, T & dst) {
   char c;
-  std::istringstream is{value};
+  std::istringstream is{ value };
   T result;
   if ((is >> std::boolalpha >> result) && !(is >> c)) {
     dst = result;
@@ -113,19 +109,6 @@ inline bool extract_vector(const std::string & value, std::vector<T> & dst) {
   return !dst.empty();
 }
 
-
-//template <typename char, typename T>
-//inline bool get_value(const std::map<std::string, std::string> & sec, const std::string & key, T & dst) {
-//  const auto it = sec.find(key);
-//  if (it == sec.end()) return false;
-//  return extract(it->second, dst);
-//}
-
-//template <typename char, typename T>
-//inline bool get_value(const std::map<std::string, std::string>& sec, const char* key, T& dst) {
-//  return get_value(sec, std::string(key), dst);
-//}
-
 class Format
 {
 public:
@@ -136,10 +119,10 @@ public:
   const char char_comment;
 
   // used for parsing
-  virtual bool is_section_start(char ch) const { return ch == char_section_start; }
-  virtual bool is_section_end(char ch) const { return ch == char_section_end; }
-  virtual bool is_assign(char ch) const { return ch == char_assign; }
-  virtual bool is_comment(char ch) const { return ch == char_comment; }
+  bool is_section_start(char ch) const { return ch == char_section_start; }
+  bool is_section_end(char ch) const { return ch == char_section_end; }
+  bool is_assign(char ch) const { return ch == char_assign; }
+  bool is_comment(char ch) const { return ch == char_comment; }
 
   // used for interpolation
   const char char_interpol;
@@ -169,10 +152,10 @@ public:
 };
 
 template<typename TagType>
-struct TagGroup {
+struct ReduceGroupConfig {
   using GroupTag = skynet::ReduceGroupTag<TagType>;
   using ValueTag = skynet::ReduceValueTag<TagType>;
-  TagGroup(const GroupTag& reduce_group_tag, const ValueTag& reduce_value_tag, const std::vector<ValueTag>& reduce_value_tags)
+  ReduceGroupConfig(const GroupTag& reduce_group_tag, const ValueTag& reduce_value_tag, const std::vector<ValueTag>& reduce_value_tags)
   : reduce_group_tag(std::move(reduce_group_tag)),
     reduce_value_tag(std::move(reduce_value_tag)),
     reduce_value_tags(std::move(reduce_value_tags))
@@ -184,7 +167,7 @@ struct TagGroup {
 };
 
 
-class MachineConfig
+class Config
 {
 public:
   using string = std::string;
@@ -197,16 +180,16 @@ public:
 
   static const int max_interpolation_depth = 10;
 
-  MachineConfig() : format(std::make_shared<Format>()) {};
-  MachineConfig(std::shared_ptr<Format> fmt) : format(fmt) {};
+  Config() : format(std::make_shared<Format>()) {};
+  Config(std::shared_ptr<Format> fmt) : format(fmt) {};
 
-  template<typename RetType>
-  RetType get_value(std::string sec_name, std::string key) {
+  template<typename DataType>
+  DataType get_value(std::string sec_name, std::string key) {
     auto sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found.");
     try {
-      RetType ret;
+      DataType ret;
       auto success = extract(it->second, ret);
       if (success) {
         return ret;
@@ -217,16 +200,37 @@ public:
     }
   };
 
+  template<typename DataType>
+  std::vector<DataType> get_vector(std::string sec_name, std::string key) {
+    auto sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) throw std::out_of_range("Key not found.");
+    std::vector<DataType> ret_vec;
+    std::istringstream list(it->second);
+    std::string val_str;
+
+    while (list >> val_str) {
+      DataType ret;
+      auto success = extract(val_str, ret);
+      if (success) {
+        ret_vec.emplace_back(ret);
+      } else {
+        throw std::exception();
+      }
+    }
+    return ret_vec;
+  };
+
   template<typename TagType>
-  TagGroup<TagType> get_reduce_group(std::string sec_name) {
+  ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) {
     auto sec = sections.at(sec_name);
 
     const auto it1 = sec.find("reduce_value_tag");
-    if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name ".");
+    if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name + ".");
     const auto reduce_value_tag_name = it1->second;
 
     const auto it2 = sec.find("reduce_value_tags");
-    if (it2 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tags' key in reduce group section " + sec_name ".");
+    if (it2 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tags' key in reduce group section " + sec_name + ".");
     const auto reduce_value_tags_names = it2->second;
 
     skynet::ReduceGroupTag<TagType> reduce_group_tag{sec_name};
@@ -353,6 +357,6 @@ private:
   }
 };
 
-}; // namespace machine_config
+}; // namespace skynet_config
 
 #endif
