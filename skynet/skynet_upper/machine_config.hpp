@@ -49,44 +49,44 @@ namespace skynet {
 
 namespace detail {
 
-// trim functions based on http://stackoverflow.com/a/217605
+  // trim functions based on http://stackoverflow.com/a/217605
 
-inline void ltrim(std::string & s, const std::locale & loc) {
-  s.erase(s.begin(),
-                std::find_if(s.begin(), s.end(),
-                             [&loc](char ch) { return !std::isspace(ch, loc); }));
-}
-
-inline void rtrim(std::string & s, const std::locale & loc) {
-  s.erase(std::find_if(s.rbegin(), s.rend(),
-                             [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
-                s.end());
-}
-
-template <class UnaryPredicate>
-inline void rtrim2(std::string& s, UnaryPredicate pred) {
-  s.erase(std::find_if(s.begin(), s.end(), pred), s.end());
-}
-
-// string replacement function based on http://stackoverflow.com/a/3418285
-
-inline bool replace(std::string & str, const std::string & from, const std::string & to) {
-  auto changed = false;
-  size_t start_pos = 0;
-  while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-    str.replace(start_pos, from.length(), to);
-    start_pos += to.length();
-    changed = true;
+  inline void ltrim(std::string & s, const std::locale & loc) {
+    s.erase(s.begin(),
+                  std::find_if(s.begin(), s.end(),
+                              [&loc](char ch) { return !std::isspace(ch, loc); }));
   }
-  return changed;
-}
+
+  inline void rtrim(std::string & s, const std::locale & loc) {
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+                              [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
+                  s.end());
+  }
+
+  template <class UnaryPredicate>
+  inline void rtrim2(std::string& s, UnaryPredicate pred) {
+    s.erase(std::find_if(s.begin(), s.end(), pred), s.end());
+  }
+
+  // string replacement function based on http://stackoverflow.com/a/3418285
+
+  inline bool replace(std::string & str, const std::string & from, const std::string & to) {
+    auto changed = false;
+    size_t start_pos = 0;
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+      str.replace(start_pos, from.length(), to);
+      start_pos += to.length();
+      changed = true;
+    }
+    return changed;
+  }
 
 } // namespace detail
 
 template <typename T>
 inline bool extract(const std::string & value, T & dst) {
   char c;
-  std::basic_istringstream<char> is{ value };
+  std::istringstream is{value};
   T result;
   if ((is >> std::boolalpha >> result) && !(is >> c)) {
     dst = result;
@@ -97,11 +97,22 @@ inline bool extract(const std::string & value, T & dst) {
   }
 }
 
-//template <typename char>
-//inline bool extract(const std::string & value, std::string & dst) {
-//  dst = value;
-//  return true;
-//}
+template <>
+inline bool extract(const std::string & value, std::string & dst) {
+  dst = value;
+  return true;
+}
+
+template<typename T>
+inline bool extract_vector(const std::string & value, std::vector<T> & dst) {
+  std::istringstream is{value};
+  T result;
+  while (!is.eof() && is >> std::boolalpha >> result) {
+    dst.push_back(result);
+  }
+  return !dst.empty();
+}
+
 
 //template <typename char, typename T>
 //inline bool get_value(const std::map<std::string, std::string> & sec, const std::string & key, T & dst) {
@@ -188,17 +199,6 @@ public:
 
   MachineConfig() : format(std::make_shared<Format>()) {};
   MachineConfig(std::shared_ptr<Format> fmt) : format(fmt) {};
-
-  bool extract(const std::string & value, std::string & dst) {
-    dst = value;
-    return true;
-  }
-
-  template<typename DataType>
-  bool extract_vector(const std::vector<std::string> & value, std::vector<DataType> & dst) {
-    dst = value;
-    return true;
-  }
 
   template<typename RetType>
   RetType get_value(std::string sec_name, std::string key) {
