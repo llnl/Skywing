@@ -1,9 +1,8 @@
 #!/bin/bash
-#SBATCH -N 1
+#SBATCH -N 4
 #SBATCH -J skynet_LC_hello_world
 #SBATCH -t 00:05:00
 #SBATCH -p pbatch
-#SBATCH -A cfa
 #SBATCH -o lc_hello_world_out.txt
 
 #### Shell commands

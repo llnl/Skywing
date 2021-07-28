@@ -54,12 +54,14 @@ def generate_config_file(num_agents, node_names_list, filename, port_start):
     """
     f = open(filename, 'w')
     num_agents_per_node = num_agents / len(node_names_list)
+    port_num = port_start
     for i, name in enumerate(node_names_list):
         for j in range(num_agents_per_node):
             agent_num = num_agents_per_node * i + j
             f.write("agent{0}\n".format(str(agent_num)))
             f.write("{0}.llnl.gov\n".format(name))
-            f.write(str(port_start + j) + "\n")
+            f.write(str(port_num) + "\n")
+            port_num += 1
             if agent_num < num_agents - 1:
                 f.write("agent{0}\n".format(str(agent_num+1)))
             f.write("---\n")

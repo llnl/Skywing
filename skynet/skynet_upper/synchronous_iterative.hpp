@@ -110,9 +110,10 @@ class SupernodeSynchronousIterative {
 public:
   using ValueType = ValueOrTuple<TagValueTypes...>;
 
-  SupernodeSynchronousIterative(std::map<PrivateTag<TagValueTypes...>, std::vector<std::string>> nodes, SynchronousIterative<TagValueTypes...> sync_iter) noexcept
-    : nodes_{std::move(nodes)}
-    , sync_iter_{std::move(sync_iter)}
+  SupernodeSynchronousIterative(
+    std::map<PrivateTag<TagValueTypes...>, std::vector<std::string>> nodes,
+    SynchronousIterative<TagValueTypes...> sync_iter) noexcept
+    : nodes_{std::move(nodes)}, sync_iter_{std::move(sync_iter)}
   {}
 
   /** \brief Retrieves the values from all tags, not being ready
@@ -124,28 +125,27 @@ public:
   template<typename... ArgTypes>
   auto values(ArgTypes&&... submit_values) noexcept
   {
-    return sync_iter_.values(std::forward<ArgTypes>(submit_values)...).then([this](const auto& base_vals) -> std::vector<ValueType> {
-      if (base_vals.empty()) { return {}; }
-      std::vector<ValueType> ret_values;
-      ret_values.reserve(nodes_.size());
-      std::size_t value_loc = 0;
-      for (const auto& [tag, node_addresses] : nodes_) {
-        (void)tag;
-        const ValueType node_value = base_vals[value_loc];
-        for (const auto& tag_producer : node_addresses) {
-          // We don't do anything with this for now
-          (void)tag_producer;
-          // There's a difference with the produced values for everything, return error
-          if (base_vals[value_loc] != node_value) {
-            return {};
+    return sync_iter_.values(std::forward<ArgTypes>(submit_values)...)
+      .then([this](const auto& base_vals) -> std::vector<ValueType> {
+        if (base_vals.empty()) { return {}; }
+        std::vector<ValueType> ret_values;
+        ret_values.reserve(nodes_.size());
+        std::size_t value_loc = 0;
+        for (const auto& [tag, node_addresses] : nodes_) {
+          (void)tag;
+          const ValueType node_value = base_vals[value_loc];
+          for (const auto& tag_producer : node_addresses) {
+            // We don't do anything with this for now
+            (void)tag_producer;
+            // There's a difference with the produced values for everything, return error
+            if (base_vals[value_loc] != node_value) { return {}; }
+            ++value_loc;
           }
-          ++value_loc;
+          ret_values.push_back(node_value);
         }
-        ret_values.push_back(node_value);
-      }
-      assert(value_loc == base_vals.size());
-      return ret_values;
-    });
+        assert(value_loc == base_vals.size());
+        return ret_values;
+      });
   }
 
 private:
@@ -155,7 +155,10 @@ private:
 
 template<typename... TagValueTypes>
 auto create_supernode_synchronous_iterative(
-  MasterHandle handle, Job& job, const PrivateTag<TagValueTypes...>& produced_tag, const std::map<PrivateTag<TagValueTypes...>, std::vector<std::string>>& nodes)
+  MasterHandle handle,
+  Job& job,
+  const PrivateTag<TagValueTypes...>& produced_tag,
+  const std::map<PrivateTag<TagValueTypes...>, std::vector<std::string>>& nodes)
 {
   using ProducedType = std::optional<SupernodeSynchronousIterative<TagValueTypes...>>;
   using BaseWaiter = Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
@@ -176,15 +179,9 @@ auto create_supernode_synchronous_iterative(
     }
   }
   return internal::create_iterative<SynchronousIterative, AllWaiterSame<BaseWaiter>>(
-    when_all_same(waiters),
-    handle,
-    job,
-    self_tag,
-    all_tags
-    ).then([nodes](auto sync_iter) -> ProducedType {
-      if (sync_iter) {
-        return SupernodeSynchronousIterative<TagValueTypes...>{nodes, std::move(*sync_iter)};
-      }
+           when_all_same(waiters), handle, job, self_tag, all_tags)
+    .then([nodes](auto sync_iter) -> ProducedType {
+      if (sync_iter) { return SupernodeSynchronousIterative<TagValueTypes...>{nodes, std::move(*sync_iter)}; }
       return {};
     });
 }
@@ -195,12 +192,7 @@ auto create_synchronous_iterative(
 {
   job.declare_publication_intent(produced_tag);
   return internal::create_iterative<SynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe_range(tags),
-    handle,
-    job,
-    produced_tag,
-    tags
-  );
+    job.subscribe_range(tags), handle, job, produced_tag, tags);
 }
 
 template<typename... TagValueTypes, typename... TagTypes>
@@ -209,19 +201,10 @@ auto create_synchronous_iterative(
 {
   job.declare_publication_intent(produced_tag);
   return internal::create_iterative<SynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe(tags...),
-    handle,
-    job,
-    produced_tag,
-    tags...
-  );
+    job.subscribe(tags...), handle, job, produced_tag, tags...);
 }
 
-template<
-  typename... TagValueTypes,
-  typename Range,
-  typename Rep,
-  typename Period>
+template<typename... TagValueTypes, typename Range, typename Rep, typename Period>
 auto create_synchronous_iterative(
   const std::chrono::time_point<Rep, Period>& end_time,
   IterativeInitErrorPolicy policy,
@@ -232,21 +215,10 @@ auto create_synchronous_iterative(
 {
   job.declare_publication_intent(produced_tag);
   return internal::create_iterative<SynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe_range(tags),
-    end_time,
-    policy,
-    handle,
-    job,
-    produced_tag,
-    tags
-  );
+    job.subscribe_range(tags), end_time, policy, handle, job, produced_tag, tags);
 }
 
-template<
-  typename... TagValueTypes,
-  typename... TagTypes,
-  typename Rep,
-  typename Period>
+template<typename... TagValueTypes, typename... TagTypes, typename Rep, typename Period>
 auto create_synchronous_iterative(
   const std::chrono::time_point<Rep, Period>& end_time,
   IterativeInitErrorPolicy policy,
@@ -257,14 +229,7 @@ auto create_synchronous_iterative(
 {
   job.declare_publication_intent(produced_tag);
   return internal::create_iterative<SynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe(tags...),
-    end_time,
-    policy,
-    handle,
-    job,
-    produced_tag,
-    tags...
-  );
+    job.subscribe(tags...), end_time, policy, handle, job, produced_tag, tags...);
 }
 
 } // namespace skynet

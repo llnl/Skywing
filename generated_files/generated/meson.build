@@ -17,9 +17,7 @@ capn_proto_sources = custom_target('capn_proto_sources',
     cpn_builder_prog,
     '-I' + meson.current_source_dir(),
     'compile',
-    # This is ugly and I don't know why it was working before but isn't now
-    # Just hardcode the path
-    '--src-prefix=../generated_files/generated',
+    '--src-prefix=' + meson.current_source_dir(),
     '-o' + cpn_builder_cpp_prog.path() + ':@OUTDIR@',
     '@INPUT@'
   ]

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <optional>
 #include <vector>
 #include <optional>//AB: I added this in for compiling locally on my mac using Clang. It couldn't find optionals otherwise.
 namespace skynet::internal::detail {
