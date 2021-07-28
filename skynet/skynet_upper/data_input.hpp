@@ -7,22 +7,19 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-// This function inputs a vector or matrix from an unstructured and dense matrix market format.
-// In the future, this functionality may be expanded to other types and formats.
-// This is the auto format since we want to return either a vector<double> or vector<vector<double>>
-// There's scenarios in which we want to force the output as a vector<vector<>>, which is the default parameter.
+/**
+ * This function inputs a vector or matrix from an unstructured and dense matrix market format.
+ * In the future, this functionality may be expanded to other types and formats.
+ */
+
 template <typename T>
 std::vector<std::vector<T>> input_matrix_from_matrix_market(std::string directory, std::string matrix_name)
 {
   std::vector<std::vector<T>> return_mat;
   std::string file_path =  directory + "/" + matrix_name;
   std::ifstream fin(file_path, std::ifstream::in);
-  // assert(fin.is_open() == 1);
-  if(fin.is_open() == 0)
-  {
-    std::cout << "File: "<< file_path << " is not open." << std::endl;
-    throw "Cannot open file!";
-  }
+  // std::cout << "file_path: " << file_path << std::endl;
+  assert(fin.is_open() == 1);
   int input_rows = 0;
   int input_cols = 0;
   // Ignore headers and comments in matrix market format.
@@ -58,14 +55,9 @@ std::vector<T> input_vector_from_matrix_market(std::string directory, std::strin
 {
   std::vector<T> return_vec;
   std::string file_path =  directory + "/" + vector_name;
-
+  // std::cout << "file_path: " << file_path << std::endl;
   std::ifstream fin(file_path, std::ifstream::in);
-  // assert(fin.is_open() == 1);
-  if(fin.is_open() == 0)
-  {
-    std::cout << "File: "<< file_path << " is not open." << std::endl;
-    throw "Cannot open file!";
-  }
+  assert(fin.is_open() == 1);
   int input_rows = 0;
   int input_cols = 0;
   // Ignore headers and comments in matrix market format.
@@ -87,22 +79,13 @@ std::vector<T> input_vector_from_matrix_market(std::string directory, std::strin
   }
   else
   {
-    std::cerr << "WARNING: This is not a vector." << std::endl;
+    std::cerr << "WARNING: This is not a vector: row number: "  << input_rows << "col number: " << input_cols << std::endl;
   }
   fin.close();
   return return_vec;
 }
 
 // Potentially useful terminal diagnostics.
-template<typename T>
-void print_vec(std::vector<T> print_me)
-{
-  for( auto entry: print_me)
-  {
-    std::cout << entry << " " << std::endl;
-  }
-}
-
 template<typename T>
 void print_mat(std::vector<std::vector<T>> print_me)
 {
@@ -114,6 +97,16 @@ void print_mat(std::vector<std::vector<T>> print_me)
     }
     std::cout << std::endl;
   }
+}
+
+template<typename T>
+void print_vec(std::vector<T> print_me)
+{
+  for( auto entry: print_me)
+  {
+    std::cout << entry << " " ;
+  }
+  std::cout << std::endl;
 }
 
 #endif

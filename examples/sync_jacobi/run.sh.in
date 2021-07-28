@@ -16,34 +16,40 @@ kill_progs() {
   done
 }
 
-# For this implementation, the number of rows in the matrix has to correspond to the size of the network. 
+# For this example, the number of rows in the matrix corresponds to the size of the network.
 size_of_network=4
-matrix_name="toy.mtx"
-
-# matrix_name=randomInteger_10_diagDom_100
-# size_of_network=10
+# matrix_name="toy.mtx"
+matrix_name="randomInteger_10_diagDom_100.mtx"
 
 number_of_trials=1
 
-directory="../../../examples/sync_jacobi/system/partition"
-# TODO: Add preprocessing step here to work from on .mtx file for each matrix/vector
+# Directory where skyent agents load their information
+system_directory="../../../examples/sync_jacobi/system"
+partition_directory="partition"
+rm -r ${partition_directory}
+mkdir ${partition_directory}
 
 # folder which stores results for aggregation.
-rm -r data_hold/
-mkdir data_hold
+save_directory="data_hold"
+rm -r ${save_directory}
+mkdir ${save_directory}
 
-echo -e Sync Jacobi: '\t'  matrix: ${matrix_name} '\t' number of trials ${number_of_trials}
+python3 ../../../examples/sync_jacobi/jacobi_pre_processing.py 0 0 ${size_of_network} ${matrix_name} ${system_directory} ${partition_directory}
+
+
+echo -e Sync Jacobi: '\t'  matrix: ${matrix_name} '\t' Number of trials ${number_of_trials}
 
 for (( counter_for_trials = 1 ; counter_for_trials <= number_of_trials ; counter_for_trials++ ))
 do
     echo Begin:  Trial ${counter_for_trials}
+    echo --------------------------------------------
     for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
     do
       if [[ ${counter_for_network_elements} < $((size_of_network-1)) ]]
       then
-        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${directory} ${counter_for_trials} &
+        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${partition_directory} ${counter_for_trials} ${save_directory} &
       else
-        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${directory} ${counter_for_trials}
+        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${partition_directory} ${counter_for_trials} ${save_directory}
       fi
       declare "erase${counter_for_network_elements}=$!"
     done

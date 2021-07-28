@@ -11,9 +11,8 @@
 #include <thread>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
+// #include <iomanip>
 
-// #include "typeinfo"
 #include "jacobi_data_output.hpp"
 
 using namespace skynet;
@@ -54,19 +53,8 @@ std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
   return tags;
 }
 
-// Terminal Diagnostic for exact solution.
-void print_exact_solution(int machine_number, std::vector<double> x_sol_partition)
-{
-  std::cout << "\t The exact solution for " << machine_number << " is ";
-  for(auto entry :  x_sol_partition)
-  {
-    std::cout << entry << " ";
-  }
-   std::cout << std::endl;
-}
-
 // All of the Skynet specific code is located in this function.
-void machine_task(const int machine_number, int size_of_network, __attribute__((unused)) int trial, std::vector<double> matrix_row_hold, std::vector<double> b_values, __attribute__((unused))std::vector<double> x_sol_partition, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags)
+void machine_task(const int machine_number, int trial, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<double> x_partition_solution, std::vector<double> x_full_solution, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::string save_directory)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
@@ -83,36 +71,59 @@ void machine_task(const int machine_number, int size_of_network, __attribute__((
     }
   }
 
-    double b_value = b_values[0];
-    int row_index = row_indices[0];
-
-    // For the synchronous_jacobi class to work, one needs to send the information for the computation, whichs is the row of the matrix used for computation, which is at this point the same as the machine_number.
     auto opt_iter_method = create_synchronous_jacobi(
       machine_number,
-      size_of_network,
-      row_index,
-      matrix_row_hold,
-      b_value,
+      A_partition,
+      b_partition,
+      row_indices,
       master_handle,
       job,
       tags[machine_number],
       tags
     ).get();
 
-    auto sync_jaco = *opt_iter_method;
-    sync_jaco.run();
+    auto sync_jacobi = *opt_iter_method;
+    sync_jacobi.run();
 
-    auto x_local_estimate = sync_jaco.return_full_x_iter();
-    auto x_partition_estimate = sync_jaco.return_solution_as_vec();
 
-    // double partial_residual = calculate_partial_residual(1, x_local_estimate, b_values, matrix_row_hold);
-    // double partial_forward_error = calculate_partial_forward_error(1, x_partition_estimate, x_sol_partition);
-    // collect_data_each_component(machine_number, 1, trial, partial_forward_error, partial_residual, iteration_count, run_time.count());
+  double run_time = sync_jacobi.return_runtime();
+  int information_received = sync_jacobi.return_information_received();
+  auto x_local_estimate = sync_jacobi.return_full_solution();
+  auto x_partition_estimate = sync_jacobi.return_partition_solution();
+  // Since this is a distributed algorithm, we only have access to information that allows us to have a "partial" residual, since not every agent has every row of the matrix. 
+  // In contrast, we can look at error involving only the components of the solution vector x which this process updates, or it's entire estimation vector, hence "partial" versus "full" in this language and "PSQ" versus "FSQ" for "partial error squared" and "full error squared". 
+  // We avoid taking square roots here in case additional post processing is wanted.
+  double partial_residual = calculate_partial_residual(x_local_estimate, b_partition, A_partition);
+  double partial_forward_error = calculate_partial_forward_error(row_indices, x_partition_estimate, x_partition_solution);
+  double forward_error = calculate_local_forward_error(x_local_estimate, x_full_solution);
 
-    // std::cout<<"machine " << machine_number << " has answer: " << sync_jaco.return_solution() << " compared to exact value: " << x_sol_partition[0] << std::endl;
-    sync_jaco.print_solution();
-    print_exact_solution(machine_number, x_sol_partition);
+  // Saves information from each Skynet machine for post processing, if wanted.
+  collect_data_each_component(machine_number, 1, trial, partial_forward_error, partial_residual, information_received, run_time, save_directory);
 
+
+  std::cout << "Machine: " << machine_number << "\tNumber of Updated Components: " << row_indices.size(); 
+  std::cout << std::endl;
+  if(static_cast<int>(row_indices.size()) < 10)
+  {
+    std::cout << "\t Estimate: \t"; 
+    print_vec<double>(x_partition_estimate);
+    std::cout << "\t Exact Sol: \t"; 
+    print_vec<double>(x_partition_solution);
+  }
+  std::cout << "\t FSQ Error: \t" << forward_error;
+  std::cout << std::endl;
+  std::cout << "\t PSQ Error: \t" << partial_forward_error;
+  std::cout << std::endl;
+  std::cout << "\t PSQ Residual: \t" << partial_residual;  
+  std::cout << std::endl;      
+  std::cout << "\t New Info: \t" << information_received ; 
+  std::cout << std::endl;
+  std::cout << "\t Runtime: \t" << run_time; 
+  std::cout << std::endl;      
+  std::cout << std::endl;
+  std::cout << "\t Iterate: \t" << sync_jacobi.return_iterate() ; 
+  std::cout << std::endl;
+  std::cout << "--------------------------------------------" << std::endl;
   });
   master.run();
 }
@@ -121,9 +132,9 @@ void machine_task(const int machine_number, int size_of_network, __attribute__((
 int main(int argc, char* argv[])
 {
   // Error checking for the number of arguments
-  if (argc != 7)
+  if (argc != 8)
   {
-    std::cout << "Usage: Note Enough Arguments: " << argc << std::endl;
+    std::cout << "Usage: Wrong Number of Arguments: " << argc << std::endl;
     return 1;
   }
 
@@ -194,39 +205,41 @@ int main(int argc, char* argv[])
 
   std::string directory = argv[5];
   int trial = std::stoi(argv[6]);
+  std::string save_directory = argv[7];
   //This creates the relevant vectors needed to interact with skynet.
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
   auto tags = obtain_tags<ValueTag>(size_of_network);
 
   // This collects the matrices and vectors for the function.
-  std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(1)  + "_indices_" + matrix_name ;
+  std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_indices_" + matrix_name ;
   std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
 
-  std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(1)  + "_" + matrix_name ;
-  std::vector<double> matrix_row_hold = input_vector_from_matrix_market<double>(directory, matrix_partition_name);
+  std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_" + matrix_name ;
+  // std::vector<double> matrix_row_hold = input_vector_from_matrix_market<double>(directory, matrix_partition_name);
+  std::vector<std::vector<double>> A_partition = input_matrix_from_matrix_market<double>(directory, matrix_partition_name);
 
-  std::string rhs_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(1)  + "_rhs_" + matrix_name ;
-  std::vector<double> b_values = input_vector_from_matrix_market<double>(directory, rhs_partition_name);
+  std::string rhs_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_rhs_" + matrix_name ;
+  std::vector<double> b_partition = input_vector_from_matrix_market<double>(directory, rhs_partition_name);
 
-  std::string x_sol_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(1)  + "_x_sol_" + matrix_name ;
-  std::vector<double> x_sol_partition = input_vector_from_matrix_market<double>(directory, x_sol_partition_name);
+  std::string x_sol_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_x_sol_" + matrix_name ;
+  std::vector<double> x_partition_solution = input_vector_from_matrix_market<double>(directory, x_sol_partition_name);
   
   // This is contrived since we know the solution.
+  // These are not used in the jacobi class, only for data output and terminal diagnostics in the example.
   std::string x_sol_name =  "x_sol_" + matrix_name ;
-  std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/async_jacobi/system", x_sol_name);
+  std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/sync_jacobi/system", x_sol_name);
 
-  // if(machine_number == 0 )
+  // if(machine_number == 0)
   // {
-  //   print_mat(matrix_rows_hold);
-  //   print_vec(b_values);
+  //   print_mat(A_partition);
+  //   print_vec(b_partition);
   //   print_vec(x_sol_partition);
   //   // print_vec(x_full_solution);
   //   print_vec(row_indices);
   // }
 
-  // Skynet code call.
-  // This runs the actual skynet code.
-  machine_task(machine_number, size_of_network, trial, matrix_row_hold, b_values, x_sol_partition, row_indices, ports, machine_names, tags);
+  // Skynet call
+  machine_task(machine_number, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tags, save_directory);
   return 0;
 }

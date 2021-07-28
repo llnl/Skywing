@@ -9,11 +9,11 @@
 #include <iomanip>
 #include <iostream>
 #include <thread>
-// #include <typeinfo>
 
 using namespace skynet;
 using ValueTag = skynet::PublishTag<std::vector<double>>;
 
+// First three functions are for the Skynet setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_system)
 {
   std::vector<std::string > machine_names;
@@ -99,8 +99,6 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
   double new_information_count = push_sum.return_new_information_count();
 
   std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;
-  // This block is for computing the information from each process for each experiment for each trial.
-  // collect_data(machine_number, consensus_value, exact_solution, iteration_count, run_time.count());
   });
   master.run();
 }

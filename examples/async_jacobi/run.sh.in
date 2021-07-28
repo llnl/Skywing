@@ -18,41 +18,49 @@ kill_progs() {
   done
 }
 
-# For this implementation, the number of rows in the matrix has to correspond to the size of the network.
-# size_of_network=4
-# matrix_name="toy.mtx"
+# For this example, the number of rows in the matrix corresponds to the size of the network.
+size_of_network=4
+matrix_name="toy.mtx"
 
-matrix_name="randomInteger_10_diagDom_100.mtx"
-size_of_network=10
+# size_of_network=10
+# matrix_name="randomInteger_10_diagDom_100"
 
 number_of_trials=1
 
-# Number of components each process updates from a row-wise partitioned matrix.
 # This implementation allows for overlapping computations.
-starting_number_of_rows=1;
-ending_number_of_rows=3;
+ 
+starting_number_of_overlapping_rows=0;
+ending_number_of_overlapping_rows=1;
 
-directory="../../../examples/async_jacobi/system/partition"
-# TODO: Add preprocessing step here to work from on .mtx file for each matrix/vector
+
+# Directory where skyent agents load their information
+system_directory="../../../examples/async_jacobi/system"
+partition_directory="partition"
+rm -r ${partition_directory}
+mkdir ${partition_directory}
 
 # folder which stores results for aggregation.
-rm -r data_hold/
-mkdir data_hold
+save_directory="data_hold"
+rm -r ${save_directory}
+mkdir ${save_directory}
 
-echo -e Asyn Jacobi: '\t'  matrix: ${matrix_name} '\t' Row Count: ${starting_number_of_rows} to ${ending_number_of_rows} '\t' number of trials each: ${number_of_trials}
+python3 ../../../examples/async_jacobi/jacobi_pre_processing.py ${starting_number_of_overlapping_rows} ${ending_number_of_overlapping_rows} ${size_of_network} ${matrix_name} ${system_directory} ${partition_directory}
 
-for (( row_counter=starting_number_of_rows ; row_counter<=ending_number_of_rows ; row_counter++ ))
+echo -e Asyn Jacobi: '\t'  matrix: ${matrix_name} '\t' Row Count: ${starting_number_of_overlapping_rows} to ${ending_number_of_overlapping_rows} '\t' number of trials each: ${number_of_trials}
+
+for (( row_counter=starting_number_of_overlapping_rows ; row_counter<=ending_number_of_overlapping_rows ; row_counter++ ))
 do
   for (( counter_for_trials = 1 ; counter_for_trials <= number_of_trials ; counter_for_trials++ ))
   do
       echo Begin: Redundancy ${row_counter} Trial ${counter_for_trials}
+      echo --------------------------------------------
       for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
       do
         if [[ ${counter_for_network_elements} < $((size_of_network-1)) ]]
         then
-          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${directory} ${counter_for_trials} &
+          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${partition_directory} ${counter_for_trials} ${save_directory} &
         else
-          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${directory} ${counter_for_trials}
+          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${partition_directory} ${counter_for_trials} ${save_directory}
         fi
         declare "erase${counter_for_network_elements}=$!"
       done
@@ -61,14 +69,3 @@ do
       STARTING_PORT=$((STARTING_PORT+size_of_network+100))
     done
 done
-
-
-# This block is for data aggregation.
-# This passes synchronous results directory for comparison analysis.
-sync_comparison_results_directory="../sync_jacobi/data_hold/"
-# This passes the file names needed for computing residuals  and forward errors.
-solution_vector_filename="../../../examples/jacobi_include/system_hold_folder/sol_hold_folder/x_sol_"${matrix_name}
-rhs_vector_filename="../../../examples/jacobi_include/system_hold_folder/rhs_hold_folder/rhs_"${matrix_name}
-
-# This is the actual python code for the data aggregation and graph generation.
-# python3 ../../../examples/jacobi_include/data_aggregation/asynchronous_jacobi_post_processing.py ${starting_number_of_rows} ${ending_number_of_rows} ${size_of_network} ${number_of_trials} ${sync_comparison_results_directory} ${solution_vector_filename} ${rhs_vector_filename}

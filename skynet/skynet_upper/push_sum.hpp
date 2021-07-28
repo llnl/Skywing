@@ -6,7 +6,15 @@
 #include "skynet_upper/asynchronous_iterative.hpp"
 #include "skynet_upper/stopping_criterion.hpp"
 
-// Convenient alias for passing doubles between machines.
+/**
+ * Push Sum is an asynchronous distributed averaging algorithm that converges to the average of initial values as long as information delay is no longer than exponential in time.
+ * This algorithm still converges even if there packet loss, it just doesn't necessarily converge to the average in this case, although it still stagnate to SOME convex combination of initial values 
+ * 
+ * @param[in] x_value initial value for distributed averaging. 
+ * @param[out] x_value/y_value obtained from return_solution(), so the solution is a ratio.
+ * 
+ */
+
 using namespace skynet;
 using ValueTag = skynet::PublishTag<std::vector<double>>;
 
@@ -71,7 +79,7 @@ public:
 
     // Stopping Criterion Initialization
     max_new_information = 20 * size_of_system;
-    max_run_time = std::chrono::milliseconds(1000)* size_of_system;
+    max_run_time = std::chrono::milliseconds(100000)* size_of_system;
     // Initial send message
     for(int j = 0 ; j < 3 ; j++)
     {
@@ -119,9 +127,6 @@ public:
         }
       }
     }
-    // This sleep is necessary to allow the buffers behind the scene to process as intended. 
-    // i.e., without this, updated = False almost always, and this means no new information is detected.
-    std::this_thread::sleep_for(std::chrono::milliseconds{10});
   };
 
   ~PushSum(){};

@@ -6,64 +6,66 @@
 #include "skynet_upper/synchronous_iterative.hpp"
 #include "skynet_upper/stopping_criterion.hpp"
 
-// This class solves the square linear system Ax=b.
-// This assumes that the system is square, consistent, and digonally dominant and thus solvable by this method.
-// This class stores the full solution vector x_iter at each machine, and the specific update that each machine solves for can be viewed by the user by calling the print_solution() function or output by the return_solution() function or return_full_solution() for either the specific update the machine solved for or the full vector respectively.
+/** 
+ * Solves the square linear system Ax=b with the Jacobi algorithm. This assumes that the system is square, consistent, and diagonally dominant to be solvable by this method. This class stores the full solution vector x_iter at each machine (return_full_solution), as well as the partition of x_iter corresponding to the partition Ax=b that each machine is responsible for updating (return_partition_solution ), i.e., if a machine is responsible for updating components 0 and 1 of "x" from Ax=b, then the only the first two components of x_iter are returned for (return_full_solution).
+ * 
+ * This implementation is agnostic of overlapping computations, nonuniform partitioning, and non-sequential partitioning of the linear system. This is why the row_index for each component of x must be sent along with every method for proper processing.
+ * 
+ * @param[in] A_partition A matrix row partition
+ * @param[in] b_partition b vector row partition -> same as A partition
+ * @param[in] row_indices indices which correspond to the row the partition above with respect to the full system "Ax=b"
+ * 
+ * @param[out] x_iter -> solution vector x from the linear solver
+ * @param[out] x_iter[row_indices] -> partition solution vector x that the individual skynet process is responsible for updating.
+ * 
+*/
 
 using namespace skynet;
 using ValueTag = skynet::PublishTag<std::vector<double>>;
 
-// This is if we want to template this class.
-// Kendall doesn't recommend this since we would then have to deal with the case where a user inputs tuples.
-// This isn't something she recommended doing, at least for the moment.
-// Since the only feasible types for the linear system are doubles or floats, this didn't seem to be a pressing issue.
-// The main crux of this example is the constructor function below.
-//
-
-// template<typename ... TagValueTypes>
 class SynchronousJacobi
 {
 
 private:
 
   int machine_number;
-  int size_of_network;
+  int size_of_linear_system;
   int row_index;
-  std::vector<double> matrix_row; 
-  double b_partition;
-  // std::vector<ValueOrTuple<TagValueTypes...>> matrix_row;
+  std::vector<std::vector<double>> A_partition; 
+  std::vector<double> b_partition;
+  std::vector<int> row_indices;
+  int number_of_updated_components;
   // Variables internal to this class.
   std::vector<double> x_iter;
   std::vector<double> publish_values;
+  // Variables for stopping criterion
   int new_information_count = 0;
   int max_new_information;
   std::chrono::duration<double> run_time = std::chrono::milliseconds(1);
   std::chrono::duration<double> max_run_time;
   bool iterate = true;
 
-
-  // Variables used for SynchronousIterative class and communication.
-  // std::array<ValueTag, 4> tags;
   // Skynet synchronous iterative variables
   friend class SynchronousIterative<std::vector<double>>;
   SynchronousIterative<std::vector<double>> iter_method ;
 
 public:
 
-  SynchronousJacobi(int machine_number, int size_of_network, int row_index, std::vector<double> matrix_row, double b_partition, SynchronousIterative<std::vector<double>> it): 
+  SynchronousJacobi(int machine_number,  std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<int> row_indices, SynchronousIterative<std::vector<double>> it): 
   machine_number(machine_number), 
-  size_of_network(size_of_network),
-  row_index(row_index),
-  matrix_row(matrix_row),
+  A_partition(A_partition),
   b_partition(b_partition), 
+  row_indices(row_indices),
   iter_method(it)
   {
-    x_iter.resize(matrix_row.size(), 0.0);
-    publish_values.resize(2,0.0);
-    max_new_information = 20 * size_of_network;
-    max_run_time = std::chrono::milliseconds(1000) *size_of_network;
-    // Initial computation and send message.
-    x_iter[row_index] = jacobi();
+    size_of_linear_system = static_cast<int>(A_partition[0].size());
+    number_of_updated_components = static_cast<int>(row_indices.size());
+    x_iter.resize(A_partition[0].size(), 0.0);
+    publish_values.resize(number_of_updated_components*2,0.0);
+    max_new_information = 1000 * size_of_linear_system;
+    max_run_time = std::chrono::milliseconds(1000000) *size_of_linear_system;
+    // Initial computation and send message, but not initial broadcast.
+    jacobi_computation();
     obtain_publish_values();
   };
 
@@ -76,8 +78,6 @@ public:
     while(iterate)
     {
       create_iteration();
-      // This allows for quick diagnostics by seeing what's in the buffers rho_x, rho_y,  at terminal.
-      // print_current_information();
       stop_jacobi = std::chrono::high_resolution_clock::now();
       run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
       iterate = should_stop(run_time, max_run_time, new_information_count, max_new_information);
@@ -90,78 +90,118 @@ public:
     const auto values = iter_method.values(publish_values).get();
     for (auto recv_message : values)
     {
-      new_information_count++;
-      int update_index = (int) recv_message[0];
-      x_iter[update_index] = recv_message[1];
+      for(int receive_index=0; receive_index < static_cast<int>(recv_message.size()/2) ; receive_index++)
+      {
+        int update_index = (int) recv_message[receive_index*2];
+        bool use_this_value = true;
+        for (int row_index = 0 ; row_index < number_of_updated_components; row_index++)
+        {
+          if(update_index == row_indices[row_index*2])
+          {
+            use_this_value = false;
+          }
+        }
+        if(use_this_value)
+        {
+          new_information_count++;
+          x_iter[update_index] = recv_message[receive_index*2+1];
+        }
+      }
     }
-    x_iter[row_index] = jacobi();
+    jacobi_computation();
     obtain_publish_values();
   };
   
   void obtain_publish_values()
   {
-    publish_values[0] = row_index*1.0;
-    publish_values[1] = x_iter[row_index];
-  }
-  
-  double jacobi()
-  {
-    double hold = 0.0;
-    for(std::vector<double>::size_type i = 0 ; i < matrix_row.size(); i++)
+    for(int i = 0 ; i < number_of_updated_components; i++)
     {
-      if((int)i!= row_index)
-      {
-        hold = hold + matrix_row[i] * x_iter[i];
-      }
+      publish_values[i*2] = row_indices[i]*1.0;
+      publish_values[i*2+1] = x_iter[row_indices[i]];
     }
-    hold  = (b_partition  - hold)/matrix_row[row_index] ;
-    return hold;
-  };
+  }
 
-  // Functions to return solution vector or individual solution.
-  double return_solution()
+  void jacobi_computation()
   {
-    return x_iter[row_index];
+    for(int i = 0 ; i < number_of_updated_components; i++)
+    {
+      double hold= 0.0;
+      for(int j = 0 ; j < static_cast<int>(A_partition[0].size()); j++)
+      {
+        if(j!=row_indices[i])
+          hold += A_partition[i][j]*x_iter[j];
+      }
+      hold = (b_partition[i] - hold)/A_partition[i][row_indices[i]];
+      int updated_index = (int)row_indices[i];
+      x_iter[updated_index] = hold;
+    }
   };
 
-  std::vector<double> return_solution_as_vec()
+  // Returns only the components for which this process updates. 
+  // Since jacobi is a row - wise operation, this is NOT the full x_iter. 
+  // If return_partial_solution() = return_partition_solution(), then each process solved the entire linear system by themselves.
+  std::vector<double> return_partition_solution()
   {
-    std::vector<double> return_vec(1,x_iter[row_index]);
-    return return_vec;
+    std::vector<double> return_vector;
+    for(int i = 0 ; i < number_of_updated_components; i++)
+    {
+      return_vector.push_back(x_iter[row_indices[i]]);
+    }
+    return return_vector;
   };
 
-  std::vector<double> return_full_x_iter()
+  std::vector<double> return_full_solution()
   {
     return x_iter;
   }
 
-  // Functions to print solution vector or individual solution.
-  void print_solution()
+  // Prints only the vector components of x  which this process updates. 
+  void print_partition_solution()
   {
-    std::cout << "\t machine " << machine_number << "\t solution: " << x_iter[row_index] << std::endl;
+    std::cout << "\t machine " << machine_number << "\tsolution ";
+
+    for(int i = 0 ; i < number_of_updated_components; i ++)
+    {
+      std::cout << x_iter[row_indices[i]] << " ";
+    }
+    std::cout << std::endl;
   };
 
-  void print_x_iter()
+  // Prints the full solution vector x.
+  void print_solution()
   {
-    std::cout << "The full x_iter vector is: ";
+    std::cout << "\t machine " << machine_number << "\t full solution ";
     for(std::vector<double>::size_type i = 0 ; i < x_iter.size(); i++)
     {
       std::cout << x_iter[i] << " ";
     }
     std::cout << std::endl;
   };
+  
+  double return_runtime()
+  {
+    return run_time.count();
+  }
 
+  bool return_iterate()
+  {
+    return iterate;
+  }
 
-}; // end synchronous_jacobi
+  int return_information_received()
+  {
+    return new_information_count;
+  }
 
-// int machine_number, int row_index, std::vector<double> matrix_row, double b_partition, SynchronousIterative<double> it)
+}; 
+
 template<typename... Args>
-auto create_synchronous_jacobi(int machine_number, int size_of_system, int row_index, std::vector<double> matrix_row, double b_partition, Args&&... args) noexcept
+auto create_synchronous_jacobi(int machine_number, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<int> row_indices,  Args&&... args) noexcept
 {
   return create_synchronous_iterative(std::forward<Args>(args)...).then([=](std::optional<SynchronousIterative<std::vector<double>>> it) -> std::optional<SynchronousJacobi> {
-     if (it) { return SynchronousJacobi(machine_number, size_of_system, row_index, matrix_row, b_partition, *it);}
+     if (it) { return SynchronousJacobi(machine_number, A_partition, b_partition, row_indices, *it);}
      else    { return {}; }
   });
 }
 
-#endif // SKYNET_UPPER_SYNCHRONOUS_JACOBI_HPP
+#endif 
