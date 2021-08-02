@@ -28,12 +28,10 @@ SOFTWARE.
 #include "skynet_core/skynet.hpp"
 
 #include <algorithm>
-#include <cctype>
-#include <cstring>
 #include <functional>
 #include <iostream>
+#include <iomanip>
 #include <list>
-#include <locale>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -80,36 +78,6 @@ namespace detail {
   
 } // namespace detail
 
-template <typename T>
-inline bool extract(const std::string & value, T & dst) {
-  char c;
-  std::istringstream is{ value };
-  T result;
-  if ((is >> std::boolalpha >> result) && !(is >> c)) {
-    dst = result;
-    return true;
-  }
-  else {
-    return false;
-  }
-}
-
-template <>
-inline bool extract(const std::string & value, std::string & dst) {
-  dst = value;
-  return true;
-}
-
-template<typename T>
-inline bool extract_vector(const std::string & value, std::vector<T> & dst) {
-  std::istringstream is{value};
-  T result;
-  while (!is.eof() && is >> std::boolalpha >> result) {
-    dst.push_back(result);
-  }
-  return !dst.empty();
-}
-
 class Format
 {
 public:
@@ -152,6 +120,62 @@ public:
   }
 };
 
+
+/**
+ * Extraction functions convert string data to a given type
+ **/
+template <typename T>
+inline bool extract(const std::string & value, T & dst) {
+  char c;
+  std::istringstream is{ value };
+  T result;
+  if ((is >> std::boolalpha >> result) && !(is >> c)) {
+    dst = result;
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+template <>
+inline bool extract(const std::string & value, std::string & dst) {
+  dst = value;
+  return true;
+}
+
+template<typename T>
+inline bool extract_vector(const std::string & value, std::vector<T> & dst) {
+  std::istringstream is{value};
+  T result;
+  while (!is.eof() && is >> std::boolalpha >> result) {
+    dst.push_back(result);
+  }
+  return !dst.empty();
+}
+
+inline decltype(auto) extract_ip_and_port(const std::string &value) {
+  auto split = value.rfind(':');
+  std::uint16_t port = 0;
+  if (split == value.npos || split == value.size()-1) {
+    auto ip = value.substr(0, split);
+    return std::make_tuple(ip, port);
+  }
+  auto ip = value.substr(0, split);
+  try {
+    auto port_num = std::stoul(value.substr(split + 1));
+    if (port_num > std::numeric_limits<std::uint16_t>::max()) {
+        std::cerr << "warning: port number '" << port_num << "' exceeds maximum and will be truncated" << std::endl;
+        port = std::numeric_limits<std::uint16_t>::max();
+    } else {
+        port = port_num;
+    }
+  } catch (std::invalid_argument& e) {
+    throw std::invalid_argument("invalid port number: " + value.substr(split+1));
+  }
+  return std::make_tuple(ip, port);
+}
+
 template<typename TagType>
 struct ReduceGroupConfig {
   using GroupTag = skynet::ReduceGroupTag<TagType>;
@@ -171,12 +195,11 @@ struct ReduceGroupConfig {
 class Config
 {
 public:
-  using string = std::string;
-  using Section = std::map<string, string>;
-  using Sections = std::map<string, Section>;
+  using Section = std::map<std::string, std::string>;
+  using Sections = std::map<std::string, Section>;
 
   Sections sections;
-  std::list<string> errors;
+  std::list<std::string> errors;
   std::shared_ptr<Format> format;
 
   static const int max_interpolation_depth = 10;
@@ -222,6 +245,16 @@ public:
     return ret_vec;
   };
 
+  decltype(auto) get_ip_and_port(std::string sec_name, std::string key) {
+    auto sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) 
+      throw std::out_of_range("Key not found in section: '" + sec_name + ": " + key + "'.");
+
+    auto [ip, port] = extract_ip_and_port(it->second);
+    return std::make_tuple(ip, port);
+  }
+
   template<typename TagType>
   ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) {
     auto sec = sections[sec_name];
@@ -258,8 +291,8 @@ public:
 
   void parse(std::string filename) {
     std::ifstream is(filename);
-    string line;
-    string section;
+    std::string line;
+    std::string section;
     const std::locale loc{"C"};
     while (std::getline(is, line)) {
       detail::ltrim(line, loc);
@@ -277,8 +310,8 @@ public:
             errors.push_back(line);
         }
         else if (pos != line.begin() && pos != line.end()) {
-          string variable(line.begin(), pos);
-          string value(pos + 1, line.end());
+          std::string variable(line.begin(), pos);
+          std::string value(pos + 1, line.end());
           detail::rtrim(variable, loc);
           detail::ltrim(value, loc);
           auto & sec = sections[section];
@@ -330,9 +363,9 @@ public:
   }
 
 private:
-  using Symbols = std::list<std::pair<string, string>>;
+  using Symbols = std::list<std::pair<std::string, std::string>>;
 
-  const Symbols local_symbols(const string & sec_name, const Section & sec) const {
+  const Symbols local_symbols(const std::string & sec_name, const Section & sec) const {
     Symbols result;
     for (const auto & val : sec)
       result.push_back(std::make_pair(format->local_symbol(val.first), format->global_symbol(sec_name, val.first)));
