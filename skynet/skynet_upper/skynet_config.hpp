@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SKYNET_UPPER_MACHINE_CONFIG_HPP
-#define SKYNET_UPPER_MACHINE_CONFIG_HPP
+#ifndef SKYNET_UPPER_CONFIG_HPP
+#define SKYNET_UPPER_CONFIG_HPP
 
 #include "skynet_core/skynet.hpp"
 
@@ -37,6 +37,7 @@ SOFTWARE.
 #include <map>
 #include <memory>
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -180,14 +181,17 @@ public:
 
   static const int max_interpolation_depth = 10;
 
-  Config() : format(std::make_shared<Format>()) {};
-  Config(std::shared_ptr<Format> fmt) : format(fmt) {};
+  Config(std::string filename) : format(std::make_shared<Format>()) {
+    parse(filename);
+    strip_trailing_comments();
+    interpolate();
+  };
 
   template<typename DataType>
   DataType get_value(std::string sec_name, std::string key) {
-    auto sec = sections.at(sec_name);
+    auto sec = sections[sec_name];
     const auto it = sec.find(key);
-    if (it == sec.end()) throw std::out_of_range("Key not found.");
+    if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
     DataType ret;
     auto success = extract(it->second, ret);
     if (success) {
@@ -199,9 +203,9 @@ public:
 
   template<typename DataType>
   std::vector<DataType> get_vector(std::string sec_name, std::string key) {
-    auto sec = sections.at(sec_name);
+    auto sec = sections[sec_name];
     const auto it = sec.find(key);
-    if (it == sec.end()) throw std::out_of_range("Key not found.");
+    if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
     std::vector<DataType> ret_vec;
     std::istringstream list(it->second);
     std::string val_str;
@@ -220,7 +224,7 @@ public:
 
   template<typename TagType>
   ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) {
-    auto sec = sections.at(sec_name);
+    auto sec = sections[sec_name];
 
     const auto it1 = sec.find("reduce_value_tag");
     if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name + ".");
@@ -231,9 +235,7 @@ public:
     const auto reduce_value_tags_names = it2->second;
 
     skynet::ReduceGroupTag<TagType> reduce_group_tag{sec_name};
-
     skynet::ReduceValueTag<TagType> reduce_value_tag{reduce_value_tag_name};
-
     std::vector<skynet::ReduceValueTag<TagType>> reduce_value_tags;
     std::istringstream list(reduce_value_tags_names);
     std::string valStr;
@@ -254,7 +256,8 @@ public:
     }
   }
 
-  void parse(std::istream& is) {
+  void parse(std::string filename) {
+    std::ifstream is(filename);
     string line;
     string section;
     const std::locale loc{"C"};
