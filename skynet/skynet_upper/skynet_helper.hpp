@@ -3,7 +3,6 @@
 
 #include <chrono>
 #include "skynet_core/skynet.hpp"
-//#include "skynet_upper/skynet_config.hpp"
 
 
 namespace skynet::helper
@@ -51,16 +50,6 @@ namespace skynet::helper
       std::this_thread::sleep_for(LOOP_DELAY);
     }
   }
-  //template<typename TagType>
-  //auto& await_reduce_group(skynet::Job& job, const skynet::config::ReduceGroupConfig<TagType>& reduce_group_config) {
-  //  auto fut = job.create_reduce_group(
-  //      reduce_group_config.reduce_group_tag, 
-  //      reduce_group_config.reduce_value_tag, 
-  //      reduce_group_config.reduce_value_tags
-  //  );
-  //  auto& group = fut.get();
-  //  return group;
-  //}
 
 } // namespace skynet::helper
 
