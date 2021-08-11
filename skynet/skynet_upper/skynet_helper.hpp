@@ -18,7 +18,6 @@ namespace skynet::helper
     std::chrono::time_point<std::chrono::steady_clock> time_limit = 
       std::chrono::steady_clock::now() + timeout;
     for (const auto& port : neighbor_ports) {
-      std::cout << "Attempting to connect to " << port << std::endl;
       while (!master_handle.connect_to_server("127.0.0.1", port).get()) {
         if (std::chrono::steady_clock::now() > time_limit) {
           std::cerr << "Took too long to connect to " << port << std::endl;

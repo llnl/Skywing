@@ -43,8 +43,6 @@ SOFTWARE.
 namespace skynet::config {
 
 namespace detail {
-
-  // trim functions based on http://stackoverflow.com/a/217605
   
   inline void ltrim(std::string & s, const std::locale & loc) {
     s.erase(s.begin(),
@@ -62,8 +60,6 @@ namespace detail {
   inline void rtrim2(std::string& s, UnaryPredicate pred) {
     s.erase(std::find_if(s.begin(), s.end(), pred), s.end());
   }
-  
-  // string replacement function based on http://stackoverflow.com/a/3418285
   
   inline bool replace(std::string & str, const std::string & from, const std::string & to) {
     auto changed = false;
