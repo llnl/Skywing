@@ -176,14 +176,18 @@ template<typename TagType>
 struct ReduceGroupConfig {
   using GroupTag = skynet::ReduceGroupTag<TagType>;
   using ValueTag = skynet::ReduceValueTag<TagType>;
-  ReduceGroupConfig(const GroupTag& reduce_group_tag, const ValueTag& reduce_value_tag, const std::vector<ValueTag>& reduce_value_tags)
-  : reduce_group_tag(std::move(reduce_group_tag)),
-    reduce_value_tag(std::move(reduce_value_tag)),
-    reduce_value_tags(std::move(reduce_value_tags))
+  ReduceGroupConfig(const GroupTag& reduce_group_tag, int reduce_value_tag_index, const std::vector<ValueTag>& reduce_value_tags)
+  : reduce_group_tag(reduce_group_tag),
+    index(reduce_value_tag_index),
+    reduce_value_tags(reduce_value_tags)
   {}
 
+  auto getGroupTag() const { return reduce_group_tag; }
+  auto getValueTag() const { return reduce_value_tags[index]; }
+  auto getValueTags() const { return reduce_value_tags; }
+private:
+  const int index;
   const skynet::ReduceGroupTag<TagType> reduce_group_tag;
-  const skynet::ReduceValueTag<TagType> reduce_value_tag;
   const std::vector<skynet::ReduceValueTag<TagType>> reduce_value_tags;
 };
 
@@ -264,15 +268,20 @@ public:
     const auto reduce_value_tags_names = it2->second;
 
     skynet::ReduceGroupTag<TagType> reduce_group_tag{sec_name};
-    skynet::ReduceValueTag<TagType> reduce_value_tag{reduce_value_tag_name};
     std::vector<skynet::ReduceValueTag<TagType>> reduce_value_tags;
     std::istringstream list(reduce_value_tags_names);
+
+    int index = 0, i = 0;
     std::string valStr;
     while (list >> valStr) {
+      if (valStr == reduce_value_tag_name) {
+        index = i;
+      }
       reduce_value_tags.emplace_back(valStr);
+      i++;
     }
 
-    return {reduce_group_tag, reduce_value_tag, reduce_value_tags};
+    return {reduce_group_tag, index, reduce_value_tags};
   }
 
   void generate(std::ostream& os) const {
