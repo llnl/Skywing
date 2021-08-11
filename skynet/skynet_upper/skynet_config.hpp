@@ -261,7 +261,7 @@ public:
     if (it == sec.end()) 
       throw std::out_of_range("Key not found in section: '" + sec_name + ": " + key + "'.");
 
-    std::vector<std::tuple<std::string, std::uint8_t>> addresses;
+    std::vector<std::tuple<std::string, std::uint16_t>> addresses;
     std::istringstream list(it->second);
     
     std::string val_str;
