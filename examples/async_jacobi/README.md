@@ -19,6 +19,9 @@ The user is required to pass in a row partition matrix A and vector b, as well a
 This also means that this method is agnostic to the partitioning of the data, meaning that non-uniform partitioning is not a problem and even expected.
 This implementation is also agnostic to overlapping computations, so if a user partitions the same row to two Skynet agents, each Skynet agent ignores the specific component that is overlapping by keeping it's own update, and every other Skynet agent simply chooses the update it has stored most recently for computing it's next update.
 Practically speaking, overlapping computations may allow for faster convergence if one expects communications to be delayed among Skynet agents.
+This method needs a minimum of 2 Skynet agents to work properly, and this example needs separate files for the A partition, b partition, and row indices to run properly, as well as solution vector x, since this is an example with terminal outputs, for EACH Skynet agent.
+The naming convention used in the example for data input for each Skynet agent can be obtained by observing async_jacobi.cpp, and the accompanying python preprocessing script named jacbo_pre_processing.py.
+This implementation assumes that all files are in matrix market format, which is what jacbo_pre_processing.py outputs in a partition directory.
 
 ## Brief 
 #### Inputs: 
@@ -28,3 +31,6 @@ Practically speaking, overlapping computations may allow for faster convergence 
 
 #### Output: 
 - Solution vector x at each Skynet Agent
+
+#### Run Example
+- To run the example, merely use ./run.sh [starting port number] in the build directory.
