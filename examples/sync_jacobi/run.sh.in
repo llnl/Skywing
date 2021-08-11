@@ -18,8 +18,8 @@ kill_progs() {
 
 # For this example, the number of rows in the matrix corresponds to the size of the network.
 size_of_network=4
-# matrix_name="toy.mtx"
-matrix_name="randomInteger_10_diagDom_100.mtx"
+matrix_name="toy.mtx"
+# matrix_name="randomInteger_10_diagDom_100.mtx"
 
 number_of_trials=1
 

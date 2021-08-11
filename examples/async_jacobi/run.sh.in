@@ -32,7 +32,6 @@ number_of_trials=1
 starting_number_of_overlapping_rows=0;
 ending_number_of_overlapping_rows=1;
 
-
 # Directory where skyent agents load their information
 system_directory="../../../examples/async_jacobi/system"
 partition_directory="partition"
