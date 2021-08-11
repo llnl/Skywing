@@ -255,6 +255,22 @@ public:
     return std::make_tuple(ip, port);
   }
 
+  decltype(auto) get_addresses(std::string sec_name, std::string key) {
+    auto sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) 
+      throw std::out_of_range("Key not found in section: '" + sec_name + ": " + key + "'.");
+
+    std::vector<std::tuple<std::string, std::uint8_t>> addresses;
+    std::istringstream list(it->second);
+    
+    std::string val_str;
+    while (list >> val_str) {
+      addresses.emplace_back(std::move(extract_ip_and_port(val_str)));
+    }
+    return addresses;
+  }
+
   template<typename TagType>
   ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) {
     auto sec = sections[sec_name];
