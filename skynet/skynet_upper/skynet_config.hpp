@@ -182,9 +182,9 @@ struct ReduceGroupConfig {
     reduce_value_tags(reduce_value_tags)
   {}
 
-  auto getGroupTag() const { return reduce_group_tag; }
-  auto getValueTag() const { return reduce_value_tags[index]; }
-  auto getValueTags() const { return reduce_value_tags; }
+  auto get_group_tag() const { return reduce_group_tag; }
+  auto get_value_tag() const { return reduce_value_tags[index]; }
+  auto get_value_tags() const { return reduce_value_tags; }
 private:
   const int index;
   const skynet::ReduceGroupTag<TagType> reduce_group_tag;
@@ -245,7 +245,7 @@ public:
     return ret_vec;
   };
 
-  decltype(auto) get_ip_and_port(std::string sec_name, std::string key) {
+  decltype(auto) get_address(std::string sec_name, std::string key) {
     auto sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) 
@@ -272,12 +272,12 @@ public:
     std::istringstream list(reduce_value_tags_names);
 
     int index = 0, i = 0;
-    std::string valStr;
-    while (list >> valStr) {
-      if (valStr == reduce_value_tag_name) {
+    std::string val_str;
+    while (list >> val_str) {
+      if (val_str == reduce_value_tag_name) {
         index = i;
       }
-      reduce_value_tags.emplace_back(valStr);
+      reduce_value_tags.emplace_back(val_str);
       i++;
     }
 
