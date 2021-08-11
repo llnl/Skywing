@@ -11,7 +11,7 @@ namespace skynet::helper
   constexpr std::chrono::milliseconds LOOP_DELAY =
     std::chrono::milliseconds(10);
 
-  inline void connect_to_neighbor(skynet::MasterHandle master_handle,
+  inline void connect_to_neighbors(skynet::MasterHandle master_handle,
     const std::vector<std::tuple<std::string, uint16_t>>& neighbor_addresses, 
     std::chrono::seconds timeout)
   {
