@@ -18,7 +18,6 @@ std::vector<std::vector<T>> input_matrix_from_matrix_market(std::string director
   std::vector<std::vector<T>> return_mat;
   std::string file_path =  directory + "/" + matrix_name;
   std::ifstream fin(file_path, std::ifstream::in);
-  // std::cout << "file_path: " << file_path << std::endl;
   assert(fin.is_open() == 1);
   int input_rows = 0;
   int input_cols = 0;
@@ -55,7 +54,6 @@ std::vector<T> input_vector_from_matrix_market(std::string directory, std::strin
 {
   std::vector<T> return_vec;
   std::string file_path =  directory + "/" + vector_name;
-  // std::cout << "file_path: " << file_path << std::endl;
   std::ifstream fin(file_path, std::ifstream::in);
   assert(fin.is_open() == 1);
   int input_rows = 0;

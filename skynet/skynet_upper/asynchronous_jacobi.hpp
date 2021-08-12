@@ -80,8 +80,6 @@ public:
     iter_method.submit_values(publish_values);
   };
 
-  ~AsynchronousJacobi(){};
-
   void run()
   {
     auto start_jacobi = std::chrono::high_resolution_clock::now();

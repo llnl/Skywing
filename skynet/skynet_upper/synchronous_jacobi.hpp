@@ -69,8 +69,6 @@ public:
     obtain_publish_values();
   };
 
-  ~SynchronousJacobi(){};
-
   void run()
   {
     auto start_jacobi = std::chrono::high_resolution_clock::now();

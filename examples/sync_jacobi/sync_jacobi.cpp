@@ -11,8 +11,8 @@
 #include <thread>
 #include <cstdint>
 #include <fstream>
-// #include <iomanip>
 
+// all jacobi_include files for matrix input and data aggregation.
 #include "jacobi_data_output.hpp"
 
 using namespace skynet;
@@ -229,15 +229,6 @@ int main(int argc, char* argv[])
   // These are not used in the jacobi class, only for data output and terminal diagnostics in the example.
   std::string x_sol_name =  "x_sol_" + matrix_name ;
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/sync_jacobi/system", x_sol_name);
-
-  // if(machine_number == 0)
-  // {
-  //   print_mat(A_partition);
-  //   print_vec(b_partition);
-  //   print_vec(x_sol_partition);
-  //   // print_vec(x_full_solution);
-  //   print_vec(row_indices);
-  // }
 
   // Skynet call
   machine_task(machine_number, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tags, save_directory);

@@ -129,8 +129,6 @@ public:
     }
   };
 
-  ~PushSum(){};
-
   void obtain_publish_values()
   {
     publish_values[0] = sigma_x;

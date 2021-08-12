@@ -17,6 +17,7 @@
 
 using namespace skynet;
 using ValueTag = skynet::PublishTag<std::vector<double>>;
+
 // First three functions are for the Skynet setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_network)
 {
@@ -227,16 +228,6 @@ int main(int argc, char* argv[])
 
   std::string x_sol_name =  "x_sol_" + matrix_name ;
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/async_jacobi/system", x_sol_name);
-
-  // This is the generic print information.
-  // if(machine_number == 1 )
-  // {
-  //   print_mat(A_partition);
-  //   print_vec(b_partition);
-  //   print_vec(x_partition_solution);
-    // print_vec(x_full_solution);
-  //   print_vec(row_indices);
-  // }
 
   // Skynet call
   machine_task(machine_number, number_of_overlapping_components, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tags, save_directory);
