@@ -266,7 +266,7 @@ public:
     
     std::string val_str;
     while (list >> val_str) {
-      addresses.emplace_back(std::move(extract_ip_and_port(val_str)));
+      addresses.emplace_back(extract_ip_and_port(val_str));
     }
     return addresses;
   }
