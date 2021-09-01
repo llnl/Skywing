@@ -211,8 +211,8 @@ public:
   };
 
   template<typename DataType>
-  DataType get_value(std::string sec_name, std::string key) {
-    auto sec = sections[sec_name];
+  DataType get_value(std::string sec_name, std::string key) const {
+    const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
     DataType ret;
@@ -225,8 +225,8 @@ public:
   };
 
   template<typename DataType>
-  std::vector<DataType> get_vector(std::string sec_name, std::string key) {
-    auto sec = sections[sec_name];
+  std::vector<DataType> get_vector(std::string sec_name, std::string key) const {
+    const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
     std::vector<DataType> ret_vec;
@@ -245,8 +245,8 @@ public:
     return ret_vec;
   };
 
-  decltype(auto) get_address(std::string sec_name, std::string key) {
-    auto sec = sections.at(sec_name);
+  decltype(auto) get_address(std::string sec_name, std::string key) const {
+    const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) 
       throw std::out_of_range("Key not found in section: '" + sec_name + ": " + key + "'.");
@@ -255,8 +255,8 @@ public:
     return std::make_tuple(ip, port);
   }
 
-  decltype(auto) get_addresses(std::string sec_name, std::string key) {
-    auto sec = sections.at(sec_name);
+  decltype(auto) get_addresses(std::string sec_name, std::string key) const {
+    const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) 
       throw std::out_of_range("Key not found in section: '" + sec_name + ": " + key + "'.");
@@ -272,8 +272,8 @@ public:
   }
 
   template<typename TagType>
-  ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) {
-    auto sec = sections[sec_name];
+  ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) const {
+    const auto& sec = sections.at(sec_name);
 
     const auto it1 = sec.find("reduce_value_tag");
     if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name + ".");
