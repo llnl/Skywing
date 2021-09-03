@@ -38,7 +38,23 @@ SOFTWARE.
 #include <fstream>
 #include <string>
 #include <vector>
+#include <type_traits>
 
+
+namespace skynet::internal {
+  template <typename T>
+  struct is_tag 
+    : std::integral_constant<
+      bool,
+      std::is_base_of_v<PublishTagBase, T> || 
+      std::is_base_of_v<ReduceValueTagBase, T> || 
+      std::is_base_of_v<ReduceGroupTagBase, T> ||
+      std::is_base_of_v<PrivateTagBase, T>
+    > {};
+
+  template<class T>
+  inline constexpr bool is_tag_v = is_tag<T>::value;
+}
 
 namespace skynet::config {
 
@@ -71,6 +87,8 @@ namespace detail {
     }
     return changed;
   }
+
+  
   
 } // namespace detail
 
@@ -211,7 +229,7 @@ public:
   };
 
   template<typename DataType>
-  DataType get_value(std::string sec_name, std::string key) const {
+  DataType get_value(std::string sec_name, std::string key, typename std::enable_if_t<!skynet::internal::is_tag_v<DataType>>* = 0) const {
     const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
@@ -224,8 +242,16 @@ public:
     } 
   };
 
+  template<typename TagType>
+  TagType get_value(std::string sec_name, std::string key, typename std::enable_if_t<skynet::internal::is_tag_v<TagType>>* = 0) const {
+    const auto& sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
+    return TagType(it->second);
+  };
+
   template<typename DataType>
-  std::vector<DataType> get_vector(std::string sec_name, std::string key) const {
+  std::vector<DataType> get_vector(std::string sec_name, std::string key, typename std::enable_if_t<!skynet::internal::is_tag_v<DataType>>* = 0) const {
     const auto& sec = sections.at(sec_name);
     const auto it = sec.find(key);
     if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
@@ -244,6 +270,20 @@ public:
     }
     return ret_vec;
   };
+
+  template<typename TagType>
+  std::vector<TagType> get_vector(std::string sec_name, std::string key, typename std::enable_if_t<skynet::internal::is_tag_v<TagType>>* = 0) {
+    const auto& sec = sections.at(sec_name);
+    const auto it = sec.find(key);
+    if (it == sec.end()) throw std::out_of_range("Key not found: " + key);
+    std::vector<TagType> ret_vec;
+    std::istringstream list(it->second);
+    std::string val_str;
+    while (list >> val_str) {
+      ret_vec.emplace_back(TagType(val_str));
+    }
+    return ret_vec;
+  }
 
   decltype(auto) get_address(std::string sec_name, std::string key) const {
     const auto& sec = sections.at(sec_name);
