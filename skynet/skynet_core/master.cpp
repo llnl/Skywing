@@ -1404,7 +1404,7 @@ void Master::process_pending_conns() noexcept
               [&](const internal::Greeting& greeting) {
                 // add connection to active list / remove from pending list
                 auto [neighbor_iter, inserted] = neighbors_.try_emplace(
-                  greeting.from(), std::move(info.conn), greeting.from(), greeting.neighbors(), *this, greeting.port());
+                  greeting.from(), std::move(info.conn), greeting.from(), greeting.neighbors(), *this, iter->first.second); // greeting.port());
                 new_neighbor_iter = neighbor_iter;
                 if (!inserted) {
                   SKYNET_TRACE_LOG(
