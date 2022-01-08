@@ -35,6 +35,8 @@ private:
   std::vector<int> row_indices;
   std::vector<ValueTag> tags_vector;
   int number_of_updated_components;
+  unsigned iteration_count = 0;
+
   // Variables internal to this class.
   std::vector<double> x_iter;
   std::vector<double> publish_values;
@@ -42,9 +44,7 @@ private:
   int debug_machine_number;
   int delayed_iteration_count;
   int delayed_process ;
-  int new_information_count = 0;
   std::chrono::duration<double> max_run_time;
-  int max_new_information;
   bool iterate = true;
   std::chrono::duration<double> run_time = std::chrono::milliseconds(1);
   // Skynet asynchronous iterative variables. 
@@ -72,8 +72,7 @@ public:
     {
       publish_values.push_back(0.0);
     }
-    max_new_information = 1000 * size_of_linear_system;
-    max_run_time = std::chrono::milliseconds(100000)* size_of_linear_system;
+    max_run_time = std::chrono::seconds(5); //std::chrono::milliseconds(100)* size_of_linear_system;
     // This serves as the initial computation and broadcast.
     jacobi_computation();
     obtain_publish_values();
@@ -86,13 +85,23 @@ public:
     auto stop_jacobi = std::chrono::high_resolution_clock::now();
     while(iterate)
     {
+      ++iteration_count;
       create_iteration();
       // This allows for quick diagnostics by seeing what's in the buffers rho_x, rho_y,  at terminal.
       // print_current_information();
       stop_jacobi = std::chrono::high_resolution_clock::now();
       run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
-      iterate = should_stop(run_time, max_run_time, new_information_count, max_new_information);
-      // iterate = should_stop(return_new_information_count(), max_new_information);
+      iterate = should_stop(run_time, max_run_time);
+
+      const auto print_val = [&](size_t row_ind) {
+        std::cout << "(" << row_indices[row_ind] << ", " << x_iter[row_indices[row_ind]] << ")";
+        if (row_ind < row_indices.size() - 1)
+          std::cout << ", ";
+      };
+      std::cout << "Machine " << machine_number << ": [";
+      for (size_t i = 0; i < row_indices.size(); i++) print_val(i);
+      std::cout << "]" << std::endl;
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
   };
 
@@ -122,7 +131,6 @@ public:
           }
           if(use_this_value)
           {
-            new_information_count++;
             int updated_index = (int) received_values[received_values_index * 2];
             x_iter[updated_index] = received_values[received_values_index * 2 + 1];
             jacobi_computation();
@@ -210,9 +218,9 @@ public:
     return iterate;
   }
 
-  int return_information_received()
+  unsigned get_iteration_count()
   {
-    return new_information_count;
+    return iteration_count;
   }
 
   // Diagnostic output to track received information from asynchronous iter_method
@@ -249,10 +257,11 @@ public:
 template<typename... Args>
 auto create_asynchronous_jacobi(int machine_number, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<int> row_indices, std::vector<ValueTag> tags, Args&&... args) noexcept
 {
-  return create_asynchronous_iterative(std::forward<Args>(args)...).then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<AsynchronousJacobi> {
+  return create_asynchronous_iterative(std::forward<Args>(args)...)
+    .then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<AsynchronousJacobi> {
      if (it) { return AsynchronousJacobi(machine_number, A_partition, b_partition, row_indices, tags, *it);}
      else    { return {}; }
-  });
+      });
 
 }
 

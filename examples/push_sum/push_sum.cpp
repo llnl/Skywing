@@ -99,6 +99,8 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
   double new_information_count = push_sum.return_new_information_count();
 
   std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;
+  
+  std::this_thread::sleep_for(std::chrono::seconds(10));
   });
   master.run();
 }

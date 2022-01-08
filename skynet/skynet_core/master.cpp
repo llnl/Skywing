@@ -23,29 +23,34 @@ ExternalMaster::ExternalMaster(
   const std::vector<MachineID>& neighbors,
   Master& master,
   const std::uint16_t port) noexcept
-  : conn_{std::move(conn)}
-  , id_{id}
+  : id_{id}
   , last_heard_{std::chrono::steady_clock::now()}
   , neighbors_{neighbors}
   , master_{&master}
   , port_{port}
-{}
+{
+  conns_.push_back(std::move(conn));
+}
 
 void ExternalMaster::get_and_handle_messages() noexcept
 {
   if (dead_) { return; }
-  while (auto handler = try_to_get_message()) {
-    // Update the last time something was heard
-    last_heard_ = std::chrono::steady_clock::now();
-    // Handle the message
-    handle_message(*handler);
+  for (auto& socket_comm : conns_)
+  {
+    while (auto handler = try_to_get_message(socket_comm)) {
+      // Update the last time something was heard
+      last_heard_ = std::chrono::steady_clock::now();
+      // Handle the message
+      handle_message(*handler);
+    }
   }
 }
 
 void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
 {
   if (dead_) { return; }
-  if (conn_.send_message(c.data(), c.size()) != ConnectionError::no_error) { dead_ = true; }
+  // TODO: Maybe don't just use the first socket communicator if there are multiple
+  if (conns_[0].send_message(c.data(), c.size()) != ConnectionError::no_error) { dead_ = true; }
 }
 
 MachineID ExternalMaster::id() const noexcept { return id_; }
@@ -116,55 +121,70 @@ void ExternalMaster::find_publishers_for_tags(
 
 std::string ExternalMaster::address() const noexcept
 {
-  const auto [ip_address, dummy] = conn_.ip_address_and_port();
+  const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
   (void)dummy;
   return ip_address + ':' + std::to_string(port_);
 }
 
 AddrPortPair ExternalMaster::address_pair() const noexcept
 {
-  const auto [ip_address, dummy] = conn_.ip_address_and_port();
+  const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
   (void)dummy;
   return {ip_address, port_};
 }
 
-// Read some bytes from the connection, returning false if the read failed
-bool ExternalMaster::read_from_conn(std::byte* const buffer, const std::size_t count) noexcept
-{
-  const auto err = conn_.read_message(buffer, count);
-  switch (err) {
-  case ConnectionError::no_error:
-    break;
-  case ConnectionError::would_block:
-    return false;
+// // Read some bytes from the connection, returning false if the read failed
+// bool ExternalMaster::read_from_conn(std::byte* const buffer, const std::size_t count) noexcept
+// {
+//   const auto err = conns_[0].read_message(buffer, count);
+//   switch (err) {
+//   case ConnectionError::no_error:
+//     break;
+//   case ConnectionError::would_block:
+//     return false;
 
-  case ConnectionError::closed:
-    // [[fallthrough]];
-  case ConnectionError::unrecoverable:
-    dead_ = true;
-    return false;
-  }
-  return true;
-}
+//   case ConnectionError::closed:
+//     // [[fallthrough]];
+//   case ConnectionError::unrecoverable:
+//     SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error upon message read", master_->id(), id_);
+//     dead_ = true;
+//     return false;
+//   }
+//   return true;
+// }
 
-std::optional<MessageHandler> ExternalMaster::try_to_get_message() noexcept
+std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunicator& socket_comm) noexcept
 {
-  const auto bytes_to_read_or_error = read_network_size(conn_);
+  const auto bytes_to_read_or_error = read_network_size(socket_comm);
   if (std::holds_alternative<NetworkSizeType>(bytes_to_read_or_error)) {
     const auto bytes_to_read = *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
     // Then read the actual message and parse it
-    if (const auto message_buffer = read_chunked(conn_, bytes_to_read); !message_buffer.empty()) {
+    if (const auto message_buffer = read_chunked(socket_comm, bytes_to_read); !message_buffer.empty()) {
       return MessageHandler::try_to_create(message_buffer);
     }
     else {
       // Couldn't read the size bytes - bad message
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to bad message", master_->id(), id_);
       dead_ = true;
       return {};
     }
   }
   else {
     const auto err = *std::get_if<ConnectionError>(&bytes_to_read_or_error);
-    if (err != ConnectionError::would_block) { dead_ = true; }
+    if (err == ConnectionError::closed)
+    {
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has closed", master_->id(), id_);
+      dead_ = true;
+    }
+    else if (err != ConnectionError::would_block)
+    {
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some weird error", master_->id(), id_);
+      dead_ = true;
+    }
+    // we get here if attempting to read_network_size returned
+    // ConnectionError::would_block, which indicates there's the
+    // connection is fine and there's just nothing currently on the
+    // wire
     return {};
   }
 }
@@ -323,7 +343,11 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
       return false;
     });
   // Something incorrect happened
-  if (!okay) { dead_ = true; }
+  if (!okay)
+  {
+    SKYNET_TRACE_LOG("\"{}\" setting {} to dead because something incorrect happened upon message handle", master_->id(), id_);
+    dead_ = true;
+  }
 }
 
 std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() const noexcept
@@ -397,6 +421,9 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
       const auto status = iter->second.conn.connect_non_blocking(canonical.first.c_str(), canonical.second);
       // Ignore status - if this initially fails it will be handled later
       (void)status;
+      SKYNET_TRACE_LOG("\"{}\" making connection from {} to {}",
+                       id_, iter->second.conn.host_ip_address_and_port(),
+                       iter->second.conn.ip_address_and_port());
     }
   }
   return make_waiter(
@@ -420,6 +447,7 @@ void Master::accept_pending_connections() noexcept
     // sure how to condense them as they are slightly different
     const auto& [address, port] = conn->ip_address_and_port();
     auto info = PendingInfo{std::move(*conn), ConnStatus::waiting_for_conn, ConnType::user_requested, ""};
+    SKYNET_DEBUG_LOG("\"{}\" accepted connection from {}:{}", id_, address, port);
     // Accept seems to re-use ports, and the actual address doesn't matter, so keep shuffling
     // until it manages to get in
     auto inc_port = port;
@@ -428,7 +456,8 @@ void Master::accept_pending_connections() noexcept
       (void)iter;
       ++inc_port;
       if (inserted) {
-        SKYNET_TRACE_LOG("\"{}\" accepted connection from {}", id_, iter->second.conn.ip_address_and_port());
+        SKYNET_DEBUG_LOG("\"{}\" inserted accepted connection from {} into pending_conns_",
+                         id_, iter->second.conn.ip_address_and_port());
         break;
       }
     }
@@ -592,6 +621,7 @@ void Master::remove_dead_neighbors() noexcept
           iter = erase_from.erase(iter);
         }
       };
+      // CVP: Also need to remove from publishers_for_tag_?
       erase_addr(addr_to_machine_, [](const auto&) {});
       // Need to re-look for the subscription tags, if any
       erase_addr(tag_to_machine_, [&](const auto& tag_pair) {
@@ -600,7 +630,7 @@ void Master::remove_dead_neighbors() noexcept
           Job::Accessor::report_dead_tag(job_pair.second, tag_pair.first);
         }
         pending_tags_.emplace_back(tag_pair.first);
-      });
+        });
       it = neighbors_.erase(it);
     }
     else {
@@ -633,21 +663,21 @@ bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) const no
     const auto iter = tag_to_machine_.find(tag);
     if (iter == tag_to_machine_.cend()) { return false; }
   }
-  SKYNET_TRACE_LOG("\"{}\" subscription for tags {} finished.", id_, required_tags);
+  SKYNET_DEBUG_LOG("\"{}\" subscription for tags {} finished.", id_, required_tags);
   return true;
 }
 
 auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
 {
-  SKYNET_TRACE_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
+  SKYNET_DEBUG_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
   std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
     if (tag_to_machine_.find(to_find) != tag_to_machine_.cend()) { return false; }
     if (std::find(pending_tags_.cbegin(), pending_tags_.cend(), to_find) != pending_tags_.cend()) { return false; }
     // Ignore private tags
     if (to_find[0] == internal::private_tag_marker) { return false; }
     return true;
-  });
+    });
   if (!pending_tags_.empty()) {
     for (auto& [name, neighbor] : neighbors_) {
       neighbor.reset_backoff_counter();
@@ -1177,11 +1207,18 @@ bool Master::handle_report_reduce_disconnection(
 
 void Master::init_connections_for_pending_tags() noexcept
 {
-  if (!pending_tags_.empty()) { SKYNET_TRACE_LOG("\"{}\" is initiating connections for tags {}", id_, pending_tags_); }
+  if (!pending_tags_.empty()) { SKYNET_TRACE_LOG("\"{}\" is initiating connections for tags {}", id_, pending_tags_);}
   // A single connection can supply multiple tags, so look through all the pending tags
   // first so that multiple connections to the same machine aren't started
   std::unordered_map<std::string, std::string> to_conn;
   std::vector<decltype(pending_tags_)::iterator> to_delete;
+  
+  SKYNET_TRACE_LOG("\"{}\" in init_connections_for_pending_tags for pendings_tags list of size {}", id_, pending_tags_.size());
+  // for (const auto& [tag, publishers] : publishers_for_tag_)
+  // {
+  //   SKYNET_TRACE_LOG("\"{}\" knows {} publishers for tag {}", id_, publishers.size(), tag);
+  // }
+  
   for (auto tag_iter = pending_tags_.begin(); tag_iter != pending_tags_.end();) {
     const auto& tag = *tag_iter;
     const auto iter = publishers_for_tag_.find(tag);
@@ -1199,13 +1236,14 @@ void Master::init_connections_for_pending_tags() noexcept
       ++tag_iter;
       continue;
     }
-    auto& publishers = iter->second;
+    
+    auto& publishers = iter->second; // a unordered_set<PublisherInfo>
     if (publishers.empty()) {
       SKYNET_TRACE_LOG("\"{}\" knows no publishers for tag \"{}\"", id_, tag);
       ++tag_iter;
     }
     else {
-      const auto& [addr, connect_to_id] = *publishers.begin();
+      const auto& [addr, connect_to_id] = *publishers.begin(); // a PublisherInfo object
       // Check if the machine is already a neighbor, and handle it if so
       const auto neighbor_iter = addr_to_machine_.find(internal::split_address(addr));
       if (neighbor_iter != addr_to_machine_.cend()) {
@@ -1234,37 +1272,46 @@ void Master::init_connections_for_pending_tags() noexcept
         }
       }
       else {
+        SKYNET_TRACE_LOG("\"{}\" will try to connect to {} \"{}\"", id_, addr, tag);
         auto [conn_iter, inserted] = to_conn.try_emplace(addr, tag);
         // Append tag to "list" if already there
         if (!inserted) {
+          SKYNET_TRACE_LOG("\"{}\" didn't insert {} because already in to_conn", id_, addr);
           auto& tag_list = conn_iter->second;
           if (!tag_list.empty()) { tag_list.push_back('\0'); }
           tag_list += tag;
         }
         to_delete.push_back(tag_iter);
+        ++tag_iter;
       }
-      publishers.erase(publishers.begin());
+      // CVP: I'm pretty sure erasing this is incorrect because this knowledge must be kept during make_known_tag_publisher_message()
+      //publishers.erase(publishers.begin());
     }
   }
   for (const auto& [addr, tag] : to_conn) {
     internal::SocketCommunicator conn{};
+    SKYNET_DEBUG_LOG("\"{}\" about to connect to \"{}\" for tag \"{}\"", id_, addr, tag);
     const auto err = conn.connect_non_blocking(addr);
     if (err == internal::ConnectionError::connection_in_progress || err == internal::ConnectionError::no_error) {
       // Port can be recycled, so have to iterate until it gets inserted
       // Ignore the address as the IP isn't initialized until the connection is complete
-      auto [ignore, port] = conn.ip_address_and_port();
-      (void)ignore;
-      SKYNET_TRACE_LOG("\"{}\" connecting to \"{}\" for tag \"{}\"", id_, addr, tag);
+      auto [addrstr, port] = internal::split_address(addr);
       while (true) {
+        SKYNET_DEBUG_LOG("\"{}\" trying connecting to \"{}\" with key {} for tag \"{}\"",
+                         id_, addr, AddrPortPair{addr.substr(0, addr.find(':')), port}, tag);
         const auto [iter, inserted] = pending_conns_.try_emplace(
-          AddrPortPair{addr.substr(0, addr.find(':')), port},
+          AddrPortPair{addrstr, port},
           PendingInfo{
             std::move(conn),
             ConnStatus::waiting_for_conn,
             tag[0] == internal::publish_tag_marker ? ConnType::subscription : ConnType::reduce_group,
             tag});
         (void)iter;
-        if (inserted) { break; }
+        if (inserted)
+        {
+          SKYNET_DEBUG_LOG("\"{}\" connecting to \"{}\" for tag \"{}\"", id_, iter->first, tag);
+          break;
+        }
         ++port;
       }
     }
@@ -1365,7 +1412,8 @@ void Master::process_pending_conns() noexcept
 
       case internal::ConnectionError::no_error: {
         SKYNET_TRACE_LOG(
-          "\"{}\" sending greeting to {} for tag \"{}\"", id_, info.conn.ip_address_and_port(), info.tag);
+          "\"{}\" sending greeting from {} to {} for tag \"{}\"",
+          id_, info.conn.host_ip_address_and_port(), info.conn.ip_address_and_port(), info.tag);
         // Send message and mark as waiting
         const auto message = make_handshake();
         if (info.conn.send_message(message.data(), message.size()) != internal::ConnectionError::no_error) {
@@ -1378,8 +1426,13 @@ void Master::process_pending_conns() noexcept
 
       // Anything else is an error
       default:
-        SKYNET_WARN_LOG(
-          "\"{}\" errored trying to connect to {}, type {}", id_, iter->first, to_c_str(iter->second.type));
+        if (iter->second.type == Master::ConnType::subscription)
+          SKYNET_WARN_LOG(
+                          "\"{}\" errored trying to connect to {}, type {}, tag {}", id_, iter->first, to_c_str(info.type), info.tag);
+        else
+          SKYNET_WARN_LOG(
+                          "\"{}\" errored trying to connect to {}, type {}", id_, iter->first, to_c_str(info.type));
+          
         handle_error(info);
         notify_connection_ = true;
         iter = pending_conns_.erase(iter);
@@ -1407,11 +1460,17 @@ void Master::process_pending_conns() noexcept
                   greeting.from(), std::move(info.conn), greeting.from(), greeting.neighbors(), *this, greeting.port());
                 new_neighbor_iter = neighbor_iter;
                 if (!inserted) {
+                  // SKYNET_TRACE_LOG(
+                  //   "\"{}\" rejected greeting from \"{}\" due to the name already being present",
+                  //   id_,
+                  //   neighbor_iter->first);
+                  // return false;
                   SKYNET_TRACE_LOG(
-                    "\"{}\" rejected greeting from \"{}\" due to the name already being present",
+                    "\"{}\" already has a connection from \"{}\" so will simply add to communicators.",
                     id_,
                     neighbor_iter->first);
-                  return false;
+                  new_neighbor_iter->second.add_communicator(std::move(info.conn));
+                  return true;
                 }
                 addr_to_machine_.try_emplace(new_neighbor_iter->second.address_pair(), &neighbor_iter->second);
                 SKYNET_TRACE_LOG("\"{}\" received greeting from \"{}\"", id_, neighbor_iter->first);

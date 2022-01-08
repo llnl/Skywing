@@ -66,10 +66,12 @@ void machine_task(int machine_number, int number_of_overlapping_components, int 
     // Connecting to the server is an asynchronous operation and can fail.
     while (!master_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
     {
-      // Empty
+      std::cout << "Machine " << machine_number << " trying to connect to " << ports[machine_number+1] << std::endl;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
+  std::cout << "Machine " << machine_number << " creating iteration object." << std::endl;
   auto opt_iter_method = create_asynchronous_jacobi(
     machine_number,
     A_partition,
@@ -82,11 +84,13 @@ void machine_task(int machine_number, int number_of_overlapping_components, int 
     tags
   ).get();
 
+  std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;
   auto async_jacobi = *opt_iter_method;
   async_jacobi.run();
+  std::cout << "Machine " << machine_number << " finished jacobi iteration." << std::endl;
 
   double run_time = async_jacobi.return_runtime();
-  int information_received = async_jacobi.return_information_received();
+  int information_received = async_jacobi.get_iteration_count();
   auto x_local_estimate = async_jacobi.return_full_solution();
   auto x_partition_estimate = async_jacobi.return_partition_solution();
   // Since this is a distributed algorithm, we only have access to information that allows us to have a "partial" residual, since not every agent has every row of the matrix. 
@@ -118,11 +122,11 @@ void machine_task(int machine_number, int number_of_overlapping_components, int 
   std::cout << std::endl;
   std::cout << "\t Runtime: \t" << run_time; 
   std::cout << std::endl;      
-  std::cout << std::endl;
-  std::cout << "\t Iterate: \t" << async_jacobi.return_iterate() ; 
+  std::cout << "\t Iteration Complete: \t" << !async_jacobi.return_iterate() ; 
   std::cout << std::endl;
   std::cout << "--------------------------------------------" << std::endl;
 
+  std::this_thread::sleep_for(std::chrono::seconds(10));
   });
   master.run();
 }

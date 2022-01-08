@@ -19,11 +19,11 @@ kill_progs() {
 }
 
 # For this example, the number of rows in the matrix corresponds to the size of the network.
-size_of_network=4
-matrix_name="toy.mtx"
+# size_of_network=4
+# matrix_name="toy.mtx"
 
-# size_of_network=10
-# matrix_name="randomInteger_10_diagDom_100"
+size_of_network=10
+matrix_name="randomInteger_10_diagDom_100.mtx"
 
 number_of_trials=1
 
@@ -55,15 +55,11 @@ do
       echo --------------------------------------------
       for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
       do
-        if [[ ${counter_for_network_elements} < $((size_of_network-1)) ]]
-        then
-          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${partition_directory} ${counter_for_trials} ${save_directory} &
-        else
-          "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${partition_directory} ${counter_for_trials} ${save_directory}
-        fi
+        "@async_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${row_counter} ${partition_directory} ${counter_for_trials} ${save_directory} &
         declare "erase${counter_for_network_elements}=$!"
       done
-      sleep 1
+      sleep 10
+      kill_progs
       echo Complete: Redundancy ${row_counter} Trial ${counter_for_trials}
       STARTING_PORT=$((STARTING_PORT+size_of_network+100))
     done
