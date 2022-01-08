@@ -149,16 +149,22 @@ public:
    */
   void increase_backoff_counter() noexcept;
 
-private:
-  // Read some bytes from the connection, returning false if the read failed
-  bool read_from_conn(std::byte* buffer, std::size_t count) noexcept;
+  const std::vector<MachineID>& neighbors()
+  { return neighbors_; }
 
-  // Read some bytes from the connection, returning an empty vector if
-  // the number of bytes couldn't be read
-  std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
+  void add_communicator(SocketCommunicator&& comm)
+  { conns_.push_back(std::move(comm)); }
+
+private:
+  // // Read some bytes from the connection, returning false if the read failed
+  // bool read_from_conn(std::byte* buffer, std::size_t count) noexcept;
+
+  // // Read some bytes from the connection, returning an empty vector if
+  // // the number of bytes couldn't be read
+  // std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
 
   // Attempts to get a message
-  std::optional<MessageHandler> try_to_get_message() noexcept;
+  std::optional<MessageHandler> try_to_get_message(SocketCommunicator& socket_comm) noexcept;
 
   // Handle status messages
   void handle_message(MessageHandler& handle) noexcept;
@@ -166,8 +172,15 @@ private:
   // Calculate the next time tags should be requested
   std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
 
-  // For talking with the external master
-  SocketCommunicator conn_;
+  // For talking with the external master.  
+  // See you'd think there would only be one SocketCommunicator for
+  // talking to another agent, so why the vector? It's because
+  // sometimes agents initiate connections with each other
+  // simulataneously, creating multiple socket connections between the
+  // same pair of agents. Deciding which one to drop would require an
+  // entire agreement protocol, which isn't worth it, so just hang on
+  // to both.
+  std::vector<SocketCommunicator> conns_;
 
   // The id of the external master
   MachineID id_;

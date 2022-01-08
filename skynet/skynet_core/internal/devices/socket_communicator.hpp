@@ -98,9 +98,13 @@ public:
    */
   ConnectionError read_message(std::byte* buffer, std::size_t size) noexcept;
 
-  /** \brief Returns the IP address and port of the socket
+  /** \brief Returns the IP address and port of the socket's peer
    */
   AddrPortPair ip_address_and_port() const noexcept;
+
+  /** \brief Returns the IP address and port of the host end of the socket
+   */
+  AddrPortPair host_ip_address_and_port() const noexcept;
 
 private:
   // Tag for using the raw handle constructor

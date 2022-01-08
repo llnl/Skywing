@@ -206,8 +206,8 @@ ConnectionError SocketCommunicator::read_message(std::byte* const buffer, const 
   const auto read_bytes = read(handle_, reinterpret_cast<char*>(buffer), size);
   if (read_bytes < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) { return ConnectionError::would_block; }
-    // std::perror("SocketCommunicator::read_message - read");
-    // std::exit(-1);
+    
+    SKYNET_DEBUG_LOG("read_message threw error: {}", strerror(errno));
     return ConnectionError::unrecoverable;
   }
   return read_bytes == 0 ? ConnectionError::closed : ConnectionError::no_error;
@@ -217,8 +217,19 @@ AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
 {
   sockaddr_in client_address;
   socklen_t len = sizeof(client_address);
-  getpeername(handle_, reinterpret_cast<sockaddr*>(&client_address), &len);
-  return {inet_ntoa(client_address.sin_addr), client_address.sin_port};
+  int err = getpeername(handle_, (struct sockaddr*)&client_address, &len);
+  if (err != 0)
+    SKYNET_DEBUG_LOG("ip_address_and_port threw error: {}", strerror(errno));
+
+  return {inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port)};
+}
+
+AddrPortPair SocketCommunicator::host_ip_address_and_port() const noexcept
+{
+  sockaddr_in host_address;
+  socklen_t len = sizeof(host_address);
+  getsockname(handle_, (struct sockaddr*)&host_address, &len);
+  return {inet_ntoa(host_address.sin_addr), ntohs(host_address.sin_port)};  
 }
 
 SocketCommunicator::SocketCommunicator(WithRawHandle, const int handle) noexcept : handle_{handle} {}
