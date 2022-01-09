@@ -59,17 +59,25 @@ namespace skynet::internal {
 namespace skynet::config {
 
 namespace detail {
-  
+
+  /* Trim the whitespace from the front of a string in place.
+   * @param s The string to trim.
+   * @param loc The std::locale which defines what whitespace is.
+   */
   inline void ltrim(std::string & s, const std::locale & loc) {
     s.erase(s.begin(),
-                  std::find_if(s.begin(), s.end(),
-                               [&loc](char ch) { return !std::isspace(ch, loc); }));
+            std::find_if(s.begin(), s.end(),
+                         [&loc](char ch) { return !std::isspace(ch, loc); }));
   }
-  
+
+  /* Trim the whitespace from the back of a string in place.
+   * @param s The string to trim.
+   * @param loc The std::locale which defines what whitespace is.
+   */
   inline void rtrim(std::string & s, const std::locale & loc) {
     s.erase(std::find_if(s.rbegin(), s.rend(),
-                               [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
-                  s.end());
+                         [&loc](char ch) { return !std::isspace(ch, loc); }).base(),
+            s.end());
   }
   
   template <class UnaryPredicate>
@@ -222,7 +230,8 @@ public:
 
   static const int max_interpolation_depth = 10;
 
-  Config(std::string filename) : format(std::make_shared<Format>()) {
+  Config(std::string filename) : format(std::make_shared<Format>())
+  {
     parse(filename);
     strip_trailing_comments();
     interpolate();

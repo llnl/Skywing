@@ -4,7 +4,6 @@
 #include <chrono>
 #include "skynet_core/skynet.hpp"
 
-
 namespace skynet::helper
 {
   constexpr std::chrono::milliseconds LOOP_DELAY =
