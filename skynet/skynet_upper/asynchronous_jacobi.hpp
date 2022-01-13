@@ -108,14 +108,15 @@ public:
   void create_iteration()
   {
     // This stores the values as a AsynchronousValues allocator which contains a bool if it is updated and a vector<double> and alive tags as vector<ValueTag>.
-    const auto& [values, alive_tags] = iter_method.values();
+    const auto& [received_values_vec, is_updated, alive_tags] = iter_method.values();
     // Cycles through received information associated with the tags this process subscribes to.
-    for(int values_index = 0; values_index < static_cast<int>(values.size()); ++values_index)
+    for(int values_index = 0; values_index < static_cast<int>(received_values_vec.size()); ++values_index)
     {
       //stores the received values as a vector<double> and updated as bool
-      const auto& [received_values, updated] = values[values_index];
-      if (updated)
+      //const auto& [received_values, updated] = values[values_index];
+      if (is_updated[values_index])
       {
+        const auto& received_values = received_values_vec[values_index];
         // This cycles through the received_values in order not to replace a component that each process is updating with another processes update if there's overlapping computations.
         // Since messages of the form [component index ; component], we have to parse these messages in pairs, which is easier to do without iterators.
         for(int received_values_index = 0; received_values_index < (static_cast<int>(received_values.size())/2); received_values_index++)
@@ -223,35 +224,7 @@ public:
     return iteration_count;
   }
 
-  // Diagnostic output to track received information from asynchronous iter_method
-  void print_all_received_information(skynet::AsynchronousValues<std::vector<double>> values)
-  {
-
-    std::cout << machine_number << " has information: \n\t";
-    for(int values_index = 0; values_index < static_cast<int>(values.size()); ++values_index)
-    {
-      const auto& [received_values, updated] = values[values_index];
-      if (updated)
-      {
-        std::cout << " values_index: " << values_index << "\n\t\t";
-        for(int received_values_index = 0; received_values_index < number_of_updated_components; received_values_index++)
-        {
-          std::cout << received_values[received_values_index] << " ";
-        }
-        if(values_index < static_cast<int>(values.size())-1)
-        {
-          std::cout << "\n\t";
-
-        }
-        else
-        {
-          std::cout << "\n";
-        }
-      }
-    }
-  }
-
-};
+}; // class AsynchronousJacobi
 
 // This is the continuation that makes this class possible as this implementation depends upon the asynchronous_iterative class.
 template<typename... Args>

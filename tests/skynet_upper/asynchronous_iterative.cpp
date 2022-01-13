@@ -48,13 +48,15 @@ void machine_task(const NetworkInfo* const info, const int index)
       iter_method.submit_values(values_to_publish[i]);
       int values_received = 0;
       while (values_received != static_cast<int>(expected_values.size())) {
-        const auto& [values, alive_tags] = iter_method.values();
+        const auto& [values, is_updated, alive_tags] = iter_method.values();
         if (alive_tags.size() != expected_values.size()) {
           std::cerr << "Unexpected connection drop!\n";
           std::exit(1);
         }
         for (int received_index = 0; received_index < static_cast<int>(values.size()); ++received_index) {
-          const auto& [received_value, updated] = values[received_index];
+          const auto& received_value = values[received_index];
+          const auto& updated = is_updated[received_index];
+          //          const auto& [received_value, updated] = values[received_index];
           if (updated) {
             std::lock_guard g{catch_mutex};
             ++values_received;
