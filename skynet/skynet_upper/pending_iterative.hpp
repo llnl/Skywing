@@ -163,7 +163,7 @@ private:
         to_ret->error_occurred_ = true;
         return true;
       }
-      return to_ret->job_->number_of_subscribers(to_ret->produced_tag_) >= static_cast<int>(to_ret->tags_.size());
+      return to_ret->job_->number_of_subscribers(to_ret->produced_tag_) >= to_ret->tags_.size();
     }
   }; // struct IsReady
 

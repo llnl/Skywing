@@ -24,6 +24,14 @@ class AsynchronousIterative : public internal::IterativeBase<TagValueTypes...> {
 public:
   using ValueType = ValueOrTuple<TagValueTypes...>;
 
+  AsynchronousIterative(Job& job,
+                        const PublishTag<TagValueTypes...>& produced_tag,
+                        const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
+    : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags},
+    values_(tags.size()),
+    is_updated_(tags.size())
+  {}
+
   /** \brief Returns values from all tags without submitting a value
    */
   auto values() noexcept -> std::tuple<const std::vector<ValueType>&,
@@ -84,15 +92,6 @@ public:
 private:
   template<typename, typename>
   friend class PendingIterativeMethod;
-
-  AsynchronousIterative(
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
-    : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags},
-    values_(tags.size()),
-    is_updated_(tags.size())
-  {}
 
   std::vector<ValueType> values_;
   std::vector<bool> is_updated_;

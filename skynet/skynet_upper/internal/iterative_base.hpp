@@ -1,12 +1,16 @@
 #ifndef SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP
 #define SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP
 
-#include "skynet_upper/pending_iterative.hpp"
+//#include "skynet_upper/pending_iterative.hpp"
+#include "skynet_core/job.hpp"
+#include "skynet_core/master.hpp"
 
 namespace skynet::internal {
 template<typename... TagValueTypes>
 class IterativeBase {
 public:
+  using TagType = PublishTag<TagValueTypes...>;
+  
   /** \brief Rebuilds connections for dead tags
    */
   auto rebuild_dead_tags() noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
@@ -105,78 +109,66 @@ protected:
   std::vector<PublishTag<TagValueTypes...>> dead_tags_;
 }; // class IterativeBase
 
-template<template<typename...> typename IterativeTemplate, typename WaiterType, typename... TagValueTypes, typename Range>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
+
+template<typename WaiterType, typename... TagValueTypes>
+struct IsIterativeReady
+{
+  // TODO: this is mutable only because waiter::is_ready is not marked const. should it be?
+  mutable WaiterType subscribe_waiter;
+  Job& job;
+  const PublishTag<TagValueTypes...> produced_tag;
+  size_t num_tags;
+
+  mutable bool is_subscribe_done_ = false;
+
+  bool operator()() const noexcept
+  {
+    if (!is_subscribe_done_)
+    {
+      if (!subscribe_waiter.is_ready())
+        return false;
+      is_subscribe_done_ = true;
+    }
+    bool is_ready = (is_subscribe_done_ &&
+                     (job.number_of_subscribers(produced_tag) >= num_tags));
+    return is_ready;
+  }
+}; // struct IsIterativeReady
+
+template<typename IterativeMethod>
+struct GetIterativeOpt
+{
+  using TagType = typename IterativeMethod::TagType;
+  Job& job;
+  const TagType produced_tag;
+  const std::vector<TagType> tags;
+  std::optional<IterativeMethod> operator()() const noexcept
+  {
+    return IterativeMethod{job, produced_tag, tags};
+  }
+}; // struct GetIterativeOpt
+
+template<template<typename...> typename IterativeTemplate,
+         typename WaiterType,
+         typename... TagValueTypes,
+         typename Range>
+auto create_iterative(
   WaiterType waiter,
   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
 {
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
-    waiter,
-    handle,
-    job,
-    produced_tag,
-    gsl::make_span(tags) // gsl::make_span(tags.cbegin(), tags.cend())
-  );
+  const auto iter = std::find(tags.cbegin(), tags.cend(), produced_tag);
+  if (iter == tags.cend()) {
+    std::cerr << "Produced tag for iterative method (ie IterativeBase) not found in the tag list!\n";
+    // TODO throw error rather than exit.
+    std::exit(2);
+  }
+
+  IsIterativeReady<WaiterType, TagValueTypes...> iir{std::move(waiter), job, produced_tag, tags.size()};
+  std::vector<PublishTag<TagValueTypes...>> tags_vec(tags.cbegin(), tags.cend());
+  GetIterativeOpt<IterativeTemplate<TagValueTypes...>> gio{job, produced_tag, tags_vec};
+  return handle.waiter_on_subscription_change(std::move(iir)).then(std::move(gio));
 }
 
-template<template<typename...> typename IterativeTemplate, typename WaiterType, typename... TagValueTypes, typename... TagTypes>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
-  WaiterType waiter,
-  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const TagTypes&... tags) noexcept
-{
-  const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
-    waiter, handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()));
-}
-
-template<
-  template<typename...>
-  typename IterativeTemplate,
-  typename WaiterType,
-  typename... TagValueTypes,
-  typename Range,
-  typename Rep,
-  typename Period>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
-  WaiterType waiter,
-  const std::chrono::time_point<Rep, Period>& end_time,
-  IterativeInitErrorPolicy policy,
-  MasterHandle handle,
-  Job& job,
-  const PublishTag<TagValueTypes...>& produced_tag,
-  const Range& tags) noexcept
-{
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
-    waiter,
-    handle,
-    job,
-    produced_tag,
-    gsl::make_span(tags), // gsl::make_span(tags.cbegin(), tags.cend()),
-    end_time,
-    policy);
-}
-
-template<
-  template<typename...>
-  typename IterativeTemplate,
-  typename WaiterType,
-  typename... TagValueTypes,
-  typename... TagTypes,
-  typename Rep,
-  typename Period>
-PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType> create_iterative(
-  WaiterType waiter,
-  const std::chrono::time_point<Rep, Period>& end_time,
-  IterativeInitErrorPolicy policy,
-  MasterHandle handle,
-  Job& job,
-  const PublishTag<TagValueTypes...>& produced_tag,
-  TagTypes&&... tags) noexcept
-{
-  const std::array<PublishTag<TagValueTypes...>, sizeof...(tags)> tags_array{tags...};
-  return PendingIterativeMethod<IterativeTemplate<TagValueTypes...>, WaiterType>::create(
-    waiter, handle, job, produced_tag, gsl::make_span(tags_array.cbegin(), tags_array.cend()), end_time, policy);
-}
 } // namespace skynet::internal
 
 #endif // SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP

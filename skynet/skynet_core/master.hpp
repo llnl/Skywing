@@ -441,8 +441,8 @@ private:
     -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
   auto connect_to_server(std::string_view address) noexcept
     -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
-  int number_of_neighbors() const noexcept;
-  int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  size_t number_of_neighbors() const noexcept;
+  size_t number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
   std::uint16_t port() const noexcept;
 
   template<typename IsReadyCallable>
@@ -450,6 +450,15 @@ private:
   {
     return make_waiter(dummy_mutex_, subscription_cv_, std::forward<IsReadyCallable>(c));
   }
+
+  template<typename IsReadyCallable, typename GetValueCallable>
+  Waiter<IsReadyCallable, GetValueCallable>
+  waiter_on_subscription_change(IsReadyCallable&& c, GetValueCallable&& v) noexcept
+  {
+    return make_waiter(dummy_mutex_, subscription_cv_,
+                       std::forward<IsReadyCallable>(c), std::forward<GetValueCallable>(v));
+  }
+
 
   ///////////////////////////////////////
   // End Interface for MasterHandle
@@ -822,6 +831,17 @@ public:
   Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
   {
     return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c));
+  }
+
+  /** \brief Creates a waiter that has a done condition that is run anytime
+   * anything with subscriptions happens and returns some value
+   */
+  template<typename IsReadyCallable, typename GetValueCallable>
+  Waiter<IsReadyCallable, GetValueCallable>
+  waiter_on_subscription_change(IsReadyCallable&& c, GetValueCallable&& v) noexcept
+  {
+    return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c),
+                                                  std::forward<GetValueCallable>(v));
   }
 
   /** \brief Returns the port the master is listening on

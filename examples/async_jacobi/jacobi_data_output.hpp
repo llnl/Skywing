@@ -1,5 +1,8 @@
-double calculate_partial_residual(std::vector<double> x_local_solution,  std::vector<double> b_partition,std::vector<std::vector<double>> A_partition){
-
+double calculate_partial_residual(
+    std::vector<double> x_local_solution,
+    std::vector<double> b_partition,
+    std::vector<std::vector<double>> A_partition)
+{
   double partial_residual = 0.0;
   for (int i = 0 ; i < static_cast<double>(A_partition.size()); i++)
   {
@@ -15,11 +18,14 @@ double calculate_partial_residual(std::vector<double> x_local_solution,  std::ve
   return partial_residual;
 }
 
-double calculate_partial_forward_error(std::vector<int> row_indices, std::vector<double> x_partition_estimate, std::vector<double> x_local_solution)
+double calculate_partial_forward_error(
+    std::vector<size_t> row_indices,
+    std::vector<double> x_partition_estimate,
+    std::vector<double> x_local_solution)
 {
   double partitioned_forward_error = 0.0;
   // std::vector<double> forward_error_vector(static_cast<int>(x_local_solution.size()),0.0);
-  for(int i =0 ; i < static_cast<int> (row_indices.size()) ; i++)
+  for(size_t i =0 ; i < row_indices.size(); i++)
   {
     double hold_value = 0.0;
     hold_value = x_partition_estimate[i]-x_local_solution[i];

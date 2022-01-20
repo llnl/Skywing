@@ -170,6 +170,21 @@ auto make_waiter(std::mutex& mutex, std::condition_variable& cv, IsReadyCallable
   return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /** \brief Class used to wait on multiple waiters.  Generally created using
  * when_all instead of directly
  */

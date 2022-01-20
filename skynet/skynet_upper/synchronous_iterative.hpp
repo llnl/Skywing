@@ -19,6 +19,14 @@ class SynchronousIterative : public internal::IterativeBase<TagValueTypes...> {
 public:
   using ValueType = ValueOrTuple<TagValueTypes...>;
 
+  SynchronousIterative(
+    Job& job,
+    const PublishTag<TagValueTypes...>& produced_tag,
+    const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
+    : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags}
+  {}
+
+
   /** \brief Retrieves the values from all tags, not being ready
    * until all tags have either received values or errored.
    *
@@ -97,12 +105,6 @@ private:
   template<typename...>
   friend class SupernodeSynchronousIterative;
 
-  SynchronousIterative(
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
-    : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags}
-  {}
 }; // class SynchronousIterative
 
 template<typename... TagValueTypes>

@@ -46,10 +46,21 @@ addrinfo_ptr resolve_addr(const char* const address, const std::uint16_t port) n
 
 int init_connection(const int sockfd, const char* const address, const std::uint16_t port) noexcept
 {
+  // TODO: What is the correct address-acquisition approach?
+  
   // This isn't super robust, but I'm not sure how to handle looking up a bunch of different
   // address in an asynchronous context
-  const auto result = resolve_addr(address, port);
-  return connect(sockfd, result->ai_addr, static_cast<int>(result->ai_addrlen));
+  //const auto result = resolve_addr(address, port);
+  //return connect(sockfd, result->ai_addr, static_cast<int>(result->ai_addrlen));
+  struct sockaddr_in serv_addr;
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(port);
+  if (inet_pton(AF_INET, address, &serv_addr.sin_addr) <= 0)
+  {
+    SKYNET_ERROR_LOG("Invalid address {}", address);
+    std::exit(4);
+  }
+  return connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 }
 } // namespace
 
@@ -193,6 +204,7 @@ ConnectionError SocketCommunicator::connection_progress_status() noexcept
 ConnectionError SocketCommunicator::send_message(const std::byte* const message, const std::size_t size) noexcept
 {
   if (send(handle_, message, size, SKYNET_NO_SIGPIPE) < 0) {
+    SKYNET_DEBUG_LOG("send_message threw error: {}", strerror(errno));
     if (errno == EAGAIN || errno == EWOULDBLOCK) { return ConnectionError::would_block; }
     // std::perror("SocketCommunicator::send_message - write");
     // std::exit(-1);

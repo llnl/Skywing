@@ -92,7 +92,7 @@ bool Job::tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase>
   return true;
 }
 
-int Job::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+size_t Job::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 {
   return MasterHandle{*master_}.number_of_subscribers(tag);
 }

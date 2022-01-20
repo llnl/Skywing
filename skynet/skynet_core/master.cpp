@@ -50,6 +50,7 @@ void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
 {
   if (dead_) { return; }
   // TODO: Maybe don't just use the first socket communicator if there are multiple
+  // TODO: Pretty sure this will incorrectly set to dead upon ConnectionError::would_block
   if (conns_[0].send_message(c.data(), c.size()) != ConnectionError::no_error) { dead_ = true; }
 }
 
@@ -178,7 +179,7 @@ std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunica
     }
     else if (err != ConnectionError::would_block)
     {
-      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some weird error", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some unknwon error, perhaps received an RST packer", master_->id(), id_);
       dead_ = true;
     }
     // we get here if attempting to read_network_size returned
@@ -465,10 +466,10 @@ void Master::accept_pending_connections() noexcept
   }
 }
 
-int Master::number_of_neighbors() const noexcept
+size_t Master::number_of_neighbors() const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
-  return static_cast<int>(neighbors_.size());
+  return neighbors_.size();
 }
 
 bool Master::submit_job(JobID name, std::function<void(Job&, MasterHandle)> to_run) noexcept
@@ -535,13 +536,13 @@ void Master::run() noexcept
 
 const std::string& Master::id() const noexcept { return id_; }
 
-int Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+size_t Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto self_iter = self_sub_count_.find(tag.id());
   const auto self_subs = self_iter == self_sub_count_.cend() ? 0 : self_iter->second;
   return std::accumulate(
-    neighbors_.cbegin(), neighbors_.cend(), self_subs, [&](const int sum, const auto& neighbor_pair) noexcept {
+    neighbors_.cbegin(), neighbors_.cend(), self_subs, [&](const size_t sum, const auto& neighbor_pair) noexcept {
       return sum + neighbor_pair.second.is_subscribed_to(tag.id());
     });
 }

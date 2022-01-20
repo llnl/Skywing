@@ -391,7 +391,7 @@ public:
    * add a way to do this and also only send data on tags which machines are
    * subscribed to.
    */
-  int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  size_t number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
 
 private:
   /** \brief Checks if a buffer has data without locking

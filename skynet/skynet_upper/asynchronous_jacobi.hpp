@@ -7,76 +7,61 @@
 #include "skynet_upper/stopping_criterion.hpp"
 
 /** 
- * Solves the square linear system Ax=b with the Asynchronous Jacobi algorithm. This assumes that the system is square, consistent, and diagonally dominant to be solvable by this method. This class stores the full solution vector x_iter at each machine (return_full_solution), as well as the partition of x_iter corresponding to the partition Ax=b that each machine is responsible for updating (return_partition_solution ), i.e., if a machine is responsible for updating components 0 and 1 of "x" from Ax=b, then the only the first two components of x_iter are returned for (return_full_solution).
+ * Solves the square linear system Ax=b with the Asynchronous Jacobi
+ * algorithm. This assumes that the system is square, consistent, and
+ * diagonally dominant to be solvable by this method. This class
+ * stores the full solution vector x_iter at each machine
+ * (return_full_solution), as well as the partition of x_iter
+ * corresponding to the partition Ax=b that each machine is
+ * responsible for updating (return_partition_solution ), i.e., if a
+ * machine is responsible for updating components 0 and 1 of "x" from
+ * Ax=b, then the only the first two components of x_iter are returned
+ * for (return_full_solution).
  * 
- * This implementation is agnostic of overlapping computations, nonuniform partitioning, and non-sequential partitioning of the linear system. This is why the row_index for each component of x must be sent along with every method for proper processing.
+ * This implementation is agnostic of overlapping computations,
+ * nonuniform partitioning, and non-sequential partitioning of the
+ * linear system. This is why the row_index for each component of x
+ * must be sent along with every method for proper processing.
  * 
  * @param[in] A_partition A matrix row partition
  * @param[in] b_partition b vector row partition -> same as A partition
  * @param[in] row_indices indices which correspond to the row the partition above with respect to the full system "Ax=b"
  * 
  * @param[out] x_iter -> solution vector x from the linear solver
- * @param[out] x_iter[row_indices] -> partition solution vector x that the individual skynet process is responsible for updating.
+ * @param[out] x_iter[row_indices] -> partition solution vector x that
+ * the individual skynet process is responsible for updating.
  * 
 */
 
 using namespace skynet;
-using ValueTag = skynet::PublishTag<std::vector<double>>;
 
+template<typename value_type = double>
 class AsynchronousJacobi
 {
-
-private:
-
-  int machine_number;
-  int size_of_linear_system;
-  std::vector<std::vector<double>> A_partition;
-  std::vector<double> b_partition;
-  std::vector<int> row_indices;
-  std::vector<ValueTag> tags_vector;
-  int number_of_updated_components;
-  unsigned iteration_count = 0;
-
-  // Variables internal to this class.
-  std::vector<double> x_iter;
-  std::vector<double> publish_values;
-  // Variables for stopping criterion
-  int debug_machine_number;
-  int delayed_iteration_count;
-  int delayed_process ;
-  std::chrono::duration<double> max_run_time;
-  bool iterate = true;
-  std::chrono::duration<double> run_time = std::chrono::milliseconds(1);
-  // Skynet asynchronous iterative variables. 
-  friend class AsynchronousIterative<std::vector<double>>;
-  AsynchronousIterative<std::vector<double>> iter_method ;
-  
 public:
+  using value_t = value_type;
+  using ValueTag = skynet::PublishTag<std::vector<value_t>>;
 
-  AsynchronousJacobi(int machine_number, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<int> row_indices, std::vector<ValueTag> tags_vector, AsynchronousIterative<std::vector<double>> it):
-    machine_number(machine_number),
-    A_partition(A_partition),
-    b_partition(b_partition),
-    row_indices(row_indices),
-    tags_vector(tags_vector),
-    iter_method(it)
+  AsynchronousJacobi(
+    std::vector<std::vector<value_t>> A_partition,
+    std::vector<value_t> b_partition,
+    std::vector<size_t> row_indices,
+    std::vector<ValueTag> tags_vector,
+    AsynchronousIterative<std::vector<value_t>> it)
+    : A_partition_(A_partition),
+      b_partition_(b_partition),
+      row_indices_(row_indices),
+      tags_vector_(tags_vector),
+      number_of_updated_components_(row_indices_.size()),
+      x_iter_(A_partition_[0].size(), 0.0),
+      publish_values_(2 * number_of_updated_components_, 0.0),
+      iter_method_(it)
   {
-
-    size_of_linear_system = static_cast<int>(A_partition[0].size());
-    number_of_updated_components = static_cast<int>(row_indices.size());
-    for(int i = 0 ; i < size_of_linear_system; i ++)
-    {
-      x_iter.push_back(0.0);
-    }
-    for(int i = 0 ; i < number_of_updated_components*2; i++)
-    {
-      publish_values.push_back(0.0);
-    }
-    max_run_time = std::chrono::seconds(5); //std::chrono::milliseconds(100)* size_of_linear_system;
+    max_run_time = std::chrono::seconds(5);
     // This serves as the initial computation and broadcast.
     jacobi_computation();
     obtain_publish_values();
-    iter_method.submit_values(publish_values);
+    iter_method_.submit_values(publish_values_);
   };
 
   void run()
@@ -85,59 +70,57 @@ public:
     auto stop_jacobi = std::chrono::high_resolution_clock::now();
     while(iterate)
     {
-      ++iteration_count;
+      ++iteration_count_;
       create_iteration();
-      // This allows for quick diagnostics by seeing what's in the buffers rho_x, rho_y,  at terminal.
-      // print_current_information();
       stop_jacobi = std::chrono::high_resolution_clock::now();
       run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_jacobi - start_jacobi);
       iterate = should_stop(run_time, max_run_time);
 
-      const auto print_val = [&](size_t row_ind) {
-        std::cout << "(" << row_indices[row_ind] << ", " << x_iter[row_indices[row_ind]] << ")";
-        if (row_ind < row_indices.size() - 1)
-          std::cout << ", ";
-      };
-      std::cout << "Machine " << machine_number << ": [";
-      for (size_t i = 0; i < row_indices.size(); i++) print_val(i);
-      std::cout << "]" << std::endl;
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
   };
 
   void create_iteration()
   {
-    // This stores the values as a AsynchronousValues allocator which contains a bool if it is updated and a vector<double> and alive tags as vector<ValueTag>.
-    const auto& [received_values_vec, is_updated, alive_tags] = iter_method.values();
-    // Cycles through received information associated with the tags this process subscribes to.
-    for(int values_index = 0; values_index < static_cast<int>(received_values_vec.size()); ++values_index)
+    // This stores the values as a AsynchronousValues allocator which
+    // contains a bool if it is updated and a vector<double> and alive
+    // tags as vector<ValueTag>.
+    const auto& [received_values_vec, is_updated, alive_tags] = iter_method_.values();
+    // Cycles through received information associated with the tags
+    // this process subscribes to.
+    for(size_t values_index = 0; values_index < received_values_vec.size(); ++values_index)
     {
       //stores the received values as a vector<double> and updated as bool
       //const auto& [received_values, updated] = values[values_index];
       if (is_updated[values_index])
       {
         const auto& received_values = received_values_vec[values_index];
-        // This cycles through the received_values in order not to replace a component that each process is updating with another processes update if there's overlapping computations.
-        // Since messages of the form [component index ; component], we have to parse these messages in pairs, which is easier to do without iterators.
-        for(int received_values_index = 0; received_values_index < (static_cast<int>(received_values.size())/2); received_values_index++)
+        // This cycles through the received_values in order not to
+        // replace a component that each process is updating with
+        // another processes update if there's overlapping
+        // computations.  Since messages of the form [component index
+        // ; component], we have to parse these messages in pairs,
+        // which is easier to do without iterators.
+        for(size_t received_values_index = 0; received_values_index < (received_values.size()/2);
+            received_values_index++)
         {
           bool use_this_value = true;
-          // Cycles through individual values in row_index to avoid replacing it's own updates if there's overlap in the linear system partition.
-          for(int row_index_cycle = 0 ; row_index_cycle < number_of_updated_components; row_index_cycle++)
+          // Cycles through individual values in row_index to avoid
+          // replacing it's own updates if there's overlap in the
+          // linear system partition.
+          for(size_t row_index_cycle = 0 ; row_index_cycle < number_of_updated_components_; row_index_cycle++)
           {
-            if((int)received_values[received_values_index*2] == row_indices[row_index_cycle])
-            {
+            if(received_values[received_values_index*2] == row_indices_[row_index_cycle])
               use_this_value = false;
-            }
           }
           if(use_this_value)
           {
-            int updated_index = (int) received_values[received_values_index * 2];
-            x_iter[updated_index] = received_values[received_values_index * 2 + 1];
+            size_t updated_index = static_cast<size_t>(received_values[received_values_index * 2]);
+            x_iter_[updated_index] = received_values[received_values_index * 2 + 1];
             jacobi_computation();
             // This submits values after each piece of new information.
             obtain_publish_values();
-            iter_method.submit_values(publish_values);
+            iter_method_.submit_values(publish_values_);
           }
         }
       }
@@ -146,68 +129,47 @@ public:
 
   void obtain_publish_values()
   {
-    for(int i = 0 ; i < number_of_updated_components; i ++)
+    for(size_t i = 0 ; i < number_of_updated_components_; i ++)
     {
-      publish_values[i*2] = row_indices[i]*1.0;
-      publish_values[i*2+1] = x_iter[row_indices[i]];
+      publish_values_[i*2] = row_indices_[i]*1.0;
+      publish_values_[i*2+1] = x_iter_[row_indices_[i]];
     }
   }
 
   void jacobi_computation()
   {
-    for(int i = 0 ; i < number_of_updated_components; i++)
+    for(size_t i = 0 ; i < number_of_updated_components_; i++)
     {
-      double hold= 0.0;
-      for(int j = 0 ; j < static_cast<int>(A_partition[0].size()); j++)
+      double hold = 0.0;
+      for(size_t j = 0 ; j < A_partition_[0].size(); j++)
       {
-        if(j!=row_indices[i])
-          hold += A_partition[i][j]*x_iter[j];
+        if(j!=row_indices_[i])
+          hold += A_partition_[i][j]*x_iter_[j];
       }
-      hold = (b_partition[i] - hold)/A_partition[i][row_indices[i]];
-      int updated_index = (int)row_indices[i];
-      x_iter[updated_index] = hold;
+      hold = (b_partition_[i] - hold)/A_partition_[i][row_indices_[i]];
+      size_t updated_index = row_indices_[i];
+      x_iter_[updated_index] = hold;
     }
   };
 
   // Returns only the components for which this process updates. 
-  // Since jacobi is a row - wise operation, this is NOT the full x_iter. 
-  // If return_partial_solution() = return_partition_solution(), then each process solved the entire linear system by themselves.
-  std::vector<double> return_partition_solution()
+  // Since jacobi is a row - wise operation, this is NOT the full x_iter.  
+  // If return_partial_solution() = return_partition_solution(), then
+  // each process solved the entire linear system by themselves.
+  std::vector<value_t> return_partition_solution()
   {
-    std::vector<double> return_vector;
-    for(int i = 0 ; i < number_of_updated_components; i++)
+    std::vector<value_t> return_vector;
+    for(size_t i = 0 ; i < number_of_updated_components_; i++)
     {
-      return_vector.push_back(x_iter[row_indices[i]]);
+      return_vector.push_back(x_iter_[row_indices_[i]]);
     }
     return return_vector;
   };
 
-  std::vector<double> return_full_solution()
+  std::vector<value_t> return_full_solution()
   {
-    return x_iter;
+    return x_iter_;
   }
-
-  // Prints only the vector components of x  which this process updates. 
-  void print_partition_solution()
-  {
-    std::cout << "\t machine " << machine_number << "\tsolution ";
-
-    for(int i = 0 ; i < number_of_updated_components; i ++)
-    {
-      std::cout << x_iter[row_indices[i]] << " ";
-    }
-    std::cout << std::endl;
-  };
-
-  void print_solution()
-  {
-    std::cout << "\t machine " << machine_number << "\t full solution ";
-    for(std::vector<double>::size_type i = 0 ; i < x_iter.size(); i++)
-    {
-      std::cout << x_iter[i] << " ";
-    }
-    std::cout << std::endl;
-  };
 
   double return_runtime()
   {
@@ -221,19 +183,49 @@ public:
 
   unsigned get_iteration_count()
   {
-    return iteration_count;
+    return iteration_count_;
   }
 
+private:
+  std::vector<std::vector<double>> A_partition_;
+  std::vector<double> b_partition_;
+  std::vector<size_t> row_indices_;
+  std::vector<ValueTag> tags_vector_;
+  size_t number_of_updated_components_;
+  size_t iteration_count_ = 0;
+
+  // Variables internal to this class.
+  std::vector<value_t> x_iter_;
+  std::vector<value_t> publish_values_;
+
+  // Variables for stopping criterion
+  std::chrono::duration<double> max_run_time;
+  bool iterate = true;
+  std::chrono::duration<double> run_time = std::chrono::milliseconds(1);
+  
+  // Skynet asynchronous iterative variables. 
+  friend class AsynchronousIterative<std::vector<double>>;
+  AsynchronousIterative<std::vector<double>> iter_method_ ;
 }; // class AsynchronousJacobi
 
-// This is the continuation that makes this class possible as this implementation depends upon the asynchronous_iterative class.
+// This is the continuation that makes this class possible as this
+// implementation depends upon the asynchronous_iterative class.
 template<typename... Args>
-auto create_asynchronous_jacobi(int machine_number, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<int> row_indices, std::vector<ValueTag> tags, Args&&... args) noexcept
+auto create_asynchronous_jacobi(
+    std::vector<std::vector<double>> A_partition,
+    std::vector<double> b_partition,
+    std::vector<size_t> row_indices,
+    std::vector<typename AsynchronousJacobi<double>::ValueTag> tags,
+    Args&&... args) noexcept
 {
   return create_asynchronous_iterative(std::forward<Args>(args)...)
-    .then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<AsynchronousJacobi> {
-     if (it) { return AsynchronousJacobi(machine_number, A_partition, b_partition, row_indices, tags, *it);}
-     else    { return {}; }
+    .then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<AsynchronousJacobi<double>> {
+     if (it) {
+       return AsynchronousJacobi<double>(A_partition, b_partition, row_indices, tags, *it);
+     }
+     else {
+       return {};
+     }
       });
 
 }
