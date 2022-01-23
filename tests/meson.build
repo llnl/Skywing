@@ -19,10 +19,10 @@ core_tests = {
     'socket_communicator'
   ],
 
-  'upper': [
-    'asynchronous_iterative',
-    'synchronous_iterative'
-  ]
+  # 'upper': [
+  #   'asynchronous_iterative',
+  #   'synchronous_iterative'
+  # ]
 }
 
 write_to_file = ''

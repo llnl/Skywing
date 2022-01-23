@@ -20,228 +20,134 @@
  */
 
 using namespace skynet;
-using ValueTag = skynet::PublishTag<std::vector<double>>;
 
+template<typename S>
 class PushSum
 {
-
-private:
-
-  friend class AsynchronousIterative<std::vector<double>>;
-
-  int machine_number;
-  int size_of_system;
-  int number_of_neighbors;
-  double new_information_count = 0.0;
-  double max_neighbor_received = 0.0;
-  double x_value;
-  double y_value = 1.0;
-  // this is the number of neighbors plus one needed for the update
-  // rule
-  double in_nodes_plus_one;
-   // Local weights.
-  double sigma_x;
-  double sigma_y;
-  // stores iterate information
-  std::vector<double> rho_x;
-  std::vector<double> rho_y;
-  std::vector<double> rho_x_previous;
-  std::vector<double> rho_y_previous;
-  // Stopping Criterion values  
-  // Note: These are pretty much fixed at the moment, and increase
-  // linearly with respect to network size, so these likely won't work
-  // if the network is too large.
-  std::chrono::duration<double> max_run_time;
-  bool iterate = true;
-  std::chrono::duration<double> run_time = std::chrono::milliseconds(1);
-  // Skynet specific variables
-  ValueTag myTag;
-  std::vector<ValueTag> tags_vector;
-  AsynchronousIterative<std::vector<double>> iter_method ;
-  std::vector<double> publish_values;
-
 public:
+  using scalar_t = S;
+  using ValueType = std::vector<scalar_t>;
+  using ValueTag = skynet::PublishTag<ValueType>;
 
-  PushSum(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, ValueTag myTag, std::vector<ValueTag> tags_vector, AsynchronousIterative<std::vector<double>> it):
-    machine_number(machine_number),
-    size_of_system(size_of_system),
-    number_of_neighbors(number_of_neighbors),
-    x_value(starting_value),
-    myTag(myTag),
-    tags_vector(tags_vector),
-    iter_method(it)
+  template<typename IterativeWrapper>
+  PushSum(const IterativeWrapper& wrapper,
+          size_t size_of_system,
+          size_t number_of_neighbors,
+          scalar_t starting_value)
+    : size_of_system_(size_of_system),
+    number_of_neighbors_(number_of_neighbors),
+    x_value_(starting_value)
   {
-    for(int i = 0 ; i < size_of_system; i++)
+    for (const auto& tag : wrapper.tags())
     {
-      rho_x.push_back(0.0);
-      rho_y.push_back(0.0);
-      rho_x_previous.push_back(0.0);
-      rho_y_previous.push_back(0.0);
+      rho_x_[tag] = 0.0;
+      rho_y_[tag] = 0.0;
+      rho_x_previous_[tag] = 0.0;
+      rho_y_previous_[tag] = 0.0;
     }
-    in_nodes_plus_one = number_of_neighbors + 1.0;
+    in_nodes_plus_one_ = number_of_neighbors_ + 1.0;
     // Local weights -> This is the information passed to neighbors.
-    sigma_x = sigma_x + (x_value / in_nodes_plus_one);
-    sigma_y = sigma_y + (y_value / in_nodes_plus_one);
-
-    // Stopping Criterion Initialization
-    max_run_time = std::chrono::seconds(5);
-    // Initial send message
-    for(int j = 0 ; j < 3 ; j++)
-    {
-      publish_values.push_back(0.0);
-    }
-    obtain_publish_values();
-    iter_method.submit_values(publish_values);
-  };
-
-  void run()
-  {
-    auto start_push_sum = std::chrono::high_resolution_clock::now();
-    auto stop_push_sum = std::chrono::high_resolution_clock::now();
-    while(iterate)
-    {
-      create_iteration();
-      // This allows for quick diagnostics by seeing what's in the buffers rho_x, rho_y,  at terminal.
-      // print_current_information();
-      stop_push_sum = std::chrono::high_resolution_clock::now();
-      run_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_push_sum - start_push_sum);
-      iterate = should_stop(run_time, max_run_time);
-
-      std::cout << "Machine " << machine_number << ": " << return_solution() << std::endl;
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-    }
+    sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
+    sigma_y_ = sigma_y_ + (y_value_ / in_nodes_plus_one_);
   }
 
-  void create_iteration()
+  ValueType get_init_publish_values()
+  { return {sigma_x_, sigma_y_, new_information_count_}; }
+
+  template<typename IterativeWrapper>
+  void process_update(const ValueTag& nbr_tag, const ValueType& nbr_values,
+                      const IterativeWrapper& wrapper)
   {
-    // This stores the values as a AsynchronousValues allocator which
-    // contains a bool if it is updated and a vector<double> and alive
-    // tags as vector<ValueTag>.
-    const auto& [values, alive_tags] = iter_method.values();
-    for(int values_index = 0; values_index < static_cast<int>(values.size()); ++values_index)
-    {
-      //stores the received values as a vector<double> and updated as
-      //bool
-      const auto& [received_values, updated] = values[values_index];
-      if (updated)
-      {
-        // index is used below to identify whether the component in
-        // question should be updated or not by checking it against
-        // the row_indices.
-        for(int tags_index = 0; tags_index < size_of_system; tags_index++)
-        {
-          // this checks if alive_tag we are looking matches against
-          // the index we are currently checking, this is a matter of
-          // "when" not "if" we find the correct tag.
-          // This also avoids taking one's own received message; this
-          // shouldn't matter, but if data is corrupted it might.
-          // This also saves time since all tags need to be passed
-          // into the asynchronous_iterative including each processes
-          // "pubTag" and has data associated with it after using
-          // iter_method.submit_values(), but each process already has
-          // that information.
-          if(alive_tags[values_index] == tags_vector[tags_index] && alive_tags[values_index]!= myTag )
-          {
-            push_sum_computation(tags_index, received_values);
-          }
-        }
-      }
-    }
-  };
+    if (nbr_tag == wrapper.my_tag())
+      return;
 
-  void obtain_publish_values()
-  {
-    publish_values[0] = sigma_x;
-    publish_values[1] = sigma_y;
-    publish_values[2] = new_information_count;
-  }
+    new_information_count_ +=1.0;
 
-  void push_sum_computation(int index, std::vector<double> received_values)
-  {
-    new_information_count +=1.0;
-    assert(index < size_of_system && index >=0);
+    rho_x_previous_[nbr_tag] = rho_x_[nbr_tag];
+    rho_y_previous_[nbr_tag] = rho_y_[nbr_tag];
+    rho_x_[nbr_tag] = nbr_values[0];
+    rho_y_[nbr_tag] = nbr_values[1];
 
-    rho_x_previous[index] = rho_x[index];
-    rho_y_previous[index] = rho_y[index];
-    rho_x[index] = received_values[0];
-    rho_y[index] = received_values[1];
-
-    x_value = x_value + rho_x[index] - rho_x_previous[index];
-    y_value = y_value + rho_y[index] - rho_y_previous[index];
+    x_value_ = x_value_ + rho_x_[nbr_tag] - rho_x_previous_[nbr_tag];
+    y_value_ = y_value_ + rho_y_[nbr_tag] - rho_y_previous_[nbr_tag];
 
     // This is the 'wake up' portion followed by broadcast (push_sum theory relevant)
-    sigma_x = sigma_x + (x_value / in_nodes_plus_one);
-    sigma_y = sigma_y + (y_value / in_nodes_plus_one);
+    sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
+    sigma_y_ = sigma_y_ + (y_value_ / in_nodes_plus_one_);
 
-    x_value = x_value / in_nodes_plus_one;
-    y_value = y_value / in_nodes_plus_one;
+    x_value_ = x_value_ / in_nodes_plus_one_;
+    y_value_ = y_value_ / in_nodes_plus_one_;
 
     // Checks the max neighbor iterations for terminal checks.
-    if (received_values[2] > max_neighbor_received)
+    if (nbr_values[2] > max_neighbor_received_)
     {
-      max_neighbor_received = received_values[2];
+      max_neighbor_received_ = nbr_values[2];
     }
-
-    obtain_publish_values();
-    iter_method.submit_values(publish_values);
   }
 
-  double return_solution()
+  void prepare_for_publication(ValueType& vals_to_publish)
   {
-    double consensus_value = x_value/y_value;
+    vals_to_publish[0] = sigma_x_;
+    vals_to_publish[1] = sigma_y_;
+    vals_to_publish[2] = new_information_count_;
+  }
+
+  scalar_t return_solution() const
+  {
+    scalar_t consensus_value = x_value_/y_value_;
     return consensus_value;
   }
 
- double return_new_information_count()
+ double return_new_information_count() const
   {
-    return new_information_count;
+    return new_information_count_;
   }
   
-  double return_run_time()
-  {
-    return run_time.count();
-  }
+private:
+  size_t size_of_system_;
+  size_t number_of_neighbors_;
+  double new_information_count_ = 0.0;
+  double max_neighbor_received_ = 0.0;
+  scalar_t x_value_;
+  scalar_t y_value_ = 1.0;
+  // this is the number of neighbors plus one needed for the update
+  // rule
+  scalar_t in_nodes_plus_one_;
+   // Local weights.
+  scalar_t sigma_x_;
+  scalar_t sigma_y_;
+  // stores iterate information
+  using tag_val_map = std::unordered_map<ValueTag, scalar_t, skynet::internal::hash<ValueTag>>;
+  tag_val_map rho_x_;
+  tag_val_map rho_y_;
+  tag_val_map rho_x_previous_;
+  tag_val_map rho_y_previous_;
+};  // class PushSum
 
-  // For troubleshooting in the case of bad communication or
-  // unexplained behavior.
-  void print_current_information()
-  {
-    std::cout << "\trho_x: \t" ;
-    for(auto entry : rho_x)
-    {
-      std::cout << entry << " " ;
-    }
-    std::cout << std::endl;
-    std::cout << "\trho_y: \t" ;
-    for(auto entry : rho_y)
-    {
-      std::cout << entry << " " ;
-    }
-    std::cout << std::endl;
-  }
 
-  void print_publish_values()
-  {
-    std::cout << "\tpublish values: \t" ;
-    for(auto entry : publish_values)
-    {
-      std::cout << entry << " " ;
-    }
-    std::cout << std::endl;
-  }
-
-}; 
-
-// This is the continuation that makes this class possible as this
-// implementation depends upon the asynchronous_iterative class.
-template<typename... Args>
-auto create_push_sum(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, ValueTag myTag, std::vector<ValueTag> tags,  Args&&... args) noexcept
+template<typename Range>
+auto create_push_sum(int size_of_system,
+                     int number_of_neighbors,
+                     double starting_value,
+                     MasterHandle handle,
+                     Job& job,
+                     const typename PushSum<double>::ValueTag& produced_tag,
+                     const Range tags) noexcept
 {
-  return create_asynchronous_iterative(std::forward<Args>(args)...).then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<PushSum> {
-     if (it) { return PushSum(machine_number, size_of_system, number_of_neighbors, starting_value, myTag, tags, *it);}
-     else    { return {}; }
-  });
+  using AsynchT = AsynchronousIterative<PushSum<double>>;
+  return create_asynchronous_iterative<AsynchT, Range>
+    (handle, job, produced_tag, tags, size_of_system, number_of_neighbors, starting_value);
 }
+
+// // This is the continuation that makes this class possible as this
+// // implementation depends upon the asynchronous_iterative class.
+// template<typename... Args>
+// auto create_push_sum(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, ValueTag myTag, std::vector<ValueTag> tags,  Args&&... args) noexcept
+// {
+//   return create_asynchronous_iterative(std::forward<Args>(args)...).then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<PushSum> {
+//      if (it) { return PushSum(machine_number, size_of_system, number_of_neighbors, starting_value, myTag, tags, *it);}
+//      else    { return {}; }
+//   });
+// }
 
 #endif

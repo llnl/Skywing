@@ -89,7 +89,6 @@ void machine_task(
     A_partition,
     b_partition,
     row_indices,
-    tags,
     master_handle,
     job,
     tags[machine_number],
@@ -97,13 +96,17 @@ void machine_task(
 
   std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;  
   auto async_jacobi = *opt_iter_method;
-  async_jacobi.run();
+  async_jacobi.run([&](const decltype(async_jacobi)& p)
+    {
+      std::cout << "Machine " << machine_number << " has values ";
+      print_vec<double>(p.get_processor().return_partition_solution());
+    });
   std::cout << "Machine " << machine_number << " finished jacobi iteration." << std::endl;
 
-  double run_time = async_jacobi.return_runtime();
+  double run_time = async_jacobi.return_run_time();
   int information_received = async_jacobi.get_iteration_count();
-  auto x_local_estimate = async_jacobi.return_full_solution();
-  auto x_partition_estimate = async_jacobi.return_partition_solution();
+  auto x_local_estimate = async_jacobi.get_processor().return_full_solution();
+  auto x_partition_estimate = async_jacobi.get_processor().return_partition_solution();
   // Since this is a distributed algorithm, we only have access to information that allows us to have a "partial" residual, since not every agent has every row of the matrix. 
   // In contrast, we can look at error involving only the components of the solution vector x which this process updates, or it's entire estimation vector, hence "partial" versus "full" in this language and "PSQ" versus "FSQ" for "partial error squared" and "full error squared". 
   // We avoid taking square roots here in case additional post processing is wanted.

@@ -77,12 +77,9 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
   }
 
   auto opt_iter_method = create_push_sum(
-    machine_number,
     size_of_system,
     number_of_neighbors,
     starting_value,
-    pubTag,
-    subTags,
     master_handle,
     job,
     pubTag,
@@ -91,12 +88,17 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
 
   auto push_sum = *opt_iter_method;
   // This is the actual iterative scheme.
-  push_sum.run();
+  push_sum.run(
+      [&](const decltype(push_sum)& p)
+      {
+        std::cout << "Machine " << machine_number << " has value " <<
+          p.get_processor().return_solution() << std::endl;
+      } );
 
-  double consensus_value = push_sum.return_solution();
+  double consensus_value = push_sum.get_processor().return_solution();
   double exact_solution = obtain_exact_average(size_of_system);
   double run_time_count = push_sum.return_run_time();
-  double new_information_count = push_sum.return_new_information_count();
+  double new_information_count = push_sum.get_processor().return_new_information_count();
 
   std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;
   

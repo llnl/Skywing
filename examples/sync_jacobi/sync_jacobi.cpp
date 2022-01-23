@@ -54,7 +54,7 @@ std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
 }
 
 // All of the Skynet specific code is located in this function.
-void machine_task(const int machine_number, int trial, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<double> x_partition_solution, std::vector<double> x_full_solution, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::string save_directory)
+void machine_task(const int machine_number, int trial, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<double> x_partition_solution, std::vector<double> x_full_solution, std::vector<size_t> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::string save_directory)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_indices_" + matrix_name ;
-  std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
+  std::vector<size_t> row_indices = input_vector_from_matrix_market<size_t>(directory, row_index_name);
 
   std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_" + matrix_name ;
   // std::vector<double> matrix_row_hold = input_vector_from_matrix_market<double>(directory, matrix_partition_name);

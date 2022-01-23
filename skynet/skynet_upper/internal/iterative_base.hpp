@@ -10,6 +10,8 @@ template<typename... TagValueTypes>
 class IterativeBase {
 public:
   using TagType = PublishTag<TagValueTypes...>;
+
+  const TagType& my_tag() const { return produced_tag_; }
   
   /** \brief Rebuilds connections for dead tags
    */
@@ -135,27 +137,41 @@ struct IsIterativeReady
   }
 }; // struct IsIterativeReady
 
-template<typename IterativeMethod>
+template<typename IterativeMethod, typename Tuple>
 struct GetIterativeOpt
 {
-  using TagType = typename IterativeMethod::TagType;
-  Job& job;
-  const TagType produced_tag;
-  const std::vector<TagType> tags;
+  // using TagType = typename IterativeMethod::ValueTag;
+  // Job& job;
+  // const TagType produced_tag;
+  // const std::vector<TagType> tags;
+  // std::optional<IterativeMethod> operator()() const noexcept
+  // {
+  //   return IterativeMethod{job, produced_tag, tags};
+  // }
+  Tuple t;
   std::optional<IterativeMethod> operator()() const noexcept
   {
-    return IterativeMethod{job, produced_tag, tags};
+    return std::make_from_tuple<IterativeMethod>(t);
   }
 }; // struct GetIterativeOpt
 
-template<template<typename...> typename IterativeTemplate,
+
+
+template<typename IterativeMethod,
          typename WaiterType,
-         typename... TagValueTypes,
-         typename Range>
+         typename Range,
+         typename... ConstructorArgs>
 auto create_iterative(
   WaiterType waiter,
-  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
-{
+  MasterHandle handle,
+  Job& job,
+  const typename IterativeMethod::ValueTag produced_tag,
+  const Range tags,
+  ConstructorArgs&&... cons_args) noexcept
+{ 
+  using ValueType = typename IterativeMethod::ValueType;
+  using ValueTag = typename IterativeMethod::ValueTag;
+  
   const auto iter = std::find(tags.cbegin(), tags.cend(), produced_tag);
   if (iter == tags.cend()) {
     std::cerr << "Produced tag for iterative method (ie IterativeBase) not found in the tag list!\n";
@@ -163,11 +179,43 @@ auto create_iterative(
     std::exit(2);
   }
 
-  IsIterativeReady<WaiterType, TagValueTypes...> iir{std::move(waiter), job, produced_tag, tags.size()};
-  std::vector<PublishTag<TagValueTypes...>> tags_vec(tags.cbegin(), tags.cend());
-  GetIterativeOpt<IterativeTemplate<TagValueTypes...>> gio{job, produced_tag, tags_vec};
+  IsIterativeReady<WaiterType, ValueType> iir{std::move(waiter), job, produced_tag, tags.size()};
+
+  auto t1 = std::make_tuple(std::forward<ConstructorArgs>(cons_args)...);
+  
+  std::vector<ValueTag> tags_vec(tags.cbegin(), tags.cend());
+  auto t2 = std::tuple<Job&, ValueTag, std::vector<ValueTag>>(job, produced_tag, tags_vec);
+  auto t = std::tuple_cat(t2, t1);
+  GetIterativeOpt<IterativeMethod, decltype(t)> gio{std::move(t)};
+
   return handle.waiter_on_subscription_change(std::move(iir)).then(std::move(gio));
 }
+
+
+
+
+
+  
+// template<template<typename...> typename IterativeTemplate,
+//          typename WaiterType,
+//          typename... TagValueTypes,
+//          typename Range>
+// auto create_iterative(
+//   WaiterType waiter,
+//   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
+// {
+//   const auto iter = std::find(tags.cbegin(), tags.cend(), produced_tag);
+//   if (iter == tags.cend()) {
+//     std::cerr << "Produced tag for iterative method (ie IterativeBase) not found in the tag list!\n";
+//     // TODO throw error rather than exit.
+//     std::exit(2);
+//   }
+
+//   IsIterativeReady<WaiterType, TagValueTypes...> iir{std::move(waiter), job, produced_tag, tags.size()};
+//   std::vector<PublishTag<TagValueTypes...>> tags_vec(tags.cbegin(), tags.cend());
+//   GetIterativeOpt<IterativeTemplate<TagValueTypes...>> gio{job, produced_tag, tags_vec};
+//   return handle.waiter_on_subscription_change(std::move(iir)).then(std::move(gio));
+// }
 
 } // namespace skynet::internal
 

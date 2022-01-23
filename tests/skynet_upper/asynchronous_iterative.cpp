@@ -36,7 +36,8 @@ void machine_task(const NetworkInfo* const info, const int index)
     connect_network(*info, master, index, [](MasterHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
-    auto opt_iter_method = create_asynchronous_iterative(master, job_handle, tags[index], tags).get();
+    auto opt_iter_method = create_asynchronous_iterative<AsynchronousIterative<int>>
+      (master, job_handle, tags[index], tags).get();
     {
       std::lock_guard<std::mutex> g{catch_mutex};
       REQUIRE(opt_iter_method);
