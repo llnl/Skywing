@@ -459,6 +459,14 @@ private:
                        std::forward<IsReadyCallable>(c), std::forward<GetValueCallable>(v));
   }
 
+  template<typename T>
+  WaiterVal<T> waiterval_on_subscription_change(std::function<bool()> is_ready_callable,
+                                                std::function<T()> get_val_callable) noexcept
+  {
+    return WaiterVal(dummy_mutex_, subscription_cv_,
+                     std::move(is_ready_callable), std::move(get_val_callable));
+  }
+
 
   ///////////////////////////////////////
   // End Interface for MasterHandle
@@ -843,6 +851,15 @@ public:
     return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c),
                                                   std::forward<GetValueCallable>(v));
   }
+
+  template<typename T>
+  WaiterVal<T> waiterval_on_subscription_change(std::function<bool()> is_ready_callable,
+                                                std::function<T()> get_val_callable) noexcept
+  {
+    return handle_->waiterval_on_subscription_change(std::move(is_ready_callable),
+                                                     std::move(get_val_callable));
+  }
+
 
   /** \brief Returns the port the master is listening on
    */

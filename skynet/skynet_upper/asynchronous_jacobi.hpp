@@ -5,6 +5,7 @@
 #include "skynet_core/master.hpp"
 #include "skynet_upper/asynchronous_iterative.hpp"
 #include "skynet_upper/stopping_criterion.hpp"
+#include "skynet_upper/update_nbrs_criterion.hpp"
 
 /** 
  * Solves the square linear system Ax=b with the Asynchronous Jacobi
@@ -43,9 +44,7 @@ public:
   using ValueType = std::vector<scalar_t>;
   using ValueTag = skynet::PublishTag<ValueType>;
 
-  template<typename IterativeWrapper>
   AsynchronousJacobi(
-    const IterativeWrapper& wrapper,
     std::vector<std::vector<scalar_t>> A_partition,
     std::vector<scalar_t> b_partition,
     std::vector<size_t> row_indices)
@@ -56,7 +55,6 @@ public:
       x_iter_(A_partition_[0].size(), 0.0),
       publish_values_(2 * number_of_updated_components_, 0.0)
   {
-    (void)wrapper;
     jacobi_computation();
   }
 
@@ -94,13 +92,14 @@ public:
     }
   }
 
-  void prepare_for_publication(ValueType& vals_to_publish)
+  ValueType prepare_for_publication(ValueType vals_to_publish)
   {
     for(size_t i = 0 ; i < number_of_updated_components_; i ++)
     {
       vals_to_publish[i*2] = row_indices_[i]*1.0;
       vals_to_publish[i*2+1] = x_iter_[row_indices_[i]];
-    }    
+    }
+    return vals_to_publish;
   }
   
   void jacobi_computation()
@@ -161,7 +160,7 @@ auto create_asynchronous_jacobi(
     const typename AsynchronousJacobi<double>::ValueTag& produced_tag,
     const Range& tags) noexcept
 {
-  using AsynchT = AsynchronousIterative<AsynchronousJacobi<double>>;
+  using AsynchT = AsynchronousIterative<AsynchronousJacobi<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
   return create_asynchronous_iterative<AsynchT, Range>
     (handle, job, produced_tag, tags, A_partition, b_partition, row_indices);
   

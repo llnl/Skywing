@@ -87,6 +87,8 @@ public:
    */
   const std::vector<PublishTag<TagValueTypes...>>& dead_tags() const noexcept { return dead_tags_; }
 
+  Job& get_job() const noexcept { return *job_; }
+  
 protected:
   IterativeBase(
     Job& job,
@@ -125,15 +127,16 @@ struct IsIterativeReady
 
   bool operator()() const noexcept
   {
-    if (!is_subscribe_done_)
-    {
-      if (!subscribe_waiter.is_ready())
-        return false;
-      is_subscribe_done_ = true;
-    }
-    bool is_ready = (is_subscribe_done_ &&
-                     (job.number_of_subscribers(produced_tag) >= num_tags));
-    return is_ready;
+    return (subscribe_waiter.is_ready() && job.number_of_subscribers(produced_tag) >= num_tags);
+    // if (!is_subscribe_done_)
+    // {
+    //   if (!subscribe_waiter.is_ready())
+    //     return false;
+    //   is_subscribe_done_ = true;
+    // }
+    // bool is_ready = (is_subscribe_done_ &&
+    //                  (job.number_of_subscribers(produced_tag) >= num_tags));
+    // return is_ready;
   }
 }; // struct IsIterativeReady
 
@@ -171,6 +174,9 @@ auto create_iterative(
 { 
   using ValueType = typename IterativeMethod::ValueType;
   using ValueTag = typename IterativeMethod::ValueTag;
+  using ProcT = typename IterativeMethod::ProcessorT;
+  using UpdateT = typename IterativeMethod::UpdateNbrsCriterionT;
+  using StopT = typename IterativeMethod::StoppingCriterionT;
   
   const auto iter = std::find(tags.cbegin(), tags.cend(), produced_tag);
   if (iter == tags.cend()) {
@@ -181,14 +187,19 @@ auto create_iterative(
 
   IsIterativeReady<WaiterType, ValueType> iir{std::move(waiter), job, produced_tag, tags.size()};
 
-  auto t1 = std::make_tuple(std::forward<ConstructorArgs>(cons_args)...);
+  auto proc = WaiterValBuilder<ProcT>(std::forward<ConstructorArgs>(cons_args)...).build_waiterval();
+  auto updater = WaiterValBuilder<UpdateT>().build_waiterval();
+  auto stopper = WaiterValBuilder<StopT>().build_waiterval();
+  
+  //  auto t1 = std::make_tuple(std::forward<ConstructorArgs>(cons_args)...);
+  auto t1 = std::make_tuple(proc.get(), updater.get(), stopper.get());
   
   std::vector<ValueTag> tags_vec(tags.cbegin(), tags.cend());
   auto t2 = std::tuple<Job&, ValueTag, std::vector<ValueTag>>(job, produced_tag, tags_vec);
   auto t = std::tuple_cat(t2, t1);
   GetIterativeOpt<IterativeMethod, decltype(t)> gio{std::move(t)};
 
-  return handle.waiter_on_subscription_change(std::move(iir)).then(std::move(gio));
+  return handle.waiterval_on_subscription_change<std::optional<IterativeMethod>>(std::move(iir), std::move(gio));
 }
 
 

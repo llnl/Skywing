@@ -13,40 +13,46 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <condition_variable>
 
 namespace skynet {
 
 /** \brief Method for receiving information from a specified set of tags
  * in an asynchronous fashion
  */
-template<typename Processor>
+template<typename Processor, typename UpdateNbrsCriterion, typename StoppingCriterion>
 class AsynchronousIterative : public internal::IterativeBase<typename Processor::ValueType>
 {
-  using ThisT = AsynchronousIterative<Processor>;
+  using ThisT = AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>;
   
 public:
   using ValueType = typename Processor::ValueType;
   using ValueTag = skynet::PublishTag<ValueType>;
+  using ProcessorT = Processor;
+  using UpdateNbrsCriterionT = UpdateNbrsCriterion;
+  using StoppingCriterionT = StoppingCriterion;
 
-  template<typename... Args>
   AsynchronousIterative(Job& job,
                         const ValueTag& produced_tag,
                         const std::vector<ValueTag>& tags,
-                        Args&&... args) noexcept
+                        Processor processor,
+                        UpdateNbrsCriterion update_nbrs_criterion,
+                        StoppingCriterion stopping_criterion) noexcept
     : internal::IterativeBase<ValueType>{job, produced_tag, tags},
-    processor_(*this, std::forward<Args>(args)...),
+    processor_(std::move(processor)),
     values_(tags.size()),
     is_updated_(tags.size()),
-    publish_values_(processor_.get_init_publish_values())
+    publish_values_(processor_.get_init_publish_values()),
+    update_nbrs_criterion_(std::move(update_nbrs_criterion)),
+    stopping_criterion_(std::move(stopping_criterion))
   {
-    max_run_time_ = std::chrono::seconds(5);
-    submit_values(publish_values_);
   }
 
   template<bool has_callback = true>
   void run(std::function<void(const ThisT&)> callback)
   {
-    auto start_time = std::chrono::high_resolution_clock::now();
+    start_time_ = clock_t::now();
+    submit_values(publish_values_);
     while(iterate_)
     {
       ++iteration_count_;
@@ -56,18 +62,21 @@ public:
         if (is_updated[vals_ind])
         {
           processor_.process_update(alive_tags[vals_ind], received_values_vec[vals_ind], *this);
-          processor_.prepare_for_publication(publish_values_);
-          submit_values(publish_values_);
         }
       }
+      ValueType new_vals = processor_.prepare_for_publication(publish_values_);
+      if (update_nbrs_criterion_(new_vals, publish_values_))
+      {
+        publish_values_ = std::move(new_vals);
+        submit_values(publish_values_);
+      }
       
-      auto curr_time = std::chrono::high_resolution_clock::now();
-      run_time_ = std::chrono::duration_cast<std::chrono::microseconds>(curr_time - start_time);
-      iterate_ = should_stop(run_time_, max_run_time_);
-
       if constexpr (has_callback)
                      callback(*this);
+      
+      iterate_ = stopping_criterion_(*this);
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      this->get_job().wait_for_update(std::chrono::milliseconds(250));
     }
   }
 
@@ -135,10 +144,16 @@ public:
     this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
   }
 
-  double return_run_time() const
+  std::chrono::milliseconds run_time() const
   {
-    return run_time_.count();
+    if (!start_time_)
+      return std::chrono::milliseconds::zero();
+    
+    auto curr_time = clock_t::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - *start_time_);
   }
+
+  const ValueType& get_publication_values() const { return publish_values_; }
   
   unsigned get_iteration_count() const
   {
@@ -158,12 +173,114 @@ private:
   std::vector<ValueType> values_;
   std::vector<bool> is_updated_;
   ValueType publish_values_;
+  UpdateNbrsCriterion update_nbrs_criterion_;
+  StoppingCriterion stopping_criterion_;
 
-  std::chrono::duration<double> max_run_time_;
-  std::chrono::duration<double> run_time_;
+  using clock_t = std::chrono::steady_clock;
+  std::optional<std::chrono::time_point<clock_t>> start_time_; // only contains a value once the iteration begins
+
   size_t iteration_count_ = 0;
   bool iterate_ = true;
 }; // class AsynchronousIterative
+
+
+
+
+template<typename Processor, typename UpdateNbrsCriterion, typename StoppingCriterion>
+class WaiterValBuilder<AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>>
+{
+public:
+  using ObjectT = AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>;
+  using ThisT = WaiterValBuilder<ObjectT>;
+  using ValueTag = typename Processor::ValueTag;
+
+  template<typename Range>
+  WaiterValBuilder(MasterHandle handle, Job& job,
+                   const ValueTag& produced_tag,
+                   const Range& tags)
+    : handle_(handle), job_(job),
+      produced_tag_(produced_tag),
+      tags_vec_(tags.cbegin(), tags.end())
+  {
+    job.declare_publication_intent(produced_tag);
+    subscribe_waiter_ =
+      std::make_shared<Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>
+      (job.subscribe_range(tags));
+  }
+
+  template<typename... Args>
+  ThisT& set_processor(Args&&... args)
+  {
+    processor_waiter_ = std::make_shared<WaiterVal<Processor>>
+      (std::move(WaiterValBuilder<Processor>(std::forward<Args>(args)...).build_waiterval()));
+    return *this;
+  }
+
+  template<typename... Args>
+  ThisT& set_nbr_update_criterion(Args&&... args)
+  {
+    nbr_update_criterion_waiter_ = std::make_shared<WaiterVal<UpdateNbrsCriterion>>
+      (WaiterValBuilder<UpdateNbrsCriterion>(std::forward<Args>(args)...).build_waiterval());
+    return *this;
+  }
+
+  template<typename... Args>
+  ThisT& set_stopping_criterion(Args&&... args)
+  {
+    stopping_criterion_waiter_ = std::make_shared<WaiterVal<StoppingCriterion>>
+      (WaiterValBuilder<StoppingCriterion>(std::forward<Args>(args)...).build_waiterval());
+    return *this;
+  }
+
+  ObjectT build()
+  {
+    return ObjectT(job_, produced_tag_, tags_vec_,
+                   std::move(processor_waiter_->get()),
+                   std::move(nbr_update_criterion_waiter_->get()),
+                   std::move(stopping_criterion_waiter_->get()));
+  }
+
+  WaiterVal<ObjectT> build_waiterval()
+  {
+    // capture by value to ensure liveness of shared ptrs
+    auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
+                     processor_waiter = this->processor_waiter_,
+                     nbr_update_criterion_waiter = this->nbr_update_criterion_waiter_,
+                     stopping_criterion_waiter = this->stopping_criterion_waiter_]()
+      {
+        return (subscribe_waiter_->is_ready()
+                && processor_waiter->is_ready()
+                && nbr_update_criterion_waiter->is_ready()
+                && stopping_criterion_waiter->is_ready());
+      };
+    
+    auto cons_args =
+      std::tuple<Job&, ValueTag, std::vector<ValueTag>,
+                 Processor, UpdateNbrsCriterion, StoppingCriterion>
+      (job_, produced_tag_, tags_vec_,
+       processor_waiter_->get(),
+       nbr_update_criterion_waiter_->get(),
+       stopping_criterion_waiter_->get());
+    auto get_object = [cons_args = std::move(cons_args)]()
+        { return std::make_from_tuple<ObjectT>(cons_args); };
+    return handle_.waiterval_on_subscription_change<ObjectT>(is_ready, std::move(get_object));
+  }
+
+
+private:
+  MasterHandle handle_;
+  Job& job_;
+  ValueTag produced_tag_;
+  std::vector<ValueTag> tags_vec_;
+
+  // Using shared_ptrs on these waiters so that they are not destroyed
+  // if the WaiterValBuilder gets destroyed before the
+  // object is retrieved from the Waiter<ThisT>.
+  std::shared_ptr<Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>> subscribe_waiter_;
+  std::shared_ptr<WaiterVal<Processor>> processor_waiter_;
+  std::shared_ptr<WaiterVal<UpdateNbrsCriterion>> nbr_update_criterion_waiter_;
+  std::shared_ptr<WaiterVal<StoppingCriterion>> stopping_criterion_waiter_;
+}; // class WaiterValBuilder<...>
 
 
 

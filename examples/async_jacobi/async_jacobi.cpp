@@ -85,17 +85,18 @@ void machine_task(
   }
 
   std::cout << "Machine " << machine_number << " creating iteration object." << std::endl;
-  auto opt_iter_method = create_asynchronous_jacobi(
-    A_partition,
-    b_partition,
-    row_indices,
-    master_handle,
-    job,
-    tags[machine_number],
-    tags).get();
-
+  
+  using IterMethod = AsynchronousIterative<AsynchronousJacobi<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
+  WaiterVal<IterMethod> iter_waiterval =
+    WaiterValBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+    .set_processor(A_partition, b_partition, row_indices)
+    .set_nbr_update_criterion(1e-6)
+    .set_stopping_criterion(std::chrono::seconds(5))
+    .build_waiterval();
+  std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
+  IterMethod async_jacobi = iter_waiterval.get();
+                                       
   std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;  
-  auto async_jacobi = *opt_iter_method;
   async_jacobi.run([&](const decltype(async_jacobi)& p)
     {
       std::cout << "Machine " << machine_number << " has values ";
@@ -103,7 +104,7 @@ void machine_task(
     });
   std::cout << "Machine " << machine_number << " finished jacobi iteration." << std::endl;
 
-  double run_time = async_jacobi.return_run_time();
+  double run_time = async_jacobi.run_time().count();
   int information_received = async_jacobi.get_iteration_count();
   auto x_local_estimate = async_jacobi.get_processor().return_full_solution();
   auto x_partition_estimate = async_jacobi.get_processor().return_partition_solution();

@@ -3,7 +3,7 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-
+#include <chrono>
 
 // This is a recursive template which compares arguments in pairs used for comparing varying criterion for in arbitrary order to determine if the method should stop.
 // This follow the logic that if all true -> return true and one false -> return false. 
@@ -25,5 +25,27 @@ bool should_stop() {
 
   return true;
 }
+
+
+class StopAfterTime
+{
+public:
+
+  template<typename Duration>
+  StopAfterTime(Duration d)
+    : max_run_time_(d)
+  {}
+
+  template<typename CallerT>
+  bool operator()(const CallerT& caller)
+  {
+    return caller.run_time() < max_run_time_;
+  }
+
+private:
+  std::chrono::milliseconds max_run_time_;
+  
+}; // class StopAfterTime
+
 
 #endif

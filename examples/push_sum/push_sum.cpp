@@ -1,7 +1,7 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
 #include "skynet_upper/push_sum.hpp"
-
+#include "skynet_upper/data_input.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -76,28 +76,26 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  auto opt_iter_method = create_push_sum(
-    size_of_system,
-    number_of_neighbors,
-    starting_value,
-    master_handle,
-    job,
-    pubTag,
-    subTags
-  ).get();
-
-  auto push_sum = *opt_iter_method;
-  // This is the actual iterative scheme.
+  using IterMethod = AsynchronousIterative<PushSum<double>, AlwaysUpdateNbrs, StopAfterTime>;
+  WaiterVal<IterMethod> iter_waiterval =
+    WaiterValBuilder<IterMethod>(master_handle, job, pubTag, subTags)
+    .set_processor(size_of_system, number_of_neighbors, starting_value, subTags)
+    .set_nbr_update_criterion()
+    .set_stopping_criterion(std::chrono::seconds(5))
+    .build_waiterval();
+  IterMethod push_sum = iter_waiterval.get();
+  
   push_sum.run(
       [&](const decltype(push_sum)& p)
       {
         std::cout << "Machine " << machine_number << " has value " <<
-          p.get_processor().return_solution() << std::endl;
+          p.get_processor().return_solution() << " and publications ";
+        print_vec<double>(p.get_publication_values());
       } );
 
   double consensus_value = push_sum.get_processor().return_solution();
   double exact_solution = obtain_exact_average(size_of_system);
-  double run_time_count = push_sum.return_run_time();
+  double run_time_count = push_sum.run_time().count();
   double new_information_count = push_sum.get_processor().return_new_information_count();
 
   std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;

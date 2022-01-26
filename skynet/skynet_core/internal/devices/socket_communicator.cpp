@@ -105,6 +105,7 @@ std::optional<SocketCommunicator> SocketCommunicator::accept() noexcept
     // This should never happen and is a programming bug if it's reached
     // Not 100% sure how to handle it, but forcefully quitting with a message
     // seems to be fine for now
+    SKYNET_DEBUG_LOG("accept had handle_ {}, raw_handle {}, threw error: {}", handle_, raw_handle, strerror(errno));
     std::perror("SocketCommunicator::accept - accept");
     std::exit(4);
   }

@@ -393,6 +393,26 @@ public:
    */
   size_t number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
 
+  void wait_for_update()
+  {
+    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    data_buffer_modified_cv_.wait(lock);
+    lock.unlock();
+  }
+
+  template<typename Duration>
+  void wait_for_update(Duration duration)
+  {
+    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    data_buffer_modified_cv_.wait_for(lock, duration);
+    lock.unlock();
+  }
+
+  void notify_of_update()
+  {
+    data_buffer_modified_cv_.notify_all();
+  }
+  
 private:
   /** \brief Checks if a buffer has data without locking
    */

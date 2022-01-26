@@ -5,6 +5,7 @@
 #include "skynet_core/master.hpp"
 #include "skynet_upper/asynchronous_iterative.hpp"
 #include "skynet_upper/stopping_criterion.hpp"
+#include "skynet_upper/update_nbrs_criterion.hpp"
 
 /**
  * Push Sum is an asynchronous distributed averaging algorithm that
@@ -29,16 +30,16 @@ public:
   using ValueType = std::vector<scalar_t>;
   using ValueTag = skynet::PublishTag<ValueType>;
 
-  template<typename IterativeWrapper>
-  PushSum(const IterativeWrapper& wrapper,
-          size_t size_of_system,
+  template<typename Range>
+  PushSum(size_t size_of_system,
           size_t number_of_neighbors,
-          scalar_t starting_value)
+          scalar_t starting_value,
+          Range& tags)
     : size_of_system_(size_of_system),
     number_of_neighbors_(number_of_neighbors),
     x_value_(starting_value)
   {
-    for (const auto& tag : wrapper.tags())
+    for (const auto& tag : tags)
     {
       rho_x_[tag] = 0.0;
       rho_y_[tag] = 0.0;
@@ -85,11 +86,12 @@ public:
     }
   }
 
-  void prepare_for_publication(ValueType& vals_to_publish)
+  ValueType prepare_for_publication(ValueType vals_to_publish)
   {
     vals_to_publish[0] = sigma_x_;
     vals_to_publish[1] = sigma_y_;
     vals_to_publish[2] = new_information_count_;
+    return vals_to_publish;
   }
 
   scalar_t return_solution() const
@@ -125,6 +127,30 @@ private:
 };  // class PushSum
 
 
+
+template<typename scalar_t>
+class UpdateIfConsensusShift
+{
+public:
+  template<typename CallerT>
+  UpdateIfConsensusShift(const CallerT& caller)
+    : shift_threshold_(1e-4)
+  {
+    (void)caller;
+  }
+
+  template<typename ValueType>
+  bool operator()(const ValueType& new_vals, const ValueType& old_vals)
+  {
+    scalar_t new_ratio = new_vals[0] / new_vals[1];
+    scalar_t old_ratio = old_vals[0] / old_vals[1];
+    return (new_ratio - old_ratio) > shift_threshold_ || (old_ratio - new_ratio) > shift_threshold_;
+  }
+
+private:
+  scalar_t shift_threshold_;
+}; // class UpdateIfConsensusShift
+
 template<typename Range>
 auto create_push_sum(int size_of_system,
                      int number_of_neighbors,
@@ -134,7 +160,7 @@ auto create_push_sum(int size_of_system,
                      const typename PushSum<double>::ValueTag& produced_tag,
                      const Range tags) noexcept
 {
-  using AsynchT = AsynchronousIterative<PushSum<double>>;
+  using AsynchT = AsynchronousIterative<PushSum<double>, UpdateIfConsensusShift<double>, StopAfterTime>;
   return create_asynchronous_iterative<AsynchT, Range>
     (handle, job, produced_tag, tags, size_of_system, number_of_neighbors, starting_value);
 }

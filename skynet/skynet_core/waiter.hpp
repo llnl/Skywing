@@ -143,8 +143,19 @@ public:
     return Continuation<Waiter, Continuations...>{*this, std::move(continuations)...};
   }
 
+  // template<typename S>
+  // Waiter<S> fed_into(std::function<bool(args)> is_ready_callable,std::function<S(ValueType)> get_value_callable)
+  // {
+  //   are_both_ready = [this](){ return is_ready_callable() && this->is_ready(); };
+  //   get_foo = [this]()
+  //     {
+  //       return get_value_callable(this->get());
+  //     };
+  // }
+
+    bool is_ready_no_lock() noexcept { return IsReadyCallable::operator()(); }
+  
 private:
-  bool is_ready_no_lock() noexcept { return IsReadyCallable::operator()(); }
 
   std::mutex* mutex_;
   std::condition_variable* cv_;
@@ -175,9 +186,127 @@ auto make_waiter(std::mutex& mutex, std::condition_variable& cv, IsReadyCallable
 
 
 
+template<typename T>
+class WaiterVal
+{
+public:
+  /// The return type of get()
+  using ValueType = T;
+
+  WaiterVal(
+    std::mutex& mutex_handle,
+    std::condition_variable& cv_handle,
+    std::function<bool()>&& is_ready_callable,
+    std::function<ValueType()>&& get_value_callable) noexcept
+    : mutex_{&mutex_handle}, cv_{&cv_handle},
+      is_ready_callable_(std::move(is_ready_callable)),
+      get_value_callable_(std::move(get_value_callable))
+  {}
+
+  // this constructor for waiters that we know are instantly ready
+  WaiterVal(std::function<ValueType()>&& get_value_callable) noexcept
+    : get_value_callable_(std::move(get_value_callable))
+  {}
+
+  ValueType get() noexcept
+  {
+    if (!mutex_)
+      return get_value_callable_();
+      
+    std::unique_lock<std::mutex> lock{**mutex_};
+    if (!is_ready_no_lock()) {
+      (*cv_)->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+    }
+    return get_value_callable_();
+  }
+
+  void wait() noexcept
+  {
+    if (!mutex_) return;
+    std::unique_lock<std::mutex> lock{**mutex_};
+    if (is_ready_no_lock()) { return; }
+    (*cv_)->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
+  }
+
+  template<class Rep, class Period>
+  bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
+  {
+    if (!mutex_) return true;
+    std::unique_lock<std::mutex> lock{**mutex_};
+    if (is_ready_no_lock()) { return true; }
+    return (*cv_)->wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
+  }
+
+  template<class Rep, class Period>
+  bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
+  {
+    if (!mutex_) return true;
+    std::unique_lock<std::mutex> lock{**mutex_};
+    if (is_ready_no_lock()) { return true; }
+    return (*cv_)->wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
+  }
+
+  bool is_ready() noexcept
+  {
+    if (!mutex_) return true;
+    std::lock_guard<std::mutex> lock{**mutex_};
+    return is_ready_no_lock();
+  }
+
+  // template<typename S>
+  // Waiter<S> fed_into(std::function<bool(args)> is_ready_callable,std::function<S(ValueType)> get_value_callable)
+  // {
+  //   are_both_ready = [this](){ return is_ready_callable() && this->is_ready(); };
+  //   get_foo = [this]()
+  //     {
+  //       return get_value_callable(this->get());
+  //     };
+  // }
+
+  bool is_ready_no_lock() noexcept
+  {
+    if (!mutex_) return true;
+    return (*is_ready_callable_)();
+  }
+
+private:
+
+  std::optional<std::mutex*> mutex_;
+  std::optional<std::condition_variable*> cv_;
+  std::optional<std::function<bool()>> is_ready_callable_;
+  std::function<ValueType()> get_value_callable_;
+}; // class WaiterVal
+
+// template<typename T>
+// class WaiterValBuilder
+// { }; // class WaiterValBuilder
+
+template<typename T>
+class WaiterValBuilder
+{
+public:
+  using ObjectT = T;
+
+  template<typename... Args>
+  WaiterValBuilder(Args&&... args)
+    : waiterval_([&](){ return ObjectT(std::forward<Args>(args)...); })
+  { }
+
+  WaiterVal<ObjectT> build_waiterval() { return waiterval_; }
+
+private:
+  WaiterVal<ObjectT> waiterval_;
+
+}; // class WaiterValBuilder<AsynchronousJacobi<double>>
 
 
 
+template<typename T>
+WaiterVal<T> make_waiterval(std::mutex& mutex, std::condition_variable& cv,
+                            std::function<bool()> ready, std::function<T()> get_value)
+{
+  return WaiterVal<T>{mutex, cv, std::move(ready), std::move(get_value)};
+}
 
 
 
@@ -254,6 +383,8 @@ AllWaiter<Waiters...> when_all(Waiters&... waiters) noexcept
 {
   return AllWaiter{waiters...};
 }
+
+
 
 /** \brief Class that can be used to wait on many waiters of the same type.
  *
