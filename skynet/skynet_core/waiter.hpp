@@ -210,7 +210,7 @@ public:
 
   ValueType get() noexcept
   {
-    if (!mutex_)
+    if (is_instant())
       return get_value_callable_();
       
     std::unique_lock<std::mutex> lock{**mutex_};
@@ -222,7 +222,7 @@ public:
 
   void wait() noexcept
   {
-    if (!mutex_) return;
+    if (is_instant()) return;
     std::unique_lock<std::mutex> lock{**mutex_};
     if (is_ready_no_lock()) { return; }
     (*cv_)->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
@@ -231,16 +231,15 @@ public:
   template<class Rep, class Period>
   bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
   {
-    if (!mutex_) return true;
-    std::unique_lock<std::mutex> lock{**mutex_};
-    if (is_ready_no_lock()) { return true; }
-    return (*cv_)->wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
+    if (is_instant()) return true;
+    const auto end_time = std::chrono::steady_clock::now() + wait_time;
+    return wait_until(end_time);
   }
 
   template<class Rep, class Period>
   bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
   {
-    if (!mutex_) return true;
+    if (is_instant()) return true;
     std::unique_lock<std::mutex> lock{**mutex_};
     if (is_ready_no_lock()) { return true; }
     return (*cv_)->wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
@@ -248,7 +247,7 @@ public:
 
   bool is_ready() noexcept
   {
-    if (!mutex_) return true;
+    if (is_instant()) return true;
     std::lock_guard<std::mutex> lock{**mutex_};
     return is_ready_no_lock();
   }
@@ -263,13 +262,15 @@ public:
   //     };
   // }
 
+private:
+
   bool is_ready_no_lock() noexcept
   {
     if (!mutex_) return true;
     return (*is_ready_callable_)();
   }
 
-private:
+  bool is_instant() { return !mutex_; }
 
   std::optional<std::mutex*> mutex_;
   std::optional<std::condition_variable*> cv_;
@@ -306,9 +307,7 @@ WaiterVal<T> make_waiterval(std::mutex& mutex, std::condition_variable& cv,
                             std::function<bool()> ready, std::function<T()> get_value)
 {
   return WaiterVal<T>{mutex, cv, std::move(ready), std::move(get_value)};
-}
-
-
+}                                               
 
 
 

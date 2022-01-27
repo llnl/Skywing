@@ -102,22 +102,6 @@ public:
     return vals_to_publish;
   }
   
-  void jacobi_computation()
-  {
-    for(size_t i = 0 ; i < number_of_updated_components_; i++)
-    {
-      double hold = 0.0;
-      for(size_t j = 0 ; j < A_partition_[0].size(); j++)
-      {
-        if(j!=row_indices_[i])
-          hold += A_partition_[i][j]*x_iter_[j];
-      }
-      hold = (b_partition_[i] - hold)/A_partition_[i][row_indices_[i]];
-      size_t updated_index = row_indices_[i];
-      x_iter_[updated_index] = hold;
-    }
-  }
-
   // Returns only the components for which this process updates. 
   // Since jacobi is a row - wise operation, this is NOT the full x_iter.  
   // If return_partial_solution() = return_partition_solution(), then
@@ -138,6 +122,23 @@ public:
   }
 
 private:
+  void jacobi_computation()
+  {
+    for(size_t i = 0 ; i < number_of_updated_components_; i++)
+    {
+      double hold = 0.0;
+      for(size_t j = 0 ; j < A_partition_[0].size(); j++)
+      {
+        if(j!=row_indices_[i])
+          hold += A_partition_[i][j]*x_iter_[j];
+      }
+      hold = (b_partition_[i] - hold)/A_partition_[i][row_indices_[i]];
+      size_t updated_index = row_indices_[i];
+      x_iter_[updated_index] = hold;
+    }
+  }
+
+
   std::vector<std::vector<scalar_t>> A_partition_;
   std::vector<scalar_t> b_partition_;
   std::vector<size_t> row_indices_;
@@ -149,33 +150,5 @@ private:
   std::vector<scalar_t> publish_values_;
 }; // class AsynchronousJacobi
 
-
-template<typename Range>
-auto create_asynchronous_jacobi(
-    std::vector<std::vector<double>> A_partition,
-    std::vector<double> b_partition,
-    std::vector<size_t> row_indices,
-    MasterHandle handle,
-    Job& job,
-    const typename AsynchronousJacobi<double>::ValueTag& produced_tag,
-    const Range& tags) noexcept
-{
-  using AsynchT = AsynchronousIterative<AsynchronousJacobi<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
-  return create_asynchronous_iterative<AsynchT, Range>
-    (handle, job, produced_tag, tags, A_partition, b_partition, row_indices);
-  
-  // return create_asynchronous_iterative<AsynchronousJacobi<double>, decltype(tags)>
-  //   (std::forward<Args>(args)...)
-  //   .then([=](std::optional<AsynchronousIterative<std::vector<double>>> it)
-  //         -> std::optional<AsynchronousJacobi<double>> {
-  //    if (it) {
-  //      return AsynchronousJacobi<double>(A_partition, b_partition, row_indices, tags, *it);
-  //    }
-  //    else {
-  //      return {};
-  //    }
-  //     });
-
-}
 
 #endif 

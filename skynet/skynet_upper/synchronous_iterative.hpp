@@ -13,10 +13,13 @@ namespace skynet {
 /** \brief Method for receiving information from a specified set of tags
  * in a synchronous fashion
  */
-template<typename Processor, typename... TagValueTypes>
-class SynchronousIterative : public internal::IterativeBase<TagValueTypes...> {
+template<typename Processor>
+class SynchronousIterative : public internal::IterativeBase<typename Processor:ValueType>
+{
+  using ThisT = SynchronousIterative<Processor>;
+  
 public:
-  using ValueType = typename Processor:ValueType; // ValueOrTuple<TagValueTypes...>;
+  using ValueType = typename Processor:ValueType;
   using ValueTag = skynet::PublishTag<ValueType>;
 
   template<typename... Args>
@@ -26,85 +29,158 @@ public:
     const std::vector<PublishTag<TagValueTypes...>>& tags,
     Args&&... args) noexcept
     : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags},
-    processor_(std::forward<Args>(args)...)
+    processor_(std::forward<Args>(args)...),
+    publish_values_(processor_.get_init_publish_values())
   {}
 
-
-  /** \brief Retrieves the values from all tags, not being ready
-   * until all tags have either received values or errored.
-   *
-   * If a subscription for a tag become unavailable, the waiter will
-   * return an empty vector.
-   */
-  template<typename... ArgTypes>
-  auto values(ArgTypes&&... submit_values) noexcept
+  template<bool has_callback=true>
+  void run(std::function<void(const ThisT&)> callback)
   {
-    this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
+    start_time_ = clock_t::now();
+    submit_values(publish_values_);
+    while (iterate_)
+    {
+      while (iterate_)
+      {
+        auto vals = std::move(values()); // an std::optional<std::vector<ValueType>>
+        if (!vals) break;
+        
+        const auto& received_values_vec = *vals;
+        ++iteration_count_;
+        for (size_t vals_ind = 0; vals_ind < received_values_vec.size(); vals_ind++)
+            processor_.process_update(alive_tags[vals_ind], received_values_vec[vals_ind], *this);
+
+        publish_values_ = processor_.prepare_for_publication(publish_values_);
+        submit_values(publish_values_);
+        
+        if constexpr (has_callback) callback(*this);
+        iterate_ = stopping_criterion_(*this);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+      this->get_job().wait_for_update(std::chrono::seconds(1));
+      iterate_ = stopping_criterion_(*this);
+    }
+  }
+
+  auto values() noexcept
+  {
     using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
     std::vector<WaiterType> waiters;
     waiters.reserve(this->tags_.size());
     for (const auto& tag : this->tags_) {
       waiters.push_back(this->job_->get_waiter(tag));
     }
-    return when_all_same(waiters).then(
-      [&](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
-        bool errored = false;
-        std::vector<ValueType> ret_values;
-        ret_values.reserve(opt_values.size());
-        auto tag_iter = this->tags_.begin();
-        for (const auto& val : opt_values) {
-          if (val) {
-            if (!errored) { ret_values.push_back(*val); }
-            ++tag_iter;
-          }
-          else {
-            errored = true;
-            this->dead_tags_.push_back(std::move(*tag_iter));
-            tag_iter = this->tags_.erase(tag_iter);
-          }
-        }
-        return errored ? std::vector<ValueType>{} : ret_values;
-      });
+    std::vector<std::optional<ValueType>> opt_values;
+    opt_values.reserve(this->tags_.size());
+    for (auto& waiter : waiters)
+      opt_values.push_back(waiter.get());
+
+    std::vector<ValueType> ret_values;
+    auto tag_iter = this->tags_.begin();
+    for (const auto& val : opt_values)
+    {
+      if (val)
+      {
+        ret_values.push_back(*val);
+        ++tag_iter;
+      }
+      else
+      {
+        this->dead_tags_.push_back(std::move(*tag_iter));
+        tag_iter = this->tags_.erase(tag_iter);
+      }
+    }
+    return ret_values;
   }
 
-  /** \brief Retrieves the values from all tags, not being ready
-   * until all tags have either received values or errored.
-   *
-   * The waiter return type is
-   * std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>&>
-   * The vector of tags indicate which tag each value is from.
-   */
   template<typename... ArgTypes>
-  auto values_ignore_errors(ArgTypes&&... submit_values) noexcept
+  auto submit_values(ArgTypes&&... values_to_submit) noexcept
   {
-    this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
-    using RetType = std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>>&>;
-    using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
-    std::vector<WaiterType> waiters;
-    waiters.reserve(this->tags_.size());
-    return when_all_same(waiters).then(
-      [this](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> RetType {
-        std::vector<ValueType> ret_values;
-        ret_values.reserve(opt_values.size());
-        auto tag_iter = this->tags_.begin();
-        for (const auto& val : opt_values) {
-          if (val) {
-            ret_values.push_back(*val);
-            ++tag_iter;
-          }
-          else {
-            this->dead_tags_.push_back(std::move(*tag_iter));
-            tag_iter = this->tags_.erase(tag_iter);
-          }
-        }
-        return {ret_values, this->tags_};
-      });
+    this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
   }
+
+
+  // /** \brief Retrieves the values from all tags, not being ready
+  //  * until all tags have either received values or errored.
+  //  *
+  //  * If a subscription for a tag become unavailable, the waiter will
+  //  * return an empty vector.
+  //  */
+  // template<typename... ArgTypes>
+  // auto values(ArgTypes&&... submit_values) noexcept
+  // {
+  //   this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
+  //   using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
+  //   std::vector<WaiterType> waiters;
+  //   waiters.reserve(this->tags_.size());
+  //   for (const auto& tag : this->tags_) {
+  //     waiters.push_back(this->job_->get_waiter(tag));
+  //   }
+  //   return when_all_same(waiters).then(
+  //     [&](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> std::vector<ValueType> {
+  //       bool errored = false;
+  //       std::vector<ValueType> ret_values;
+  //       ret_values.reserve(opt_values.size());
+  //       auto tag_iter = this->tags_.begin();
+  //       for (const auto& val : opt_values) {
+  //         if (val) {
+  //           if (!errored) { ret_values.push_back(*val); }
+  //           ++tag_iter;
+  //         }
+  //         else {
+  //           errored = true;
+  //           this->dead_tags_.push_back(std::move(*tag_iter));
+  //           tag_iter = this->tags_.erase(tag_iter);
+  //         }
+  //       }
+  //       return errored ? std::vector<ValueType>{} : ret_values;
+  //     });
+  // }
+
+
+  // /** \brief Retrieves the values from all tags, not being ready
+  //  * until all tags have either received values or errored.
+  //  *
+  //  * The waiter return type is
+  //  * std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>&>
+  //  * The vector of tags indicate which tag each value is from.
+  //  */
+  // template<typename... ArgTypes>
+  // auto values_ignore_errors(ArgTypes&&... submit_values) noexcept
+  // {
+  //   this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(submit_values)...);
+  //   using RetType = std::pair<std::vector<ValueType>, const std::vector<PublishTag<TagValueTypes...>>&>;
+  //   using WaiterType = decltype(this->job_->get_waiter(this->tags_.front()));
+  //   std::vector<WaiterType> waiters;
+  //   waiters.reserve(this->tags_.size());
+  //   return when_all_same(waiters).then(
+  //     [this](const std::vector<std::optional<ValueType>>& opt_values) noexcept -> RetType {
+  //       std::vector<ValueType> ret_values;
+  //       ret_values.reserve(opt_values.size());
+  //       auto tag_iter = this->tags_.begin();
+  //       for (const auto& val : opt_values) {
+  //         if (val) {
+  //           ret_values.push_back(*val);
+  //           ++tag_iter;
+  //         }
+  //         else {
+  //           this->dead_tags_.push_back(std::move(*tag_iter));
+  //           tag_iter = this->tags_.erase(tag_iter);
+  //         }
+  //       }
+  //       return {ret_values, this->tags_};
+  //     });
+  // }
 
 private:
-  template<typename...>
-  friend class SupernodeSynchronousIterative;
+  Processor processor_;
+  ValueType publish_values_;
 
+  using clock_t = std::chrono::steady_clock;
+  std::optional<std::chrono::time_point<clock_t>> start_time_; // only contains a value once the iteration begins
+
+  size_t iteration_count_ = 0;
+  bool iterate_ = true;
 }; // class SynchronousIterative
 
 // template<typename... TagValueTypes>

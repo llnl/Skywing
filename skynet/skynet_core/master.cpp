@@ -1461,11 +1461,6 @@ void Master::process_pending_conns() noexcept
                   greeting.from(), std::move(info.conn), greeting.from(), greeting.neighbors(), *this, greeting.port());
                 new_neighbor_iter = neighbor_iter;
                 if (!inserted) {
-                  // SKYNET_TRACE_LOG(
-                  //   "\"{}\" rejected greeting from \"{}\" due to the name already being present",
-                  //   id_,
-                  //   neighbor_iter->first);
-                  // return false;
                   SKYNET_TRACE_LOG(
                     "\"{}\" already has a connection from \"{}\" so will simply add to communicators.",
                     id_,

@@ -132,12 +132,10 @@ template<typename scalar_t>
 class UpdateIfConsensusShift
 {
 public:
-  template<typename CallerT>
-  UpdateIfConsensusShift(const CallerT& caller)
-    : shift_threshold_(1e-4)
-  {
-    (void)caller;
-  }
+
+  UpdateIfConsensusShift(scalar_t thresh)
+    : shift_threshold_(thresh)
+  {  }
 
   template<typename ValueType>
   bool operator()(const ValueType& new_vals, const ValueType& old_vals)
@@ -151,29 +149,5 @@ private:
   scalar_t shift_threshold_;
 }; // class UpdateIfConsensusShift
 
-template<typename Range>
-auto create_push_sum(int size_of_system,
-                     int number_of_neighbors,
-                     double starting_value,
-                     MasterHandle handle,
-                     Job& job,
-                     const typename PushSum<double>::ValueTag& produced_tag,
-                     const Range tags) noexcept
-{
-  using AsynchT = AsynchronousIterative<PushSum<double>, UpdateIfConsensusShift<double>, StopAfterTime>;
-  return create_asynchronous_iterative<AsynchT, Range>
-    (handle, job, produced_tag, tags, size_of_system, number_of_neighbors, starting_value);
-}
-
-// // This is the continuation that makes this class possible as this
-// // implementation depends upon the asynchronous_iterative class.
-// template<typename... Args>
-// auto create_push_sum(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, ValueTag myTag, std::vector<ValueTag> tags,  Args&&... args) noexcept
-// {
-//   return create_asynchronous_iterative(std::forward<Args>(args)...).then([=](std::optional<AsynchronousIterative<std::vector<double>>> it) -> std::optional<PushSum> {
-//      if (it) { return PushSum(machine_number, size_of_system, number_of_neighbors, starting_value, myTag, tags, *it);}
-//      else    { return {}; }
-//   });
-// }
 
 #endif

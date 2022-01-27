@@ -53,30 +53,33 @@ public:
   {
     start_time_ = clock_t::now();
     submit_values(publish_values_);
-    while(iterate_)
+    while (iterate_)
     {
-      ++iteration_count_;
-      const auto& [received_values_vec, is_updated, alive_tags] = values();
-      for (size_t vals_ind = 0; vals_ind < received_values_vec.size(); vals_ind++)
+      while (iterate_)
       {
-        if (is_updated[vals_ind])
+        auto vals = std::move(values()); // an std::optional<std::tuple<...>>
+        if (!vals) break;
+        
+        const auto& [received_values_vec, is_updated, alive_tags] = *vals;
+        ++iteration_count_;
+        for (size_t vals_ind = 0; vals_ind < received_values_vec.size(); vals_ind++)
         {
-          processor_.process_update(alive_tags[vals_ind], received_values_vec[vals_ind], *this);
+          if (is_updated[vals_ind])
+            processor_.process_update(alive_tags[vals_ind], received_values_vec[vals_ind], *this);
         }
+        ValueType new_vals = processor_.prepare_for_publication(publish_values_);
+        if (update_nbrs_criterion_(new_vals, publish_values_))
+        {
+          publish_values_ = std::move(new_vals);
+          submit_values(publish_values_);
+        }
+        
+        if constexpr (has_callback) callback(*this);
+        iterate_ = stopping_criterion_(*this);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
-      ValueType new_vals = processor_.prepare_for_publication(publish_values_);
-      if (update_nbrs_criterion_(new_vals, publish_values_))
-      {
-        publish_values_ = std::move(new_vals);
-        submit_values(publish_values_);
-      }
-      
-      if constexpr (has_callback)
-                     callback(*this);
-      
+      this->get_job().wait_for_update(std::chrono::seconds(1));
       iterate_ = stopping_criterion_(*this);
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
-      this->get_job().wait_for_update(std::chrono::milliseconds(250));
     }
   }
 
@@ -89,9 +92,9 @@ public:
 
   /** \brief Returns values from all tags without submitting a value
    */
-  auto values() noexcept -> std::tuple<const std::vector<ValueType>&,
-                                       const std::vector<bool>&,
-                                       const std::vector<ValueTag>&>
+  auto values() noexcept -> std::optional<std::tuple<const std::vector<ValueType>&,
+                                                     const std::vector<bool>&,
+                                                     const std::vector<ValueTag>&>>
   {
     auto updated_iter = is_updated_.begin();
     auto value_iter = values_.begin();
@@ -102,6 +105,7 @@ public:
       updated_iter = is_updated_.erase(updated_iter);
       tag_iter = this->tags_.erase(tag_iter);
     };
+    bool any_updated = false;
     while (tag_iter != this->tags_.cend()) {
       const auto& tag = *tag_iter;
       if (!this->job_->tag_has_active_publisher(tag)) {
@@ -111,6 +115,7 @@ public:
       else if (this->job_->has_data(tag)) {
         const auto value_opt = this->job_->get_waiter(tag).get();
         assert(value_opt);
+        any_updated = true;
         *updated_iter = true;
         *value_iter = *value_opt;
       }
@@ -121,7 +126,8 @@ public:
       ++value_iter;
       ++tag_iter;
     }
-    return {values_, is_updated_, this->tags_};
+    if (any_updated) return std::make_optional(std::make_tuple(std::cref(values_), std::cref(is_updated_), std::cref(this->tags_))); //std::optional<ret_v_t>(std::in_place, values_, is_updated_, this->tags_);
+    else return {};
   }
 
   /** \brief Returns values from all tags while submitting a value
@@ -254,10 +260,8 @@ public:
                 && stopping_criterion_waiter->is_ready());
       };
     
-    auto cons_args =
-      std::tuple<Job&, ValueTag, std::vector<ValueTag>,
-                 Processor, UpdateNbrsCriterion, StoppingCriterion>
-      (job_, produced_tag_, tags_vec_,
+    auto cons_args = std::make_tuple
+      (std::ref(job_), produced_tag_, tags_vec_,
        processor_waiter_->get(),
        nbr_update_criterion_waiter_->get(),
        stopping_criterion_waiter_->get());
@@ -283,114 +287,6 @@ private:
 }; // class WaiterValBuilder<...>
 
 
-
-template<typename ConcreteAsynchronous, typename Range, typename... CAArgs>
-auto create_asynchronous_iterative(
-    MasterHandle handle,
-    Job& job,
-    const typename ConcreteAsynchronous::ValueTag& produced_tag,
-    const Range& tags,
-    CAArgs&&... args) noexcept
-{
-  job.declare_publication_intent(produced_tag);
-  return internal::create_iterative<ConcreteAsynchronous, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe_range(tags),
-    handle,
-    job,
-    produced_tag,
-    tags,
-    std::forward<CAArgs>(args)...
-  );
-}
-  
-
-
-
-
-
-
-
-
-
-  
-// template<typename... TagValueTypes,
-//          typename Range>
-// auto create_asynchronous_iterative(
-//   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
-// {
-//   job.declare_publication_intent(produced_tag);
-//   return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-//     job.subscribe_range(tags),
-//     handle,
-//     job,
-//     produced_tag,
-//     tags
-//   );
-// }
-
-// template<typename... TagValueTypes, typename... TagTypes>
-// auto create_asynchronous_iterative(
-//   MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const TagTypes&... tags) noexcept
-// {
-//   job.declare_publication_intent(produced_tag);
-//   return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-//     job.subscribe(tags...),
-//     handle,
-//     job,
-//     produced_tag,
-//     tags...
-//   );
-// }
-
-// template<
-//   typename... TagValueTypes,
-//   typename Range,
-//   typename Rep,
-//   typename Period>
-// auto create_asynchronous_iterative(
-//   const std::chrono::time_point<Rep, Period>& end_time,
-//   IterativeInitErrorPolicy policy,
-//   MasterHandle handle,
-//   Job& job,
-//   const PublishTag<TagValueTypes...>& produced_tag,
-//   const Range& tags) noexcept
-// {
-//   job.declare_publication_intent(produced_tag);
-//   return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-//     job.subscribe_range(tags),
-//     end_time,
-//     policy,
-//     handle,
-//     job,
-//     produced_tag,
-//     tags
-//   );
-// }
-
-// template<
-//   typename... TagValueTypes,
-//   typename... TagTypes,
-//   typename Rep,
-//   typename Period>
-// auto create_asynchronous_iterative(
-//   const std::chrono::time_point<Rep, Period>& end_time,
-//   IterativeInitErrorPolicy policy,
-//   MasterHandle handle,
-//   Job& job,
-//   const PublishTag<TagValueTypes...>& produced_tag,
-//   const TagTypes&... tags) noexcept
-// {
-//   job.declare_publication_intent(produced_tag);
-//   return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-//     job.subscribe(tags...),
-//     end_time,
-//     policy,
-//     handle,
-//     job,
-//     produced_tag,
-//     tags...
-//   );
-// }
 } // namespace skynet
 
 #endif // SKYNET_UPPER_ASYNCHRONOUS_ITERATIVE_HPP

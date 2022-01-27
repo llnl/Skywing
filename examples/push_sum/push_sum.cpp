@@ -76,11 +76,11 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSum<double>, AlwaysUpdateNbrs, StopAfterTime>;
+  using IterMethod = AsynchronousIterative<PushSum<double>, UpdateIfConsensusShift<double>, StopAfterTime>;
   WaiterVal<IterMethod> iter_waiterval =
     WaiterValBuilder<IterMethod>(master_handle, job, pubTag, subTags)
     .set_processor(size_of_system, number_of_neighbors, starting_value, subTags)
-    .set_nbr_update_criterion()
+    .set_nbr_update_criterion(1e-4)
     .set_stopping_criterion(std::chrono::seconds(5))
     .build_waiterval();
   IterMethod push_sum = iter_waiterval.get();
