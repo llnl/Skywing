@@ -17,7 +17,8 @@ const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
 
 std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
 
-tag_map<std::vector<int>> publish_values{
+tag_map<std::vector<int>> publish_values
+{
   {tags[0], std::vector<int>{0, 10}},
   {tags[1], std::vector<int>{1, 20}},
   {tags[2], std::vector<int>{2, 30}}

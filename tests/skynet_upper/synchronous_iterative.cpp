@@ -74,7 +74,6 @@ void machine_task(const NetworkInfo* const info, const int index)
       (
        [&]([[maybe_unused]] const IterMethod& c)
        {
-         std::cout << "machine " << index << " callback" << std::endl;
          std::this_thread::sleep_for(std::chrono::seconds(1));
        }
       );
