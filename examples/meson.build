@@ -6,7 +6,7 @@ if build_lc_examples
    subdir('lc_hello_world')
 endif
 
-#subdir('sync_jacobi')
+subdir('sync_jacobi')
 subdir('async_jacobi')
 subdir('push_sum')
 

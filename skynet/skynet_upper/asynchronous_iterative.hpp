@@ -3,7 +3,7 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/internal/iterative_base.hpp"
+#include "skynet_upper/iterative_method.hpp"
 #include "skynet_upper/stopping_criterion.hpp"
 
 #include <cstdlib>
@@ -16,73 +16,109 @@
 #include <condition_variable>
 
 namespace skynet {
-
-/** \brief Method for receiving information from a specified set of tags
- * in an asynchronous fashion
+using namespace std::chrono_literals;
+  
+/**
+ * @brief A decentralized, fully-asynchronous iterative method.
+ * 
+ * This class template implements the framework of an iterative method
+ * in which an agent performs a local computation, and possibly sends
+ * updates to neighbors, as soon as it receives any update. It does
+ * not wait for all neighbors to send updates.
+ *
+ * Can be constructed directly, but in most cases is easiest to build
+ * through the WaiterBuilder class.
+ *
+ * @tparam Processor The numerical heart of the iterative method. Must
+ * define a type @p ValueType of the data type to communicate, as well
+ * as the following member functions: 
+ * - @p ValueType get_init_publish_values()
+ * - @p void template<typename CallerT> process_update(const std::vector<ValueTag>&, const std::vector<ValueType>&, const CallerT&)
+ * - @p ValueType prepare_for_publication(ValueType)
+ *
+ * @tparam PublishPolicy Determines when it is worth sending an
+ * update to its neighbors. Must define a member function 
+ * @p bool operator()(const ValueType& new_vals, const ValueType& old_vals)
+ *
+ * @tparam StopPolicy Determines when to stop the
+ * iteration. Must define a member function @ bool operator()(constCallerT&)
  */
-template<typename Processor, typename UpdateNbrsCriterion, typename StoppingCriterion>
-class AsynchronousIterative : public internal::IterativeBase<typename Processor::ValueType>
+template<typename Processor, typename PublishPolicy, typename StopPolicy>
+class AsynchronousIterative : public IterativeMethod<typename Processor::ValueType>
 {
-  using ThisT = AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>;
+  using ThisT = AsynchronousIterative<Processor, PublishPolicy, StopPolicy>;
   
 public:
   using ValueType = typename Processor::ValueType;
   using ValueTag = skynet::PublishTag<ValueType>;
   using ProcessorT = Processor;
-  using UpdateNbrsCriterionT = UpdateNbrsCriterion;
-  using StoppingCriterionT = StoppingCriterion;
+  using PublishPolicyT = PublishPolicy;
+  using StopPolicyT = StopPolicy;
 
-  AsynchronousIterative(Job& job,
-                        const ValueTag& produced_tag,
-                        const std::vector<ValueTag>& tags,
-                        Processor processor,
-                        UpdateNbrsCriterion update_nbrs_criterion,
-                        StoppingCriterion stopping_criterion) noexcept
-    : internal::IterativeBase<ValueType>{job, produced_tag, tags},
+    /**
+   * @param job The job running the iteration.
+   * @param produced_tag The tag of the data produced by this agent and sent to iteration neighbors.
+   * @param tags The set of tags with <em>already finalized subscriptions</em> from neighbors this iteration relies on.
+   * @param processor The Processor object used in iteration.
+   * @param publish_policy The PublishPolicy object used in iteration.
+   * @param stop_policy The StopPolicy object used in iteration.
+   * @param loop_delay_max The maximum amount of time to wait for an update before at least checking the stopping criterion.
+   */
+  AsynchronousIterative(
+    Job& job,
+    const ValueTag& produced_tag,
+    const std::vector<ValueTag>& tags,
+    Processor processor,
+    PublishPolicy publish_policy,
+    StopPolicy stop_policy,
+    std::chrono::milliseconds loop_delay_max = 1000ms) noexcept
+    : IterativeMethod<ValueType>{job, produced_tag, tags},
     processor_(std::move(processor)),
-    values_(tags.size()),
-    is_updated_(tags.size()),
     publish_values_(processor_.get_init_publish_values()),
-    update_nbrs_criterion_(std::move(update_nbrs_criterion)),
-    stopping_criterion_(std::move(stopping_criterion))
-  {
-  }
+    publish_policy_(std::move(publish_policy)),
+    stop_policy_(std::move(stop_policy)),
+    wait_max_(loop_delay_max)
+  { }
 
+  /** @brief Run the iteration until stopping time or forever.
+   *  @param callback A callback function to call after each processing iteration.
+   */ 
   template<bool has_callback = true>
   void run(std::function<void(const ThisT&)> callback)
   {
     start_time_ = clock_t::now();
     submit_values(publish_values_);
+    iterate_ = true;
     while (iterate_)
     {
       while (iterate_)
       {
-        auto vals = std::move(values()); // an std::optional<std::tuple<...>>
+        auto vals = values(); // an std::optional<std::pair<...>>
         if (!vals) break;
+
+        const auto [received_values_vec, nbr_tags] = *vals;
+        processor_.process_update(nbr_tags, received_values_vec, *this);
         
-        const auto& [received_values_vec, is_updated, alive_tags] = *vals;
-        ++iteration_count_;
-        for (size_t vals_ind = 0; vals_ind < received_values_vec.size(); vals_ind++)
-        {
-          if (is_updated[vals_ind])
-            processor_.process_update(alive_tags[vals_ind], received_values_vec[vals_ind], *this);
-        }
         ValueType new_vals = processor_.prepare_for_publication(publish_values_);
-        if (update_nbrs_criterion_(new_vals, publish_values_))
+        if (publish_policy_(new_vals, publish_values_))
         {
           publish_values_ = std::move(new_vals);
           submit_values(publish_values_);
         }
         
         if constexpr (has_callback) callback(*this);
-        iterate_ = stopping_criterion_(*this);
+        iterate_ = stop_policy_(*this);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
-      this->get_job().wait_for_update(std::chrono::seconds(1));
-      iterate_ = stopping_criterion_(*this);
+      if (!iterate_) break;
+      this->get_job().wait_for_update(wait_max_);
+      iterate_ = stop_policy_(*this);
     }
+    stop_time_ = clock_t::now();
   }
 
+  /** @brief Run the iteration until stopping time or forever without a callback.
+   */ 
   void run()
   {
     // Call run with has_callback=false so the callback doesn't get
@@ -90,59 +126,52 @@ public:
     run<false>([](const ThisT&) { return; } );
   }
 
-  /** \brief Returns values from all tags without submitting a value
+  /** @brief Returns values from all tags that have been updated.
+   *
+   *  @returns If any neighbor data has been updated, an optional
+   *  containing a pair of vectors of values and associated
+   *  tags. Otherwise, an empty optional.
    */
-  auto values() noexcept -> std::optional<std::tuple<const std::vector<ValueType>&,
-                                                     const std::vector<bool>&,
-                                                     const std::vector<ValueTag>&>>
+  auto values() noexcept -> std::optional<std::pair<std::vector<ValueType>,
+                                                    std::vector<ValueTag>>>
   {
-    auto updated_iter = is_updated_.begin();
-    auto value_iter = values_.begin();
     auto tag_iter = this->tags_.begin();
     const auto mark_current_as_dead = [&]() {
       this->dead_tags_.push_back(std::move(*tag_iter));
-      value_iter = values_.erase(value_iter);
-      updated_iter = is_updated_.erase(updated_iter);
       tag_iter = this->tags_.erase(tag_iter);
     };
-    bool any_updated = false;
-    while (tag_iter != this->tags_.cend()) {
+    size_t num_updated = 0;
+    while (tag_iter != this->tags_.cend())
+    {
       const auto& tag = *tag_iter;
-      if (!this->job_->tag_has_active_publisher(tag)) {
+      if (!this->job_->tag_has_active_publisher(tag))
+      {
         mark_current_as_dead();
         continue;
       }
-      else if (this->job_->has_data(tag)) {
-        const auto value_opt = this->job_->get_waiter(tag).get();
-        assert(value_opt);
-        any_updated = true;
-        *updated_iter = true;
-        *value_iter = *value_opt;
-      }
-      else {
-        *updated_iter = false;
-      }
-      ++updated_iter;
-      ++value_iter;
+      if (this->job_->has_data(tag)) num_updated++;
       ++tag_iter;
     }
-    if (any_updated) return std::make_optional(std::make_tuple(std::cref(values_), std::cref(is_updated_), std::cref(this->tags_))); //std::optional<ret_v_t>(std::in_place, values_, is_updated_, this->tags_);
-    else return {};
+    if (num_updated == 0) return {};
+    
+    std::vector<ValueType> nbr_values;
+    std::vector<ValueTag> nbr_tags;
+    nbr_values.reserve(num_updated);
+    nbr_tags.reserve(num_updated);
+    for (const auto& tag : this->tags_)
+    {
+      if (this->job_->has_data(tag))
+      {
+        const auto value_opt = this->job_->get_waiter(tag).get();
+        assert(value_opt);
+        nbr_values.push_back(*value_opt);
+        nbr_tags.push_back(tag);
+      }
+    }
+    return std::make_optional(std::make_pair(std::move(nbr_values), std::move(nbr_tags)));
   }
 
-  /** \brief Returns values from all tags while submitting a value
-   */
-  template<typename... ArgTypes>
-  auto values(ArgTypes&&... values_to_submit) noexcept
-    -> std::tuple<const std::vector<ValueType>&,
-                  const std::vector<bool>&,
-                  const std::vector<ValueTag>&>
-  {
-    submit_values(std::forward<ArgTypes>(values_to_submit)...);
-    return values();
-  }
-
-  /** \brief Submit a value
+  /** @brief Publish this agent's values for its neighbors.
    */
   template<typename... ArgTypes>
   auto submit_values(ArgTypes&&... values_to_submit) noexcept
@@ -150,22 +179,31 @@ public:
     this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
   }
 
+  /** @brief Get iteration run time, or zero if not yet began.
+   */
   std::chrono::milliseconds run_time() const
   {
     if (!start_time_)
       return std::chrono::milliseconds::zero();
+    if (!iterate_)
+      return std::chrono::duration_cast<std::chrono::milliseconds>(*stop_time_ - *start_time_);
     
     auto curr_time = clock_t::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - *start_time_);
   }
 
   const ValueType& get_publication_values() const { return publish_values_; }
-  
+
+  /** @brief Get number of iterations.
+   */
   unsigned get_iteration_count() const
   {
     return iteration_count_;
   }
 
+  /** @brief Get if iteration is ongoing. False can mean either that
+   *   it has stopped or that it has not yet begun.
+   */
   bool return_iterate() const
   {
     return iterate_;
@@ -176,32 +214,63 @@ public:
 
 private:
   Processor processor_;
-  std::vector<ValueType> values_;
-  std::vector<bool> is_updated_;
   ValueType publish_values_;
-  UpdateNbrsCriterion update_nbrs_criterion_;
-  StoppingCriterion stopping_criterion_;
+  PublishPolicy publish_policy_;
+  StopPolicy stop_policy_;
 
   using clock_t = std::chrono::steady_clock;
   std::optional<std::chrono::time_point<clock_t>> start_time_; // only contains a value once the iteration begins
+  std::optional<std::chrono::time_point<clock_t>> stop_time_; // only contains a value once the iteration ends
 
   size_t iteration_count_ = 0;
-  bool iterate_ = true;
+  bool iterate_ = false;
+  std::chrono::milliseconds wait_max_;
 }; // class AsynchronousIterative
 
 
 
 
-template<typename Processor, typename UpdateNbrsCriterion, typename StoppingCriterion>
-class WaiterValBuilder<AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>>
+/** @brief A template specialization of WaiterBuilder for AsynchronousIterative methods.
+ *
+ * To build this WaiterBuilder, do not pass the AsynchronousIterative
+ * template parameters directly, but define the specific type of
+ * AsynchronousIterative you wish to build and pass that. Then call
+ * each of the @p set_* member functions, passing constructor
+ * parameters as needed (still call it even if the parameter list is
+ * empty), and finally call @p build_waiter to obtain a Waiter to your
+ * iterative method. This waiter will wait on any subscriptions or
+ * other wait conditions that need to be completed, and will then
+ * lazily construct each sub-component and finally the iterative
+ * method itself.
+ *
+ * For example, a typical use might be as follows:
+ * @code
+ * using IterMethod = AsynchronousIterative<JacobiProcessor<double>, AlwaysUpdateNbrs, StopAfterTime>;
+ * Waiter<IterMethod> iter_waiter =
+ *  WaiterBuilder<IterMethod>(master_handle, job, my_tag, nbr_tags)
+ *  .set_processor(A, b, row_inds)
+ *  .set_nbr_update_criterion()
+ *  .set_stop_policy(std::chrono::seconds(5))
+ *  .build_waiter();
+ * IterMethod sync_jacobi = iter_waiter.get();
+ * @endcode
+ */  
+template<typename Processor, typename PublishPolicy, typename StopPolicy>
+class WaiterBuilder<AsynchronousIterative<Processor, PublishPolicy, StopPolicy>>
 {
 public:
-  using ObjectT = AsynchronousIterative<Processor, UpdateNbrsCriterion, StoppingCriterion>;
-  using ThisT = WaiterValBuilder<ObjectT>;
+  using ObjectT = AsynchronousIterative<Processor, PublishPolicy, StopPolicy>;
+  using ThisT = WaiterBuilder<ObjectT>;
   using ValueTag = typename Processor::ValueTag;
 
+    /**
+   * @param handle MasterHandle object running this agent.
+   * @param job The job running the iteration.
+   * @param produced_tag The tag of the data produced by this agent and sent to iteration neighbors.
+   * @param tags An iteration-capable container of tags of neighboring data from which this agent will collect updates. Can be 
+   */
   template<typename Range>
-  WaiterValBuilder(MasterHandle handle, Job& job,
+  WaiterBuilder(MasterHandle handle, Job& job,
                    const ValueTag& produced_tag,
                    const Range& tags)
     : handle_(handle), job_(job),
@@ -210,64 +279,64 @@ public:
   {
     job.declare_publication_intent(produced_tag);
     subscribe_waiter_ =
-      std::make_shared<Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>
-      (job.subscribe_range(tags));
+      std::make_shared<Waiter<void>>(job.subscribe_range(tags));
   }
 
+  /** @brief Build a Waiter<Processor> that will construct the Processor for this iterative method.
+   */
   template<typename... Args>
   ThisT& set_processor(Args&&... args)
   {
-    processor_waiter_ = std::make_shared<WaiterVal<Processor>>
-      (std::move(WaiterValBuilder<Processor>(std::forward<Args>(args)...).build_waiterval()));
+    processor_waiter_ = std::make_shared<Waiter<Processor>>
+      (std::move(WaiterBuilder<Processor>(std::forward<Args>(args)...).build_waiter()));
     return *this;
   }
 
+  /** @brief Build a Waiter<PublishPolicy> that will construct the PublishPolicy for this iterative method.
+   */
   template<typename... Args>
-  ThisT& set_nbr_update_criterion(Args&&... args)
+  ThisT& set_publish_policy(Args&&... args)
   {
-    nbr_update_criterion_waiter_ = std::make_shared<WaiterVal<UpdateNbrsCriterion>>
-      (WaiterValBuilder<UpdateNbrsCriterion>(std::forward<Args>(args)...).build_waiterval());
+    publish_policy_waiter_ = std::make_shared<Waiter<PublishPolicy>>
+      (WaiterBuilder<PublishPolicy>(std::forward<Args>(args)...).build_waiter());
     return *this;
   }
 
+  /** @brief Build a Waiter<StopPolicy> that will construct the StopPolicy for this iterative method.
+   */
   template<typename... Args>
-  ThisT& set_stopping_criterion(Args&&... args)
+  ThisT& set_stop_policy(Args&&... args)
   {
-    stopping_criterion_waiter_ = std::make_shared<WaiterVal<StoppingCriterion>>
-      (WaiterValBuilder<StoppingCriterion>(std::forward<Args>(args)...).build_waiterval());
+    stop_policy_waiter_ = std::make_shared<Waiter<StopPolicy>>
+      (WaiterBuilder<StopPolicy>(std::forward<Args>(args)...).build_waiter());
     return *this;
   }
-
-  ObjectT build()
-  {
-    return ObjectT(job_, produced_tag_, tags_vec_,
-                   std::move(processor_waiter_->get()),
-                   std::move(nbr_update_criterion_waiter_->get()),
-                   std::move(stopping_criterion_waiter_->get()));
-  }
-
-  WaiterVal<ObjectT> build_waiterval()
+  
+  /* @brief Build a Waiter to the desired synchronous iterative method.
+   * @returns A Waiter<AsynchronousIterative<Processor, PublishPolicy, StopPolicy>>
+   */
+  Waiter<ObjectT> build_waiter()
   {
     // capture by value to ensure liveness of shared ptrs
     auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
                      processor_waiter = this->processor_waiter_,
-                     nbr_update_criterion_waiter = this->nbr_update_criterion_waiter_,
-                     stopping_criterion_waiter = this->stopping_criterion_waiter_]()
+                     publish_policy_waiter = this->publish_policy_waiter_,
+                     stop_policy_waiter = this->stop_policy_waiter_]()
       {
         return (subscribe_waiter_->is_ready()
                 && processor_waiter->is_ready()
-                && nbr_update_criterion_waiter->is_ready()
-                && stopping_criterion_waiter->is_ready());
+                && publish_policy_waiter->is_ready()
+                && stop_policy_waiter->is_ready());
       };
     
     auto cons_args = std::make_tuple
       (std::ref(job_), produced_tag_, tags_vec_,
        processor_waiter_->get(),
-       nbr_update_criterion_waiter_->get(),
-       stopping_criterion_waiter_->get());
+       publish_policy_waiter_->get(),
+       stop_policy_waiter_->get());
     auto get_object = [cons_args = std::move(cons_args)]()
         { return std::make_from_tuple<ObjectT>(cons_args); };
-    return handle_.waiterval_on_subscription_change<ObjectT>(is_ready, std::move(get_object));
+    return handle_.waiter_on_subscription_change<ObjectT>(is_ready, std::move(get_object));
   }
 
 
@@ -278,13 +347,13 @@ private:
   std::vector<ValueTag> tags_vec_;
 
   // Using shared_ptrs on these waiters so that they are not destroyed
-  // if the WaiterValBuilder gets destroyed before the
+  // if the WaiterBuilder gets destroyed before the
   // object is retrieved from the Waiter<ThisT>.
-  std::shared_ptr<Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>> subscribe_waiter_;
-  std::shared_ptr<WaiterVal<Processor>> processor_waiter_;
-  std::shared_ptr<WaiterVal<UpdateNbrsCriterion>> nbr_update_criterion_waiter_;
-  std::shared_ptr<WaiterVal<StoppingCriterion>> stopping_criterion_waiter_;
-}; // class WaiterValBuilder<...>
+  std::shared_ptr<Waiter<void>> subscribe_waiter_;
+  std::shared_ptr<Waiter<Processor>> processor_waiter_;
+  std::shared_ptr<Waiter<PublishPolicy>> publish_policy_waiter_;
+  std::shared_ptr<Waiter<StopPolicy>> stop_policy_waiter_;
+}; // class WaiterBuilder<...>
 
 
 } // namespace skynet

@@ -82,132 +82,79 @@ private:
   Waiter to_wait_on_;
 }; // class Continuation
 
-template<typename IsReadyCallable, typename GetValueCallable>
-class Waiter
-  : public IsReadyCallable
-  , public GetValueCallable {
-public:
-  /// The return type of get()
-  using ValueType = decltype(std::declval<GetValueCallable>()());
-
-  Waiter(
-    std::mutex& mutex_handle,
-    std::condition_variable& cv_handle,
-    IsReadyCallable ready,
-    GetValueCallable get_value) noexcept
-    : IsReadyCallable{std::move(ready)}, GetValueCallable{std::move(get_value)}, mutex_{&mutex_handle}, cv_{&cv_handle}
-  {}
-
-  decltype(auto) get() noexcept
-  {
-    std::unique_lock<std::mutex> lock{*mutex_};
-    if (!is_ready_no_lock()) {
-      cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
-    }
-    return GetValueCallable::operator()();
-  }
-
-  void wait() noexcept
-  {
-    std::unique_lock<std::mutex> lock{*mutex_};
-    if (is_ready_no_lock()) { return; }
-    cv_->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
-  }
-
-  template<class Rep, class Period>
-  bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
-  {
-    std::unique_lock<std::mutex> lock{*mutex_};
-    if (is_ready_no_lock()) { return true; }
-    return cv_->wait_for(lock, wait_time, [this]() noexcept { return is_ready_no_lock(); });
-  }
-
-  template<class Rep, class Period>
-  bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
-  {
-    std::unique_lock<std::mutex> lock{*mutex_};
-    if (is_ready_no_lock()) { return true; }
-    return cv_->wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
-  }
-
-  bool is_ready() noexcept
-  {
-    std::lock_guard<std::mutex> lock{*mutex_};
-    return is_ready_no_lock();
-  }
-
-  // For transforming the get type
-  template<typename... Continuations>
-  Continuation<Waiter, Continuations...> then(Continuations... continuations) && noexcept
-  {
-    return Continuation<Waiter, Continuations...>{*this, std::move(continuations)...};
-  }
-
-  // template<typename S>
-  // Waiter<S> fed_into(std::function<bool(args)> is_ready_callable,std::function<S(ValueType)> get_value_callable)
-  // {
-  //   are_both_ready = [this](){ return is_ready_callable() && this->is_ready(); };
-  //   get_foo = [this]()
-  //     {
-  //       return get_value_callable(this->get());
-  //     };
-  // }
-
-    bool is_ready_no_lock() noexcept { return IsReadyCallable::operator()(); }
-  
-private:
-
-  std::mutex* mutex_;
-  std::condition_variable* cv_;
-}; // class Waiter
-
-struct WaiterGetNoOp {
-  constexpr void operator()() const noexcept {}
-}; // struct WaiterGetNoOp
-
-template<typename IsReadyCallable, typename GetValueCallable>
-auto make_waiter(
-  std::mutex& mutex, std::condition_variable& cv, IsReadyCallable ready, GetValueCallable get_value) noexcept
-  -> Waiter<IsReadyCallable, GetValueCallable>
-{
-  return Waiter<IsReadyCallable, GetValueCallable>{mutex, cv, std::move(ready), std::move(get_value)};
-}
-
-// Overload for void returning futures
-template<typename IsReadyCallable>
-auto make_waiter(std::mutex& mutex, std::condition_variable& cv, IsReadyCallable ready) noexcept
-  -> Waiter<IsReadyCallable, WaiterGetNoOp>
-{
-  return make_waiter(mutex, cv, std::move(ready), WaiterGetNoOp{});
-}
 
 
 
 
-
-
+/** @brief A container that waits for some condition to become true
+ * before returning the object of interest.
+ *
+ * This is frequently used to wait on operations occurring in other
+ * threads, or even on other agents, to complete, such as waiting for
+ * a set of subscriptions to finalize. Through Waiters, a user is only
+ * able to get an object once conditions required for its use are
+ * met. For example, for an iterative method to function,
+ * subscriptions to neighboring agents' publications associated with
+ * the method must be finalized, and constructing an appropriate
+ * Waiter allows a user to guarantee subscription completion before
+ * use of the iterative method.
+ *
+ * Waiters are often (but not always) constructed through various
+ * specializations of the BuildWaiter class, which can be used to
+ * define subscriptions or other wait conditions needed for the type
+ * of interest.
+ *
+ * There are two common special cases of Waiters:
+ * 1. The <em>instant Waiter</em> that is immediately ready. Enables lazy construction of objects.
+ * 2. The <em>void Waiter</em> which does not return anything upon @p get(). Enables checking for completion of tasks without needing to build an associated object.
+ *
+ * @tparam T The object type to be returned upon get().
+ */
 template<typename T>
-class WaiterVal
+class Waiter
 {
 public:
   /// The return type of get()
   using ValueType = T;
 
-  WaiterVal(
-    std::mutex& mutex_handle,
-    std::condition_variable& cv_handle,
-    std::function<bool()>&& is_ready_callable,
-    std::function<ValueType()>&& get_value_callable) noexcept
+  /** @param mutex_handle A reference to the mutex used with the associated condition variable.
+   *  @param cv_handle A reference to the condition variable to wait on.
+   *  @param is_ready_callable An @p std::function<bool()> that must return true to declare readiness.
+   *  @param get_value_callable An @p std::function<T()> that returns the object of interest.
+   */
+  Waiter(std::mutex& mutex_handle,
+         std::condition_variable& cv_handle,
+         std::function<bool()>&& is_ready_callable,
+         std::function<ValueType()>&& get_value_callable) noexcept
     : mutex_{&mutex_handle}, cv_{&cv_handle},
       is_ready_callable_(std::move(is_ready_callable)),
       get_value_callable_(std::move(get_value_callable))
   {}
 
-  // this constructor for waiters that we know are instantly ready
-  WaiterVal(std::function<ValueType()>&& get_value_callable) noexcept
+  /** @brief A constructor for an "instant Waiter".
+   *
+   *  @param get_value_callable An @p std::function<T()> that returns the object of interest.
+   */
+  Waiter(std::function<ValueType()>&& get_value_callable) noexcept
     : get_value_callable_(std::move(get_value_callable))
   {}
 
+  /** @brief A constructor for a "void Waiter".
+   *
+   *  @param mutex_handle A reference to the mutex used with the associated condition variable.
+   *  @param cv_handle A reference to the condition variable to wait on.
+   *  @param is_ready_callable An @p std::function<bool()> that must return true to declare readiness.
+   */
+  Waiter(std::mutex& mutex_handle,
+         std::condition_variable& cv_handle,
+         std::function<bool()>&& is_ready_callable) noexcept
+    : mutex_{&mutex_handle}, cv_{&cv_handle},
+      is_ready_callable_(std::move(is_ready_callable)),
+      get_value_callable_([](){ return; })
+  {}
+
+  /** @brief Block until ready, then return object.
+   */
   ValueType get() noexcept
   {
     if (is_instant())
@@ -220,6 +167,8 @@ public:
     return get_value_callable_();
   }
 
+  /** @brief Block until ready.
+   */
   void wait() noexcept
   {
     if (is_instant()) return;
@@ -228,6 +177,8 @@ public:
     (*cv_)->wait(lock, [this]() noexcept { return is_ready_no_lock(); });
   }
 
+  /** @brief Block until ready or a given amount of time passes, whichever is first.
+   */
   template<class Rep, class Period>
   bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
   {
@@ -236,6 +187,8 @@ public:
     return wait_until(end_time);
   }
 
+  /** @brief Block until ready or a given time is reached, whichever is first.
+   */
   template<class Rep, class Period>
   bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
   {
@@ -245,6 +198,9 @@ public:
     return (*cv_)->wait_until(lock, end_time, [this]() noexcept { return is_ready_no_lock(); });
   }
 
+  /** @brief Thread-safe check if ready.
+   *  Blocks to acquire mutex but does not wait for condition to be ready.
+   */
   bool is_ready() noexcept
   {
     if (is_instant()) return true;
@@ -252,15 +208,12 @@ public:
     return is_ready_no_lock();
   }
 
-  // template<typename S>
-  // Waiter<S> fed_into(std::function<bool(args)> is_ready_callable,std::function<S(ValueType)> get_value_callable)
-  // {
-  //   are_both_ready = [this](){ return is_ready_callable() && this->is_ready(); };
-  //   get_foo = [this]()
-  //     {
-  //       return get_value_callable(this->get());
-  //     };
-  // }
+  // For transforming the get type
+  template<typename... Continuations>
+  Continuation<Waiter, Continuations...> then(Continuations... continuations) && noexcept
+  {
+    return Continuation<Waiter, Continuations...>{*this, std::move(continuations)...};
+  }
 
 private:
 
@@ -276,125 +229,84 @@ private:
   std::optional<std::condition_variable*> cv_;
   std::optional<std::function<bool()>> is_ready_callable_;
   std::function<ValueType()> get_value_callable_;
-}; // class WaiterVal
+}; // class Waiter
 
-// template<typename T>
-// class WaiterValBuilder
-// { }; // class WaiterValBuilder
 
+/** @brief A default WaiterBuilder to build waiters for objects.
+ *
+ *  This default WaiterBuilder constructs an "instant Waiter" that is
+ *  immediately ready. If you wish to build a Waiter for an object
+ *  that has nontrivial wait conditions, implement a specialization of
+ *  the WaiterBuilder class for the type you wish to build. See, e.g,
+ *  the WaiterBuilder for the AsynchronousIterative class template for
+ *  an example.
+ */
 template<typename T>
-class WaiterValBuilder
+class WaiterBuilder
 {
 public:
   using ObjectT = T;
 
+  //TODO: Will this correctly perform lazy construction of an ObjecT with perfect forwarding?
+  // template<typename... Args>
+  // WaiterBuilder(Args&&... args)
+  //   : waiter_([args_tup = std::make_tuple(std::forward<Args>(args)...)]()
+  //       {
+  //         return std::make_from_tuple<ObjectT>(args_tup);
+  //       })
+  // { }
   template<typename... Args>
-  WaiterValBuilder(Args&&... args)
-    : waiterval_([&](){ return ObjectT(std::forward<Args>(args)...); })
+  WaiterBuilder(Args&&... args)
+    : waiter_([&]()
+        {
+          return ObjectT(std::forward<Args>(args)...);
+        })
   { }
 
-  WaiterVal<ObjectT> build_waiterval() { return waiterval_; }
+
+  Waiter<ObjectT> build_waiter() { return waiter_; }
 
 private:
-  WaiterVal<ObjectT> waiterval_;
+  Waiter<ObjectT> waiter_;
 
-}; // class WaiterValBuilder<AsynchronousJacobi<double>>
+}; // class WaiterBuilder
 
 
+struct WaiterGetNoOp {
+  constexpr void operator()() const noexcept {}
+}; // struct WaiterGetNoOp
 
+  
 template<typename T>
-WaiterVal<T> make_waiterval(std::mutex& mutex, std::condition_variable& cv,
-                            std::function<bool()> ready, std::function<T()> get_value)
+inline Waiter<T> make_waiter(std::mutex& mutex,
+                             std::condition_variable& cv,
+                             std::function<bool()>&& is_ready_callable,
+                             std::function<T()>&& get_value_callable) noexcept
 {
-  return WaiterVal<T>{mutex, cv, std::move(ready), std::move(get_value)};
-}                                               
+  return Waiter<T>{mutex, cv, std::move(is_ready_callable), std::move(get_value_callable)};
+}
 
-
-
-
-
-/** \brief Class used to wait on multiple waiters.  Generally created using
- * when_all instead of directly
- */
-template<typename... Waiters>
-class AllWaiter {
-public:
-  using ValueType = std::conditional_t<
-    (... && std::is_same_v<void, typename Waiters::ValueType>),
-    void,
-    std::tuple<internal::WrapVoidValue<typename Waiters::ValueType>...>>;
-
-  explicit AllWaiter(Waiters&... waiters) noexcept : to_wait_on_{waiters...} {}
-
-  ValueType get() noexcept
-  {
-    return for_each_waiter([](auto& waiter) noexcept -> typename decltype(waiter)::ValueType { return waiter.get(); });
-  }
-
-  void wait() noexcept
-  {
-    for_each_waiter([](auto& waiter) noexcept { waiter.wait(); });
-  }
-
-  template<class Rep, class Period>
-  bool wait_until(const std::chrono::time_point<Rep, Period>& end_time) noexcept
-  {
-    bool value_available = true;
-    for_each_waiter([&](auto& waiter) noexcept { value_available = value_available && waiter.wait_until(end_time); });
-    return value_available;
-  }
-
-  template<class Rep, class Period>
-  bool wait_for(const std::chrono::duration<Rep, Period>& wait_time) noexcept
-  {
-    const auto end_time = std::chrono::steady_clock::now() + wait_time;
-    return wait_until(end_time);
-  }
-
-  template<typename... Continuations>
-  Continuation<AllWaiter, Continuations...> then(Continuations... continuations) && noexcept
-  {
-    return Continuation<AllWaiter, Continuations...>{*this, std::move(continuations)...};
-  }
-
-private:
-  template<typename Callable, std::size_t... Is>
-  ValueType for_each_waiter_impl(Callable&& c, std::index_sequence<Is...>) noexcept
-  {
-    return {c(std::get<Is>(to_wait_on_))...};
-  }
-
-  template<typename Callable>
-  ValueType for_each_waiter(Callable&& c) noexcept
-  {
-    return for_each_waiter_impl(std::forward<Callable>(c), std::index_sequence_for<Waiters...>{});
-  }
-
-  std::tuple<Waiters...> to_wait_on_;
-}; // class AllWaiter
-
-/** \brief Returns an AllWaiter that can be used to wait for when multiple
- * waiters complete and return a tuple of the values, with void values represented
- * as VoidWrapper instead.
- */
-template<typename... Waiters>
-AllWaiter<Waiters...> when_all(Waiters&... waiters) noexcept
+inline Waiter<void> make_waiter(std::mutex& mutex,
+                                std::condition_variable& cv,
+                                std::function<bool()>&& is_ready_callable) noexcept
 {
-  return AllWaiter{waiters...};
+  return Waiter<void>(mutex, cv, std::move(is_ready_callable), WaiterGetNoOp{});
 }
 
 
 
+
+  
 /** \brief Class that can be used to wait on many waiters of the same type.
  *
  * Generally not created directly, but through when_all_same instead.
  */
-template<typename Waiter>
-class AllWaiterSame {
+template<typename T>
+class WaiterVec {
 public:
-  using ValueType = std::vector<typename Waiter::ValueType>;
+  using ValueType = std::vector<T>;
 
-  explicit AllWaiterSame(std::vector<Waiter> waiters) noexcept : waiters_{std::move(waiters)} {}
+  explicit WaiterVec(std::vector<Waiter<T>> waiters) noexcept : waiters_{std::move(waiters)} {}
 
   ValueType get() noexcept
   {
@@ -439,23 +351,18 @@ public:
     return true;
   }
 
-  template<typename... Continuations>
-  Continuation<AllWaiterSame, Continuations...> then(Continuations... continuations) && noexcept
-  {
-    return Continuation<AllWaiterSame, Continuations...>{*this, std::move(continuations)...};
-  }
-
 private:
-  std::vector<Waiter> waiters_;
+  std::vector<Waiter<T>> waiters_;
 };
 
 /** \brief Returns an AllWaiterSame
  */
-template<typename Waiter>
-AllWaiterSame<Waiter> when_all_same(std::vector<Waiter> waiters) noexcept
+template<typename T>
+WaiterVec<T> make_waitervec(std::vector<Waiter<T>> waiters) noexcept
 {
-  return AllWaiterSame{std::move(waiters)};
+  return WaiterVec<T>{std::move(waiters)};
 }
+
 } // namespace skynet
 
 #endif // SKYNET_WAITER_HPP

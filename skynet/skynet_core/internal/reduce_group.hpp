@@ -90,7 +90,7 @@ protected:
   bool returns_value_on_reduce() const noexcept;
 
   // Rebuilds a reduce group after it fails due to a disconnection
-  auto rebuild() noexcept -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>;
+  Waiter<void> rebuild() noexcept;
 
   // Process any pending reduce operations, removing them if finished
   void process_pending_reduce_ops() noexcept { do_process_pending_reduce_ops(); }
@@ -308,7 +308,7 @@ private:
     const auto conn_id = conn_counter;
     using produced_type = std::conditional_t<IsAllReduce, std::optional<ValueType>, ReduceResult<ValueType>>;
     // As the produced type is different,
-    return make_waiter(
+    return make_waiter<produced_type>(
       buffer_mutex_,
       future_info_cv_,
       [this, required_version, conn_id]() noexcept {

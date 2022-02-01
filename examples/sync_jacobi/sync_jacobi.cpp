@@ -1,7 +1,9 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/synchronous_jacobi.hpp"
+#include "skynet_upper/synchronous_iterative.hpp"
+#include "skynet_upper/jacobi_processor.hpp"
 #include "skynet_upper/data_input.hpp"
+#include "skynet_upper/stopping_criterion.hpp"
 
 #include <array>
 #include <chrono>
@@ -71,25 +73,25 @@ void machine_task(const int machine_number, int trial, std::vector<std::vector<d
     }
   }
 
-    auto opt_iter_method = create_synchronous_jacobi(
-      machine_number,
-      A_partition,
-      b_partition,
-      row_indices,
-      master_handle,
-      job,
-      tags[machine_number],
-      tags
-    ).get();
+  using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime>;
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+    .set_processor(A_partition, b_partition, row_indices)
+    .set_stop_policy(std::chrono::seconds(5))
+    .build_waiter();
+  std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
+  IterMethod sync_jacobi = iter_waiter.get();
 
-    auto sync_jacobi = *opt_iter_method;
-    sync_jacobi.run();
+  sync_jacobi.run([&](const decltype(sync_jacobi)& p)
+    {
+      std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has values ";
+      print_vec<double>(p.get_processor().return_partition_solution());
+    });
 
-
-  double run_time = sync_jacobi.return_runtime();
-  int information_received = sync_jacobi.return_information_received();
-  auto x_local_estimate = sync_jacobi.return_full_solution();
-  auto x_partition_estimate = sync_jacobi.return_partition_solution();
+    double run_time = sync_jacobi.run_time().count();
+  int information_received = sync_jacobi.get_iteration_count();
+  auto x_local_estimate = sync_jacobi.get_processor().return_full_solution();
+  auto x_partition_estimate = sync_jacobi.get_processor().return_partition_solution();
   // Since this is a distributed algorithm, we only have access to information that allows us to have a "partial" residual, since not every agent has every row of the matrix. 
   // In contrast, we can look at error involving only the components of the solution vector x which this process updates, or it's entire estimation vector, hence "partial" versus "full" in this language and "PSQ" versus "FSQ" for "partial error squared" and "full error squared". 
   // We avoid taking square roots here in case additional post processing is wanted.

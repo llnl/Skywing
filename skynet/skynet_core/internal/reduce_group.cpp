@@ -108,7 +108,7 @@ const TagID& ReduceGroupBase::produced_tag() const noexcept { return produced_ta
 
 const TagID& ReduceGroupBase::group_id() const noexcept { return group_id_; }
 
-auto ReduceGroupBase::rebuild() noexcept -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>
+Waiter<void> ReduceGroupBase::rebuild() noexcept
 {
   // Reset the buffers
   {

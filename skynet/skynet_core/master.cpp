@@ -408,8 +408,7 @@ Master::Master(
 
 Master::~Master() { send_to_neighbors(internal::make_goodbye()); }
 
-auto Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
-  -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+Waiter<bool> Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto canonical = internal::to_canonical(AddrPortPair{address, port});
@@ -427,15 +426,14 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
                        iter->second.conn.ip_address_and_port());
     }
   }
-  return make_waiter(
+  return make_waiter<bool>(
     job_mut_,
     connection_cv_,
     internal::MasterConnectionIsComplete{*this, canonical.first, canonical.second},
     internal::MasterGetConnectionSuccess{*this, canonical.first, canonical.second});
 }
 
-auto Master::connect_to_server(std::string_view address) noexcept
-  -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+Waiter<bool> Master::connect_to_server(std::string_view address) noexcept
 {
   const auto [addr, port] = internal::split_address(address);
   return connect_to_server(addr.c_str(), port);
@@ -668,8 +666,7 @@ bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) const no
   return true;
 }
 
-auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-  -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+Waiter<void> Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
 {
   SKYNET_DEBUG_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
   std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
@@ -690,8 +687,7 @@ auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   return make_waiter(job_mut_, subscription_cv_, internal::MasterSubscribeIsDone{*this, tag_ids});
 }
 
-auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
-  -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
+Waiter<bool> Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
 {
   const auto canonical_addr = internal::to_canonical(addr);
   const auto iter = addr_to_machine_.find(canonical_addr);
@@ -727,7 +723,7 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
     // Ignore the status - it is handeled later
     (void)iter->second.conn.connect_non_blocking(canonical_addr.first.c_str(), canonical_addr.second);
   }
-  return make_waiter(
+  return make_waiter<bool>(
     job_mut_,
     subscription_cv_,
     internal::MasterIPSubscribeComplete{*this, canonical_addr, tag_ids, is_self_sub},
@@ -946,8 +942,7 @@ void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   notify_subscriptions_ = true;
 }
 
-auto Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-  -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+Waiter<internal::ReduceGroupBase&> Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
 {
   const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
   const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
@@ -978,15 +973,14 @@ auto Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> grou
   }
   // Notify reduce groups for when new tags are produced
   notify_reduce_group_ = true;
-  return make_waiter(
+  return make_waiter<internal::ReduceGroupBase&>(
     job_mut_,
     reduce_group_cv_,
     internal::MasterReduceGroupIsCreated{*this, group_id},
     internal::MasterGetReduceGroup{*this, group_id});
 }
 
-auto Master::rebuild_reduce_group(const TagID& group_id) noexcept
-  -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>
+Waiter<void> Master::rebuild_reduce_group(const TagID& group_id) noexcept
 {
   SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
   const auto iter = reduce_tag_data_.find(group_id);

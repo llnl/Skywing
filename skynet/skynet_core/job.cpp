@@ -174,17 +174,15 @@ void Job::init_or_update_subscribe(
   }
 }
 
-auto Job::get_subscribe_future(const gsl::span<const internal::PublishTagBase> tags) noexcept
-  -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+Waiter<void> Job::get_subscribe_future(const gsl::span<const internal::PublishTagBase> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   return Master::JobAccessor::subscribe(*master_, tag_ids);
 }
 
-auto Job::get_ip_subscribe_future(
+Waiter<bool> Job::get_ip_subscribe_future(
   const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
-  -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
@@ -271,8 +269,8 @@ internal::ReduceGroupNeighbors Job::create_reduce_group_init(
   return tags_to_find;
 }
 
-auto Job::create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-  -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+Waiter<internal::ReduceGroupBase&>
+Job::create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
 {
   return Master::JobAccessor::create_reduce_group(*master_, std::move(group_ptr));
 }

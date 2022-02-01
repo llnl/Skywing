@@ -1,6 +1,6 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/push_sum.hpp"
+#include "skynet_upper/push_sum_processor.hpp"
 #include "skynet_upper/data_input.hpp"
 #include <array>
 #include <chrono>
@@ -76,19 +76,19 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSum<double>, UpdateIfConsensusShift<double>, StopAfterTime>;
-  WaiterVal<IterMethod> iter_waiterval =
-    WaiterValBuilder<IterMethod>(master_handle, job, pubTag, subTags)
-    .set_processor(size_of_system, number_of_neighbors, starting_value, subTags)
-    .set_nbr_update_criterion(1e-4)
-    .set_stopping_criterion(std::chrono::seconds(5))
-    .build_waiterval();
-  IterMethod push_sum = iter_waiterval.get();
-  
+  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, UpdateIfPushSumShift<double>, StopAfterTime>;
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(master_handle, job, pubTag, subTags)
+    .set_processor(number_of_neighbors, starting_value, subTags)
+    .set_publish_policy(1e-4)
+    .set_stop_policy(std::chrono::seconds(5))
+    .build_waiter();
+  IterMethod push_sum = iter_waiter.get();
+
   push_sum.run(
       [&](const decltype(push_sum)& p)
       {
-        std::cout << "Machine " << machine_number << " has value " <<
+        std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has value " <<
           p.get_processor().return_solution() << " and publications ";
         print_vec<double>(p.get_publication_values());
       } );

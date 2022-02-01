@@ -1,6 +1,6 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_jacobi.hpp"
+#include "skynet_upper/jacobi_processor.hpp"
 #include "skynet_upper/data_input.hpp"
 
 #include <array>
@@ -86,20 +86,20 @@ void machine_task(
 
   std::cout << "Machine " << machine_number << " creating iteration object." << std::endl;
   
-  using IterMethod = AsynchronousIterative<AsynchronousJacobi<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
-  WaiterVal<IterMethod> iter_waiterval =
-    WaiterValBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+  using IterMethod = AsynchronousIterative<JacobiProcessor<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
     .set_processor(A_partition, b_partition, row_indices)
-    .set_nbr_update_criterion(1e-6)
-    .set_stopping_criterion(std::chrono::seconds(5))
-    .build_waiterval();
+    .set_publish_policy(1e-6)
+    .set_stop_policy(std::chrono::seconds(5))
+    .build_waiter();
   std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
-  IterMethod async_jacobi = iter_waiterval.get();
+  IterMethod async_jacobi = iter_waiter.get();
                                        
   std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;  
   async_jacobi.run([&](const decltype(async_jacobi)& p)
     {
-      std::cout << "Machine " << machine_number << " has values ";
+      std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has values ";
       print_vec<double>(p.get_processor().return_partition_solution());
     });
   std::cout << "Machine " << machine_number << " finished jacobi iteration." << std::endl;
