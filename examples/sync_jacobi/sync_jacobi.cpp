@@ -3,7 +3,8 @@
 #include "skynet_upper/synchronous_iterative.hpp"
 #include "skynet_upper/jacobi_processor.hpp"
 #include "skynet_upper/data_input.hpp"
-#include "skynet_upper/stopping_criterion.hpp"
+#include "skynet_upper/stop_policies.hpp"
+#include "skynet_upper/publish_policies.hpp"
 
 #include <array>
 #include <chrono>

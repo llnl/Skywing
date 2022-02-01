@@ -4,7 +4,7 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 #include "skynet_upper/iterative_method.hpp"
-#include "skynet_upper/stopping_criterion.hpp"
+#include "skynet_upper/stop_policies.hpp"
 
 #include <cstdlib>
 #include <iostream>

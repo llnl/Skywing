@@ -2,6 +2,8 @@
 #include "skynet_core/master.hpp"
 #include "skynet_upper/jacobi_processor.hpp"
 #include "skynet_upper/data_input.hpp"
+#include "skynet_upper/stop_policies.hpp"
+#include "skynet_upper/publish_policies.hpp"
 
 #include <array>
 #include <chrono>
@@ -86,7 +88,7 @@ void machine_task(
 
   std::cout << "Machine " << machine_number << " creating iteration object." << std::endl;
   
-  using IterMethod = AsynchronousIterative<JacobiProcessor<double>, UpdateNbrsOnLinf<double>, StopAfterTime>;
+  using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>, StopAfterTime>;
   Waiter<IterMethod> iter_waiter =
     WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
     .set_processor(A_partition, b_partition, row_indices)

@@ -2,6 +2,8 @@
 #include "skynet_core/master.hpp"
 #include "skynet_upper/push_sum_processor.hpp"
 #include "skynet_upper/data_input.hpp"
+#include "skynet_upper/stop_policies.hpp"
+#include "skynet_upper/publish_policies.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -76,11 +78,11 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, UpdateIfPushSumShift<double>, StopAfterTime>;
+  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, PublishOnRatioShift<double>, StopAfterTime>;
   Waiter<IterMethod> iter_waiter =
     WaiterBuilder<IterMethod>(master_handle, job, pubTag, subTags)
     .set_processor(number_of_neighbors, starting_value, subTags)
-    .set_publish_policy(1e-4)
+    .set_publish_policy(1e-4, 0, 1)
     .set_stop_policy(std::chrono::seconds(5))
     .build_waiter();
   IterMethod push_sum = iter_waiter.get();
