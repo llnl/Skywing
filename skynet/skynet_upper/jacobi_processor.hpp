@@ -3,7 +3,6 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_iterative.hpp"
 
 using namespace skynet;
 

@@ -3,7 +3,6 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_iterative.hpp"
 
 using namespace skynet;
 
@@ -125,6 +124,9 @@ public:
   {
     return new_information_count_;
   }
+
+  scalar_t get_x() const {return x_value_;}
+  scalar_t get_y() const {return y_value_;}
   
 private:
   size_t number_of_neighbors_;

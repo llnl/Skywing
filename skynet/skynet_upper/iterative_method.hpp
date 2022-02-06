@@ -16,6 +16,12 @@ template<typename... TagValueTypes>
 class IterativeMethod {
 public:
   using TagType = PublishTag<TagValueTypes...>;
+  using ValueTag = TagType;
+  using ValueType = ValueOrTuple<TagValueTypes...>;
+
+  template<typename T>
+  using tag_map = std::unordered_map
+    <TagType, T, skynet::internal::hash<TagType>>;
 
   const TagType& my_tag() const { return produced_tag_; }
   
@@ -94,7 +100,66 @@ public:
   const std::vector<PublishTag<TagValueTypes...>>& dead_tags() const noexcept { return dead_tags_; }
 
   Job& get_job() const noexcept { return *job_; }
-  
+
+
+
+  /****************************************************
+   * VALUES INTERFACE
+   ***************************************************/
+
+  const tag_map<ValueType>& get_values_unsafe() { return neighbor_values_; }
+
+  template<typename R>
+  R sum() {
+    return f_sum<R>([](const ValueType& v) { return v; });
+  }
+  template<typename R>
+  R f_sum(std::function<R(const ValueType&)> f) {
+    return weighted_f_accumulate_<R, R, true, false, false>
+      (std::move(f), 0, std::plus<R>(), nullptr);
+  }
+  template<typename R, typename S>
+  R weighted_f_sum(std::function<R(const ValueType&)> f, tag_map<S> coeffs)
+  {
+    return weighted_f_accumulate_<R, S, true, true, false>
+      (std::move(f), [&](const ValueTag& t){ return coeffs[t];}, std::plus<R>(), nullptr);
+  }
+
+  template<typename R>
+  R average() {
+    return sum<R>() / tags_.size();
+  }
+  template<typename R>
+  R f_average(std::function<R(const ValueType&)> f) {
+    return f_sum<R>(std::move(f)) / tags_.size();
+  }
+  template<typename R, typename S>
+  R weighted_f_average(std::function<R(const ValueType&)> f, tag_map<S> coeffs)
+  {
+    R num =  weighted_f_sum<R, S>(std::move(f), coeffs);
+    R denom = weighted_f_accumulate_<R, S, false, true, false>
+      (0, [&](const ValueTag& t){ return coeffs[t];}, std::plus<R>(), nullptr);
+    return num / denom;
+  }
+
+  template<typename R>
+  R f_accumulate(std::function<R(const ValueType&)> f,
+                 std::function<R(R, R)> binary_op)
+  {
+    return weighted_f_accumulate_<R, R, true, false, false>(std::move(f), std::move(binary_op));
+  }
+  template<typename R>
+  R f_max(std::function<R(const ValueType&)> f)
+  {
+    return f_accumulate<R>(std::move(f), [](R x, R y){return std::max(x, y);});
+  }
+  template<typename R>
+  R f_min(std::function<R(const ValueType&)> f)
+  {
+    return f_accumulate<R>(std::move(f), [](R x, R y){return std::min(x, y);});
+  }
+
+
 protected:
 
   /** @param job The job running this iterative method.
@@ -118,10 +183,51 @@ protected:
     }
   }
 
+  template<typename R, typename S,
+           bool use_f, bool use_coef>
+  std::function<R(const ValueTag&)>
+  get_sum_contributor_(std::function<R(const ValueType&)>& f,
+                       std::function<S(const ValueTag&)>& coef)
+  {
+    static_assert(use_f || use_coef);
+    if constexpr (!use_f) {
+        return [&](const ValueTag& t) { return coef(t); };
+    }
+    else if (!use_coef) {
+      return [&](const ValueTag& t) { return f(this->neighbor_values_[t]); };
+    }
+    else return [&](const ValueTag& t) { return coef(t) * f(this->neighbor_values_[t]); };
+  }
+
+  template<typename R, typename S, bool use_f, bool use_coef, bool use_shift>
+  R weighted_f_accumulate_(std::function<R(const ValueType&)> f,
+                           std::function<S(const ValueTag&)> coef,
+                           std::function<R(R, R)> binary_op,
+                           R* shift)
+  {
+    auto contributor = get_sum_contributor_<R, S, use_f, use_coef>(f, coef);
+    
+    auto tag_iter = tags_.cbegin();
+    R val = [&]{
+      if constexpr (use_shift) return binary_op(*shift, contributor(*tag_iter));
+      else return contributor(*tag_iter);
+    }();
+    ++tag_iter;
+    
+    for (; tag_iter != tags_.cend(); ++tag_iter)
+      val = binary_op(std::move(val), std::move(contributor(*tag_iter)));
+
+    return val;
+  }
+
   Job* job_;
   PublishTag<TagValueTypes...> produced_tag_;
   std::vector<PublishTag<TagValueTypes...>> tags_;
   std::vector<PublishTag<TagValueTypes...>> dead_tags_;
+
+private:
+  tag_map<ValueType> neighbor_values_;
+  
 }; // class IterativeBase
 
 } // namespace skynet
