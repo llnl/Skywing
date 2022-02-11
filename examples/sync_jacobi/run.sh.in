@@ -1,8 +1,8 @@
 #!/bin/bash
 
 if [[ $# < 1 ]]; then
-  echo "usage: @exe@ starting_port_number"
-  exit 1
+  echo "usage: source $(basename ${BASH_SOURCE[0]}) starting_port_number"
+  return
 fi
 
 STARTING_PORT=$1
@@ -45,15 +45,11 @@ do
     echo --------------------------------------------
     for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
     do
-      if [[ ${counter_for_network_elements} < $((size_of_network-1)) ]]
-      then
-        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${partition_directory} ${counter_for_trials} ${save_directory} &
-      else
-        "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${partition_directory} ${counter_for_trials} ${save_directory}
-      fi
+      "@sync_jacobi_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} ${matrix_name} ${partition_directory} ${counter_for_trials} ${save_directory} &
       declare "erase${counter_for_network_elements}=$!"
     done
-    sleep 1
+    sleep 10
+    kill_progs
     echo Complete: Trial ${counter_for_trials}
     STARTING_PORT=$((STARTING_PORT+size_of_network+100))
   done

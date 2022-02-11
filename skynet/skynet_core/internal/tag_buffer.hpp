@@ -89,6 +89,15 @@ private:
   gsl::span<const std::uint8_t> expected_types_;
 }; // class TagBase
 
+template<typename TagT>
+struct hash
+{
+  std::size_t operator()(const TagT& tb) const
+  {
+    return std::hash<TagID>{}(tb.id());
+  }
+}; // struct hash<TagBase<BaseTagType>>
+
 template<typename... Ts>
 inline static constexpr std::array<std::uint8_t, sizeof...(Ts)> expected_type_for{
   static_cast<std::uint8_t>(index_of<Ts, PublishValueTypeList>)...};

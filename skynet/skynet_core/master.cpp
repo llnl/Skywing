@@ -50,6 +50,7 @@ void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
 {
   if (dead_) { return; }
   // TODO: Maybe don't just use the first socket communicator if there are multiple
+  // TODO: Pretty sure this will incorrectly set to dead upon ConnectionError::would_block
   if (conns_[0].send_message(c.data(), c.size()) != ConnectionError::no_error) { dead_ = true; }
 }
 
@@ -178,7 +179,7 @@ std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunica
     }
     else if (err != ConnectionError::would_block)
     {
-      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some weird error", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some unknwon error, perhaps received an RST packer", master_->id(), id_);
       dead_ = true;
     }
     // we get here if attempting to read_network_size returned
@@ -407,8 +408,7 @@ Master::Master(
 
 Master::~Master() { send_to_neighbors(internal::make_goodbye()); }
 
-auto Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
-  -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+Waiter<bool> Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto canonical = internal::to_canonical(AddrPortPair{address, port});
@@ -426,15 +426,14 @@ auto Master::connect_to_server(const char* const address, const std::uint16_t po
                        iter->second.conn.ip_address_and_port());
     }
   }
-  return make_waiter(
+  return make_waiter<bool>(
     job_mut_,
     connection_cv_,
     internal::MasterConnectionIsComplete{*this, canonical.first, canonical.second},
     internal::MasterGetConnectionSuccess{*this, canonical.first, canonical.second});
 }
 
-auto Master::connect_to_server(std::string_view address) noexcept
-  -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+Waiter<bool> Master::connect_to_server(std::string_view address) noexcept
 {
   const auto [addr, port] = internal::split_address(address);
   return connect_to_server(addr.c_str(), port);
@@ -465,10 +464,10 @@ void Master::accept_pending_connections() noexcept
   }
 }
 
-int Master::number_of_neighbors() const noexcept
+size_t Master::number_of_neighbors() const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
-  return static_cast<int>(neighbors_.size());
+  return neighbors_.size();
 }
 
 bool Master::submit_job(JobID name, std::function<void(Job&, MasterHandle)> to_run) noexcept
@@ -535,13 +534,13 @@ void Master::run() noexcept
 
 const std::string& Master::id() const noexcept { return id_; }
 
-int Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+size_t Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto self_iter = self_sub_count_.find(tag.id());
   const auto self_subs = self_iter == self_sub_count_.cend() ? 0 : self_iter->second;
   return std::accumulate(
-    neighbors_.cbegin(), neighbors_.cend(), self_subs, [&](const int sum, const auto& neighbor_pair) noexcept {
+    neighbors_.cbegin(), neighbors_.cend(), self_subs, [&](const size_t sum, const auto& neighbor_pair) noexcept {
       return sum + neighbor_pair.second.is_subscribed_to(tag.id());
     });
 }
@@ -667,8 +666,7 @@ bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) const no
   return true;
 }
 
-auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
-  -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+Waiter<void> Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
 {
   SKYNET_DEBUG_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
   std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
@@ -689,8 +687,7 @@ auto Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   return make_waiter(job_mut_, subscription_cv_, internal::MasterSubscribeIsDone{*this, tag_ids});
 }
 
-auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
-  -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
+Waiter<bool> Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
 {
   const auto canonical_addr = internal::to_canonical(addr);
   const auto iter = addr_to_machine_.find(canonical_addr);
@@ -726,7 +723,7 @@ auto Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& ta
     // Ignore the status - it is handeled later
     (void)iter->second.conn.connect_non_blocking(canonical_addr.first.c_str(), canonical_addr.second);
   }
-  return make_waiter(
+  return make_waiter<bool>(
     job_mut_,
     subscription_cv_,
     internal::MasterIPSubscribeComplete{*this, canonical_addr, tag_ids, is_self_sub},
@@ -945,8 +942,7 @@ void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   notify_subscriptions_ = true;
 }
 
-auto Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-  -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>
+Waiter<internal::ReduceGroupBase&> Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
 {
   const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
   const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
@@ -977,15 +973,14 @@ auto Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> grou
   }
   // Notify reduce groups for when new tags are produced
   notify_reduce_group_ = true;
-  return make_waiter(
+  return make_waiter<internal::ReduceGroupBase&>(
     job_mut_,
     reduce_group_cv_,
     internal::MasterReduceGroupIsCreated{*this, group_id},
     internal::MasterGetReduceGroup{*this, group_id});
 }
 
-auto Master::rebuild_reduce_group(const TagID& group_id) noexcept
-  -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>
+Waiter<void> Master::rebuild_reduce_group(const TagID& group_id) noexcept
 {
   SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
   const auto iter = reduce_tag_data_.find(group_id);
@@ -1460,11 +1455,6 @@ void Master::process_pending_conns() noexcept
                   greeting.from(), std::move(info.conn), greeting.from(), greeting.neighbors(), *this, greeting.port());
                 new_neighbor_iter = neighbor_iter;
                 if (!inserted) {
-                  // SKYNET_TRACE_LOG(
-                  //   "\"{}\" rejected greeting from \"{}\" due to the name already being present",
-                  //   id_,
-                  //   neighbor_iter->first);
-                  // return false;
                   SKYNET_TRACE_LOG(
                     "\"{}\" already has a connection from \"{}\" so will simply add to communicators.",
                     id_,

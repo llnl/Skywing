@@ -6,6 +6,7 @@
 #include "skynet_upper/synchronous_iterative.hpp"
 
 #include "utils.hpp"
+#include "iterative_test_stuff.hpp"
 
 #include <array>
 #include <map>
@@ -20,25 +21,32 @@ const std::uint16_t start_port = get_starting_port();
 using ValueTag = skynet::PublishTag<int>;
 using PrivateValueTag = skynet::PrivateTag<int>;
 
-const std::array<ValueTag, 4> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}, ValueTag{"tag3"}};
+std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}, ValueTag{"tag3"}};
 const std::array<PrivateValueTag, 2> private_tags{PrivateValueTag{"tag0"}, PrivateValueTag{"tag1"}};
 
-const std::array<std::uint16_t, 4> ports{start_port, static_cast<std::uint16_t>(start_port + 1), static_cast<std::uint16_t>(start_port + 2), static_cast<std::uint16_t>(start_port + 3)};
+const std::array<std::uint16_t, 4> ports{
+  start_port, static_cast<std::uint16_t>(start_port + 1),
+    static_cast<std::uint16_t>(start_port + 2), static_cast<std::uint16_t>(start_port + 3)};
 
-constexpr std::array<std::array<int, 2>, 4> publish_values{
-  std::array<int, 2>{0, 10}, std::array<int, 2>{1, 20}, std::array<int, 2>{2, 30}, std::array<int, 2>{3, 40}};
-
-std::vector<int> expected_results(const int iter)
+tag_map<std::vector<int>> publish_values
 {
-  assert(iter == 0 || iter == 1);
-  return {publish_values[0][iter], publish_values[1][iter], publish_values[2][iter], publish_values[3][iter]};
-}
+  {tags[0], std::vector<int>{0, 10}},
+  {tags[1], std::vector<int>{1, 20}},
+  {tags[2], std::vector<int>{2, 30}},
+  {tags[3], std::vector<int>{3, 40}}
+};
 
-std::vector<int> expected_results_private(const int iter)
-{
-  assert(iter == 0 || iter == 1);
-  return {publish_values[0][iter], publish_values[1][iter]};
-}
+// std::vector<int> expected_results(const int iter)
+// {
+//   assert(iter == 0 || iter == 1);
+//   return {publish_values[0][iter], publish_values[1][iter], publish_values[2][iter], publish_values[3][iter]};
+// }
+
+// std::vector<int> expected_results_private(const int iter)
+// {
+//   assert(iter == 0 || iter == 1);
+//   return {publish_values[0][iter], publish_values[1][iter]};
+// }
 
 const std::map<PrivateValueTag, std::vector<std::string>> nodes{
   {private_tags[0], {"localhost:" + std::to_string(ports[0]), "localhost:" + std::to_string(ports[1])}},
@@ -57,53 +65,68 @@ void machine_task(const NetworkInfo* const info, const int index)
     ///////////////////////////////
     // Normal iterative method
     ///////////////////////////////
-    auto opt_iter_method = create_synchronous_iterative(master, job_handle, tags[index], tags).get();
-    {
-      std::lock_guard<std::mutex> g{catch_mutex};
-      REQUIRE(opt_iter_method);
-    }
-    const auto& values_to_publish = publish_values[index];
-    auto iter_method = *opt_iter_method;
-    for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i) {
-      const auto values = iter_method.values(values_to_publish[i]).get();
-      {
-        std::lock_guard g{catch_mutex};
-        REQUIRE(values == expected_results(i));
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds{100});
-    }
+    using IterMethod = SynchronousIterative<TestAsyncProcessor, TestAsyncStopPolicy>;
+    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tags[index], tags)
+      .set_processor(index, publish_values, tags, catch_mutex)
+      .set_stop_policy(publish_values, tags)
+      .build_waiter().get();
+    iter_method.run
+      (
+       [&]([[maybe_unused]] const IterMethod& c)
+       {
+         std::this_thread::sleep_for(std::chrono::seconds(1));
+       }
+      );
+
+    
+    // auto opt_iter_method = create_synchronous_iterative<SynchronousIterative<int>>
+    //   (master, job_handle, tags[index], tags).get();
+    // {
+    //   std::lock_guard<std::mutex> g{catch_mutex};
+    //   REQUIRE(opt_iter_method);
+    // }
+    // const auto& values_to_publish = publish_values[index];
+    // auto iter_method = *opt_iter_method;
+    // for (int i = 0; i < static_cast<int>(values_to_publish.size()); ++i) {
+    //   const auto values = iter_method.values(values_to_publish[i]).get();
+    //   {
+    //     std::lock_guard g{catch_mutex};
+    //     REQUIRE(values == expected_results(i));
+    //   }
+    //   std::this_thread::sleep_for(std::chrono::milliseconds{100});
+    // }
 
     ///////////////////////////////////
     // Supernode iterative method
     ///////////////////////////////////
-    auto super_opt_iter_method = create_supernode_synchronous_iterative(master, job_handle, private_tags[index / 2], nodes).get();
-    {
-      std::lock_guard<std::mutex> g{catch_mutex};
-      REQUIRE(super_opt_iter_method);
-    }
-    auto super_iter = *super_opt_iter_method;
-    const auto& private_values_to_publish = publish_values[index / 2];
-    for (int i = 0; i < static_cast<int>(private_values_to_publish.size()); ++i) {
-      const auto values = super_iter.values(private_values_to_publish[i]).get();
-      {
-        std::lock_guard g{catch_mutex};
-        REQUIRE(values == expected_results_private(i));
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds{100});
-    }
-    // Test erroring
-    if (index == 0) {
-      const auto values = super_iter.values(private_values_to_publish[0] + 1).get();
-      REQUIRE(values.empty());
-    }
-    else {
-      const auto values = super_iter.values(private_values_to_publish[0]).get();
-      {
-        std::lock_guard g{catch_mutex};
-        REQUIRE(values.empty());
-      }
-    }
-  });
+    // auto super_opt_iter_method = create_supernode_synchronous_iterative(master, job_handle, private_tags[index / 2], nodes).get();
+    // {
+    //   std::lock_guard<std::mutex> g{catch_mutex};
+    //   REQUIRE(super_opt_iter_method);
+    // }
+    // auto super_iter = *super_opt_iter_method;
+    // const auto& private_values_to_publish = publish_values[index / 2];
+    // for (int i = 0; i < static_cast<int>(private_values_to_publish.size()); ++i) {
+    //   const auto values = super_iter.values(private_values_to_publish[i]).get();
+    //   {
+    //     std::lock_guard g{catch_mutex};
+    //     REQUIRE(values == expected_results_private(i));
+    //   }
+    //   std::this_thread::sleep_for(std::chrono::milliseconds{100});
+    // }
+    // // Test erroring
+    // if (index == 0) {
+    //   const auto values = super_iter.values(private_values_to_publish[0] + 1).get();
+    //   REQUIRE(values.empty());
+    // }
+    // else {
+    //   const auto values = super_iter.values(private_values_to_publish[0]).get();
+    //   {
+    //     std::lock_guard g{catch_mutex};
+    //     REQUIRE(values.empty());
+    //   }
+    // }
+    });
   base_master.run();
 }
 

@@ -3,8 +3,8 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/internal/iterative_base.hpp"
-#include "skynet_upper/pending_iterative.hpp"
+#include "skynet_upper/iterative_method.hpp"
+#include "skynet_upper/stop_policies.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -13,241 +13,165 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <condition_variable>
 
 namespace skynet {
-namespace internal {
-/** \brief Sentinel class for iterators; separate from the AsynchronousValues
- * class as it doesn't need to be templated.
- */
-struct AsynchronousValuesSentinel {};
-} // namespace internal
-
-/** \brief Value for a single AsynchronousIterative value.
+using namespace std::chrono_literals;
+  
+/**
+ * @brief A decentralized, fully-asynchronous iterative method.
+ * 
+ * This class template implements the framework of an iterative method
+ * in which an agent performs a local computation, and possibly sends
+ * updates to neighbors, as soon as it receives any update. It does
+ * not wait for all neighbors to send updates.
  *
- * It is separate from the AsynchronousValues class in order to support
- * structured bindings
+ * Can be constructed directly, but in most cases is easiest to build
+ * through the WaiterBuilder class.
+ *
+ * @tparam Processor The numerical heart of the iterative method. Must
+ * define a type @p ValueType of the data type to communicate, as well
+ * as the following member functions: 
+ * - @p ValueType get_init_publish_values()
+ * - @p void template<typename CallerT> process_update(const std::vector<ValueTag>&, const std::vector<ValueType>&, const CallerT&)
+ * - @p ValueType prepare_for_publication(ValueType)
+ *
+ * @tparam PublishPolicy Determines when it is worth sending an
+ * update to its neighbors. Must define a member function 
+ * @p bool operator()(const ValueType& new_vals, const ValueType& old_vals)
+ *
+ * @tparam StopPolicy Determines when to stop the
+ * iteration. Must define a member function @ bool operator()(constCallerT&)
  */
-template<typename ValueType>
-class AsynchronousElement {
+template<typename Processor, typename PublishPolicy, typename StopPolicy>
+class AsynchronousIterative : public IterativeMethod<typename Processor::ValueType>
+{
+  using ThisT = AsynchronousIterative<Processor, PublishPolicy, StopPolicy>;
+  
 public:
-  AsynchronousElement(const ValueType* value, bool was_updated) noexcept : value_{value}, was_updated_{was_updated} {}
+  using ValueType = typename Processor::ValueType;
+  using ValueTag = skynet::PublishTag<ValueType>;
+  using ProcessorT = Processor;
+  using PublishPolicyT = PublishPolicy;
+  using StopPolicyT = StopPolicy;
 
-  /** \brief Returns the value associated with the index
+    /**
+   * @param job The job running the iteration.
+   * @param produced_tag The tag of the data produced by this agent and sent to iteration neighbors.
+   * @param tags The set of tags with <em>already finalized subscriptions</em> from neighbors this iteration relies on.
+   * @param processor The Processor object used in iteration.
+   * @param publish_policy The PublishPolicy object used in iteration.
+   * @param stop_policy The StopPolicy object used in iteration.
+   * @param loop_delay_max The maximum amount of time to wait for an update before at least checking the stopping criterion.
    */
-  const ValueType& value() const noexcept { return *value_; }
+  AsynchronousIterative(
+    Job& job,
+    const ValueTag& produced_tag,
+    const std::vector<ValueTag>& tags,
+    Processor processor,
+    PublishPolicy publish_policy,
+    StopPolicy stop_policy,
+    std::chrono::milliseconds loop_delay_max = 1000ms) noexcept
+    : IterativeMethod<ValueType>{job, produced_tag, tags},
+    processor_(std::move(processor)),
+    publish_values_(processor_.get_init_publish_values()),
+    publish_policy_(std::move(publish_policy)),
+    stop_policy_(std::move(stop_policy)),
+    wait_max_(loop_delay_max)
+  { }
 
-  /** \brief Returns if the value associated with the index has been updated
-   */
-  bool was_updated() const noexcept { return was_updated_; }
-
-  // Structured binding support
-  template<std::size_t I>
-  std::conditional_t<I == 0, const ValueType&, bool> get() const noexcept
+  /** @brief Run the iteration until stopping time or forever.
+   *  @param callback A callback function to call after each processing iteration.
+   */ 
+  template<bool has_callback = true>
+  void run(std::function<void(const ThisT&)> callback)
   {
-    static_assert(I == 0 || I == 1);
-    if constexpr (I == 0) { return value(); }
-    else {
-      return was_updated();
+    start_time_ = clock_t::now();
+    submit_values(publish_values_);
+    iterate_ = true;
+    while (iterate_)
+    {
+      while (iterate_)
+      {
+        auto vals = values(); // an std::optional<std::pair<...>>
+        if (!vals) break;
+
+        const auto [received_values_vec, nbr_tags] = *vals;
+        processor_.process_update(nbr_tags, received_values_vec, *this);
+        
+        ValueType new_vals = processor_.prepare_for_publication(publish_values_);
+        if (publish_policy_(new_vals, publish_values_))
+        {
+          publish_values_ = std::move(new_vals);
+          submit_values(publish_values_);
+        }
+        
+        if constexpr (has_callback) callback(*this);
+        iterate_ = stop_policy_(*this);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+      if (!iterate_) break;
+      this->get_job().wait_for_update(wait_max_);
+      iterate_ = stop_policy_(*this);
     }
+    stop_time_ = clock_t::now();
   }
 
-private:
-  const ValueType* value_;
-  bool was_updated_;
-}; // class AsynchronousElement
-
-template<typename... TagValueTypes>
-class AsynchronousIterative;
-
-/** \brief Container for holding AsynchronousIterative values; essentially just
- * a vector of values + a vector of bools for if they are updated or not
- */
-template<typename ValueType>
-class AsynchronousValues {
-private:
-  using Sentinel = internal::AsynchronousValuesSentinel;
-  using Element = AsynchronousElement<ValueType>;
-
-  template<typename... TagValueTypes>
-  friend class AsynchronousIterative;
-
-public:
-  /** \brief Iterator for begin/end
-   */
-  class Iterator {
-  public:
-    Iterator(const AsynchronousValues* owner, std::size_t index) noexcept : owner_{owner}, index_{index} {}
-
-    // Dereference/arrow operator
-    Element operator*() const noexcept { return Element{&owner_->values_[index_], owner_->updated_[index_]}; }
-    auto operator->() const noexcept
-    {
-      struct ElementWrapper {
-        const Element* operator->() const noexcept { return &self_element; }
-
-        Element self_element;
-      };
-
-      return ElementWrapper{*this};
-    }
-
-    // Iterator equality
-    friend bool operator==(const Iterator& lhs, const Iterator& rhs) noexcept
-    {
-      assert(lhs.owner_ == rhs.owner_);
-      return lhs.index_ == rhs.index_;
-    }
-
-    // Sentinel equality
-    friend bool operator==(const Iterator& it, Sentinel) noexcept { return it.index_ == it.owner_->size(); }
-    friend bool operator==(Sentinel s, const Iterator& it) noexcept { return it == s; }
-    friend bool operator!=(const Iterator& it, Sentinel s) noexcept { return !(it == s); }
-    friend bool operator!=(Sentinel s, const Iterator& it) noexcept { return !(it == s); }
-
-    // Increment
-    Iterator& operator++() noexcept
-    {
-      ++index_;
-      return *this;
-    }
-    Iterator operator++(int) noexcept
-    {
-      const auto self = *this;
-      ++*this;
-      return self;
-    }
-
-    // Addition
-    Iterator& operator+=(int offset) noexcept
-    {
-      index_ += offset;
-      return *this;
-    }
-    friend Iterator operator+(Iterator it, int offset) noexcept { return it += offset; }
-    friend Iterator operator+(int offset, Iterator it) noexcept { return it += offset; }
-
-    // Decrement
-    Iterator& operator--() noexcept
-    {
-      --index_;
-      return *this;
-    }
-    Iterator operator--(int) noexcept
-    {
-      const auto self = *this;
-      --*this;
-      return self;
-    }
-
-    // Subtraction
-    Iterator& operator-=(int offset) noexcept
-    {
-      index_ -= offset;
-      return *this;
-    }
-    friend Iterator operator-(Iterator it, int offset) noexcept { return it -= offset; }
-    friend Iterator operator-(int offset, Iterator it) noexcept { return it -= offset; }
-
-  private:
-    const AsynchronousValues* owner_;
-    std::size_t index_;
-  }; // class AsynchronousValues::Iterator
-
-  const std::vector<ValueType>& values() const noexcept { return values_; }
-  const std::vector<bool>& updated() const noexcept { return updated_; }
-
-  /** \brief Returns true if all values are updated
-   */
-  bool all_updated() const noexcept
+  /** @brief Run the iteration until stopping time or forever without a callback.
+   */ 
+  void run()
   {
-    // Can't use algorithms due to std::vector<bool>
-    for (auto val : updated_) {
-      if (!val) { return false; }
-    }
-    return true;
+    // Call run with has_callback=false so the callback doesn't get
+    // called. The actual lambda passed in doesn't matter.
+    run<false>([](const ThisT&) { return; } );
   }
 
-  /** \brief Returns true if any values have been updated
+  /** @brief Returns values from all tags that have been updated.
+   *
+   *  @returns If any neighbor data has been updated, an optional
+   *  containing a pair of vectors of values and associated
+   *  tags. Otherwise, an empty optional.
    */
-  bool any_updated() const noexcept
+  auto values() noexcept -> std::optional<std::pair<std::vector<ValueType>,
+                                                    std::vector<ValueTag>>>
   {
-    for (auto val : updated_) {
-      if (val) { return true; }
-    }
-    return false;
-  }
-
-  // Container-like functions
-  Iterator begin() const noexcept { return Iterator{this, 0}; }
-  Iterator cbegin() const noexcept { return begin(); }
-  Sentinel end() const noexcept { return Sentinel{}; }
-  Sentinel cend() const noexcept { return end(); }
-  std::size_t size() const noexcept { return values_.size(); }
-  Element operator[](const std::size_t offset) const noexcept { return *(begin() + offset); }
-
-private:
-  explicit AsynchronousValues(const std::size_t num_tags) noexcept : values_(num_tags), updated_(num_tags) {}
-
-  std::vector<ValueType> values_;
-  // TODO: std::vector<bool> is problematic, but we want the space savings
-  std::vector<bool> updated_;
-}; // class AsynchronousValues
-
-/** \brief Method for receiving information from a specified set of tags
- * in an asynchronous fashion
- */
-template<typename... TagValueTypes>
-class AsynchronousIterative : public internal::IterativeBase<TagValueTypes...> {
-public:
-  using ValueType = ValueOrTuple<TagValueTypes...>;
-  using ValueReturnType = AsynchronousValues<ValueType>;
-
-  /** \brief Returns values from all tags without submitting a value
-   */
-  auto values() noexcept -> std::pair<const ValueReturnType&, const std::vector<PublishTag<TagValueTypes...>>&>
-  {
-    auto updated_iter = values_.updated_.begin();
-    auto value_iter = values_.values_.begin();
     auto tag_iter = this->tags_.begin();
     const auto mark_current_as_dead = [&]() {
       this->dead_tags_.push_back(std::move(*tag_iter));
-      value_iter = values_.values_.erase(value_iter);
-      updated_iter = values_.updated_.erase(updated_iter);
       tag_iter = this->tags_.erase(tag_iter);
     };
-    while (tag_iter != this->tags_.cend()) {
+    size_t num_updated = 0;
+    while (tag_iter != this->tags_.cend())
+    {
       const auto& tag = *tag_iter;
-      if (!this->job_->tag_has_active_publisher(tag)) {
+      if (!this->job_->tag_has_active_publisher(tag))
+      {
         mark_current_as_dead();
         continue;
       }
-      else if (this->job_->has_data(tag)) {
-        const auto value_opt = this->job_->get_waiter(tag).get();
-        assert(value_opt);
-        *updated_iter = true;
-        *value_iter = *value_opt;
-      }
-      else {
-        *updated_iter = false;
-      }
-      ++updated_iter;
-      ++value_iter;
+      if (this->job_->has_data(tag)) num_updated++;
       ++tag_iter;
     }
-    return {values_, this->tags_};
+    if (num_updated == 0) return {};
+    
+    std::vector<ValueType> nbr_values;
+    std::vector<ValueTag> nbr_tags;
+    nbr_values.reserve(num_updated);
+    nbr_tags.reserve(num_updated);
+    for (const auto& tag : this->tags_)
+    {
+      if (this->job_->has_data(tag))
+      {
+        const auto value_opt = this->job_->get_waiter(tag).get();
+        assert(value_opt);
+        nbr_values.push_back(*value_opt);
+        nbr_tags.push_back(tag);
+      }
+    }
+    return std::make_optional(std::make_pair(std::move(nbr_values), std::move(nbr_tags)));
   }
 
-  /** \brief Returns values from all tags while submitting a value
-   */
-  template<typename... ArgTypes>
-  auto values(ArgTypes&&... values_to_submit) noexcept
-    -> std::pair<const ValueReturnType&, const std::vector<PublishTag<TagValueTypes...>>&>
-  {
-    submit_values(std::forward<ArgTypes>(values_to_submit)...);
-    return values();
-  }
-
-  /** \brief Submit a value
+  /** @brief Publish this agent's values for its neighbors.
    */
   template<typename... ArgTypes>
   auto submit_values(ArgTypes&&... values_to_submit) noexcept
@@ -255,109 +179,183 @@ public:
     this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
   }
 
+  /** @brief Get iteration run time, or zero if not yet began.
+   */
+  std::chrono::milliseconds run_time() const
+  {
+    if (!start_time_)
+      return std::chrono::milliseconds::zero();
+    if (!iterate_)
+      return std::chrono::duration_cast<std::chrono::milliseconds>(*stop_time_ - *start_time_);
+    
+    auto curr_time = clock_t::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - *start_time_);
+  }
+
+  const ValueType& get_publication_values() const { return publish_values_; }
+
+  /** @brief Get number of iterations.
+   */
+  unsigned get_iteration_count() const
+  {
+    return iteration_count_;
+  }
+
+  /** @brief Get if iteration is ongoing. False can mean either that
+   *   it has stopped or that it has not yet begun.
+   */
+  bool return_iterate() const
+  {
+    return iterate_;
+  }
+
+  Processor& get_processor() { return processor_; }
+  const Processor& get_processor() const { return processor_; }
+
 private:
-  template<typename, typename>
-  friend class PendingIterativeMethod;
+  Processor processor_;
+  ValueType publish_values_;
+  PublishPolicy publish_policy_;
+  StopPolicy stop_policy_;
 
-  AsynchronousIterative(
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
-    : internal::IterativeBase<TagValueTypes...>{job, produced_tag, tags}, values_{tags.size()}
-  {}
+  using clock_t = std::chrono::steady_clock;
+  std::optional<std::chrono::time_point<clock_t>> start_time_; // only contains a value once the iteration begins
+  std::optional<std::chrono::time_point<clock_t>> stop_time_; // only contains a value once the iteration ends
 
-  AsynchronousValues<ValueType> values_;
+  size_t iteration_count_ = 0;
+  bool iterate_ = false;
+  std::chrono::milliseconds wait_max_;
 }; // class AsynchronousIterative
 
-template<typename... TagValueTypes, typename Range>
-auto create_asynchronous_iterative(
-  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const Range& tags) noexcept
+
+
+
+/** @brief A template specialization of WaiterBuilder for AsynchronousIterative methods.
+ *
+ * To build this WaiterBuilder, do not pass the AsynchronousIterative
+ * template parameters directly, but define the specific type of
+ * AsynchronousIterative you wish to build and pass that. Then call
+ * each of the @p set_* member functions, passing constructor
+ * parameters as needed (still call it even if the parameter list is
+ * empty), and finally call @p build_waiter to obtain a Waiter to your
+ * iterative method. This waiter will wait on any subscriptions or
+ * other wait conditions that need to be completed, and will then
+ * lazily construct each sub-component and finally the iterative
+ * method itself.
+ *
+ * For example, a typical use might be as follows:
+ * @code
+ * using IterMethod = AsynchronousIterative<JacobiProcessor<double>, AlwaysUpdateNbrs, StopAfterTime>;
+ * Waiter<IterMethod> iter_waiter =
+ *  WaiterBuilder<IterMethod>(master_handle, job, my_tag, nbr_tags)
+ *  .set_processor(A, b, row_inds)
+ *  .set_nbr_update_criterion()
+ *  .set_stop_policy(std::chrono::seconds(5))
+ *  .build_waiter();
+ * IterMethod sync_jacobi = iter_waiter.get();
+ * @endcode
+ */  
+template<typename Processor, typename PublishPolicy, typename StopPolicy>
+class WaiterBuilder<AsynchronousIterative<Processor, PublishPolicy, StopPolicy>>
 {
-  job.declare_publication_intent(produced_tag);
-  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe_range(tags),
-    handle,
-    job,
-    produced_tag,
-    tags
-  );
-}
-
-template<typename... TagValueTypes, typename... TagTypes>
-auto create_asynchronous_iterative(
-  MasterHandle handle, Job& job, const PublishTag<TagValueTypes...>& produced_tag, const TagTypes&... tags) noexcept
-{
-  job.declare_publication_intent(produced_tag);
-  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe(tags...),
-    handle,
-    job,
-    produced_tag,
-    tags...
-  );
-}
-
-template<
-  typename... TagValueTypes,
-  typename Range,
-  typename Rep,
-  typename Period>
-auto create_asynchronous_iterative(
-  const std::chrono::time_point<Rep, Period>& end_time,
-  IterativeInitErrorPolicy policy,
-  MasterHandle handle,
-  Job& job,
-  const PublishTag<TagValueTypes...>& produced_tag,
-  const Range& tags) noexcept
-{
-  job.declare_publication_intent(produced_tag);
-  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe_range(tags),
-    end_time,
-    policy,
-    handle,
-    job,
-    produced_tag,
-    tags
-  );
-}
-
-template<
-  typename... TagValueTypes,
-  typename... TagTypes,
-  typename Rep,
-  typename Period>
-auto create_asynchronous_iterative(
-  const std::chrono::time_point<Rep, Period>& end_time,
-  IterativeInitErrorPolicy policy,
-  MasterHandle handle,
-  Job& job,
-  const PublishTag<TagValueTypes...>& produced_tag,
-  const TagTypes&... tags) noexcept
-{
-  job.declare_publication_intent(produced_tag);
-  return internal::create_iterative<AsynchronousIterative, Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>>(
-    job.subscribe(tags...),
-    end_time,
-    policy,
-    handle,
-    job,
-    produced_tag,
-    tags...
-  );
-}
-} // namespace skynet
-
-// Support needed for structured bindings
-template<typename T>
-class std::tuple_size<skynet::AsynchronousElement<T>> : public std::integral_constant<std::size_t, 2> {};
-
-template<std::size_t I, typename T>
-class std::tuple_element<I, skynet::AsynchronousElement<T>> {
-  static_assert(I == 0 || I == 1);
-
 public:
-  using type = decltype(std::declval<skynet::AsynchronousElement<T>>().template get<I>());
-};
+  using ObjectT = AsynchronousIterative<Processor, PublishPolicy, StopPolicy>;
+  using ThisT = WaiterBuilder<ObjectT>;
+  using ValueTag = typename Processor::ValueTag;
+
+    /**
+   * @param handle MasterHandle object running this agent.
+   * @param job The job running the iteration.
+   * @param produced_tag The tag of the data produced by this agent and sent to iteration neighbors.
+   * @param tags An iteration-capable container of tags of neighboring data from which this agent will collect updates. Can be 
+   */
+  template<typename Range>
+  WaiterBuilder(MasterHandle handle, Job& job,
+                   const ValueTag& produced_tag,
+                   const Range& tags)
+    : handle_(handle), job_(job),
+      produced_tag_(produced_tag),
+      tags_vec_(tags.cbegin(), tags.end())
+  {
+    job.declare_publication_intent(produced_tag);
+    subscribe_waiter_ =
+      std::make_shared<Waiter<void>>(job.subscribe_range(tags));
+  }
+
+  /** @brief Build a Waiter<Processor> that will construct the Processor for this iterative method.
+   */
+  template<typename... Args>
+  ThisT& set_processor(Args&&... args)
+  {
+    processor_waiter_ = std::make_shared<Waiter<Processor>>
+      (std::move(WaiterBuilder<Processor>(std::forward<Args>(args)...).build_waiter()));
+    return *this;
+  }
+
+  /** @brief Build a Waiter<PublishPolicy> that will construct the PublishPolicy for this iterative method.
+   */
+  template<typename... Args>
+  ThisT& set_publish_policy(Args&&... args)
+  {
+    publish_policy_waiter_ = std::make_shared<Waiter<PublishPolicy>>
+      (WaiterBuilder<PublishPolicy>(std::forward<Args>(args)...).build_waiter());
+    return *this;
+  }
+
+  /** @brief Build a Waiter<StopPolicy> that will construct the StopPolicy for this iterative method.
+   */
+  template<typename... Args>
+  ThisT& set_stop_policy(Args&&... args)
+  {
+    stop_policy_waiter_ = std::make_shared<Waiter<StopPolicy>>
+      (WaiterBuilder<StopPolicy>(std::forward<Args>(args)...).build_waiter());
+    return *this;
+  }
+  
+  /* @brief Build a Waiter to the desired synchronous iterative method.
+   * @returns A Waiter<AsynchronousIterative<Processor, PublishPolicy, StopPolicy>>
+   */
+  Waiter<ObjectT> build_waiter()
+  {
+    // capture by value to ensure liveness of shared ptrs
+    auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
+                     processor_waiter = this->processor_waiter_,
+                     publish_policy_waiter = this->publish_policy_waiter_,
+                     stop_policy_waiter = this->stop_policy_waiter_]()
+      {
+        return (subscribe_waiter_->is_ready()
+                && processor_waiter->is_ready()
+                && publish_policy_waiter->is_ready()
+                && stop_policy_waiter->is_ready());
+      };
+    
+    auto cons_args = std::make_tuple
+      (std::ref(job_), produced_tag_, tags_vec_,
+       processor_waiter_->get(),
+       publish_policy_waiter_->get(),
+       stop_policy_waiter_->get());
+    auto get_object = [cons_args = std::move(cons_args)]()
+        { return std::make_from_tuple<ObjectT>(cons_args); };
+    return handle_.waiter_on_subscription_change<ObjectT>(is_ready, std::move(get_object));
+  }
+
+
+private:
+  MasterHandle handle_;
+  Job& job_;
+  ValueTag produced_tag_;
+  std::vector<ValueTag> tags_vec_;
+
+  // Using shared_ptrs on these waiters so that they are not destroyed
+  // if the WaiterBuilder gets destroyed before the
+  // object is retrieved from the Waiter<ThisT>.
+  std::shared_ptr<Waiter<void>> subscribe_waiter_;
+  std::shared_ptr<Waiter<Processor>> processor_waiter_;
+  std::shared_ptr<Waiter<PublishPolicy>> publish_policy_waiter_;
+  std::shared_ptr<Waiter<StopPolicy>> stop_policy_waiter_;
+}; // class WaiterBuilder<...>
+
+
+} // namespace skynet
 
 #endif // SKYNET_UPPER_ASYNCHRONOUS_ITERATIVE_HPP

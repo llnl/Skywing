@@ -437,19 +437,25 @@ private:
   // Interface for MasterHandle
   ///////////////////////////////////////
 
-  auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
-    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
-  auto connect_to_server(std::string_view address) noexcept
-    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>;
-  int number_of_neighbors() const noexcept;
-  int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  Waiter<bool> connect_to_server(const char* const address, const std::uint16_t port) noexcept;
+  Waiter<bool> connect_to_server(std::string_view address) noexcept;
+  size_t number_of_neighbors() const noexcept;
+  size_t number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
   std::uint16_t port() const noexcept;
 
-  template<typename IsReadyCallable>
-  Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
+  Waiter<void> waiter_on_subscription_change(std::function<bool()> is_ready_callable) noexcept
   {
-    return make_waiter(dummy_mutex_, subscription_cv_, std::forward<IsReadyCallable>(c));
+    return make_waiter(dummy_mutex_, subscription_cv_, std::move(is_ready_callable));
   }
+
+  template<typename T>
+  Waiter<T> waiter_on_subscription_change(std::function<bool()> is_ready_callable,
+                                          std::function<T()> get_val_callable) noexcept
+  {
+    return Waiter<T>(dummy_mutex_, subscription_cv_,
+                     std::move(is_ready_callable), std::move(get_val_callable));
+  }
+
 
   ///////////////////////////////////////
   // End Interface for MasterHandle
@@ -507,12 +513,11 @@ private:
 
   /** \brief Subscribes to the passed tags.
    */
-  auto subscribe(const std::vector<TagID>& tag_ids) noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
+  Waiter<void> subscribe(const std::vector<TagID>& tag_ids) noexcept;
 
   /** \brief Subscribes to the passed tags only on a specific IP
    */
-  auto ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
-    -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
+  Waiter<bool> ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept;
 
   /** \brief Handles the get_publishers message
    */
@@ -541,13 +546,11 @@ private:
 
   /** \brief Starts the process of creating a reduce group
    */
-  auto create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-    -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+  Waiter<internal::ReduceGroupBase&> create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept;
 
   /** \brief Gets a future for when a reduce group has been re-built.
    */
-  auto rebuild_reduce_group(const TagID& group_id) noexcept
-    -> Waiter<internal::MasterReduceGroupIsCreated, WaiterGetNoOp>;
+  Waiter<void> rebuild_reduce_group(const TagID& group_id) noexcept;
 
   /** \brief Returns true if the specified reduce group has been successfully created.
    *
@@ -786,16 +789,14 @@ public:
    * \param address The address to connect to
    * \param port The port to connect on
    */
-  auto connect_to_server(const char* const address, const std::uint16_t port) noexcept
-    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+  Waiter<bool> connect_to_server(const char* const address, const std::uint16_t port) noexcept
   {
     return handle_->connect_to_server(address, port);
   }
 
   /** \brief Connects to another instance with the address:port format
    */
-  auto connect_to_server(std::string_view address) noexcept
-    -> Waiter<internal::MasterConnectionIsComplete, internal::MasterGetConnectionSuccess>
+  Waiter<bool> connect_to_server(std::string_view address) noexcept
   {
     return handle_->connect_to_server(address);
   }
@@ -818,11 +819,20 @@ public:
   /** \brief Creates a waiter that has a done condition that is run anytime
    * anything with subscriptions happens
    */
-  template<typename IsReadyCallable>
-  Waiter<IsReadyCallable, WaiterGetNoOp> waiter_on_subscription_change(IsReadyCallable&& c) noexcept
+  Waiter<void> waiter_on_subscription_change(std::function<bool()> is_ready_callable) noexcept
   {
-    return handle_->waiter_on_subscription_change(std::forward<IsReadyCallable>(c));
+    return handle_->waiter_on_subscription_change(std::move(is_ready_callable));
   }
+
+
+  template<typename T>
+  Waiter<T> waiter_on_subscription_change(std::function<bool()> is_ready_callable,
+                                          std::function<T()> get_val_callable) noexcept
+  {
+    return handle_->waiter_on_subscription_change(std::move(is_ready_callable),
+                                                     std::move(get_val_callable));
+  }
+
 
   /** \brief Returns the port the master is listening on
    */

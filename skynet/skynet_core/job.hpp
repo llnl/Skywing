@@ -171,7 +171,7 @@ public:
    * \pre The tag is subscribed to
    */
   template<typename... Ts>
-  auto get_waiter(const PublishTag<Ts...>& tag) noexcept
+  Waiter<std::optional<ValueOrTuple<Ts...>>> get_waiter(const PublishTag<Ts...>& tag) noexcept
   {
     using ValueType = ValueOrTuple<Ts...>;
     // Can just capture the reference to the value as it
@@ -183,7 +183,7 @@ public:
     assert(tag_iter != buffers.cend());
     auto& tag_info = tag_iter->second;
     const auto tag_conn_id = tag_info.connection_id;
-    return make_waiter(
+    return make_waiter<std::optional<ValueType>>(
       bufs_.mutex(),
       data_buffer_modified_cv_,
       [&tag_info, tag_conn_id]() {
@@ -210,7 +210,7 @@ public:
    * \return A future for when the tags have been subscribed to
    */
   template<typename... Ts>
-  auto subscribe(const Ts&... tags) noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+  Waiter<void> subscribe(const Ts&... tags) noexcept
   //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
   {
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
@@ -230,7 +230,7 @@ public:
   /** \brief Subscribes to a range of tags.
    */
   template<typename Range>
-  auto subscribe_range(const Range& tags) noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+  Waiter<void> subscribe_range(const Range& tags) noexcept
   // requires std::ranges::contiguous_range<Range>
   {
     using IterType = std::decay_t<decltype(tags.begin())>;
@@ -246,8 +246,7 @@ public:
   /** \brief Subscribe to a set of tags from a specific IP
    */
   template<typename... Ts>
-  auto ip_subscribe(const std::string& address, const Ts&... tags) noexcept
-    -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>
+  Waiter<bool> ip_subscribe(const std::string& address, const Ts&... tags) noexcept
   // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
@@ -340,7 +339,7 @@ public:
   /** \brief Rebuilds connections for the specified tags
    */
   template<typename Range>
-  auto rebuild_tags(const Range& tags) -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+  Waiter<void> rebuild_tags(const Range& tags)
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
     init_or_update_subscribe(
@@ -353,7 +352,7 @@ public:
    *
    * \return A future for when the tags are re-connected
    */
-  auto rebuild_missing_tag_connections() noexcept -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>
+  Waiter<void> rebuild_missing_tag_connections() noexcept
   {
     // init_or_update_subscribe obtains a lock, so might as well just
     // init this in a lambda (since it can then be const)
@@ -391,8 +390,28 @@ public:
    * add a way to do this and also only send data on tags which machines are
    * subscribed to.
    */
-  int number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  size_t number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
 
+  void wait_for_update()
+  {
+    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    data_buffer_modified_cv_.wait(lock);
+    lock.unlock();
+  }
+
+  template<typename Duration>
+  void wait_for_update(Duration duration)
+  {
+    std::unique_lock<std::mutex> lock{bufs_.mutex()};
+    data_buffer_modified_cv_.wait_for(lock, duration);
+    lock.unlock();
+  }
+
+  void notify_of_update()
+  {
+    data_buffer_modified_cv_.notify_all();
+  }
+  
 private:
   /** \brief Checks if a buffer has data without locking
    */
@@ -419,12 +438,10 @@ private:
     gsl::span<const internal::PublishTagBase> tags,
     gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  auto get_subscribe_future(gsl::span<const internal::PublishTagBase> tags) noexcept
-    -> Waiter<internal::MasterSubscribeIsDone, WaiterGetNoOp>;
+  Waiter<void> get_subscribe_future(gsl::span<const internal::PublishTagBase> tags) noexcept;
 
-  auto
-    get_ip_subscribe_future(const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
-    -> Waiter<internal::MasterIPSubscribeComplete, internal::MasterIPSubscribeSuccess>;
+  Waiter<bool> get_ip_subscribe_future(
+    const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept;
 
   void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept;
   void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const> tags) noexcept;
@@ -437,8 +454,7 @@ private:
     const std::vector<TagID>& reduce_over_tags,
     gsl::span<const std::uint8_t> expected_type) noexcept;
 
-  auto create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-    -> Waiter<internal::MasterReduceGroupIsCreated, internal::MasterGetReduceGroup>;
+  Waiter<internal::ReduceGroupBase&> create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept;
 
   bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
   bool tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept;

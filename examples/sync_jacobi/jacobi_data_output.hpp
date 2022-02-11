@@ -15,7 +15,7 @@ double calculate_partial_residual( std::vector<double> x_local_solution,  std::v
   return partial_residual;
 }
 
-double calculate_partial_forward_error(std::vector<int> row_indices, std::vector<double> x_partition_estimate, std::vector<double> x_local_solution)
+double calculate_partial_forward_error(std::vector<size_t> row_indices, std::vector<double> x_partition_estimate, std::vector<double> x_local_solution)
 {
   double partitioned_forward_error = 0.0;
   for(int i =0 ; i < static_cast<int> (row_indices.size()) ; i++)

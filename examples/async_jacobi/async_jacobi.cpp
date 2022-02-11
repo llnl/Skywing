@@ -1,7 +1,9 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_jacobi.hpp"
+#include "skynet_upper/jacobi_processor.hpp"
 #include "skynet_upper/data_input.hpp"
+#include "skynet_upper/stop_policies.hpp"
+#include "skynet_upper/publish_policies.hpp"
 
 #include <array>
 #include <chrono>
@@ -11,6 +13,7 @@
 #include <thread>
 #include <cstdint>
 #include <fstream>
+#include <type_traits>
 
 // all jacobi_include files for matrix input and data aggregation.
 #include "jacobi_data_output.hpp"
@@ -54,7 +57,19 @@ std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
 }
 
 // All of the Skynet specific code is located in this function.
-void machine_task(int machine_number, int number_of_overlapping_components, int trial, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<double> x_partition_solution, std::vector<double> x_full_solution, std::vector<int> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::string save_directory)
+void machine_task(
+    int machine_number,
+    int number_of_overlapping_components,
+    int trial,
+    std::vector<std::vector<double>> A_partition,
+    std::vector<double> b_partition,
+    std::vector<double> x_partition_solution,
+    std::vector<double> x_full_solution,
+    std::vector<size_t> row_indices,
+    std::vector<std::uint16_t> ports,
+    std::vector<std::string> machine_names,
+    std::vector<ValueTag> tags,
+    std::string save_directory)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
@@ -72,27 +87,29 @@ void machine_task(int machine_number, int number_of_overlapping_components, int 
   }
 
   std::cout << "Machine " << machine_number << " creating iteration object." << std::endl;
-  auto opt_iter_method = create_asynchronous_jacobi(
-    machine_number,
-    A_partition,
-    b_partition,
-    row_indices,
-    tags,
-    master_handle,
-    job,
-    tags[machine_number],
-    tags
-  ).get();
-
-  std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;
-  auto async_jacobi = *opt_iter_method;
-  async_jacobi.run();
+  
+  using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>, StopAfterTime>;
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+    .set_processor(A_partition, b_partition, row_indices)
+    .set_publish_policy(1e-6)
+    .set_stop_policy(std::chrono::seconds(5))
+    .build_waiter();
+  std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
+  IterMethod async_jacobi = iter_waiter.get();
+                                       
+  std::cout << "Machine " << machine_number << " about to start jacobi iteration." << std::endl;  
+  async_jacobi.run([&](const decltype(async_jacobi)& p)
+    {
+      std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has values ";
+      print_vec<double>(p.get_processor().return_partition_solution());
+    });
   std::cout << "Machine " << machine_number << " finished jacobi iteration." << std::endl;
 
-  double run_time = async_jacobi.return_runtime();
+  double run_time = async_jacobi.run_time().count();
   int information_received = async_jacobi.get_iteration_count();
-  auto x_local_estimate = async_jacobi.return_full_solution();
-  auto x_partition_estimate = async_jacobi.return_partition_solution();
+  auto x_local_estimate = async_jacobi.get_processor().return_full_solution();
+  auto x_partition_estimate = async_jacobi.get_processor().return_partition_solution();
   // Since this is a distributed algorithm, we only have access to information that allows us to have a "partial" residual, since not every agent has every row of the matrix. 
   // In contrast, we can look at error involving only the components of the solution vector x which this process updates, or it's entire estimation vector, hence "partial" versus "full" in this language and "PSQ" versus "FSQ" for "partial error squared" and "full error squared". 
   // We avoid taking square roots here in case additional post processing is wanted.
@@ -217,7 +234,7 @@ int main(int argc, char* argv[])
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_overlapping_components)  + "_indices_" + matrix_name ;
-  std::vector<int> row_indices = input_vector_from_matrix_market<int>(directory, row_index_name);
+  std::vector<size_t> row_indices = input_vector_from_matrix_market<size_t>(directory, row_index_name);
 
   std::string matrix_partition_name = "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_overlapping_components)  + "_" + matrix_name ;
   std::vector<std::vector<double>> A_partition = input_matrix_from_matrix_market<double>(directory, matrix_partition_name);
