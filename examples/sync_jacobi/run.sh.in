@@ -1,8 +1,8 @@
 #!/bin/bash
 
 if [[ $# < 1 ]]; then
-  echo "usage: @exe@ starting_port_number"
-  exit 1
+  echo "usage: source $(basename ${BASH_SOURCE[0]}) starting_port_number"
+  return
 fi
 
 STARTING_PORT=$1
