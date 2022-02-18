@@ -31,7 +31,7 @@ public:
   template<typename TagIter>
   TagIter handle_dead_neighbor(const TagIter& tag_iter) noexcept
   {
-    dead_tags.push_back(std::move(*tag_iter));
+    dead_tags_.push_back(std::move(*tag_iter));
     return tags_.erase(tag_iter);
   }
   
