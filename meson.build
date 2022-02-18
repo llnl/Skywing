@@ -1,5 +1,5 @@
 project('skynet', 'cpp',
-  version: '0.0.1',
+  version: '0.0.2',
   default_options : [
     'cpp_std=c++17',
     'warning_level=3',
@@ -41,7 +41,7 @@ gsl_dep = declare_dependency(
   include_directories : include_directories('subprojects/gsl/include')
 )
 
-capnproto_dep = dependency('capnp', version : '>=0.7.0')
+capnproto_dep = dependency('capnp', version : '>=0.8.0')
 
 use_helics = get_option('use_helics')
 if use_helics

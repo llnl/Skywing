@@ -11,10 +11,9 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
 
 ## Development team
  * Aly Fox <fox33@llnl.gov>
- * Corey McNeish <mcneish1@llnl.gov>
- * Colin Ponce <ponce11@llnl.gov>
- * Chris Vogl <vogl2@llnl.gov>
  * Kendall Harter <harter8@llnl.gov>
+ * **Colin Ponce <ponce11@llnl.gov>** (corresponding author)
+ * Chris Vogl <vogl2@llnl.gov>
 
 ## Dependencies Not Automatically Managed
  * compiler that supports c++17 library
@@ -24,7 +23,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * CMake (https://cmake.org/)
  * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
-   * requires version 0.7.0 or newer
+   * requires version 0.8.0 or newer
 
 ## Dependencies Managed as Git Submodules
  * Catch2
