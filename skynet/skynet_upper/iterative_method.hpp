@@ -8,11 +8,14 @@ namespace skynet {
 
 /** @brief Base class for iterative methods.
  * 
+ * @param DeadNeighborPolicy Determines how this IterativeMethod
+ * should respond to realizing a neighbor is dead.
+ *
  * @tparam TagValueTypes... Values types this iterative method will
  * publish to neighbors.
  * 
  */
-template<typename... TagValueTypes>
+template<typename DeadNeighborPolicy, typename... TagValueTypes>
 class IterativeMethod {
 public:
   using TagType = PublishTag<TagValueTypes...>;
@@ -24,6 +27,13 @@ public:
     <TagType, T, skynet::internal::hash<TagType>>;
 
   const TagType& my_tag() const { return produced_tag_; }
+
+  template<typename TagIter>
+  TagIter handle_dead_neighbor(const TagIter& tag_iter) noexcept
+  {
+    dead_tags.push_back(std::move(*tag_iter));
+    return tags_.erase(tag_iter);
+  }
   
   /** @brief Rebuilds connections for dead tags
    */

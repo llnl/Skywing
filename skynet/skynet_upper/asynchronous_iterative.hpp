@@ -146,7 +146,8 @@ public:
       const auto& tag = *tag_iter;
       if (!this->job_->tag_has_active_publisher(tag))
       {
-        mark_current_as_dead();
+        //        mark_current_as_dead();
+        tag_iter = this->handle_dead_neighbor(tag_iter);
         continue;
       }
       if (this->job_->has_data(tag)) num_updated++;

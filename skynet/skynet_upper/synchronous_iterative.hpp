@@ -128,8 +128,9 @@ public:
       }
       else
       {
-        this->dead_tags_.push_back(std::move(*tag_iter));
-        tag_iter = this->tags_.erase(tag_iter);
+        // this->dead_tags_.push_back(std::move(*tag_iter));
+        // tag_iter = this->tags_.erase(tag_iter);
+        tag_iter = this->handle_dead_neighbor(tag_iter);
       }
     }
     return ret_values;
