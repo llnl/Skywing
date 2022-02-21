@@ -95,6 +95,7 @@ void machine_task(
     .set_processor(A_partition, b_partition, row_indices)
     .set_publish_policy(1e-6)
     .set_stop_policy(std::chrono::seconds(5))
+    .set_resilience_policy()
     .build_waiter();
   std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
   IterMethod async_jacobi = iter_waiter.get();

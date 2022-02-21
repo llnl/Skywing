@@ -85,6 +85,7 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     .set_processor(number_of_neighbors, starting_value, subTags)
     .set_publish_policy(1e-4, 0, 1)
     .set_stop_policy(std::chrono::seconds(5))
+    .set_resilience_policy()
     .build_waiter();
   IterMethod push_sum = iter_waiter.get();
 

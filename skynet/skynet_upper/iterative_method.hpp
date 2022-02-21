@@ -3,28 +3,50 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
+#include "skynet_upper/pubsub_converter.hpp"
+#include "skynet_upper/iterative_helpers.hpp"
+#include "skynet_upper/neighbor_data_handler.hpp"
 
 namespace skynet {
 
 /** @brief Base class for iterative methods.
  * 
- * @param DeadNeighborPolicy Determines how this IterativeMethod
- * should respond to realizing a neighbor is dead.
+ * @param ResiliencePolicy Determines how this IterativeMethod
+ * should respond to problems such as dead neighbors.
  *
  * @tparam TagValueTypes... Values types this iterative method will
  * publish to neighbors.
  * 
  */
-template<typename DeadNeighborPolicy, typename... TagValueTypes>
+template<typename ResiliencePolicy, typename DataType>
 class IterativeMethod {
 public:
-  using TagType = PublishTag<TagValueTypes...>;
-  using ValueTag = TagType;
-  using ValueType = ValueOrTuple<TagValueTypes...>;
+  using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
+  using TagValueType = typename PubSubConverter<DataType>::pubsub_type;
+  using TagType = PublishTag<TagValueType>;
 
-  template<typename T>
-  using tag_map = std::unordered_map
-    <TagType, T, skynet::internal::hash<TagType>>;
+  /** @param job The job running this iterative method.
+   *  @param produced_tag The tag this agent will publish during iteration.
+   *  @param tags The set of tags consumed during iteration, possibly including @p produced_tag
+   */
+  IterativeMethod(
+    Job& job,
+    const TagType& produced_tag,
+    const std::vector<TagType>& tags,
+    ResiliencePolicy resilience_policy) noexcept
+    : job_{&job}, produced_tag_{produced_tag}, tags_{tags},
+      resilience_policy_(resilience_policy)
+  {
+    for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();) {
+      if (!job_->tag_has_active_publisher(*tag_iter)) {
+        dead_tags_.push_back(std::move(*tag_iter));
+        tag_iter = tags_.erase(tag_iter);
+      }
+      else {
+        ++tag_iter;
+      }
+    }
+  }
 
   const TagType& my_tag() const { return produced_tag_; }
 
@@ -32,6 +54,7 @@ public:
   TagIter handle_dead_neighbor(const TagIter& tag_iter) noexcept
   {
     dead_tags_.push_back(std::move(*tag_iter));
+    resilience_policy_.handle_dead_neighbor(*this, tag_iter);
     return tags_.erase(tag_iter);
   }
   
@@ -50,7 +73,7 @@ public:
   template<typename Range>
   Waiter<void> rebuild_dead_tags_range(const Range& r) noexcept
   {
-    std::vector<PublishTag<TagValueTypes...>> search_tags;
+    std::vector<TagType> search_tags;
     for (const auto& tag : r) {
       auto iter = std::find(dead_tags_.begin(), dead_tags_.end(), tag.id());
       if (iter != dead_tags_.end()) {
@@ -101,143 +124,76 @@ public:
       static_cast<internal::PublishTagBase>(tags)...};
   }
 
+  bool gather_values()
+  {
+    auto tag_iter = tags_.begin();
+    size_t num_updated = 0;
+    while (tag_iter != tags_.cend())
+    {
+      const auto& tag = *tag_iter;
+      if (!job_->tag_has_active_publisher(tag))
+      {
+        tag_iter = handle_dead_neighbor(tag_iter);
+        continue;
+      }
+      if (job_->has_data(tag)) num_updated++;
+      ++tag_iter;
+    }
+    if (num_updated == 0) return false;
+
+    updated_tags_.clear();
+    updated_tags_.reserve(num_updated);
+    for (const auto& tag : tags_)
+    {
+      if (job_->has_data(tag))
+      {
+        const auto value_opt = job_->get_waiter(tag).get();
+        assert(value_opt);
+        neighbor_values_[tag] = PubSubConverter<DataType>::deconvert(*value_opt);
+        updated_tags_.push_back(&tag);
+      }
+    }
+    return true;
+  }
+
+  /** @brief Publish this agent's values for its neighbors.
+   */
+  auto submit_values(DataType value_to_submit) noexcept
+  {
+    job_->publish(produced_tag_, PubSubConverter<DataType>::convert(std::move(value_to_submit)));
+  }
+
+
   /** @brief Returns all active tags
    */
-  const std::vector<PublishTag<TagValueTypes...>>& tags() const noexcept { return tags_; }
+  const std::vector<TagType>& tags() const noexcept { return tags_; }
 
   /** @brief Returns all dead tags
    */
-  const std::vector<PublishTag<TagValueTypes...>>& dead_tags() const noexcept { return dead_tags_; }
+  const std::vector<TagType>& dead_tags() const noexcept { return dead_tags_; }
 
   Job& get_job() const noexcept { return *job_; }
 
-
-
-  /****************************************************
-   * VALUES INTERFACE
-   ***************************************************/
-
-  const tag_map<ValueType>& get_values_unsafe() { return neighbor_values_; }
-
-  template<typename R>
-  R sum() {
-    return f_sum<R>([](const ValueType& v) { return v; });
-  }
-  template<typename R>
-  R f_sum(std::function<R(const ValueType&)> f) {
-    return weighted_f_accumulate_<R, R, true, false, false>
-      (std::move(f), 0, std::plus<R>(), nullptr);
-  }
-  template<typename R, typename S>
-  R weighted_f_sum(std::function<R(const ValueType&)> f, tag_map<S> coeffs)
-  {
-    return weighted_f_accumulate_<R, S, true, true, false>
-      (std::move(f), [&](const ValueTag& t){ return coeffs[t];}, std::plus<R>(), nullptr);
-  }
-
-  template<typename R>
-  R average() {
-    return sum<R>() / tags_.size();
-  }
-  template<typename R>
-  R f_average(std::function<R(const ValueType&)> f) {
-    return f_sum<R>(std::move(f)) / tags_.size();
-  }
-  template<typename R, typename S>
-  R weighted_f_average(std::function<R(const ValueType&)> f, tag_map<S> coeffs)
-  {
-    R num =  weighted_f_sum<R, S>(std::move(f), coeffs);
-    R denom = weighted_f_accumulate_<R, S, false, true, false>
-      (0, [&](const ValueTag& t){ return coeffs[t];}, std::plus<R>(), nullptr);
-    return num / denom;
-  }
-
-  template<typename R>
-  R f_accumulate(std::function<R(const ValueType&)> f,
-                 std::function<R(R, R)> binary_op)
-  {
-    return weighted_f_accumulate_<R, R, true, false, false>(std::move(f), std::move(binary_op));
-  }
-  template<typename R>
-  R f_max(std::function<R(const ValueType&)> f)
-  {
-    return f_accumulate<R>(std::move(f), [](R x, R y){return std::max(x, y);});
-  }
-  template<typename R>
-  R f_min(std::function<R(const ValueType&)> f)
-  {
-    return f_accumulate<R>(std::move(f), [](R x, R y){return std::min(x, y);});
-  }
-
+  template<typename ret_type>
+  NeighborDataHandler<ThisT, ret_type> get_neighbor_data_handler(std::function<ret_type(DataType& v)> f)
+  { return NeighborDataHandler<ThisT, ret_type>(std::move(f), *this); }
+                                                                 
+  NeighborDataHandler<ThisT, DataType> get_neighbor_data_handler()
+  { return get_neighbor_data_handler([](DataType& v){return v;}); }
 
 protected:
-
-  /** @param job The job running this iterative method.
-   *  @param produced_tag The tag this agent will publish during iteration.
-   *  @param tags The set of tags consumed during iteration, possibly including @p produced_tag
-   */
-  IterativeMethod(
-    Job& job,
-    const PublishTag<TagValueTypes...>& produced_tag,
-    const std::vector<PublishTag<TagValueTypes...>>& tags) noexcept
-    : job_{&job}, produced_tag_{produced_tag}, tags_{tags}
-  {
-    for (auto tag_iter = tags_.begin(); tag_iter != tags_.end();) {
-      if (!job_->tag_has_active_publisher(*tag_iter)) {
-        dead_tags_.push_back(std::move(*tag_iter));
-        tag_iter = tags_.erase(tag_iter);
-      }
-      else {
-        ++tag_iter;
-      }
-    }
-  }
-
-  template<typename R, typename S,
-           bool use_f, bool use_coef>
-  std::function<R(const ValueTag&)>
-  get_sum_contributor_(std::function<R(const ValueType&)>& f,
-                       std::function<S(const ValueTag&)>& coef)
-  {
-    static_assert(use_f || use_coef);
-    if constexpr (!use_f) {
-        return [&](const ValueTag& t) { return coef(t); };
-    }
-    else if (!use_coef) {
-      return [&](const ValueTag& t) { return f(this->neighbor_values_[t]); };
-    }
-    else return [&](const ValueTag& t) { return coef(t) * f(this->neighbor_values_[t]); };
-  }
-
-  template<typename R, typename S, bool use_f, bool use_coef, bool use_shift>
-  R weighted_f_accumulate_(std::function<R(const ValueType&)> f,
-                           std::function<S(const ValueTag&)> coef,
-                           std::function<R(R, R)> binary_op,
-                           R* shift)
-  {
-    auto contributor = get_sum_contributor_<R, S, use_f, use_coef>(f, coef);
-    
-    auto tag_iter = tags_.cbegin();
-    R val = [&]{
-      if constexpr (use_shift) return binary_op(*shift, contributor(*tag_iter));
-      else return contributor(*tag_iter);
-    }();
-    ++tag_iter;
-    
-    for (; tag_iter != tags_.cend(); ++tag_iter)
-      val = binary_op(std::move(val), std::move(contributor(*tag_iter)));
-
-    return val;
-  }
-
   Job* job_;
-  PublishTag<TagValueTypes...> produced_tag_;
-  std::vector<PublishTag<TagValueTypes...>> tags_;
-  std::vector<PublishTag<TagValueTypes...>> dead_tags_;
+  TagType produced_tag_;
+  std::vector<TagType> tags_;
+  std::vector<TagType> dead_tags_;
+  ResiliencePolicy resilience_policy_;
 
 private:
-  tag_map<ValueType> neighbor_values_;
-  
+  tag_map<TagType, DataType> neighbor_values_;
+  std::vector<const TagType*> updated_tags_;
+
+  template<typename Callable, typename IterMethod>
+  friend class NeighborDataHandler;
 }; // class IterativeBase
 
 } // namespace skynet

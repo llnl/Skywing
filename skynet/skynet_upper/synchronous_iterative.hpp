@@ -5,6 +5,7 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 #include "skynet_upper/iterative_method.hpp"
+#include "skynet_upper/iterative_resilience_policies.hpp"
 
 #include <map>
 #include <utility>
@@ -38,14 +39,15 @@ using namespace std::chrono_literals;
  * @tparam StopPolicy Determines when to stop the
  * iteration. Must define a member function @ bool operator()(constCallerT&)
  */
-template<typename Processor, typename StopPolicy>
-class SynchronousIterative : public IterativeMethod<typename Processor::ValueType>
+template<typename Processor, typename StopPolicy, typename ResiliencePolicy = TrivialResiliencePolicy>
+class SynchronousIterative : public IterativeMethod<ResiliencePolicy, typename Processor::ValueType>
 {
-  using ThisT = SynchronousIterative<Processor, StopPolicy>;
-  
 public:
+  using ThisT = SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>;
+  using BaseT = IterativeMethod<ResiliencePolicy, typename Processor::ValueType>;
+  
   using ValueType = typename Processor::ValueType;
-  using ValueTag = skynet::PublishTag<ValueType>;
+  using TagType = typename BaseT::TagType;
 
   /**
    * @param job The job running the iteration.
@@ -61,8 +63,9 @@ public:
     const std::vector<ValueTag>& tags,
     Processor processor,
     StopPolicy stop_policy,
+    ResiliencePolicy resilience_policy,
     std::chrono::milliseconds loop_delay_max = 1000ms) noexcept
-    : IterativeMethod<ValueType>{job, produced_tag, tags},
+    : IterativeMethod<ResiliencePolicy, ValueType>{job, produced_tag, tags, std::move(resilience_policy)},
     processor_(std::move(processor)),
     publish_values_(processor_.get_init_publish_values()),
     stop_policy_(std::move(stop_policy)),
@@ -84,9 +87,11 @@ public:
       {
         wait_for_values();
         if (!waitervec_->is_ready()) break;
-        std::vector<ValueType> received_values_vec = values();
+        //        std::vector<ValueType> received_values_vec = values();
+        this->gather_values();
 
-        processor_.process_update(this->tags_, received_values_vec, *this);
+        //        processor_.process_update(this->tags_, received_values_vec, *this);
+        processor_.process_update(this->get_neighbor_data_handler());
         ++iteration_count_;
 
         publish_values_ = processor_.prepare_for_publication(publish_values_);
@@ -115,34 +120,34 @@ public:
   /** @brief Collect values from each of the neighbors.
    *  @returns A std::vector<ValueType> of values from neighbors, in the same order as this->tags_.
    */
-  std::vector<ValueType> values() noexcept
-  {
-    std::vector<ValueType> ret_values;
-    auto tag_iter = this->tags_.begin();
-    for (const auto& val : waitervec_->get())
-    {
-      if (val)
-      {
-        ret_values.push_back(*val);
-        ++tag_iter;
-      }
-      else
-      {
-        // this->dead_tags_.push_back(std::move(*tag_iter));
-        // tag_iter = this->tags_.erase(tag_iter);
-        tag_iter = this->handle_dead_neighbor(tag_iter);
-      }
-    }
-    return ret_values;
-  }
+  // std::vector<ValueType> values() noexcept
+  // {
+  //   std::vector<ValueType> ret_values;
+  //   auto tag_iter = this->tags_.begin();
+  //   for (const auto& val : waitervec_->get())
+  //   {
+  //     if (val)
+  //     {
+  //       ret_values.push_back(*val);
+  //       ++tag_iter;
+  //     }
+  //     else
+  //     {
+  //       // this->dead_tags_.push_back(std::move(*tag_iter));
+  //       // tag_iter = this->tags_.erase(tag_iter);
+  //       tag_iter = this->handle_dead_neighbor(tag_iter);
+  //     }
+  //   }
+  //   return ret_values;
+  // }
 
   /** @brief Publish this agent's values for its neighbors.
    */
-  template<typename... ArgTypes>
-  auto submit_values(ArgTypes&&... values_to_submit) noexcept
-  {
-    this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
-  }
+  // template<typename... ArgTypes>
+  // auto submit_values(ArgTypes&&... values_to_submit) noexcept
+  // {
+  //   this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
+  // }
 
   /** @brief Get iteration run time, or zero if not yet began.
    */
@@ -229,13 +234,13 @@ private:
  * IterMethod sync_jacobi = iter_waiter.get();
  * @endcode
  */  
-template<typename Processor, typename StopPolicy>
-class WaiterBuilder<SynchronousIterative<Processor, StopPolicy>>
+template<typename Processor, typename StopPolicy, typename ResiliencePolicy>
+class WaiterBuilder<SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>>
 {
 public:
   using ObjectT = SynchronousIterative<Processor, StopPolicy>;
   using ThisT = WaiterBuilder<ObjectT>;
-  using ValueTag = typename Processor::ValueTag;
+  using TagType = typename ObjectT::BaseT::TagType;
 
   /**
    * @param handle MasterHandle object running this agent.
@@ -245,7 +250,7 @@ public:
    */
   template<typename Range>
   WaiterBuilder(MasterHandle handle, Job& job,
-                const ValueTag& produced_tag,  const Range& tags)
+                const TagType& produced_tag,  const Range& tags)
     : handle_(handle), job_(job),
       produced_tag_(produced_tag),
       tags_vec_(tags.cbegin(), tags.cend())
@@ -275,6 +280,16 @@ public:
     return *this;
   }
 
+  /** @brief Build a Waiter<ResiliencePolicy> that will construct the ResiliencePolicy for this iterative method.
+   */
+  template<typename... Args>
+  ThisT& set_resilience_policy(Args&&... args)
+  {
+    resilience_policy_waiter_ = std::make_shared<Waiter<ResiliencePolicy>>
+      (WaiterBuilder<ResiliencePolicy>(std::forward<Args>(args)...).build_waiter());
+    return *this;
+  }
+
   /* @brief Build a Waiter to the desired synchronous iterative method.
    * @returns A Waiter<SynchronousIterative<Processor, StopPolicy>>
    */
@@ -283,17 +298,20 @@ public:
     // capture by value to ensure liveness of shared ptrs
     auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
                      processor_waiter = this->processor_waiter_,
-                     stop_policy_waiter_ = this->stop_policy_waiter_]()
+                     stop_policy_waiter = this->stop_policy_waiter_,
+                     resilience_policy_waiter = this->resilience_policy_waiter_]()
       {
         return (subscribe_waiter_->is_ready()
                 && processor_waiter->is_ready()
-                && stop_policy_waiter_->is_ready());
+                && stop_policy_waiter->is_ready()
+                && resilience_policy_waiter->is_ready());
       };
     
     auto cons_args = std::make_tuple
       (std::ref(job_), produced_tag_, tags_vec_,
        processor_waiter_->get(),
-       stop_policy_waiter_->get());
+       stop_policy_waiter_->get(),
+       resilience_policy_waiter_->get());
     auto get_object = [cons_args = std::move(cons_args)]()
         { return std::make_from_tuple<ObjectT>(cons_args); };
     return handle_.waiter_on_subscription_change<ObjectT>(is_ready, std::move(get_object));
@@ -302,8 +320,8 @@ public:
 private:
   MasterHandle handle_;
   Job& job_;
-  ValueTag produced_tag_;
-  std::vector<ValueTag> tags_vec_;
+  TagType produced_tag_;
+  std::vector<TagType> tags_vec_;
 
   // Using shared_ptrs on these waiters so that they are not destroyed
   // if the WaiterBuilder gets destroyed before the
@@ -311,6 +329,7 @@ private:
   std::shared_ptr<Waiter<void>> subscribe_waiter_;
   std::shared_ptr<Waiter<Processor>> processor_waiter_;
   std::shared_ptr<Waiter<StopPolicy>> stop_policy_waiter_;
+  std::shared_ptr<Waiter<ResiliencePolicy>> resilience_policy_waiter_;
 }; // class WaiterBuilder<...>
   
 } // namespace skynet

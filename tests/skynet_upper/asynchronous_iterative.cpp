@@ -46,6 +46,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       .set_processor(index, publish_values, tags, catch_mutex)
       .set_publish_policy()
       .set_stop_policy(publish_values, tags)
+      .set_resilience_policy()
       .build_waiter().get();
     iter_method.run
       (
