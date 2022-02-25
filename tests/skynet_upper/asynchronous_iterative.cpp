@@ -15,13 +15,14 @@ constexpr int num_connections = 1;
 
 const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
 
-std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
+std::vector<std::string> tag_ids{"tag0", "tag1", "tag2"};
+//std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
 
-tag_map<std::vector<int>> publish_values
+data_id_map<std::vector<int>> publish_values
 {
-  {tags[0], std::vector<int>{0, 10}},
-  {tags[1], std::vector<int>{1, 20}},
-  {tags[2], std::vector<int>{2, 30}}
+  {tag_ids[0], std::vector<int>{0, 10}},
+  {tag_ids[1], std::vector<int>{1, 20}},
+  {tag_ids[2], std::vector<int>{2, 30}}
 };
 
 
@@ -42,10 +43,10 @@ void machine_task(const NetworkInfo* const info, const int index)
     });    
 
     using IterMethod = AsynchronousIterative<TestAsyncProcessor, TestAsyncPublishPolicy, TestAsyncStopPolicy>;
-    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tags[index], tags)
-      .set_processor(index, publish_values, tags, catch_mutex)
+    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
+      .set_processor(index, publish_values, tag_ids, catch_mutex)
       .set_publish_policy()
-      .set_stop_policy(publish_values, tags)
+      .set_stop_policy(publish_values, tag_ids)
       .set_resilience_policy()
       .build_waiter().get();
     iter_method.run

@@ -42,13 +42,13 @@ namespace skynet
   /** @brief Get std::tuple<T1::ValueType, T2::ValueType, ...> if all ValueTypes are tuples.
    */
   template<typename... Ts>
-  struct ValueTypesInTuple
+  struct TupleOfValueTypes
   {
     using type = decltype(std::tuple_cat(std::declval<typename ValueTypeAsTuple<Ts>::type>()...));
   };
 
   template<typename... Ts>
-  using ValueTypesInTuple_t = typename ValueTypesInTuple<Ts...>::type;
+  using TupleOfValueTypes_t = typename TupleOfValueTypes<Ts...>::type;
 
   // void testblah()
   // {

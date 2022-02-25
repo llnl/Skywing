@@ -36,18 +36,18 @@ public:
   template<typename Range>
   PushSumProcessor(size_t number_of_neighbors,
                    scalar_t starting_value,
-                   Range& tags)
+                   Range& tag_ids)
     : number_of_neighbors_(number_of_neighbors),
       x_value_(starting_value)
   {
     // TODO do we need these tags in the constructor? Maybe we can
     // just initialize on-the-go during processing.
-    for (const auto& tag : tags)
+    for (const auto& id : tag_ids)
     {
-      rho_x_[tag] = 0.0;
-      rho_y_[tag] = 0.0;
-      rho_x_previous_[tag] = 0.0;
-      rho_y_previous_[tag] = 0.0;
+      rho_x_[id] = 0.0;
+      rho_y_[id] = 0.0;
+      rho_x_previous_[id] = 0.0;
+      rho_y_previous_[id] = 0.0;
     }
     in_nodes_plus_one_ = number_of_neighbors_ + 1.0;
     // Local weights -> This is the information passed to neighbors.
@@ -141,11 +141,11 @@ private:
   scalar_t sigma_x_;
   scalar_t sigma_y_;
   // stores iterate information
-  using tag_val_map = std::unordered_map<ValueTag, scalar_t, skynet::internal::hash<ValueTag>>;
-  tag_val_map rho_x_;
-  tag_val_map rho_y_;
-  tag_val_map rho_x_previous_;
-  tag_val_map rho_y_previous_;
+  using data_id_map = std::unordered_map<std::string, scalar_t>;
+  data_id_map rho_x_;
+  data_id_map rho_y_;
+  data_id_map rho_x_previous_;
+  data_id_map rho_y_previous_;
 };  // class PushSumProcessor
 
 

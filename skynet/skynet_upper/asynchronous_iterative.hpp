@@ -52,10 +52,10 @@ template<typename Processor, typename PublishPolicy,
          typename StopPolicy, typename ResiliencePolicy = TrivialResiliencePolicy>
 class AsynchronousIterative :
     public IterativeMethod<ResiliencePolicy,
-                           ValueTypesInTuple_t<Processor, PublishPolicy, StopPolicy, ResiliencePolicy>>
+                           TupleOfValueTypes_t<Processor, PublishPolicy, StopPolicy, ResiliencePolicy>>
 {  
 public:
-  using ValueType = ValueTypesInTuple_t<Processor, PublishPolicy, StopPolicy, ResiliencePolicy>;
+  using ValueType = TupleOfValueTypes_t<Processor, PublishPolicy, StopPolicy, ResiliencePolicy>;
   using ThisT = AsynchronousIterative<Processor, PublishPolicy, StopPolicy, ResiliencePolicy>;
   using BaseT = IterativeMethod<ResiliencePolicy, ValueType>;
                                 
@@ -99,7 +99,7 @@ public:
   void run(std::function<void(const ThisT&)> callback)
   {
     start_time_ = clock_t::now();
-    submit_values(publish_values_);
+    this->submit_values(publish_values_);
     iterate_ = true;
     while (iterate_)
     {
@@ -117,7 +117,7 @@ public:
         if (publish_policy_(new_vals, publish_values_))
         {
           publish_values_ = std::move(new_vals);
-          submit_values(publish_values_);
+          this->submit_values(publish_values_);
         }
         
         if constexpr (has_callback) callback(*this);
@@ -213,7 +213,7 @@ public:
     return std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - *start_time_);
   }
 
-  const ValueType& get_publication_values() const { return publish_values_; }
+  //  const ValueType& get_publication_values() const { return publish_values_; }
 
   /** @brief Get number of iterations.
    */
@@ -292,16 +292,19 @@ public:
    */
   template<typename Range>
   WaiterBuilder(MasterHandle handle, Job& job,
-                   const TagType& produced_tag,
-                   const Range& tags)
+                const std::string produced_tag_id,
+                const Range& sub_tag_ids)
     : handle_(handle), job_(job),
-      produced_tag_(produced_tag),
-      tags_vec_(tags.cbegin(), tags.end())
+      produced_tag_(produced_tag_id),
+      tags_vec_(sub_tag_ids.cbegin(), sub_tag_ids.end())
   {
-    job.declare_publication_intent(produced_tag);
+    job.declare_publication_intent(produced_tag_);
     subscribe_waiter_ =
-      std::make_shared<Waiter<void>>(job.subscribe_range(tags));
+      std::make_shared<Waiter<void>>(job.subscribe_range(tags_vec_));
   }
+
+  const TagType& produced_tag() const { return produced_tag_; }
+  const std::vector<TagType>& subscribed_tags() const { return tags_vec_; }
 
   /** @brief Build a Waiter<Processor> that will construct the Processor for this iterative method.
    */

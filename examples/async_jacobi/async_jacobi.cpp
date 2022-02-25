@@ -20,7 +20,7 @@
 #include "jacobi_data_output.hpp"
 
 using namespace skynet;
-using ValueTag = skynet::PublishTag<std::vector<double>>;
+// using ValueTag = skynet::PublishTag<std::vector<double>>;
 
 // First three functions are for the Skynet setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_network)
@@ -45,16 +45,15 @@ std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::ui
   return ports;
 }
 
-template <class TagType>
-std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
+std::vector<std::string> obtain_tag_ids(std::uint16_t size_of_network)
 {
-  std::vector<TagType> tags;
+  std::vector<std::string> tag_ids;
   for(int i = 0; i < size_of_network; i++)
   {
     std::string hold = "tag" +  std::to_string(i);
-    tags.push_back(TagType{hold});
+    tag_ids.push_back(hold);
   }
-  return tags;
+  return tag_ids;
 }
 
 // All of the Skynet specific code is located in this function.
@@ -69,7 +68,7 @@ void machine_task(
     std::vector<size_t> row_indices,
     std::vector<std::uint16_t> ports,
     std::vector<std::string> machine_names,
-    std::vector<ValueTag> tags,
+    std::vector<std::string> tag_ids,
     std::string save_directory)
 {
 
@@ -91,7 +90,7 @@ void machine_task(
   
   using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>, StopAfterTime>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+    WaiterBuilder<IterMethod>(master_handle, job, tag_ids[machine_number], tag_ids)
     .set_processor(A_partition, b_partition, row_indices)
     .set_publish_policy(1e-6)
     .set_stop_policy(std::chrono::seconds(5))
@@ -232,7 +231,7 @@ int main(int argc, char* argv[])
   //This creates the relevant vectors needed to interact with skynet.
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
-  auto tags = obtain_tags<ValueTag>(size_of_network);
+  std::vector<std::string> tag_ids = obtain_tag_ids(size_of_network);
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(number_of_overlapping_components)  + "_indices_" + matrix_name ;
@@ -253,7 +252,7 @@ int main(int argc, char* argv[])
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/async_jacobi/system", x_sol_name);
 
   // Skynet call
-  machine_task(machine_number, number_of_overlapping_components, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tags, save_directory);
+  machine_task(machine_number, number_of_overlapping_components, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tag_ids, save_directory);
 
   return 0;
 }

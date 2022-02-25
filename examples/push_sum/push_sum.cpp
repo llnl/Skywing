@@ -39,14 +39,13 @@ std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::ui
   return ports;
 }
 
-template <class TagType>
-std::vector<TagType> obtain_tags(int size_of_system)
+std::vector<std::string> obtain_tag_ids(int size_of_system)
 {
-  std::vector<TagType> tags;
+  std::vector<std::string> tags;
   for(int i = 0; i < size_of_system; i++)
   {
       std::string hold = "push_sum_tag" +  std::to_string(i);
-      tags.push_back(TagType{hold});
+      tags.push_back(hold);
   }
   return tags;
 }
@@ -63,7 +62,10 @@ double obtain_exact_average(int size_of_system)
   return average;
 }
 
-void machine_task(int machine_number, int size_of_system, int number_of_neighbors, double starting_value, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, ValueTag pubTag, std::vector<ValueTag> subTags)
+void machine_task(int machine_number, int size_of_system, int number_of_neighbors,
+                  double starting_value, std::vector<std::uint16_t> ports,
+                  std::vector<std::string> machine_names,
+                  std::string pubTagID, std::vector<std::string> subTagIDs)
 {
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
 
@@ -81,8 +83,8 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
 
   using IterMethod = AsynchronousIterative<PushSumProcessor<double>, PublishOnRatioShift<double>, StopAfterTime>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, pubTag, subTags)
-    .set_processor(number_of_neighbors, starting_value, subTags)
+    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, subTagIDs)
+    .set_processor(number_of_neighbors, starting_value, subTagIDs)
     .set_publish_policy(1e-4, 0, 1)
     .set_stop_policy(std::chrono::seconds(5))
     .set_resilience_policy()
@@ -94,8 +96,7 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
       {
         std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has value " <<
           p.get_processor().return_solution() << " and vals ";
-        std::cout << p.get_processor().get_x() << ", " << p.get_processor().get_y() << " and publications ";
-        print_vec<double>(p.get_publication_values());
+        std::cout << p.get_processor().get_x() << ", " << p.get_processor().get_y() << std::endl;
       } );
 
   double consensus_value = push_sum.get_processor().return_solution();
@@ -166,14 +167,15 @@ int main(int argc, char* argv[])
   // Skynet setup
   auto ports = set_port(starting_port_number, size_of_system);
   auto machine_names = obtain_machine_names(size_of_system);
-  auto subTags = obtain_tags<ValueTag>(size_of_system);
+  auto subTagIDs = obtain_tag_ids(size_of_system);
   // This pubTag is exists in subTags[machine_number] which is needed for initialization, but its declared separately here mainly to highlight how the creator works for the push_sum class.
-  ValueTag pubTag("push_sum_tag" +  std::to_string(machine_number)) ;
+  std::string pubTagID("push_sum_tag" +  std::to_string(machine_number)) ;
   // Push sum variables -> initialized by user
   double starting_value = (machine_number+1)*1.0;
   int number_of_neighbors = size_of_system - 1;
 
   // Skynet job
-  machine_task(machine_number, size_of_system, number_of_neighbors, starting_value, ports, machine_names, pubTag, subTags);
+  machine_task(machine_number, size_of_system, number_of_neighbors,
+               starting_value, ports, machine_names, pubTagID, subTagIDs);
   return 0;
 }

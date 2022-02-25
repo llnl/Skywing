@@ -6,6 +6,7 @@
 #include "skynet_core/master.hpp"
 #include "skynet_upper/iterative_method.hpp"
 #include "skynet_upper/iterative_resilience_policies.hpp"
+#include "skynet_upper/iterative_helpers.hpp"
 
 #include <map>
 #include <utility>
@@ -40,14 +41,20 @@ using namespace std::chrono_literals;
  * iteration. Must define a member function @ bool operator()(constCallerT&)
  */
 template<typename Processor, typename StopPolicy, typename ResiliencePolicy = TrivialResiliencePolicy>
-class SynchronousIterative : public IterativeMethod<ResiliencePolicy, typename Processor::ValueType>
+class SynchronousIterative :
+    public IterativeMethod<ResiliencePolicy, TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>>
 {
 public:
   using ThisT = SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>;
   using BaseT = IterativeMethod<ResiliencePolicy, typename Processor::ValueType>;
-  
-  using ValueType = typename Processor::ValueType;
+
   using TagType = typename BaseT::TagType;
+  
+  using ValueType = TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>;
+
+  using ProcessorT = Processor;
+  using StopPolicyT = StopPolicy;
+  using ResiliencePolicyT = ResiliencePolicy;
 
   /**
    * @param job The job running the iteration.
@@ -59,8 +66,8 @@ public:
    */
   SynchronousIterative(
     Job& job,
-    const ValueTag& produced_tag,
-    const std::vector<ValueTag>& tags,
+    const TagType& produced_tag,
+    const std::vector<TagType>& tags,
     Processor processor,
     StopPolicy stop_policy,
     ResiliencePolicy resilience_policy,
@@ -79,7 +86,7 @@ public:
   void run(std::function<void(const ThisT&)> callback)
   {
     start_time_ = clock_t::now();
-    submit_values(publish_values_);
+    this->submit_values(publish_values_);
     iterate_ = true;
     while (iterate_)
     {
@@ -95,7 +102,7 @@ public:
         ++iteration_count_;
 
         publish_values_ = processor_.prepare_for_publication(publish_values_);
-        submit_values(publish_values_);
+        this->submit_values(publish_values_);
         
         if constexpr (has_callback) callback(*this);
         iterate_ = stop_policy_(*this);
@@ -250,14 +257,15 @@ public:
    */
   template<typename Range>
   WaiterBuilder(MasterHandle handle, Job& job,
-                const TagType& produced_tag,  const Range& tags)
+                const std::string produced_tag_id,
+                const Range& sub_tag_ids)
     : handle_(handle), job_(job),
-      produced_tag_(produced_tag),
+      produced_tag_(produced_tag_id),
       tags_vec_(tags.cbegin(), tags.cend())
   {
-    job.declare_publication_intent(produced_tag);
+    job.declare_publication_intent(produced_tag_);
     subscribe_waiter_ =
-      std::make_shared<Waiter<void>>(job.subscribe_range(tags));
+      std::make_shared<Waiter<void>>(job.subscribe_range(tags_vec_));
   }
 
   /** @brief Build a Waiter<Processor> that will construct the Processor for this iterative method.

@@ -24,6 +24,7 @@ public:
   using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
   using TagValueType = typename PubSubConverter<DataType>::pubsub_type;
   using TagType = PublishTag<TagValueType>;
+  using DataT = DataType;
 
   /** @param job The job running this iterative method.
    *  @param produced_tag The tag this agent will publish during iteration.

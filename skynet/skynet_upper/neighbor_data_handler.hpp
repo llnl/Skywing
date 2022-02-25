@@ -11,7 +11,7 @@ namespace skynet
   class NeighborDataHandler
   {
     using TagType = typename IterMethod::TagType;
-    using DataType = typename IterMethod::DataType;
+    using DataType = typename IterMethod::DataT;
   public:
 
     NeighborDataHandler(std::function<ret_type(DataType&)> transformer,
@@ -54,7 +54,7 @@ namespace skynet
      *****************************/
 
     template<typename R = ret_type>
-    R average() { return sum() / iter_method_.tags_.size(); }
+    R average() { return sum() / num_neighbors(); }
 
     template<typename S>
     ret_type weighted_average(tag_map<TagType, S> coeffs)
@@ -68,6 +68,8 @@ namespace skynet
     /******************************
      * Other useful functions
      *****************************/
+
+    std::size_t num_neighbors() { return iter_method_.tags_.size(); }
     
     template<typename R>
     R f_accumulate(std::function<R(const DataType&)> f,
@@ -81,6 +83,7 @@ namespace skynet
     { return transform_(iter_method_.neighbor_values_[tag]); }
 
     const std::vector<const TagType*>& get_updated_tags() { return iter_method_.updated_tags_; }
+
     
   private:
     template<typename R, typename S>
