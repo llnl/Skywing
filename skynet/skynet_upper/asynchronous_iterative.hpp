@@ -111,10 +111,10 @@ public:
 
         // const auto [received_values_vec, nbr_tags] = *vals;
         // processor_.process_update(nbr_tags, received_values_vec, *this);
-        processor_.process_update(this->get_neighbor_data_handler());
+        processor_.process_update(get_processor_data_handler(), *this);
         
-        ValueType new_vals = processor_.prepare_for_publication(publish_values_);
-        if (publish_policy_(new_vals, publish_values_))
+        ValueType new_vals = gather_data_for_publication_(); //processor_.prepare_for_publication(publish_values_);
+        if (publish_policy_(std::get<0>(new_vals), std::get<0>(publish_values_)))
         {
           publish_values_ = std::move(new_vals);
           this->submit_values(publish_values_);
@@ -139,12 +139,59 @@ public:
     // called. The actual lambda passed in doesn't matter.
     run<false>([](const ThisT&) { return; } );
   }
-
-  NeighborDataHandler<ThisT, typename Processor::ValueType> get_processor_data_handler()
+  
+  /** @brief Get the NeighborDataHandler for the Processor data.
+   */
+  NeighborDataHandler<ValueType, typename Processor::ValueType> get_processor_data_handler()
   {
-    return this->get_neighbor_data_handler([](ValueType& v){return std::get<0>(v);});
+    using ret_t = typename Processor::ValueType;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<0>(v);});
   }
-    
+
+  /** @brief Get the NeighborDataHandler for the PublishPolicy data, if it has data.
+   *
+   *  If PublishPolicy does not contribute to communicated values,
+   *  then this function does not exist.
+   */
+  template<typename pub_policy = PublishPolicy>
+  std::enable_if_t<std::is_same_v<pub_policy, PublishPolicy>,
+                   NeighborDataHandler<ValueType, typename pub_policy::ValueType>>
+  get_publish_policy_data_handler()
+  {
+    using ret_t = typename PublishPolicy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<pub_policy, ThisT>::index;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
+  }
+
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+   *
+   *  If StopPolicy does not contribute to communicated values,
+   *  then this function does not exist.
+   */
+  template<typename stop_policy = StopPolicy>
+  std::enable_if_t<std::is_same_v<stop_policy, StopPolicy>,
+                   NeighborDataHandler<ValueType, typename stop_policy::ValueType>>
+  get_stop_policy_data_handler()
+  {
+    using ret_t = typename StopPolicy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<stop_policy, ThisT>::index;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
+  }
+
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+   *
+   *  If StopPolicy does not contribute to communicated values,
+   *  then this function does not exist.
+   */
+  template<typename resilience_policy = ResiliencePolicy>
+  std::enable_if_t<std::is_same_v<resilience_policy, ResiliencePolicy>,
+                   NeighborDataHandler<ValueType, typename resilience_policy::ValueType>>
+  get_resilience_policy_data_handler()
+  {
+    using ret_t = typename ResiliencePolicy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<resilience_policy, ThisT>::index;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
+  }
 
   /** @brief Returns values from all tags that have been updated.
    *
@@ -234,6 +281,19 @@ public:
   const Processor& get_processor() const { return processor_; }
 
 private:
+
+  /** @brief Collect values for publication from all policies.
+   *
+   * Any policy that contributes is asked, any policy that doesn't is not.
+   */
+  ValueType gather_data_for_publication_()
+  {
+    return std::tuple_cat(this->template get_pub_tuple_<Processor, ThisT>(processor_, publish_values_),
+                          this->template get_pub_tuple_<PublishPolicy, ThisT>(publish_policy_, publish_values_),
+                          this->template get_pub_tuple_<StopPolicy, ThisT>(stop_policy_, publish_values_),
+                          this->template get_pub_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_, publish_values_));
+  }
+
   Processor processor_;
   ValueType publish_values_;
   PublishPolicy publish_policy_;

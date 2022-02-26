@@ -6,8 +6,9 @@
 
 namespace skynet
 {
-  /** @brief struct that wraps a type in a tuple if it isn't already a tuple.
-   */
+  /*************************************************************************
+   * @brief struct that wraps a type in a tuple if it isn't already a tuple.
+   **************************************************************************/
   template<typename S>
   struct TupleIfNotAlready
   {
@@ -24,19 +25,22 @@ namespace skynet
   };
 
 
-  /** @brief Get the ValueType typename in a type, wrapped in a tuple
-      if not already, or an empty tuple if it doesn't exist.
-   */
+  /****************************************************************
+   * @brief Get the ValueType typename in a type, wrapped in a tuple
+   * if not already, or an empty tuple if it doesn't exist.
+   ******************************************************************/
   template<typename, typename = void>
-  struct ValueTypeAsTuple
+  struct IfHasValueType
   {
-    using type = std::tuple<>;
+    using tuple_of_value_type = std::tuple<>;
+    using tuple_of_type = std::tuple<>;
   };
   
   template<typename T>
-  struct ValueTypeAsTuple<T, std::void_t<typename T::ValueType>>
+  struct IfHasValueType<T, std::void_t<typename T::ValueType>>
   {
-    using type = typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
+    using tuple_of_value_type = typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
+    using tuple_of_type = typename TupleIfNotAlready<T>::tuple_type;
   };
 
   /** @brief Get std::tuple<T1::ValueType, T2::ValueType, ...> if all ValueTypes are tuples.
@@ -44,11 +48,73 @@ namespace skynet
   template<typename... Ts>
   struct TupleOfValueTypes
   {
-    using type = decltype(std::tuple_cat(std::declval<typename ValueTypeAsTuple<Ts>::type>()...));
+    using type = decltype(std::tuple_cat(std::declval<typename IfHasValueType<Ts>::tuple_of_value_type>()...));
   };
 
   template<typename... Ts>
   using TupleOfValueTypes_t = typename TupleOfValueTypes<Ts...>::type;
+
+  /*************************************************************************
+   * @brief Get the index of a type in a tuple.
+   **************************************************************************/
+  template<typename, typename>
+  struct IndexOf {};
+
+  template<typename T, typename... Ts>
+  struct IndexOf<T, std::tuple<T, Ts...>>
+  {
+    static constexpr std::size_t index = 0;
+  };
+
+  template<typename T, typename TNext, typename... Ts>
+  struct IndexOf<T, std::tuple<T, TNext, Ts...>>
+  {
+    static constexpr std::size_t index = 1 + IndexOf<T, std::tuple<Ts...>>::index;
+  };
+
+  /*************************************************************************
+   * @brief Get a tuple of types in this, excluding those that do not
+   * publish (aka do not define a ValueType).
+   **************************************************************************/
+  template<typename... Ts>
+  struct TupleOfOnlyPublishers
+  {
+    using type = decltype(std::tuple_cat(std::declval<typename IfHasValueType<Ts>::tuple_of_type>()...));
+  };
+
+  
+  /*************************************************************************
+   * @brief Get the index of policy P in Method's list of Policies,
+   * excluding those that do not publish (aka do not define a ValueType).
+   **************************************************************************/
+  template<typename P, typename Method>
+  struct IndexInPublishers { };
+
+  template<typename P, template<typename...> typename MethodTemp, typename... Ps>
+  struct IndexInPublishers<P, MethodTemp<Ps...>>
+  {
+    using tuple_of_publishers = typename TupleOfOnlyPublishers<Ps...>::type;
+    static constexpr std::size_t index = IndexOf<P, tuple_of_publishers>::index;
+  };
+
+  /*************************************************************************
+   * @brief Pass T to a template and get the resulting type. If T is a
+   * std::tuple<Ts...>, pass the Ts... to the template instead.
+   **************************************************************************/
+  template<template<typename...> typename Temp, typename T>
+  struct DeTupleAndPass
+  {
+    using type = Temp<T>;
+  };
+
+  template<template<typename...> typename Temp, typename... Ts>
+  struct DeTupleAndPass<Temp, std::tuple<Ts...>>
+  {
+    using type = Temp<Ts...>;
+  };
+
+  template<template<typename...> typename Temp, typename T>
+  using DeTupleAndPass_t = typename DeTupleAndPass<Temp, T>::type;
 
   // void testblah()
   // {

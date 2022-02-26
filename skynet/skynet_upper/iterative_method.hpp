@@ -22,8 +22,8 @@ template<typename ResiliencePolicy, typename DataType>
 class IterativeMethod {
 public:
   using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
-  using TagValueType = typename PubSubConverter<DataType>::pubsub_type;
-  using TagType = PublishTag<TagValueType>;
+  using TagValueType = typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
+  using TagType = DeTupleAndPass_t<PublishTag, TagValueType>; // PublishTag<stuff...>;
   using DataT = DataType;
 
   /** @param job The job running this iterative method.
@@ -161,7 +161,8 @@ public:
    */
   auto submit_values(DataType value_to_submit) noexcept
   {
-    job_->publish(produced_tag_, PubSubConverter<DataType>::convert(std::move(value_to_submit)));
+    TagValueType to_publish = PubSubConverter<DataType>::convert(std::move(value_to_submit));
+    job_->publish_tuple(produced_tag_, to_publish);
   }
 
 
@@ -175,14 +176,32 @@ public:
 
   Job& get_job() const noexcept { return *job_; }
 
-  template<typename ret_type>
-  NeighborDataHandler<ThisT, ret_type> get_neighbor_data_handler(std::function<ret_type(DataType& v)> f)
-  { return NeighborDataHandler<ThisT, ret_type>(std::move(f), *this); }
-                                                                 
-  NeighborDataHandler<ThisT, DataType> get_neighbor_data_handler()
-  { return get_neighbor_data_handler([](DataType& v){return v;}); }
+  template<typename SubDataType>
+  NeighborDataHandler<DataType, SubDataType>
+  get_neighbor_data_handler(std::function<SubDataType(const DataType& v)> f)
+  { return NeighborDataHandler<DataType, SubDataType>(std::move(f), tags_, neighbor_values_, updated_tags_); }
 
 protected:
+
+  /** @brief Ask a policy for the value it wants to publish, if it produces any.
+   *
+   *  Wraps that value in a std::tuple of length 1. If the Policy does
+   *  not publish anything, returns a std::tuple<>. The purpose of
+   *  this is to be included in a call to std::tuple_cat.
+   */
+  template<typename Policy, typename IterMethod>
+  auto get_pub_tuple_(Policy& policy_obj_, const typename IterMethod::ValueType& old_vals)
+  {
+    using PubTup = typename IfHasValueType<Policy>::tuple_of_value_type;
+    if constexpr (std::tuple_size_v<PubTup> == 0) return std::tuple<>();
+    else
+    {
+      constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
+      return PubTup(policy_obj_.prepare_for_publication(std::get<ind>(old_vals)));
+    }
+  }
+
+  
   Job* job_;
   TagType produced_tag_;
   std::vector<TagType> tags_;

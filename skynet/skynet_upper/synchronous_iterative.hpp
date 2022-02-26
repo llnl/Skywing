@@ -92,16 +92,17 @@ public:
     {
       while (iterate_)
       {
-        wait_for_values();
+        wait_for_values_();
         if (!waitervec_->is_ready()) break;
         //        std::vector<ValueType> received_values_vec = values();
         this->gather_values();
 
         //        processor_.process_update(this->tags_, received_values_vec, *this);
-        processor_.process_update(this->get_neighbor_data_handler());
+        processor_.process_update(get_processor_data_handler(), *this);
         ++iteration_count_;
 
-        publish_values_ = processor_.prepare_for_publication(publish_values_);
+        // publish_values_ = processor_.prepare_for_publication(publish_values_);
+        publish_values_ = gather_data_for_publication_();
         this->submit_values(publish_values_);
         
         if constexpr (has_callback) callback(*this);
@@ -156,6 +157,44 @@ public:
   //   this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
   // }
 
+  /** @brief Get the NeighborDataHandler for the Processor data.
+   */
+  NeighborDataHandler<ValueType, typename Processor::ValueType> get_processor_data_handler()
+  {
+    using ret_t = typename Processor::ValueType;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<0>(v);});
+  }
+
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+   *
+   *  If StopPolicy does not contribute to communicated values,
+   *  then this function does not exist.
+   */
+  template<typename stop_policy = StopPolicy>
+  std::enable_if_t<std::is_same_v<stop_policy, StopPolicy>,
+                   NeighborDataHandler<ValueType, typename stop_policy::ValueType>>
+  get_stop_policy_data_handler()
+  {
+    using ret_t = typename StopPolicy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<stop_policy, ThisT>::index;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
+  }
+
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+   *
+   *  If StopPolicy does not contribute to communicated values,
+   *  then this function does not exist.
+   */
+  template<typename resilience_policy = ResiliencePolicy>
+  std::enable_if_t<std::is_same_v<resilience_policy, ResiliencePolicy>,
+                   NeighborDataHandler<ValueType, typename resilience_policy::ValueType>>
+  get_resilience_policy_data_handler()
+  {
+    using ret_t = typename ResiliencePolicy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<resilience_policy, ThisT>::index;
+    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
+  }
+
   /** @brief Get iteration run time, or zero if not yet began.
    */
   std::chrono::milliseconds run_time() const
@@ -188,12 +227,25 @@ public:
   const Processor& get_processor() const { return processor_; }
 
 private:
+  using pubval_t = typename TagType::ValueType;
+
+  /** @brief Collect values for publication from all policies.
+   *
+   * Any policy that contributes is asked, any policy that doesn't is not.
+   */
+  ValueType gather_data_for_publication_()
+  {
+    return std::tuple_cat
+      (this->template get_pub_tuple_<Processor, ThisT>(processor_, publish_values_),
+       this->template get_pub_tuple_<StopPolicy, ThisT>(stop_policy_, publish_values_),
+       this->template get_pub_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_, publish_values_));
+  }
 
   /** @brief Wait up to @p wait_max_ time for values to be ready.
    */
-  void wait_for_values()
+  void wait_for_values_()
   {
-    std::vector<Waiter<std::optional<ValueType>>> waiters;
+    std::vector<Waiter<std::optional<pubval_t>>> waiters;
     waiters.reserve(this->tags_.size());
     for (const auto& tag : this->tags_) {
       waiters.push_back(this->job_->get_waiter(tag));
@@ -212,7 +264,7 @@ private:
 
   size_t iteration_count_ = 0;
   bool iterate_ = false;
-  std::optional<WaiterVec<std::optional<ValueType>>> waitervec_;
+  std::optional<WaiterVec<std::optional<pubval_t>>> waitervec_;
   std::chrono::milliseconds wait_max_;
 }; // class SynchronousIterative
 
@@ -261,7 +313,7 @@ public:
                 const Range& sub_tag_ids)
     : handle_(handle), job_(job),
       produced_tag_(produced_tag_id),
-      tags_vec_(tags.cbegin(), tags.cend())
+      tags_vec_(sub_tag_ids.cbegin(), sub_tag_ids.cend())
   {
     job.declare_publication_intent(produced_tag_);
     subscribe_waiter_ =

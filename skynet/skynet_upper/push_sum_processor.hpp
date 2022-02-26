@@ -64,26 +64,24 @@ public:
    * @param nbr_values The new values from the neighbors.
    * @param caller The iterative wrapper calling this method.
    */
-  template<typename IterativeWrapper>
-  void process_update(const std::vector<ValueTag>& nbr_tags,
-                      const std::vector<ValueType>& nbr_values,
-                      const IterativeWrapper& wrapper)
+  template<typename NbrDataHandler, typename IterMethod>
+  void process_update(const NbrDataHandler& nbr_data_handler, const IterMethod& iter_method)
   {
-    for (size_t i = 0; i < nbr_tags.size(); i++)
+    for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
-      if (nbr_tags[i] == wrapper.my_tag())
+      if (*pTag == iter_method.my_tag())
         continue;
 
-      const ValueTag& nbr_tag = nbr_tags[i];
-      const ValueType& nbr_value = nbr_values[i];
+      std::string nbr_tag_id = pTag->id();
+      ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
 
-      rho_x_previous_[nbr_tag] = rho_x_[nbr_tag];
-      rho_y_previous_[nbr_tag] = rho_y_[nbr_tag];
-      rho_x_[nbr_tag] = nbr_value[0];
-      rho_y_[nbr_tag] = nbr_value[1];
+      rho_x_previous_[nbr_tag_id] = rho_x_[nbr_tag_id];
+      rho_y_previous_[nbr_tag_id] = rho_y_[nbr_tag_id];
+      rho_x_[nbr_tag_id] = nbr_value[0];
+      rho_y_[nbr_tag_id] = nbr_value[1];
 
-      x_value_ = x_value_ + rho_x_[nbr_tag] - rho_x_previous_[nbr_tag];
-      y_value_ = y_value_ + rho_y_[nbr_tag] - rho_y_previous_[nbr_tag];
+      x_value_ = x_value_ + rho_x_[nbr_tag_id] - rho_x_previous_[nbr_tag_id];
+      y_value_ = y_value_ + rho_y_[nbr_tag_id] - rho_y_previous_[nbr_tag_id];
 
       // This is the 'wake up' portion followed by broadcast (push_sum theory relevant)
       sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);

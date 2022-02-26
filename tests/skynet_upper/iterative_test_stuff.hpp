@@ -53,8 +53,9 @@ public:
     return publish_values[tag_ids[machine_ind_]][stage_of_iteration_];
   }
 
-  template<typename NbrDataHandler>
-  void process_update(NbrDataHandler nbr_data_handler)
+  template<typename NbrDataHandler, typename IterMethod>
+  void process_update(const NbrDataHandler& nbr_data_handler,
+                      [[maybe_unused]] const IterMethod&)
   {
     if (nbr_data_handler.num_neighbors() != tag_ids.size())
     {

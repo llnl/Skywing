@@ -42,7 +42,7 @@ void machine_task(const NetworkInfo* const info, const int index)
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });    
 
-    using IterMethod = AsynchronousIterative<TestAsyncProcessor, TestAsyncPublishPolicy, TestAsyncStopPolicy>;
+    using IterMethod = AsynchronousIterative<TestAsyncProcessor, TestAsyncPublishPolicy, TestAsyncStopPolicy, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, publish_values, tag_ids, catch_mutex)
       .set_publish_policy()

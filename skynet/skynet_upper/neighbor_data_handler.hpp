@@ -1,51 +1,56 @@
 #ifndef SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 #define SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 
+#include "skynet_upper/pubsub_converter.hpp"
+
 namespace skynet
 {
   template<typename TagType, typename T>
   using tag_map = std::unordered_map
     <TagType, T, skynet::internal::hash<TagType>>;
 
-  template<typename IterMethod, typename ret_type>
+  template<typename BaseDataType, typename DataType>
   class NeighborDataHandler
   {
-    using TagType = typename IterMethod::TagType;
-    using DataType = typename IterMethod::DataT;
+    using TagValueType = typename PubSubConverter<BaseDataType>::pubsub_type;
   public:
+    using TagType = DeTupleAndPass_t<PublishTag, TagValueType>;
 
-    NeighborDataHandler(std::function<ret_type(DataType&)> transformer,
-                        IterMethod& iter_method)
-      : transformer_(transformer), iter_method_(iter_method)
+    NeighborDataHandler(std::function<DataType(const BaseDataType&)> transformer,
+                        const std::vector<TagType>& tags,
+                        const tag_map<TagType, BaseDataType>& neighbor_values,
+                        const std::vector<const TagType*>& updated_tags)
+      : transformer_(transformer), tags_(tags),
+        neighbor_values_(neighbor_values), updated_tags_(updated_tags)
     {}
 
-    template<typename sub_type>
-    NeighborDataHandler<IterMethod, sub_type>
-    get_sub_handler(std::function<sub_type(ret_type&)> sub_transformer)
+    template<typename SubDataType>
+    NeighborDataHandler<BaseDataType, SubDataType>
+    get_sub_handler(std::function<SubDataType(DataType&)> sub_transformer) const
     {
-      return NeighborDataHandler<IterMethod, sub_type>
-        ([&](DataType& v){return sub_transformer(transformer_(v));},
-         iter_method_);
+      return NeighborDataHandler<BaseDataType, SubDataType>
+        ([&](BaseDataType& v){return sub_transformer(transformer_(v));},
+         tags_, neighbor_values_, updated_tags_);
     }
 
     /******************************
      * Summation functions
      *****************************/
     
-    template<typename R = ret_type>
-    R sum() { return weighted_f_accumulate_<R>(transformer_, std::plus<R>()); }
+    template<typename R = DataType>
+    R sum() const { return weighted_f_accumulate_<R>(transformer_, std::plus<R>()); }
 
-    template<typename S = ret_type, typename R = ret_type>
-    R weighted_sum(tag_map<TagType, S> coeffs)
+    template<typename S = DataType, typename R = DataType>
+    R weighted_sum(tag_map<TagType, S> coeffs) const
     {
-      return weighted_f_accumulate_<ret_type>
+      return weighted_f_accumulate_<DataType>
         (transformer_, [&](const TagType& t){return coeffs[t];}, std::plus<R>());
     }
 
     template<typename R>
-    R f_sum(std::function<R(const ret_type&)> f)
+    R f_sum(std::function<R(const DataType&)> f) const
     {
-      return weighted_f_accumulate_<R>([&](const DataType& v){return f(transformer_(v));},
+      return weighted_f_accumulate_<R>([&](const BaseDataType& v){return f(transformer_(v));},
                                       std::plus<R>());
     }
 
@@ -53,14 +58,14 @@ namespace skynet
      * Averaging functions
      *****************************/
 
-    template<typename R = ret_type>
-    R average() { return sum() / num_neighbors(); }
+    template<typename R = DataType>
+    R average() const { return sum() / num_neighbors(); }
 
     template<typename S>
-    ret_type weighted_average(tag_map<TagType, S> coeffs)
+    DataType weighted_average(tag_map<TagType, S> coeffs) const
     {
-      ret_type num = weighted_sum(std::move(coeffs));
-      ret_type denom = weighted_f_accumulate_<S>([&](const TagType& t){return coeffs[t];},
+      DataType num = weighted_sum(std::move(coeffs));
+      DataType denom = weighted_f_accumulate_<S>([&](const TagType& t){return coeffs[t];},
                                                  std::plus<S>());
       return num / denom;
     }
@@ -69,84 +74,86 @@ namespace skynet
      * Other useful functions
      *****************************/
 
-    std::size_t num_neighbors() { return iter_method_.tags_.size(); }
+    std::size_t num_neighbors() const { return tags_.size(); }
     
     template<typename R>
-    R f_accumulate(std::function<R(const DataType&)> f,
-                   std::function<R(R, R)> binary_op)
+    R f_accumulate(std::function<R(const DataType&)> f, std::function<R(R, R)> binary_op) const
     {
-      return f_accumulate_<R>([&](const DataType& v){return f(transformer_(v));},
+      return f_accumulate_<R>([&](const BaseDataType& v){return f(transformer_(v));},
                              std::move(binary_op));
     }
 
-    ret_type get_data_unsafe(TagType& tag)
-    { return transform_(iter_method_.neighbor_values_[tag]); }
+    DataType get_data_unsafe(const TagType& tag) const
+    {
+      return transformer_(neighbor_values_.at(tag));
+    }
 
-    const std::vector<const TagType*>& get_updated_tags() { return iter_method_.updated_tags_; }
-
+    const std::vector<const TagType*>& get_updated_tags() const { return updated_tags_; }
     
   private:
     template<typename R, typename S>
-    R weighted_f_accumulate_(std::function<R(const DataType&)> f,
+    R weighted_f_accumulate_(std::function<R(const BaseDataType&)> f,
                              std::function<S(const TagType&)> coef,
                              std::function<R(R, R)> binary_op,
-                             R* shift)
+                             R* shift) const
     {
-      auto tag_iter = iter_method_.tags_.cbegin();
-      R val = binary_op(*shift, coef(*tag_iter) * f(iter_method_.neighbor_values_[*tag_iter]));
-      for (; tag_iter != iter_method_.tags_.cend(); ++tag_iter)
-        val = binary_op(std::move(val), coef(*tag_iter) * f(iter_method_.neighbor_values_[*tag_iter]));
+      auto tag_iter = tags_.cbegin();
+      R val = binary_op(*shift, coef(*tag_iter) * f(neighbor_values_[*tag_iter]));
+      for (; tag_iter != tags_.cend(); ++tag_iter)
+        val = binary_op(std::move(val), coef(*tag_iter) * f(neighbor_values_[*tag_iter]));
       return val;
     }
 
     template<typename R, typename S>
-    R weighted_f_accumulate_(std::function<R(const DataType&)> f,
+    R weighted_f_accumulate_(std::function<R(const BaseDataType&)> f,
                              std::function<S(const TagType&)> coef,
-                             std::function<R(R, R)> binary_op)
+                             std::function<R(R, R)> binary_op) const
     {
-      auto tag_iter = iter_method_.tags_.cbegin();
-      R val = coef(*tag_iter) * f(iter_method_.neighbor_values_[*tag_iter]);
-      for (; tag_iter != iter_method_.tags_.cend(); ++tag_iter)
-        val = binary_op(std::move(val), coef(*tag_iter) * f(iter_method_.neighbor_values_[*tag_iter]));
+      auto tag_iter = tags_.cbegin();
+      R val = coef(*tag_iter) * f(neighbor_values_[*tag_iter]);
+      for (; tag_iter != tags_.cend(); ++tag_iter)
+        val = binary_op(std::move(val), coef(*tag_iter) * f(neighbor_values_[*tag_iter]));
       return val;
     }
 
     template<typename R>
-    R f_accumulate_(std::function<R(const DataType&)> f,
+    R f_accumulate_(std::function<R(const BaseDataType&)> f,
                     std::function<R(R, R)> binary_op,
-                    R* shift)
+                    R* shift) const
     {
-      auto tag_iter = iter_method_.tags_.cbegin();
-      R val = binary_op(*shift, f(iter_method_.neighbor_values_[*tag_iter]));
-      for (; tag_iter != iter_method_.tags_.cend(); ++tag_iter)
-        val = binary_op(std::move(val), f(iter_method_.neighbor_values_[*tag_iter]));
+      auto tag_iter = tags_.cbegin();
+      R val = binary_op(*shift, f(neighbor_values_[*tag_iter]));
+      for (; tag_iter != tags_.cend(); ++tag_iter)
+        val = binary_op(std::move(val), f(neighbor_values_[*tag_iter]));
       return val;
     }
 
     template<typename R>
-    R f_accumulate_(std::function<R(const DataType&)> f,
-                    std::function<R(R, R)> binary_op)
+    R f_accumulate_(std::function<R(const BaseDataType&)> f,
+                    std::function<R(R, R)> binary_op) const
     {
-      auto tag_iter = iter_method_.tags_.cbegin();
-      R val = f(iter_method_.neighbor_values_[*tag_iter]);
-      for (; tag_iter != iter_method_.tags_.cend(); ++tag_iter)
-        val = binary_op(std::move(val), f(iter_method_.neighbor_values_[*tag_iter]));
+      auto tag_iter = tags_.cbegin();
+      R val = f(neighbor_values_[*tag_iter]);
+      for (; tag_iter != tags_.cend(); ++tag_iter)
+        val = binary_op(std::move(val), f(neighbor_values_[*tag_iter]));
       return val;
     }
 
     template<typename R>
     R weighted_f_accumulate_(std::function<R(const TagType&)> coef,
-                             std::function<R(R, R)> binary_op)
+                             std::function<R(R, R)> binary_op) const
     {
-      auto tag_iter = iter_method_.tags_.cbegin();
+      auto tag_iter = tags_.cbegin();
       R val = coef(*tag_iter);
-      for (; tag_iter != iter_method_.tags_.cend(); ++tag_iter)
+      for (; tag_iter != tags_.cend(); ++tag_iter)
         val = binary_op(std::move(val), coef(*tag_iter));
       return val;
     }
 
-    std::function<ret_type(DataType&)> transformer_;
-    IterMethod& iter_method_;
+    std::function<DataType(const BaseDataType&)> transformer_;
+    const std::vector<TagType>& tags_;
+    const tag_map<TagType, BaseDataType>& neighbor_values_;
+    const std::vector<const TagType*>& updated_tags_;
   }; // class NeighborDataHandler
 
 } // namespace skynet

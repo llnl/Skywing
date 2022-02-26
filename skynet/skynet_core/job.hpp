@@ -316,6 +316,14 @@ public:
     std::apply(apply_to, value_tuple);
   }
 
+  template<typename... PublishTagTypes, typename... TupleTypes>
+  void publish_tuple(const PublishTag<PublishTagTypes...>& tag,
+                     const std::tuple<TupleTypes...>& value_tuple) noexcept
+  {
+    const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
+    std::apply(apply_to, value_tuple);
+  }
+
   /** \brief Returns true if the job is finished, false if it is not
    */
   bool is_finished() const noexcept;
