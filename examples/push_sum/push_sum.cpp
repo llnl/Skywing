@@ -1,10 +1,10 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/push_sum_processor.hpp"
-#include "skynet_upper/asynchronous_iterative.hpp"
-#include "skynet_upper/data_input.hpp"
-#include "skynet_upper/stop_policies.hpp"
-#include "skynet_upper/publish_policies.hpp"
+#include "skynet_mid/push_sum_processor.hpp"
+#include "skynet_mid/asynchronous_iterative.hpp"
+#include "skynet_mid/data_input.hpp"
+#include "skynet_mid/stop_policies.hpp"
+#include "skynet_mid/publish_policies.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -81,7 +81,8 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, PublishOnRatioShift<double>, StopAfterTime>;
+  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, PublishOnRatioShift<double>,
+                                           StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
     WaiterBuilder<IterMethod>(master_handle, job, pubTagID, subTagIDs)
     .set_processor(number_of_neighbors, starting_value, subTagIDs)

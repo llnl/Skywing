@@ -1,7 +1,7 @@
 #ifndef SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 #define SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 
-#include "skynet_upper/pubsub_converter.hpp"
+#include "skynet_mid/pubsub_converter.hpp"
 
 namespace skynet
 {
@@ -14,7 +14,7 @@ namespace skynet
   {
     using TagValueType = typename PubSubConverter<BaseDataType>::pubsub_type;
   public:
-    using TagType = DeTupleAndPass_t<PublishTag, TagValueType>;
+    using TagType = UnwrapAndApply_t<TagValueType, PublishTag>;
 
     NeighborDataHandler(std::function<DataType(const BaseDataType&)> transformer,
                         const std::vector<TagType>& tags,

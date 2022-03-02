@@ -19,7 +19,7 @@ core_tests = {
     'socket_communicator'
   ],
 
-  'upper': [
+  'mid': [
     'asynchronous_iterative',
     'synchronous_iterative'
   ]

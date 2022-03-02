@@ -1,12 +1,12 @@
-#ifndef SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
-#define SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
+#ifndef SKYNET_MID_SYNCHRONOUS_ITERATIVE_HPP
+#define SKYNET_MID_SYNCHRONOUS_ITERATIVE_HPP
 
 #include "skynet_core/internal/devices/socket_communicator.hpp"
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/iterative_method.hpp"
-#include "skynet_upper/iterative_resilience_policies.hpp"
-#include "skynet_upper/iterative_helpers.hpp"
+#include "skynet_mid/iterative_method.hpp"
+#include "skynet_mid/iterative_resilience_policies.hpp"
+#include "skynet_mid/internal/iterative_helpers.hpp"
 
 #include <map>
 #include <utility>
@@ -39,8 +39,11 @@ using namespace std::chrono_literals;
  *
  * @tparam StopPolicy Determines when to stop the
  * iteration. Must define a member function @ bool operator()(constCallerT&)
+ *
+ * @tparam ResiliencePolicy Determines how this iterative method
+ * should respond to problems such as dead neighbors.
  */
-template<typename Processor, typename StopPolicy, typename ResiliencePolicy = TrivialResiliencePolicy>
+template<typename Processor, typename StopPolicy, typename ResiliencePolicy>
 class SynchronousIterative :
     public IterativeMethod<ResiliencePolicy, TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>>
 {
@@ -62,6 +65,7 @@ public:
    * @param tags The set of tags with <em>already finalized subscriptions</em> from neighbors this iteration relies on.
    * @param processor The Processor object used in iteration.
    * @param stop_policy The StopPolicy object used in iteration.
+   * @param resilience_policy The ResiliencePolicy object used in iteration.
    * @param loop_delay_max The maximum amount of time to wait for an update before at least checking the stopping criterion.
    */
   SynchronousIterative(
@@ -94,14 +98,11 @@ public:
       {
         wait_for_values_();
         if (!waitervec_->is_ready()) break;
-        //        std::vector<ValueType> received_values_vec = values();
         this->gather_values();
-
-        //        processor_.process_update(this->tags_, received_values_vec, *this);
+        
         processor_.process_update(get_processor_data_handler(), *this);
         ++iteration_count_;
-
-        // publish_values_ = processor_.prepare_for_publication(publish_values_);
+        
         publish_values_ = gather_data_for_publication_();
         this->submit_values(publish_values_);
         
@@ -116,7 +117,8 @@ public:
     stop_time_ = clock_t::now();
   }
 
-  /** @brief Run the iteration until stopping time or forever without a callback.
+  /** @brief Run the iteration until stopping time or forever without
+      a callback.
    */ 
   void run()
   {
@@ -124,38 +126,6 @@ public:
     // called. The actual lambda passed in doesn't matter.
     run<false>([](const ThisT&) { return; } );
   }
-
-  /** @brief Collect values from each of the neighbors.
-   *  @returns A std::vector<ValueType> of values from neighbors, in the same order as this->tags_.
-   */
-  // std::vector<ValueType> values() noexcept
-  // {
-  //   std::vector<ValueType> ret_values;
-  //   auto tag_iter = this->tags_.begin();
-  //   for (const auto& val : waitervec_->get())
-  //   {
-  //     if (val)
-  //     {
-  //       ret_values.push_back(*val);
-  //       ++tag_iter;
-  //     }
-  //     else
-  //     {
-  //       // this->dead_tags_.push_back(std::move(*tag_iter));
-  //       // tag_iter = this->tags_.erase(tag_iter);
-  //       tag_iter = this->handle_dead_neighbor(tag_iter);
-  //     }
-  //   }
-  //   return ret_values;
-  // }
-
-  /** @brief Publish this agent's values for its neighbors.
-   */
-  // template<typename... ArgTypes>
-  // auto submit_values(ArgTypes&&... values_to_submit) noexcept
-  // {
-  //   this->job_->publish(this->produced_tag_, std::forward<ArgTypes>(values_to_submit)...);
-  // }
 
   /** @brief Get the NeighborDataHandler for the Processor data.
    */
@@ -165,7 +135,8 @@ public:
     return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<0>(v);});
   }
 
-  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if
+   * it has data.
    *
    *  If StopPolicy does not contribute to communicated values,
    *  then this function does not exist.
@@ -180,7 +151,8 @@ public:
     return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
   }
 
-  /** @brief Get the NeighborDataHandler for the StopPolicy data, if it has data.
+  /** @brief Get the NeighborDataHandler for the StopPolicy data, if
+   * it has data.
    *
    *  If StopPolicy does not contribute to communicated values,
    *  then this function does not exist.
@@ -269,7 +241,8 @@ private:
 }; // class SynchronousIterative
 
 
-/** @brief A template specialization of WaiterBuilder for SynchronousIterative methods.
+/** @brief A template specialization of WaiterBuilder for
+ * SynchronousIterative methods.
  *
  * To build this WaiterBuilder, do not pass the Processor and
  * StopPolicy parameters directly, but define the specific type
@@ -284,11 +257,12 @@ private:
  *
  * For example, a typical use might be as follows:
  * @code
- * using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime>;
+ * using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime, TrivialResiliencePolicy>;
  * Waiter<IterMethod> iter_waiter =
  *  WaiterBuilder<IterMethod>(master_handle, job, my_tag, nbr_tags)
  *  .set_processor(A, b, row_inds)
  *  .set_stop_policy(std::chrono::seconds(5))
+ *  .set_resilience_policy()
  *  .build_waiter();
  * IterMethod sync_jacobi = iter_waiter.get();
  * @endcode
@@ -297,15 +271,23 @@ template<typename Processor, typename StopPolicy, typename ResiliencePolicy>
 class WaiterBuilder<SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>>
 {
 public:
-  using ObjectT = SynchronousIterative<Processor, StopPolicy>;
+  using ObjectT = SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>;
   using ThisT = WaiterBuilder<ObjectT>;
   using TagType = typename ObjectT::BaseT::TagType;
 
-  /**
+  /** @brief WaiterBuilder constructor for SynchronousIterative methods.
+   *
+   * Note that the user does not directly pass the tags, but passes
+   * the string IDs that are used to construct the tags. This is
+   * because the actual tag types, which are templated on the data
+   * types being sent, can be quite complex depending on the
+   * policies used. So, let Skynet worry about building the correct
+   * tag type.
+   *
    * @param handle MasterHandle object running this agent.
    * @param job The job running the iteration.
-   * @param produced_tag The tag of the data produced by this agent and sent to iteration neighbors.
-   * @param tags An iteration-capable container of tags of neighboring data from which this agent will collect updates. Can be 
+   * @param produced_tag_id The string ID of the tag of the data produced by this agent.
+   * @param sub_tag_ids An iteration-capable container of string IDs of tags of neighboring data from which this agent will collect updates.
    */
   template<typename Range>
   WaiterBuilder(MasterHandle handle, Job& job,
@@ -355,6 +337,9 @@ public:
    */
   Waiter<ObjectT> build_waiter()
   {
+    if (!(subscribe_waiter_ && processor_waiter_ && stop_policy_waiter_ && resilience_policy_waiter_))
+      throw std::runtime_error("WaiterBuilder<SynchronousIterative> requires having built all necessary components prior to calling build_waiter().");
+
     // capture by value to ensure liveness of shared ptrs
     auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
                      processor_waiter = this->processor_waiter_,
@@ -394,4 +379,4 @@ private:
   
 } // namespace skynet
 
-#endif // SKYNET_UPPER_SYNCHRONOUS_ITERATIVE_HPP
+#endif // SKYNET_MID_SYNCHRONOUS_ITERATIVE_HPP

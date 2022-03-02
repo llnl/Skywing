@@ -1,11 +1,11 @@
-#ifndef SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP
-#define SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP
+#ifndef SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
+#define SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/pubsub_converter.hpp"
-#include "skynet_upper/iterative_helpers.hpp"
-#include "skynet_upper/neighbor_data_handler.hpp"
+#include "skynet_mid/pubsub_converter.hpp"
+#include "skynet_mid/internal/iterative_helpers.hpp"
+#include "skynet_mid/neighbor_data_handler.hpp"
 
 namespace skynet {
 
@@ -14,8 +14,9 @@ namespace skynet {
  * @param ResiliencePolicy Determines how this IterativeMethod
  * should respond to problems such as dead neighbors.
  *
- * @tparam TagValueTypes... Values types this iterative method will
- * publish to neighbors.
+ * @tparam DataType The type of data that this iterative method will
+ * send to its neighbors. Not necessarily in pubsub type; that
+ * conversion will be handled by IterativeMethod.
  * 
  */
 template<typename ResiliencePolicy, typename DataType>
@@ -23,12 +24,13 @@ class IterativeMethod {
 public:
   using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
   using TagValueType = typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
-  using TagType = DeTupleAndPass_t<PublishTag, TagValueType>; // PublishTag<stuff...>;
+  using TagType = UnwrapAndApply_t<TagValueType, PublishTag>; // PublishTag<stuff...>;
   using DataT = DataType;
 
   /** @param job The job running this iterative method.
    *  @param produced_tag The tag this agent will publish during iteration.
    *  @param tags The set of tags consumed during iteration, possibly including @p produced_tag
+   *  @param resilience_policy The ResiliencePolicy object used in iteration.
    */
   IterativeMethod(
     Job& job,
@@ -51,6 +53,10 @@ public:
 
   const TagType& my_tag() const { return produced_tag_; }
 
+  /** @brief When a neighbor dies, record and react appropriately.
+   *
+   * The exact behavior here depends on the ResiliencePolicy.
+   */
   template<typename TagIter>
   TagIter handle_dead_neighbor(const TagIter& tag_iter) noexcept
   {
@@ -125,10 +131,23 @@ public:
       static_cast<internal::PublishTagBase>(tags)...};
   }
 
+  /** @brief Gather any data that has been published by neighbors.
+   *
+   * If any neighbors have died, this is where that will be detected
+   * and handled. This function does not worry about whether or not
+   * all neighbors, or even any neighbors, have ready data. So in the
+   * case of a SynchronousIterative method, for example, it is the
+   * responsibility of that derived class to ensure it is time to call
+   * this function before doing so.
+   *
+   * @returns true if any new data is received, false otherwise.
+   */
   bool gather_values()
   {
     auto tag_iter = tags_.begin();
     size_t num_updated = 0;
+    // Go through tags, detect any that have died and detect any that
+    // have available data to read.
     while (tag_iter != tags_.cend())
     {
       const auto& tag = *tag_iter;
@@ -142,6 +161,8 @@ public:
     }
     if (num_updated == 0) return false;
 
+    // For the neighbors that are alive and have ready data, read in
+    // the data. Record which tags have been updated.
     updated_tags_.clear();
     updated_tags_.reserve(num_updated);
     for (const auto& tag : tags_)
@@ -149,7 +170,9 @@ public:
       if (job_->has_data(tag))
       {
         const auto value_opt = job_->get_waiter(tag).get();
+        // an assert...doesn't seem like the right way to handle this
         assert(value_opt);
+        // convert the pubsub_type back into the required DataType
         neighbor_values_[tag] = PubSubConverter<DataType>::deconvert(*value_opt);
         updated_tags_.push_back(&tag);
       }
@@ -176,6 +199,23 @@ public:
 
   Job& get_job() const noexcept { return *job_; }
 
+  /** @brief Get a NeighborDataHandler to the recieved data.
+   *
+   *  The NeighborDataHandler acts as a resilient interface to data,
+   *  so that client iterative methods can leverage that resilience
+   *  without implementing it themselves.
+   *
+   *  Often, the raw DataType is a concatenation of values used by
+   *  different policies in the IterativeMethod, and so we want to
+   *  only present an interface to an element of the DataType. This
+   *  function enables getting a NeighborDataHandler that provides an
+   *  interface to only the underlying data of interest.
+   *
+   * @param f A function that converts an object of type DataType into
+   * something of type SubDataType. For example, a common function to
+   * pass here would be the tuple element-getter function 
+   * <tt>[](const DataType& v){return std::get<0>(v);}</tt>
+   */ 
   template<typename SubDataType>
   NeighborDataHandler<DataType, SubDataType>
   get_neighbor_data_handler(std::function<SubDataType(const DataType& v)> f)
@@ -183,21 +223,30 @@ public:
 
 protected:
 
-  /** @brief Ask a policy for the value it wants to publish, if it produces any.
+  /** @brief Ask a policy for the value it wants to publish, if it
+   * produces any.
    *
    *  Wraps that value in a std::tuple of length 1. If the Policy does
    *  not publish anything, returns a std::tuple<>. The purpose of
    *  this is to be included in a call to std::tuple_cat.
+   *
+   * For example, a derived IterMethod type might call
+   * \code{.cpp}
+   * std::tuple_cat
+   *   (this->template get_pub_tuple_<Processor, ThisT>(processor_, publish_values_),
+   *    this->template get_pub_tuple_<StopPolicy, ThisT>(stop_policy_, publish_values_),
+   *    this->template get_pub_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_, publish_values_));
+   * \code
    */
   template<typename Policy, typename IterMethod>
-  auto get_pub_tuple_(Policy& policy_obj_, const typename IterMethod::ValueType& old_vals)
+  auto get_pub_tuple_(Policy& policy_obj_, const typename IterMethod::ValueType& vals)
   {
     using PubTup = typename IfHasValueType<Policy>::tuple_of_value_type;
     if constexpr (std::tuple_size_v<PubTup> == 0) return std::tuple<>();
     else
     {
       constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
-      return PubTup(policy_obj_.prepare_for_publication(std::get<ind>(old_vals)));
+      return PubTup(policy_obj_.prepare_for_publication(std::get<ind>(vals)));
     }
   }
 
@@ -218,4 +267,4 @@ private:
 
 } // namespace skynet
 
-#endif // SKYNET_UPPER_INTERNAL_ITERATIVE_BASE_HPP
+#endif // SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP

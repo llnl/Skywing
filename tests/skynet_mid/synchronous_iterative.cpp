@@ -3,7 +3,7 @@
 #include "skynet_core/enable_logging.hpp"
 
 #include "skynet_core/enable_logging.hpp"
-#include "skynet_upper/synchronous_iterative.hpp"
+#include "skynet_mid/synchronous_iterative.hpp"
 
 #include "utils.hpp"
 #include "iterative_test_stuff.hpp"
@@ -49,7 +49,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     ///////////////////////////////
     // Normal iterative method
     ///////////////////////////////
-    using IterMethod = SynchronousIterative<TestAsyncProcessor, TestAsyncStopPolicy>;
+    using IterMethod = SynchronousIterative<TestAsyncProcessor, TestAsyncStopPolicy, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, publish_values, tag_ids, catch_mutex)
       .set_stop_policy(publish_values, tag_ids)

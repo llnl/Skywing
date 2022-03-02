@@ -1,10 +1,11 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/synchronous_iterative.hpp"
-#include "skynet_upper/jacobi_processor.hpp"
-#include "skynet_upper/data_input.hpp"
-#include "skynet_upper/stop_policies.hpp"
-#include "skynet_upper/publish_policies.hpp"
+#include "skynet_mid/synchronous_iterative.hpp"
+#include "skynet_mid/asynchronous_iterative.hpp"
+#include "skynet_mid/jacobi_processor.hpp"
+#include "skynet_mid/data_input.hpp"
+#include "skynet_mid/stop_policies.hpp"
+#include "skynet_mid/publish_policies.hpp"
 
 #include <array>
 #include <chrono>
@@ -68,6 +69,7 @@ void machine_task(const int machine_number, int trial,
 
   master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle) {
 
+  std::cout << "Agent " << machine_number << " about to connect to neighbors." << std::endl;
   if (machine_number != (static_cast<int>(ports.size()) - 1))
   {
     // Connecting to the server is an asynchronous operation and can fail.
@@ -77,12 +79,16 @@ void machine_task(const int machine_number, int trial,
       // Empty
     }
   }
-
-  using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime>;
+  std::cout << "Agent " << machine_number << " finished connecting to neighbors." << std::endl;
+  
+   using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime, TrivialResiliencePolicy>;
+  // using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>,
+  //                                          StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
     WaiterBuilder<IterMethod>(master_handle, job, tag_ids[machine_number], tag_ids)
     .set_processor(A_partition, b_partition, row_indices)
     .set_stop_policy(std::chrono::seconds(5))
+    .set_resilience_policy()
     .build_waiter();
   std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
   IterMethod sync_jacobi = iter_waiter.get();

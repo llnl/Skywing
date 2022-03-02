@@ -64,7 +64,7 @@ skynet_core_dep = declare_dependency(
   link_with : skynet_core_lib
 )
 
-subdir('skynet/skynet_upper')
+subdir('skynet/skynet_mid')
 skynet_upper_dep = declare_dependency(
   dependencies : skynet_core_dep
 )

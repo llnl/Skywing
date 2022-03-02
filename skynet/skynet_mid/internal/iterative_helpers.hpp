@@ -101,31 +101,35 @@ namespace skynet
    * @brief Pass T to a template and get the resulting type. If T is a
    * std::tuple<Ts...>, pass the Ts... to the template instead.
    **************************************************************************/
-  template<template<typename...> typename Temp, typename T>
-  struct DeTupleAndPass
+  template<typename T, template<typename...> typename Temp>
+  struct UnwrapAndApply
   {
     using type = Temp<T>;
   };
 
-  template<template<typename...> typename Temp, typename... Ts>
-  struct DeTupleAndPass<Temp, std::tuple<Ts...>>
+  template<typename... Ts, template<typename...> typename Temp>
+  struct UnwrapAndApply<std::tuple<Ts...>, Temp>
   {
     using type = Temp<Ts...>;
   };
 
-  template<template<typename...> typename Temp, typename T>
-  using DeTupleAndPass_t = typename DeTupleAndPass<Temp, T>::type;
+  template<typename T, template<typename...> typename Temp>
+  using UnwrapAndApply_t = typename UnwrapAndApply<T, Temp>::type;
 
-  // void testblah()
-  // {
-  //   struct T1 { using ValueType = std::tuple<int>; };
-  //   struct T2 { using ValueType = double; };
-  //   struct T3 { };
-  //   typename ValueTypesInTuple<T1, T3, T2, T3>::type v = "hello";
-  //   (void)v;
-  // }
-    
+
+  /*************************************************************************
+   * @brief Constructs an std::index_sequence<N, N+1, ..., N+k> 
+   ************************************************************************/
+  template<std::size_t N, typename Seq> struct offset_sequence;
   
+  template<std::size_t N, std::size_t... Ints>
+  struct offset_sequence<N, std::index_sequence<Ints...>>
+  {
+    using type = std::index_sequence<Ints + N...>;
+  };
+  template<std::size_t N, typename Seq>
+  using offset_sequence_t = typename offset_sequence<N, Seq>::type;
+
 } // namespace skynet
 
 #endif // SKYNET_ITERATIVE_HELPERS_HPP
