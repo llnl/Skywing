@@ -20,7 +20,6 @@ core_tests = {
   ],
 
   'mid': [
-    'asynchronous_iterative',
     'synchronous_iterative'
   ]
 }

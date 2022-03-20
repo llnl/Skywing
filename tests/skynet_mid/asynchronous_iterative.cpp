@@ -18,11 +18,11 @@ const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
 std::vector<std::string> tag_ids{"tag0", "tag1", "tag2"};
 //std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
 
-data_id_map<std::vector<int>> publish_values
+std::unordered_map<std::size_t, std::vector<int>> publish_values
 {
-  {tag_ids[0], std::vector<int>{0, 10}},
-  {tag_ids[1], std::vector<int>{1, 20}},
-  {tag_ids[2], std::vector<int>{2, 30}}
+  {0, std::vector<int>{0, 10}},
+  {1, std::vector<int>{1, 20}},
+  {2, std::vector<int>{2, 30}}
 };
 
 

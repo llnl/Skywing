@@ -85,11 +85,11 @@ public:
     ResiliencePolicy resilience_policy,
     std::chrono::milliseconds loop_delay_max = 1000ms) noexcept
     : BaseT{job, produced_tag, tags, std::move(resilience_policy)},
-    processor_(std::move(processor)),
-    publish_values_(processor_.get_init_publish_values()),
-    publish_policy_(std::move(publish_policy)),
-    stop_policy_(std::move(stop_policy)),
-    wait_max_(loop_delay_max)
+      processor_(std::move(processor)),
+      publish_values_(gather_initial_publications_()),
+      publish_policy_(std::move(publish_policy)),
+      stop_policy_(std::move(stop_policy)),
+      wait_max_(loop_delay_max)
   { }
 
   /** @brief Run the iteration until stopping time or forever.
@@ -100,14 +100,15 @@ public:
   {
     start_time_ = clock_t::now();
     this->submit_values(publish_values_);
-    iterate_ = true;
-    while (iterate_)
+    should_iterate_ = true;
+    while (should_iterate_)
     {
-      while (iterate_)
+      while (should_iterate_)
       {
         if (!this->gather_values()) break;
 
-        processor_.process_update(get_processor_data_handler(), *this);
+        //        processor_.process_update(get_processor_data_handler(), *this);
+        process_all_updates_();
         
         ValueType new_vals = gather_data_for_publication_();
         if (publish_policy_(std::get<0>(new_vals), std::get<0>(publish_values_)))
@@ -117,12 +118,12 @@ public:
         }
         
         if constexpr (has_callback) callback(*this);
-        iterate_ = stop_policy_(*this);
+        should_iterate_ = !stop_policy_(*this);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
-      if (!iterate_) break;
+      if (!should_iterate_) break;
       this->get_job().wait_for_update(wait_max_);
-      iterate_ = stop_policy_(*this);
+      should_iterate_ = stop_policy_(*this);
     }
     stop_time_ = clock_t::now();
   }
@@ -197,7 +198,7 @@ public:
   {
     if (!start_time_)
       return std::chrono::milliseconds::zero();
-    if (!iterate_)
+    if (!should_iterate_)
       return std::chrono::duration_cast<std::chrono::milliseconds>(*stop_time_ - *start_time_);
     
     auto curr_time = clock_t::now();
@@ -216,13 +217,74 @@ public:
    */
   bool return_iterate() const
   {
-    return iterate_;
+    return should_iterate_;
   }
 
   Processor& get_processor() { return processor_; }
   const Processor& get_processor() const { return processor_; }
 
 private:
+
+    /* @brief Default trivial function for when a policy does not define ValueType.
+   */
+  template<typename Policy>
+  void process_policy_update_(Policy&)
+  {  }
+
+  /* @brief Process the PublishPolicy's updates.
+   *
+   * Only done if PublishPolicy defines a ValueType (and is therefore an
+   * auxiliary processor).
+   */
+  std::enable_if_t<has_ValueType<PublishPolicy>::value, void>
+  process_policy_update_(PublishPolicy& policy_obj)
+  { policy_obj.process_update(get_publish_policy_data_handler(), *this);  }
+
+  /* @brief Process the StopPolicy's updates.
+   *
+   * Only done if StopPolicy defines a ValueType (and is therefore an
+   * auxiliary processor).
+   */
+  std::enable_if_t<has_ValueType<StopPolicy>::value, void>
+  process_policy_update_(StopPolicy& policy_obj)
+  { policy_obj.process_update(get_stop_policy_data_handler(), *this);  }
+
+  /* @brief Process the ResiliencePolicy's updates.
+   *
+   * Only done if ResiliencePolicy defines a ValueType (and is therefore an
+   * auxiliary processor).
+   */
+  std::enable_if_t<has_ValueType<ResiliencePolicy>::value, void>
+  process_policy_update_(ResiliencePolicy& policy_obj)
+  { policy_obj.process_update(get_resilience_policy_data_handler(), *this); }
+
+  /** @brief Process all updates for the main processor and the policies.
+   *
+   *  If a policy has defined a ValueType, then it is an auxiliary
+   *  processor that implements the same interface as Processor, and
+   *  so processes updates. If it does not define ValueType, then
+   *  nothing is done with that policy.
+   */
+  void process_all_updates_()
+  {
+    processor_.process_update(get_processor_data_handler(), *this);
+    process_policy_update_(publish_policy_);
+    process_policy_update_(stop_policy_);
+    process_policy_update_(this->resilience_policy_);
+  }
+
+  /** @brief Collect values for initial publication from all policies.
+   *
+   * Any policy that contributes is asked, any policy that doesn't is not.
+   */
+  ValueType gather_initial_publications_()
+  {
+    return std::tuple_cat
+      (this->template get_init_tuple_<Processor, ThisT>(processor_),
+       this->template get_init_tuple_<PublishPolicy, ThisT>(publish_policy_),
+       this->template get_init_tuple_<StopPolicy, ThisT>(stop_policy_),
+       this->template get_init_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_));
+  }
 
   /** @brief Collect values for publication from all policies.
    *
@@ -247,7 +309,7 @@ private:
   std::optional<std::chrono::time_point<clock_t>> stop_time_; // only contains a value once the iteration ends
 
   size_t iteration_count_ = 0;
-  bool iterate_ = false;
+  bool should_iterate_ = false;
   std::chrono::milliseconds wait_max_;
 }; // class AsynchronousIterative
 

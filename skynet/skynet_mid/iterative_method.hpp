@@ -223,6 +223,28 @@ public:
 
 protected:
 
+  /** @brief Ask a policy for its initial value, if it produces any.
+   *
+   *  Wraps that value in a std::tuple of length 1. If the Policy does
+   *  not publish anything, returns a std::tuple<>. The purpose of
+   *  this is to be included in a call to std::tuple_cat.
+   *
+   * For example, a derived IterMethod type might call
+   * \code{.cpp}
+   * std::tuple_cat
+   *   (this->template get_init_tuple_<Processor, ThisT>(processor_),
+   *    this->template get_init_tuple_<StopPolicy, ThisT>(stop_policy_),
+   *    this->template get_init_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_));
+   * \code
+   */
+  template<typename Policy, typename IterMethod>
+  auto get_init_tuple_(Policy& policy_obj)
+  {
+    using PubTup = typename IfHasValueType<Policy>::tuple_of_value_type;
+    if constexpr (std::tuple_size_v<PubTup> == 0) return std::tuple<>();
+    else return PubTup(policy_obj.get_init_publish_values());
+  }  
+
   /** @brief Ask a policy for the value it wants to publish, if it
    * produces any.
    *
@@ -239,14 +261,14 @@ protected:
    * \code
    */
   template<typename Policy, typename IterMethod>
-  auto get_pub_tuple_(Policy& policy_obj_, const typename IterMethod::ValueType& vals)
+  auto get_pub_tuple_(Policy& policy_obj, const typename IterMethod::ValueType& vals)
   {
     using PubTup = typename IfHasValueType<Policy>::tuple_of_value_type;
     if constexpr (std::tuple_size_v<PubTup> == 0) return std::tuple<>();
     else
     {
       constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
-      return PubTup(policy_obj_.prepare_for_publication(std::get<ind>(vals)));
+      return PubTup(policy_obj.prepare_for_publication(std::get<ind>(vals)));
     }
   }
 

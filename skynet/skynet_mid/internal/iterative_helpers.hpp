@@ -6,6 +6,9 @@
 
 namespace skynet
 {
+  template<typename TagType, typename T>
+  using tag_map = std::unordered_map<TagType, T, skynet::internal::hash<TagType>>;
+  
   /*************************************************************************
    * @brief struct that wraps a type in a tuple if it isn't already a tuple.
    **************************************************************************/
@@ -60,15 +63,18 @@ namespace skynet
   template<typename, typename>
   struct IndexOf {};
 
+  // when the next type in the tuple is T, return index 0.
   template<typename T, typename... Ts>
   struct IndexOf<T, std::tuple<T, Ts...>>
   {
     static constexpr std::size_t index = 0;
   };
 
-  template<typename T, typename TNext, typename... Ts>
-  struct IndexOf<T, std::tuple<T, TNext, Ts...>>
+  // when the next type in the tuple is not T, return 1 + recurse.
+  template<typename T, typename TOther, typename... Ts>
+  struct IndexOf<T, std::tuple<TOther, Ts...>>
   {
+    static_assert(!std::is_same_v<T, TOther>);
     static constexpr std::size_t index = 1 + IndexOf<T, std::tuple<Ts...>>::index;
   };
 
@@ -129,6 +135,19 @@ namespace skynet
   };
   template<std::size_t N, typename Seq>
   using offset_sequence_t = typename offset_sequence<N, Seq>::type;
+
+  
+  /*************************************************************************
+   * @brief Check if a type has a nested ValueType type.
+   ************************************************************************/
+  
+  // primary template handles types that have no nested ::type member:
+  template< class, class = void >
+  struct has_ValueType : std::false_type { };
+ 
+  // specialization recognizes types that do have a nested ::type member:
+  template< class T >
+  struct has_ValueType<T, std::void_t<typename T::ValueType>> : std::true_type { };
 
 } // namespace skynet
 

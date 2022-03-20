@@ -10,6 +10,7 @@
 
 #include <array>
 #include <map>
+#include <iostream>
 
 using namespace skynet;
 
@@ -24,18 +25,13 @@ const std::array<std::uint16_t, 4> ports{
   start_port, static_cast<std::uint16_t>(start_port + 1),
     static_cast<std::uint16_t>(start_port + 2), static_cast<std::uint16_t>(start_port + 3)};
 
-data_id_map<std::vector<int>> publish_values
+std::unordered_map<std::size_t, std::vector<int>> publish_values
 {
-  {tag_ids[0], std::vector<int>{0, 10}},
-  {tag_ids[1], std::vector<int>{1, 20}},
-  {tag_ids[2], std::vector<int>{2, 30}},
-  {tag_ids[3], std::vector<int>{3, 40}}
+  {0, std::vector<int>{0, 10}},
+  {1, std::vector<int>{1, 20}},
+  {2, std::vector<int>{2, 30}},
+  {3, std::vector<int>{3, 40}}
 };
-
-// const std::map<PrivateValueTag, std::vector<std::string>> nodes{
-//   {private_tags[0], {"localhost:" + std::to_string(ports[0]), "localhost:" + std::to_string(ports[1])}},
-//   {private_tags[1], {"localhost:" + std::to_string(ports[2]), "localhost:" + std::to_string(ports[3])}}
-// };
 
 std::mutex catch_mutex;
 
@@ -53,7 +49,9 @@ void machine_task(const NetworkInfo* const info, const int index)
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, publish_values, tag_ids, catch_mutex)
       .set_stop_policy(publish_values, tag_ids)
+      .set_resilience_policy()
       .build_waiter().get();
+    std::cout << "Finished building iter_method." << std::endl;
     iter_method.run
       (
        [&]([[maybe_unused]] const IterMethod& c)
