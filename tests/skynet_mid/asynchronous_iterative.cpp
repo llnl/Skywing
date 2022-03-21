@@ -2,6 +2,8 @@
 
 #include "skynet_core/enable_logging.hpp"
 #include "skynet_mid/asynchronous_iterative.hpp"
+#include "skynet_mid/stop_policies.hpp"
+#include "skynet_mid/publish_policies.hpp"
 
 #include "utils.hpp"
 #include "iterative_test_stuff.hpp"
@@ -13,7 +15,12 @@ using namespace skynet;
 constexpr int num_machines = 3;
 constexpr int num_connections = 1;
 
-const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
+//const std::array<std::uint16_t, 3> ports{10000, 20000, 30000};
+const std::uint16_t start_port = get_starting_port();
+const std::array<std::uint16_t, 3> ports{
+  start_port, static_cast<std::uint16_t>(start_port + 1),
+    static_cast<std::uint16_t>(start_port + 2)};
+
 
 std::vector<std::string> tag_ids{"tag0", "tag1", "tag2"};
 //std::vector<ValueTag> tags{ValueTag{"tag0"}, ValueTag{"tag1"}, ValueTag{"tag2"}};
@@ -42,17 +49,16 @@ void machine_task(const NetworkInfo* const info, const int index)
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });    
 
-    using IterMethod = AsynchronousIterative<TestAsyncProcessor, TestAsyncPublishPolicy, TestAsyncStopPolicy, TrivialResiliencePolicy>;
+    using IterMethod = AsynchronousIterative<TestAsyncProcessor, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
-      .set_processor(index, publish_values, tag_ids, catch_mutex)
+      .set_processor(index, num_machines)
       .set_publish_policy()
-      .set_stop_policy(publish_values, tag_ids)
+      .set_stop_policy(std::chrono::seconds(5))
       .set_resilience_policy()
       .build_waiter().get();
-    iter_method.run
-      (
-       []([[maybe_unused]] const IterMethod& c) { std::this_thread::sleep_for(std::chrono::seconds(1));}
-      );
+    iter_method.run();
+    
+    REQUIRE(fabs(iter_method.get_processor().get_curr_average() - iter_method.get_processor().get_target()) < 0.02);
     });
   base_master.run();
 }

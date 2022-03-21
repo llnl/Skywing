@@ -20,7 +20,9 @@ core_tests = {
   ],
 
   'mid': [
-    'synchronous_iterative'
+    'synchronous_iterative',
+    'stoppolicy_send',
+    'asynchronous_iterative'
   ]
 }
 

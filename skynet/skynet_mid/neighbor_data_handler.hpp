@@ -74,7 +74,7 @@ namespace skynet
      * @tparam R The return type, \c DataType by default.
      */
     template<typename R = DataType>
-    R sum() const { return weighted_f_accumulate_<R>(transformer_, std::plus<R>()); }
+    R sum() const { return f_accumulate_<R>(transformer_, std::plus<R>()); }
 
     /* @brief Compute a weighted sum of neighbor data.
      * @tparam S The coefficient type.
@@ -109,7 +109,12 @@ namespace skynet
      * @tparam R The return type, \c DataType by default.
      */
     template<typename R = DataType>
-    R average() const { return sum() / num_neighbors(); }
+    R average() const
+    {
+      R num = sum();
+      R denom = f_accumulate_<R>([](const BaseDataType&) { return 1.0; }, std::plus<R>());
+      return num / denom;
+    }
 
     /* @brief Compute a weighted average af neighbor data.
      * @tparam S The coefficient type.
@@ -168,6 +173,10 @@ namespace skynet
     
   private:
 
+    //TODO: Improve efficiency of these functions to not look up keys
+    //in neighbor_values_ twice (currently it's once to check that it
+    //exists and once to use it).
+
     /** @brief Compute an affine accumulation of a function of the data, \f$s + \sum_i c_i f(x_i)\f$.
      *
      * @tparam R The output type of the computation.
@@ -185,9 +194,15 @@ namespace skynet
                              R* shift) const
     {
       auto tag_iter = tags_.cbegin();
+      while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = binary_op(*shift, coef(*tag_iter) * f(neighbor_values_[*tag_iter]));
+      
+      ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
+      {
+        if (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) continue;
         val = binary_op(std::move(val), coef(*tag_iter) * f(neighbor_values_.at(*tag_iter)));
+      }
       return val;
     }
 
@@ -206,9 +221,15 @@ namespace skynet
                              std::function<R(R, R)> binary_op) const
     {
       auto tag_iter = tags_.cbegin();
+      while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = coef(*tag_iter) * f(neighbor_values_.at(*tag_iter));
+      
+      ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
+      {
+        if (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) continue;
         val = binary_op(std::move(val), coef(*tag_iter) * f(neighbor_values_.at(*tag_iter)));
+      }
       return val;
     }
 
@@ -223,10 +244,17 @@ namespace skynet
     R f_accumulate_(std::function<R(const BaseDataType&)> f,
                     std::function<R(R, R)> binary_op) const
     {
+      // find starting existing value
       auto tag_iter = tags_.cbegin();
+      while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = f(neighbor_values_.at(*tag_iter));
+      
+      ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
+      {
+        if (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) continue;
         val = binary_op(std::move(val), f(neighbor_values_.at(*tag_iter)));
+      }
       return val;
     }
 
@@ -247,9 +275,15 @@ namespace skynet
                              std::function<R(R, R)> binary_op) const
     {
       auto tag_iter = tags_.cbegin();
+      while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = coef(*tag_iter);
+      
+      ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
+      {
+        if (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) continue;
         val = binary_op(std::move(val), coef(*tag_iter));
+      }
       return val;
     }
 

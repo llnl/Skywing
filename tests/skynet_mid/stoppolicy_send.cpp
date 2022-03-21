@@ -50,19 +50,24 @@ void machine_task(const NetworkInfo* const info, const int index)
     ///////////////////////////////
     // Normal iterative method
     ///////////////////////////////
-    using IterMethod = SynchronousIterative<TestAsyncProcessor, StopAfterTime, TrivialResiliencePolicy>;
+    size_t NUM_ITERS = 20;
+    using IterMethod = SynchronousIterative<TestAsyncProcessor, TestWaitForNbrsStopPolicy, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, num_machines)
-      .set_stop_policy(std::chrono::seconds(5))
+      .set_stop_policy(static_cast<double>(index+1), static_cast<double>(NUM_ITERS), index)
       .set_resilience_policy()
       .build_waiter().get();
-    iter_method.run();
-    REQUIRE(fabs(iter_method.get_processor().get_curr_average() - iter_method.get_processor().get_target()) < 0.02);
+
+    size_t iter_count = 0;
+    iter_method.run( [&](const IterMethod&) { ++iter_count; } );
+    REQUIRE(iter_count >= NUM_ITERS);
+    REQUIRE(iter_count < (NUM_ITERS+3));
+    REQUIRE(fabs(iter_method.get_processor().get_curr_average() - iter_method.get_processor().get_target()) < 0.1);
     });
   base_master.run();
 }
 
-TEST_CASE("Synchronous Iterative", "[Skynet_SynchronousIterative]")
+TEST_CASE("StopPolicy Send", "[Skynet_StopPolicy_Send]")
 {
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
