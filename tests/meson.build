@@ -4,7 +4,7 @@ core_tests = {
     'assorted',
     'broadcast',
     'broken_reduce',
-    'broken_subscribes',
+#    'broken_subscribes',
     'disconnect',
     'heartbeat',
     'ip_subscribe',
