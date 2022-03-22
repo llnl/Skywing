@@ -41,7 +41,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * `cd build`
    * `ninja`
  * Run tests
-   * `ninja test`
+   * `meson test --print-errorlogs -t 5.0`
 
 ## Enabling Tests and Examples
 
