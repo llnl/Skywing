@@ -143,12 +143,14 @@ namespace skynet
   
   // primary template handles types that have no nested ::type member:
   template< class, class = void >
-  struct has_ValueType : std::false_type { };
+  struct has_ValueType : public std::false_type { };
  
   // specialization recognizes types that do have a nested ::type member:
   template< class T >
-  struct has_ValueType<T, std::void_t<typename T::ValueType>> : std::true_type { };
+  struct has_ValueType<T, std::void_t<typename T::ValueType>> : public std::true_type { };
 
+  template<class T>
+  inline constexpr bool has_ValueType_v = has_ValueType<T>::value;
 } // namespace skynet
 
 #endif // SKYNET_ITERATIVE_HELPERS_HPP

@@ -49,10 +49,10 @@ class SynchronousIterative :
     public IterativeMethod<ResiliencePolicy, TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>>
 {
 public:
-  using ValueType = TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>;
+  using BaseT = IterativeMethod<ResiliencePolicy, TupleOfValueTypes_t<Processor, StopPolicy, ResiliencePolicy>>;
   using ThisT = SynchronousIterative<Processor, StopPolicy, ResiliencePolicy>;
-  using BaseT = IterativeMethod<ResiliencePolicy, ValueType>;
 
+  using ValueType = typename BaseT::ValueType;
   using TagType = typename BaseT::TagType;
 
   using ProcessorT = Processor;
@@ -130,46 +130,6 @@ public:
     run<false>([](const ThisT&) { return; } );
   }
 
-  /** @brief Get the NeighborDataHandler for the Processor data.
-   */
-  NeighborDataHandler<ValueType, typename Processor::ValueType> get_processor_data_handler()
-  {
-    using ret_t = typename Processor::ValueType;
-    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<0>(v);});
-  }
-
-  /** @brief Get the NeighborDataHandler for the StopPolicy data, if
-   * it has data.
-   *
-   *  If StopPolicy does not contribute to communicated values,
-   *  then this function does not exist.
-   */
-  template<typename stop_policy = StopPolicy>
-  std::enable_if_t<std::is_same_v<stop_policy, StopPolicy>,
-                   NeighborDataHandler<ValueType, typename stop_policy::ValueType>>
-  get_stop_policy_data_handler()
-  {
-    using ret_t = typename StopPolicy::ValueType;
-    constexpr std::size_t ind = IndexInPublishers<stop_policy, ThisT>::index;
-    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
-  }
-
-  /** @brief Get the NeighborDataHandler for the StopPolicy data, if
-   * it has data.
-   *
-   *  If StopPolicy does not contribute to communicated values,
-   *  then this function does not exist.
-   */
-  template<typename resilience_policy = ResiliencePolicy>
-  std::enable_if_t<std::is_same_v<resilience_policy, ResiliencePolicy>,
-                   NeighborDataHandler<ValueType, typename resilience_policy::ValueType>>
-  get_resilience_policy_data_handler()
-  {
-    using ret_t = typename ResiliencePolicy::ValueType;
-    constexpr std::size_t ind = IndexInPublishers<resilience_policy, ThisT>::index;
-    return this->template get_neighbor_data_handler<ret_t>([](const ValueType& v){return std::get<ind>(v);});
-  }
-
   /** @brief Get iteration run time, or zero if not yet began.
    */
   std::chrono::milliseconds run_time() const
@@ -202,30 +162,6 @@ public:
   const Processor& get_processor() const { return processor_; }
 
 private:
-  
-  /* @brief Default trivial function for when a policy does not define ValueType.
-   */
-  template<typename Policy>
-  void process_policy_update_(Policy&)
-  {  }
-
-  /* @brief Process the StopPolicy's updates.
-   *
-   * Only done if StopPolicy defines a ValueType (and is therefore an
-   * auxiliary processor).
-   */
-  std::enable_if_t<has_ValueType<StopPolicy>::value, void>
-  process_policy_update_(StopPolicy& policy_obj)
-  { policy_obj.process_update(get_stop_policy_data_handler(), *this);  }
-
-  /* @brief Process the ResiliencePolicy's updates.
-   *
-   * Only done if ResiliencePolicy defines a ValueType (and is therefore an
-   * auxiliary processor).
-   */
-  std::enable_if_t<has_ValueType<ResiliencePolicy>::value, void>
-  process_policy_update_(ResiliencePolicy& policy_obj)
-  { policy_obj.process_update(get_resilience_policy_data_handler(), *this); }
 
   /** @brief Process all updates for the main processor and the policies.
    *
@@ -236,9 +172,11 @@ private:
    */
   void process_all_updates_()
   {
-    processor_.process_update(get_processor_data_handler(), *this);
-    process_policy_update_(stop_policy_);
-    process_policy_update_(this->resilience_policy_);
+    processor_.process_update(this->template get_policy_data_handler<Processor, ThisT>(), *this);
+    this->template process_policy_update_<StopPolicy, ThisT>
+      (stop_policy_, std::bool_constant<has_ValueType_v<StopPolicy>>{});
+    this->template process_policy_update_<ResiliencePolicy, ThisT>
+      (this->resilience_policy_, std::bool_constant<has_ValueType_v<ResiliencePolicy>>{});
   }
 
   /** @brief Collect values for initial publication from all policies.

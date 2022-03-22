@@ -26,6 +26,7 @@ public:
   using TagValueType = typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
   using TagType = UnwrapAndApply_t<TagValueType, PublishTag>; // PublishTag<stuff...>;
   using DataT = DataType;
+  using ValueType = DataType;
 
   /** @param job The job running this iterative method.
    *  @param produced_tag The tag this agent will publish during iteration.
@@ -219,9 +220,50 @@ public:
   template<typename SubDataType>
   NeighborDataHandler<DataType, SubDataType>
   get_neighbor_data_handler(std::function<SubDataType(const DataType& v)> f)
-  { return NeighborDataHandler<DataType, SubDataType>(std::move(f), tags_, neighbor_values_, updated_tags_); }
+  {
+    return NeighborDataHandler<DataType, SubDataType>
+      (std::move(f), tags_, neighbor_values_, updated_tags_);
+  }
 
 protected:
+
+  /** @brief Get the NeighborDataHandler for the Policy data.
+   *
+   * If the Policy does not define a ValueType, then attempting to
+   * instantiate this function will induce a compile-time error.
+   */
+  template<typename Policy, typename IterMethod>
+  NeighborDataHandler<ValueType, typename Policy::ValueType>
+  get_policy_data_handler()
+  {
+    using ret_t = typename Policy::ValueType;
+    constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
+    return this->template get_neighbor_data_handler<ret_t>
+      ([](const ValueType& v){return std::get<ind>(v);});
+  }
+
+  /** @brief Ask this Policy to process an update.
+   *
+   * This function is to be called only if Policy defines ValueType.
+   *
+   * @param policy the Policy object to update.
+   * @param std::true_type Flag to create overload resolution.
+   */
+  template<typename Policy, typename IterMethod>
+  void process_policy_update_(Policy& policy, std::true_type)
+  {
+    policy.process_update(get_policy_data_handler<Policy, IterMethod>(), *this);
+  }
+  /** @brief Ask this Policy to process an update.
+   *
+   * This function is to be called only if Policy does NOT define ValueType.
+   *
+   * @param policy the Policy object to update.
+   * @param std::false_type Flag to create overload resolution.
+   */
+  template<typename Policy, typename IterMethod>
+  void process_policy_update_(Policy&, std::false_type)
+  {}
 
   /** @brief Ask a policy for its initial value, if it produces any.
    *
