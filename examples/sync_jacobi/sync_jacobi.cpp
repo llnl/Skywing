@@ -1,10 +1,11 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/synchronous_iterative.hpp"
-#include "skynet_upper/jacobi_processor.hpp"
-#include "skynet_upper/data_input.hpp"
-#include "skynet_upper/stop_policies.hpp"
-#include "skynet_upper/publish_policies.hpp"
+#include "skynet_mid/synchronous_iterative.hpp"
+#include "skynet_mid/asynchronous_iterative.hpp"
+#include "skynet_mid/jacobi_processor.hpp"
+#include "skynet_mid/data_input.hpp"
+#include "skynet_mid/stop_policies.hpp"
+#include "skynet_mid/publish_policies.hpp"
 
 #include <array>
 #include <chrono>
@@ -19,7 +20,7 @@
 #include "jacobi_data_output.hpp"
 
 using namespace skynet;
-using ValueTag = skynet::PublishTag<std::vector<double>>;
+//using ValueTag = skynet::PublishTag<std::vector<double>>;
 
 // First three functions are for the Skynet setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_network)
@@ -44,26 +45,31 @@ std::vector<std::uint16_t>  set_port(std::uint16_t starting_port_number, std::ui
   return ports;
 }
 
-template <class TagType>
-std::vector<TagType> obtain_tags(std::uint16_t size_of_network)
+std::vector<std::string> obtain_tag_ids(std::uint16_t size_of_network)
 {
-  std::vector<TagType> tags;
+  std::vector<std::string> tag_ids;
   for(int i = 0; i < size_of_network; i++)
   {
     std::string hold = "tag" +  std::to_string(i);
-    tags.push_back(TagType{hold});
+    tag_ids.push_back(hold);
   }
-  return tags;
+  return tag_ids;
 }
 
 // All of the Skynet specific code is located in this function.
-void machine_task(const int machine_number, int trial, std::vector<std::vector<double>> A_partition, std::vector<double> b_partition, std::vector<double> x_partition_solution, std::vector<double> x_full_solution, std::vector<size_t> row_indices, std::vector<std::uint16_t> ports, std::vector<std::string> machine_names, std::vector<ValueTag> tags, std::string save_directory)
+void machine_task(const int machine_number, int trial,
+                  std::vector<std::vector<double>> A_partition, std::vector<double> b_partition,
+                  std::vector<double> x_partition_solution, std::vector<double> x_full_solution,
+                  std::vector<size_t> row_indices, std::vector<std::uint16_t> ports,
+                  std::vector<std::string> machine_names, std::vector<std::string> tag_ids,
+                  std::string save_directory)
 {
 
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
 
   master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle) {
 
+  std::cout << "Agent " << machine_number << " about to connect to neighbors." << std::endl;
   if (machine_number != (static_cast<int>(ports.size()) - 1))
   {
     // Connecting to the server is an asynchronous operation and can fail.
@@ -73,12 +79,16 @@ void machine_task(const int machine_number, int trial, std::vector<std::vector<d
       // Empty
     }
   }
-
-  using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime>;
+  std::cout << "Agent " << machine_number << " finished connecting to neighbors." << std::endl;
+  
+   using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime, TrivialResiliencePolicy>;
+  // using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>,
+  //                                          StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, tags[machine_number], tags)
+    WaiterBuilder<IterMethod>(master_handle, job, tag_ids[machine_number], tag_ids)
     .set_processor(A_partition, b_partition, row_indices)
     .set_stop_policy(std::chrono::seconds(5))
+    .set_resilience_policy()
     .build_waiter();
   std::cout << "Machine " << machine_number << " about to get iteration object." << std::endl;
   IterMethod sync_jacobi = iter_waiter.get();
@@ -212,7 +222,7 @@ int main(int argc, char* argv[])
   //This creates the relevant vectors needed to interact with skynet.
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
-  auto tags = obtain_tags<ValueTag>(size_of_network);
+  std::vector<std::string> tag_ids = obtain_tag_ids(size_of_network);
 
   // This collects the matrices and vectors for the function.
   std::string row_index_name= "machine_" + std::to_string(machine_number) + "_row_count_" + std::to_string(0)  + "_indices_" + matrix_name ;
@@ -234,6 +244,6 @@ int main(int argc, char* argv[])
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/sync_jacobi/system", x_sol_name);
 
   // Skynet call
-  machine_task(machine_number, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tags, save_directory);
+  machine_task(machine_number, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tag_ids, save_directory);
   return 0;
 }

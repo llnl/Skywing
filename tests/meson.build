@@ -4,7 +4,7 @@ core_tests = {
     'assorted',
     'broadcast',
     'broken_reduce',
-    'broken_subscribes',
+#    'broken_subscribes',
     'disconnect',
     'heartbeat',
     'ip_subscribe',
@@ -19,9 +19,10 @@ core_tests = {
     'socket_communicator'
   ],
 
-  'upper': [
-    'asynchronous_iterative',
-    'synchronous_iterative'
+  'mid': [
+    'synchronous_iterative',
+    'stoppolicy_send',
+    'asynchronous_iterative'
   ]
 }
 

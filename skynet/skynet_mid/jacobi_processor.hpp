@@ -3,7 +3,6 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_iterative.hpp"
 
 using namespace skynet;
 
@@ -68,14 +67,13 @@ public:
    * @param nbr_values The new values from the neighbors.
    * @param caller The iterative wrapper calling this method.
    */
-  template<typename CallerT>
-  void process_update([[maybe_unused]] const std::vector<ValueTag>& nbr_tags,
-                      const std::vector<ValueType>& nbr_values,
-                      [[maybe_unused]] const CallerT& caller)
+  template<typename NbrDataHandler, typename IterMethod>
+  void process_update(const NbrDataHandler& nbr_data_handler,
+                      [[maybe_unused]] const IterMethod&)
   {
-    for (size_t i = 0; i < nbr_values.size(); i++)
+    for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
-      const ValueType& nbr_value = nbr_values[i];
+      ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
       // This cycles through the received_values in order not to
       // replace a component that each process is updating with
       // another processes update if there's overlapping
@@ -102,6 +100,40 @@ public:
       }
     }
   }
+  // template<typename CallerT>
+  // void process_update([[maybe_unused]] const std::vector<ValueTag>& nbr_tags,
+  //                     const std::vector<ValueType>& nbr_values,
+  //                     [[maybe_unused]] const CallerT& caller)
+  // {
+  //   for (size_t i = 0; i < nbr_values.size(); i++)
+  //   {
+  //     const ValueType& nbr_value = nbr_values[i];
+  //     // This cycles through the received_values in order not to
+  //     // replace a component that each process is updating with
+  //     // another processes update if there's overlapping
+  //     // computations.  Since messages of the form [component index
+  //     // ; component], we have to parse these messages in pairs,
+  //     // which is easier to do without iterators.
+  //     for(size_t nbr_vals_ind = 0; nbr_vals_ind < (nbr_value.size()/2); nbr_vals_ind++)
+  //     {
+  //       bool use_this_value = true;
+  //       // Cycles through individual values in row_index to avoid
+  //       // replacing its own updates if there's overlap in the
+  //       // linear system partition.
+  //       for(size_t row_index_cycle = 0 ; row_index_cycle < number_of_updated_components_; row_index_cycle++)
+  //       {
+  //         if(nbr_value[nbr_vals_ind*2] == row_indices_[row_index_cycle])
+  //           use_this_value = false;
+  //       }
+  //       if(use_this_value)
+  //       {
+  //         size_t updated_index = static_cast<size_t>(nbr_value[nbr_vals_ind * 2]);
+  //         x_iter_[updated_index] = nbr_value[nbr_vals_ind * 2 + 1];
+  //         jacobi_computation();
+  //       }
+  //     }
+  //   }
+  // }
 
   /** @brief Prepare values to send to neighbors.
    */

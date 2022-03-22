@@ -1,14 +1,7 @@
 #ifndef ITERATIVE_TEST_STUFF_HPP
 #define ITERATIVE_TEST_STUFF_HPP
 
-using ValueTag = skynet::PublishTag<int>;
-
-template<typename T>
-using tag_map = std::unordered_map<ValueTag, T, skynet::internal::hash<ValueTag>>;
-
-int expected_result(ValueTag tag, size_t ind);
-
-struct TestAsyncPublishPolicy
+class TestAsyncPublishPolicy
 {
 public:
   template<typename ValueType>
@@ -16,15 +9,9 @@ public:
   { return new_val != old_val;  }
 };
 
-struct TestAsyncStopPolicy
+class TestAsyncStopPolicy
 {
-  TestAsyncStopPolicy(tag_map<std::vector<int>> publish_values, std::vector<ValueTag> tags)
-    : publish_values(publish_values), tags(tags)
-  {}
-                      
-  tag_map<std::vector<int>> publish_values;
-  std::vector<ValueTag> tags;
-  
+public:
   template<typename CallerT>
   bool operator()(const CallerT& caller)
   { return caller.get_processor().stage_of_iteration_ >
@@ -32,18 +19,16 @@ struct TestAsyncStopPolicy
   }
 };
 
+
+
 class TestAsyncProcessor
 {
 public:
   using ValueType = int;
   using ValueTag = skynet::PublishTag<ValueType>;
 
-  TestAsyncProcessor(size_t machine_ind, tag_map<std::vector<int>> publish_values,
-                     std::vector<ValueTag>& tags, std::mutex& mut)
-    : machine_ind_(machine_ind),
-      publish_values(publish_values),
-      tags(tags),
-      catch_mutex(mut)
+  TestAsyncProcessor(size_t machine_ind)
+    : machine_ind_(machine_ind)
   {}
   
   ValueType get_init_publish_values()
@@ -65,7 +50,7 @@ public:
       const auto& received_val = vals[i];
       std::lock_guard g{catch_mutex};
       ++num_values_received_;
-      REQUIRE(received_val == publish_values[nbr_tags[i]][stage_of_iteration_]); //expected_result(nbr_tags[i], stage_of_iteration_));
+      REQUIRE(received_val == expected_result(nbr_tags[i], stage_of_iteration_));
     }
     if (num_values_received_ == tags.size())
     {
@@ -83,9 +68,6 @@ private:
   size_t stage_of_iteration_ = 0;
   size_t num_values_received_ = 0;
   size_t machine_ind_;
-  tag_map<std::vector<int>> publish_values;
-  std::vector<ValueTag>& tags;
-  std::mutex& catch_mutex;
 
   friend class TestAsyncPublishPolicy;
   friend class TestAsyncStopPolicy;

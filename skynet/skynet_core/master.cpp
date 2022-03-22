@@ -34,16 +34,21 @@ ExternalMaster::ExternalMaster(
 
 void ExternalMaster::get_and_handle_messages() noexcept
 {
+  //  std::cout << "Agent " << master_->id() << " handling neighbor messages from " << id() << " with dead status" << dead_ << std::endl;
   if (dead_) { return; }
   for (auto& socket_comm : conns_)
   {
+    //    std::cout << "Agent " << master_->id() << " about to try to get a message from " << id() << std::endl;
     while (auto handler = try_to_get_message(socket_comm)) {
       // Update the last time something was heard
       last_heard_ = std::chrono::steady_clock::now();
       // Handle the message
+      //      std::cout << "Agent " << master_->id() << " got a message from " << id() << ", about to handle it. " << std::endl;
       handle_message(*handler);
+      //      std::cout << "Agent " << master_->id() << " finished handling message from " << id() << std::endl;
     }
   }
+  //  std::cout << "Agent " << master_->id() << " done handling messages from the live " << id() << std::endl;
 }
 
 void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
@@ -156,11 +161,16 @@ AddrPortPair ExternalMaster::address_pair() const noexcept
 
 std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunicator& socket_comm) noexcept
 {
+  //std::cout << "Agent " << master_->id() << " trying to get messages from " << id() << std::endl;
   const auto bytes_to_read_or_error = read_network_size(socket_comm);
+  //std::cout << "Agent " << master_->id() << " got bytes to read from " << id() << std::endl;
   if (std::holds_alternative<NetworkSizeType>(bytes_to_read_or_error)) {
+    //std::cout << "Agent " << master_->id() << " about to read message size from " << id() << std::endl;
     const auto bytes_to_read = *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
+    //std::cout << "Agent " << master_->id() << " successfully read message size from " << id() << std::endl;
     // Then read the actual message and parse it
     if (const auto message_buffer = read_chunked(socket_comm, bytes_to_read); !message_buffer.empty()) {
+      //std::cout << "Agent " << master_->id() << " read the actual message from " << id() << std::endl;
       return MessageHandler::try_to_create(message_buffer);
     }
     else {
@@ -186,6 +196,7 @@ std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunica
     // ConnectionError::would_block, which indicates there's the
     // connection is fine and there's just nothing currently on the
     // wire
+    //std::cout << "Agent " << master_->id() << " didn't receive anything from " << id() << std::endl;
     return {};
   }
 }
@@ -490,7 +501,9 @@ void Master::run() noexcept
     const auto end_sleep_time = std::chrono::steady_clock::now() + 100us;
     {
       // Ensure there's no data race with jobs
+      //std::cout << "Agent " << id() << " at top of loop." << std::endl;
       std::lock_guard lock{job_mut_};
+      //std::cout << "Agent " << id() << " acquired mutex." << std::endl;
       // Remove any finished jobs
       for (auto iter = jobs_.begin(); iter != jobs_.end();) {
         std::unique_lock lock{Job::Accessor::get_mutex(iter->second), std::try_to_lock};
@@ -503,14 +516,21 @@ void Master::run() noexcept
           ++iter;
         }
       }
+      //std::cout << "Agent " << id() << " about to process pending conns. " << std::endl;
       process_pending_conns();
+      //std::cout << "Agent " << id() << " about to accept pending connections. " << std::endl;
       accept_pending_connections();
+      //std::cout << "Agent " << id() << " about to handle neighbor messages. " << std::endl;
       handle_neighbor_messages();
+      //std::cout << "Agent " << id() << " about to remove dead neighbors " << std::endl;
       remove_dead_neighbors();
+      //std::cout << "Agent " << id() << " about to find publishers for pending tags. " << std::endl;
       find_publishers_for_pending_tags();
+      //std::cout << "Agent " << id() << " about to send heartbeats. " << std::endl;
       for (auto&& neighbor : neighbors_) {
         neighbor.second.send_heartbeat_if_past_interval(heartbeat_interval_);
       }
+      //std::cout << "Agent " << id() << " about to announce notifications. " << std::endl;
       using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
       std::array<cv_ref_pair, 3> cv_array{
         cv_ref_pair{notify_subscriptions_, subscription_cv_},
@@ -526,10 +546,12 @@ void Master::run() noexcept
     // Wait a bit for other messages
     std::this_thread::sleep_until(end_sleep_time);
   }
+  //std::cout << "Agent " << id() << " has no running jobs, waiting for threads to complete." << std::endl;
   // Join all of the threads now
   for (auto& thread : threads) {
     thread.join();
   }
+  //std::cout << "Agent " << id() << " is shutting down." << std::endl;
 }
 
 const std::string& Master::id() const noexcept { return id_; }
@@ -549,6 +571,7 @@ std::uint16_t Master::port() const noexcept { return port_; }
 
 void Master::handle_neighbor_messages() noexcept
 {
+  //std::cout << "Agent " << id() << " handling neighbor messages." << std::endl;
   for (auto&& neighbor : neighbors_) {
     neighbor.second.get_and_handle_messages();
   }

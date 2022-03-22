@@ -3,7 +3,6 @@
 
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_upper/asynchronous_iterative.hpp"
 
 using namespace skynet;
 
@@ -37,18 +36,18 @@ public:
   template<typename Range>
   PushSumProcessor(size_t number_of_neighbors,
                    scalar_t starting_value,
-                   Range& tags)
+                   Range& tag_ids)
     : number_of_neighbors_(number_of_neighbors),
       x_value_(starting_value)
   {
     // TODO do we need these tags in the constructor? Maybe we can
     // just initialize on-the-go during processing.
-    for (const auto& tag : tags)
+    for (const auto& id : tag_ids)
     {
-      rho_x_[tag] = 0.0;
-      rho_y_[tag] = 0.0;
-      rho_x_previous_[tag] = 0.0;
-      rho_y_previous_[tag] = 0.0;
+      rho_x_[id] = 0.0;
+      rho_y_[id] = 0.0;
+      rho_x_previous_[id] = 0.0;
+      rho_y_previous_[id] = 0.0;
     }
     in_nodes_plus_one_ = number_of_neighbors_ + 1.0;
     // Local weights -> This is the information passed to neighbors.
@@ -65,26 +64,24 @@ public:
    * @param nbr_values The new values from the neighbors.
    * @param caller The iterative wrapper calling this method.
    */
-  template<typename IterativeWrapper>
-  void process_update(const std::vector<ValueTag>& nbr_tags,
-                      const std::vector<ValueType>& nbr_values,
-                      const IterativeWrapper& wrapper)
+  template<typename NbrDataHandler, typename IterMethod>
+  void process_update(const NbrDataHandler& nbr_data_handler, const IterMethod& iter_method)
   {
-    for (size_t i = 0; i < nbr_tags.size(); i++)
+    for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
-      if (nbr_tags[i] == wrapper.my_tag())
+      if (*pTag == iter_method.my_tag())
         continue;
 
-      const ValueTag& nbr_tag = nbr_tags[i];
-      const ValueType& nbr_value = nbr_values[i];
+      std::string nbr_tag_id = pTag->id();
+      ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
 
-      rho_x_previous_[nbr_tag] = rho_x_[nbr_tag];
-      rho_y_previous_[nbr_tag] = rho_y_[nbr_tag];
-      rho_x_[nbr_tag] = nbr_value[0];
-      rho_y_[nbr_tag] = nbr_value[1];
+      rho_x_previous_[nbr_tag_id] = rho_x_[nbr_tag_id];
+      rho_y_previous_[nbr_tag_id] = rho_y_[nbr_tag_id];
+      rho_x_[nbr_tag_id] = nbr_value[0];
+      rho_y_[nbr_tag_id] = nbr_value[1];
 
-      x_value_ = x_value_ + rho_x_[nbr_tag] - rho_x_previous_[nbr_tag];
-      y_value_ = y_value_ + rho_y_[nbr_tag] - rho_y_previous_[nbr_tag];
+      x_value_ = x_value_ + rho_x_[nbr_tag_id] - rho_x_previous_[nbr_tag_id];
+      y_value_ = y_value_ + rho_y_[nbr_tag_id] - rho_y_previous_[nbr_tag_id];
 
       // This is the 'wake up' portion followed by broadcast (push_sum theory relevant)
       sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
@@ -125,6 +122,9 @@ public:
   {
     return new_information_count_;
   }
+
+  scalar_t get_x() const {return x_value_;}
+  scalar_t get_y() const {return y_value_;}
   
 private:
   size_t number_of_neighbors_;
@@ -139,11 +139,11 @@ private:
   scalar_t sigma_x_;
   scalar_t sigma_y_;
   // stores iterate information
-  using tag_val_map = std::unordered_map<ValueTag, scalar_t, skynet::internal::hash<ValueTag>>;
-  tag_val_map rho_x_;
-  tag_val_map rho_y_;
-  tag_val_map rho_x_previous_;
-  tag_val_map rho_y_previous_;
+  using data_id_map = std::unordered_map<std::string, scalar_t>;
+  data_id_map rho_x_;
+  data_id_map rho_y_;
+  data_id_map rho_x_previous_;
+  data_id_map rho_y_previous_;
 };  // class PushSumProcessor
 
 
