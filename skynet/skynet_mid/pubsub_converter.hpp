@@ -24,8 +24,8 @@ namespace skynet
   template<typename T>
   struct PubSubConverter
   {
-    static_assert(true,
-                  "You tried to apply the default PubSubConverter to a type that is not native to Skynet. You must implement a specialization of the PubSubConverter for your specific type.");
+    static_assert(internal::index_of<T, PublishValueTypeList> != internal::size<PublishValueTypeList>,
+                  "Looks like you want Skynet to send messages with a new data type. For Skynet to do this, you must implement a specialization of PubSubConverter<T> to translate it into something Skynet knows how to send. See skynet/skynet_mid/pubsub_converter.hpp for more information.");
     
     using input_type = T;
     using pubsub_type = T;

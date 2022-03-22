@@ -7,7 +7,7 @@ int expected_result(std::string& tag_id, size_t ind);
 
 struct TestWaitForNbrsStopPolicy
 {
-   using ValueType = double;
+  using ValueType = double;
   
   TestWaitForNbrsStopPolicy(double coef, double stop_val,
                             size_t machine_ind)
