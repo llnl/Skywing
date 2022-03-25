@@ -42,8 +42,8 @@ namespace skynet
   template<typename T>
   struct IfHasValueType<T, std::void_t<typename T::ValueType>>
   {
-    using tuple_of_value_type = typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
-    using tuple_of_type = typename TupleIfNotAlready<T>::tuple_type;
+    using tuple_of_value_type = std::tuple<typename T::ValueType>; //typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
+    using tuple_of_type = std::tuple<T>; //typename TupleIfNotAlready<T>::tuple_type;
   };
 
   /** @brief Get std::tuple<T1::ValueType, T2::ValueType, ...> if all ValueTypes are tuples.

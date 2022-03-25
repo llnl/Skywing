@@ -22,7 +22,9 @@ core_tests = {
   'mid': [
     'synchronous_iterative',
     'stoppolicy_send',
-    'asynchronous_iterative'
+    'asynchronous_iterative',
+    'max_test',
+    'count_test'
   ]
 }
 

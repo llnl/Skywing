@@ -31,25 +31,12 @@ public:
   /**
    * @param number_of_neighbors Number of neighboring agents.
    * @param starting_values This agent's contribution to the average.
-   * @param tags The <em>assumed already subscribed</em> tags of neighbors.
    */
-  template<typename Range>
   PushSumProcessor(size_t number_of_neighbors,
-                   scalar_t starting_value,
-                   Range& tag_ids)
-    : number_of_neighbors_(number_of_neighbors),
-      x_value_(starting_value)
+                   scalar_t starting_value)
+    : x_value_(starting_value)
   {
-    // TODO do we need these tags in the constructor? Maybe we can
-    // just initialize on-the-go during processing.
-    for (const auto& id : tag_ids)
-    {
-      rho_x_[id] = 0.0;
-      rho_y_[id] = 0.0;
-      rho_x_previous_[id] = 0.0;
-      rho_y_previous_[id] = 0.0;
-    }
-    in_nodes_plus_one_ = number_of_neighbors_ + 1.0;
+    in_nodes_plus_one_ = number_of_neighbors + 1.0;
     // Local weights -> This is the information passed to neighbors.
     sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
     sigma_y_ = sigma_y_ + (y_value_ / in_nodes_plus_one_);
@@ -75,6 +62,11 @@ public:
       std::string nbr_tag_id = pTag->id();
       ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
 
+      if (rho_x_.count(nbr_tag_id) == 0)
+      {
+        rho_x_[nbr_tag_id] = 0.0;
+        rho_y_[nbr_tag_id] = 0.0;
+      } 
       rho_x_previous_[nbr_tag_id] = rho_x_[nbr_tag_id];
       rho_y_previous_[nbr_tag_id] = rho_y_[nbr_tag_id];
       rho_x_[nbr_tag_id] = nbr_value[0];
@@ -127,7 +119,6 @@ public:
   scalar_t get_y() const {return y_value_;}
   
 private:
-  size_t number_of_neighbors_;
   double new_information_count_ = 0.0;
   double max_neighbor_received_ = 0.0;
   scalar_t x_value_;

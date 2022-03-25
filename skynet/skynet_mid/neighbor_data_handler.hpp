@@ -59,12 +59,20 @@ namespace skynet
      */
     template<typename SubDataType>
     NeighborDataHandler<BaseDataType, SubDataType>
-    get_sub_handler(std::function<SubDataType(DataType&)> sub_transformer) const
+    get_sub_handler(std::function<SubDataType(const DataType&)> sub_transformer) const
     {
       return NeighborDataHandler<BaseDataType, SubDataType>
-        ([&](BaseDataType& v){return sub_transformer(transformer_(v));},
+        ([=](const BaseDataType& v){return sub_transformer(transformer_(v));},
          tags_, neighbor_values_, updated_tags_);
     }
+
+    // template<std::size_t index>
+    // NeighborDataHandler<BaseDataType, typename std::tuple_element<index, DataType>::type>
+    // get_tuple_element_handler() const
+    // {
+    //   return get_sub_handler<typename std::tuple_element<index, DataType>::type>
+    //     ([](DataType& d) { return std::get<index>(d); }
+    // }
 
     /******************************
      * Summation functions
