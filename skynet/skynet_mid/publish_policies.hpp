@@ -63,27 +63,25 @@ private:
  *
  * @tparam scalar_t The same scalar type as used in the PushSumProcessor.
  */
-template<typename scalar_t = double>
+template<typename scalar_t, size_t ind1, size_t ind2>
 class PublishOnRatioShift
 {
 public:
 
-  PublishOnRatioShift(scalar_t thresh, size_t ind1, size_t ind2)
-    : shift_threshold_(thresh),
-      ind1_(ind1), ind2_(ind2)
+  PublishOnRatioShift(scalar_t thresh)
+    : shift_threshold_(thresh)
   {  }
 
   template<typename ValueType>
   bool operator()(const ValueType& new_vals, const ValueType& old_vals)
   {
-    scalar_t new_ratio = new_vals[ind1_] / new_vals[ind2_];
-    scalar_t old_ratio = old_vals[ind1_] / old_vals[ind2_];
+    scalar_t new_ratio = std::get<ind1>(new_vals) / std::get<ind2>(new_vals);
+    scalar_t old_ratio = std::get<ind1>(old_vals) / std::get<ind2>(old_vals);
     return (new_ratio - old_ratio) > shift_threshold_ || (old_ratio - new_ratio) > shift_threshold_;
   }
 
 private:
   scalar_t shift_threshold_;
-  size_t ind1_, ind2_;
 }; // class PublishRatioShift
 
 #endif // UPDATE_NBRS_CRITERION_HPP

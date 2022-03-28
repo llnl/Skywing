@@ -6,7 +6,7 @@
 #include "skynet_mid/asynchronous_iterative.hpp"
 #include "skynet_mid/stop_policies.hpp"
 #include "skynet_mid/publish_policies.hpp"
-#include "skynet_mid/softmax_count_processor.hpp"
+#include "skynet_mid/quacc_processor.hpp"
 
 #include "utils.hpp"
 #include "iterative_test_stuff.hpp"
@@ -39,7 +39,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     });
     std::cout << "Machine " << index << " about to build itermethod." << std::endl;
     using IterMethod = AsynchronousIterative
-      <SoftmaxCountProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+      <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
       .set_processor(num_machines-1)
       .set_publish_policy()

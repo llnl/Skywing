@@ -3,6 +3,7 @@
 
 #include <tuple>
 #include <type_traits>
+#include "skynet_core/internal/tag_buffer.hpp"
 
 namespace skynet
 {

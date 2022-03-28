@@ -1,10 +1,11 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
-#include "skynet_mid/softmax_count_processor.hpp"
+#include "skynet_mid/quacc_processor.hpp"
 #include "skynet_mid/asynchronous_iterative.hpp"
 #include "skynet_mid/data_input.hpp"
 #include "skynet_mid/stop_policies.hpp"
 #include "skynet_mid/publish_policies.hpp"
+#include "skynet_mid/big_float.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -89,11 +90,11 @@ void machine_task(int machine_number, int size_of_system,
   {tagIDs[wrap_ind(i-1)], tagIDs[i], tagIDs[wrap_ind(i+1)]};
 
   using IterMethod = AsynchronousIterative
-    <SoftmaxCountProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+    <QUACCProcessor<BigFloat>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   IterMethod iter_method = WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
-    .set_processor(number_of_neighbors, 4e-4)
+    .set_processor(number_of_neighbors, 1e-10)
     .set_publish_policy()
-    .set_stop_policy(std::chrono::seconds(10))
+    .set_stop_policy(std::chrono::seconds(15))
     .set_resilience_policy()
     .build_waiter().get();
 

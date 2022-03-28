@@ -5,6 +5,7 @@
 #include "skynet_mid/data_input.hpp"
 #include "skynet_mid/stop_policies.hpp"
 #include "skynet_mid/publish_policies.hpp"
+#include "skynet_mid/big_float.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -81,12 +82,13 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSumProcessor<double>, PublishOnRatioShift<double>,
+  using IterMethod = AsynchronousIterative<PushSumProcessor<double>,
+                                           PublishOnRatioShift<double, 0, 1>,
                                            StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
     WaiterBuilder<IterMethod>(master_handle, job, pubTagID, subTagIDs)
     .set_processor(number_of_neighbors, starting_value)
-    .set_publish_policy(1e-4, 0, 1)
+    .set_publish_policy(1e-4)
     .set_stop_policy(std::chrono::seconds(5))
     .set_resilience_policy()
     .build_waiter();
