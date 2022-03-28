@@ -90,7 +90,7 @@ void machine_task(int machine_number, int size_of_system,
   {tagIDs[wrap_ind(i-1)], tagIDs[i], tagIDs[wrap_ind(i+1)]};
 
   using IterMethod = AsynchronousIterative
-    <QUACCProcessor<BigFloat>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+    <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   IterMethod iter_method = WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
     .set_processor(number_of_neighbors, 1e-10)
     .set_publish_policy()
