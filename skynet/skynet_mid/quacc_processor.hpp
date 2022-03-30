@@ -3,15 +3,17 @@
 
 #include "skynet_mid/idempotent_processor.hpp"
 #include "skynet_mid/push_sum_processor.hpp"
+#include "skynet_mid/push_flow_processor.hpp"
 #include "skynet_mid/big_float.hpp"
 #include <chrono>
 #include <random>
 #include <cmath>
 #include <iostream>
 
-using namespace skynet;
+namespace skynet
+{
 
-/** QUasi-Arithmetic Collective Counter
+/** @brief QUasi-Arithmetic Collective Counter
  *
  * This processor implements a gossip method for counting the number
  * of agents in a collective. Consider a set of positive real numbers
@@ -62,11 +64,11 @@ public:
    *  likely not necessary for something else like Push Flow.
    *  @param lambda Parameter for the exponential distribution.
    */
-  QUACCProcessor(size_t number_of_neighbors,
-                 real_t lambda = 1e-8)
-    : my_val_(get_exponential_dist_value(lambda)),
+  template<typename... Args>
+  QUACCProcessor(Args&&... args)
+    : my_val_(get_exponential_dist_value()),
       min_processor_(my_val_),
-      mean_processor_(number_of_neighbors, exp(-my_val_))
+      mean_processor_(exp(-my_val_), std::forward<Args>(args)...)
   {
     std::cout << "Have my_val_=" << my_val_ << " and exp=" << exp(-my_val_) << std::endl;
   }
@@ -95,7 +97,7 @@ public:
 
   real_t get_raw_count() const
   {
-    return exp(-(log(mean_processor_.return_solution())
+    return exp(-(log(mean_processor_.get_value())
                  + min_processor_.get_value()));
   }
   size_t get_count() const
@@ -115,7 +117,7 @@ private:
 
   // Draw a value at random from the exponential distribution with
   // parameter lambda
-  real_t get_exponential_dist_value(real_t lambda)
+  real_t get_exponential_dist_value()
   {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator(seed);
@@ -124,14 +126,17 @@ private:
     real_t p = distribution(generator);
     // should actually be 1-p but the distribution of p and
     // distribution of 1-p are the same so it's fine.
-    return -log(p) / lambda;
+    return -log(p) / LAMBDA;
   }
-  
+
+  const real_t LAMBDA = 1e-10;
   real_t my_val_;
   MinProc min_processor_;
   MeanProc mean_processor_;
 
   
 }; // class QUACCProcessor
+
+} // namespace skyne
 
 #endif // QUACC_PROCESSOR_HPP

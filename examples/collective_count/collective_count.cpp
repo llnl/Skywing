@@ -92,7 +92,7 @@ void machine_task(int machine_number, int size_of_system,
   using IterMethod = AsynchronousIterative
     <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   IterMethod iter_method = WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
-    .set_processor(number_of_neighbors, 1e-10)
+    .set_processor(number_of_neighbors)
     .set_publish_policy()
     .set_stop_policy(std::chrono::seconds(15))
     .set_resilience_policy()

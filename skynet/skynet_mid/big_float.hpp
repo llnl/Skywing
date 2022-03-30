@@ -103,7 +103,19 @@ BigFloat operator+(const BigFloat& a, const BigFloat& b)
   else return BigFloat(a.exp_, a.fraction_ + b.fraction_);
 }
 
+BigFloat& operator+=(BigFloat& a, const BigFloat& b)
+{
+  a = a + b;
+  return a;
+}
+
 BigFloat operator-(const BigFloat& a) {  return BigFloat(a.exp_, -a.fraction_); }
+
+BigFloat& operator-=(BigFloat& a, const BigFloat& b)
+{
+  a = a - b;
+  return a;
+}
 
 BigFloat operator-(const BigFloat& a, const BigFloat& b)
 { return a + (-b); }

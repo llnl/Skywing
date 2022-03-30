@@ -41,7 +41,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     using IterMethod = AsynchronousIterative
       <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
-      .set_processor(num_machines-1)
+      .set_processor() //num_machines-1)
       .set_publish_policy()
       .set_stop_policy(std::chrono::seconds(3))
       .set_resilience_policy()

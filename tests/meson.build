@@ -24,7 +24,7 @@ core_tests = {
     'stoppolicy_send',
     'asynchronous_iterative',
     'max_test',
-    'count_test'
+#    'count_test'
   ]
 }
 

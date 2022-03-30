@@ -9,6 +9,21 @@ namespace skynet
 {
   template<typename TagType, typename T>
   using tag_map = std::unordered_map<TagType, T, skynet::internal::hash<TagType>>;
+
+  /*************************************************************************
+   * @brief struct that checks if a type is one of the ones that
+   * Skynet sends natively. The list of native types is the
+   * PublishValueTypeList in skynet_core/types.hpp
+   **************************************************************************/
+
+  template<typename T>
+  struct IsNativeToSkynet
+  {
+    static constexpr bool value = internal::index_of<T, PublishValueTypeList> != internal::size<PublishValueTypeList>;
+  };
+
+  template<typename T>
+  inline constexpr bool IsNativeToSkynet_v = IsNativeToSkynet<T>::value;  
   
   /*************************************************************************
    * @brief struct that wraps a type in a tuple if it isn't already a tuple.

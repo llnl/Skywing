@@ -4,7 +4,8 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 
-using namespace skynet;
+namespace skynet
+{
 
 /**
  * Push Sum is an asynchronous distributed averaging algorithm that
@@ -32,8 +33,8 @@ public:
    * @param number_of_neighbors Number of neighboring agents.
    * @param starting_values This agent's contribution to the average.
    */
-  PushSumProcessor(size_t number_of_neighbors,
-                   scalar_t starting_value)
+  PushSumProcessor(scalar_t starting_value,
+                   size_t number_of_neighbors)
     : x_value_(starting_value)
   {
     in_nodes_plus_one_ = number_of_neighbors + 1.0;
@@ -43,7 +44,7 @@ public:
   }
 
   ValueType get_init_publish_values()
-  { return {sigma_x_, sigma_y_, new_information_count_}; }
+  { return {sigma_x_, sigma_y_, information_count_}; }
 
   /** @brief Perform the push-sum update computation.
    *
@@ -56,8 +57,7 @@ public:
   {
     for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
-      if (*pTag == iter_method.my_tag())
-        continue;
+      if (*pTag == iter_method.my_tag()) continue;
 
       std::string nbr_tag_id = pTag->id();
       ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
@@ -82,7 +82,7 @@ public:
       x_value_ = x_value_ / in_nodes_plus_one_;
       y_value_ = y_value_ / in_nodes_plus_one_;
       
-      ++new_information_count_;
+      ++information_count_;
     }
   }
 
@@ -90,31 +90,31 @@ public:
    */
   ValueType prepare_for_publication(ValueType)
   {
-    return {sigma_x_, sigma_y_, new_information_count_};
+    return {sigma_x_, sigma_y_, information_count_};
     // vals_to_publish[0] = sigma_x_;
     // vals_to_publish[1] = sigma_y_;
-    // vals_to_publish[2] = new_information_count_;
+    // vals_to_publish[2] = information_count_;
     // return vals_to_publish;
   }
 
   /** @brief Returns the current estimate of the global average.
    */
-  scalar_t return_solution() const
+  scalar_t get_value() const
   {
     scalar_t consensus_value = x_value_/y_value_;
     return consensus_value;
   }
 
-  unsigned return_new_information_count() const
+  unsigned get_information_count() const
   {
-    return new_information_count_;
+    return information_count_;
   }
 
   scalar_t get_x() const {return x_value_;}
   scalar_t get_y() const {return y_value_;}
   
 private:
-  unsigned new_information_count_ = 0;
+  unsigned information_count_ = 0;
   scalar_t x_value_;
   scalar_t y_value_ = 1.0;
   // this is the number of neighbors plus one needed for the update
@@ -131,5 +131,6 @@ private:
   data_id_map rho_y_previous_;
 };  // class PushSumProcessor
 
+} // namespace skynet
 
 #endif

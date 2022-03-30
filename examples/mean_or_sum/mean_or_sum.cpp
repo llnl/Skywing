@@ -1,11 +1,15 @@
 #include "skynet_core/skynet.hpp"
 #include "skynet_core/master.hpp"
 #include "skynet_mid/push_sum_processor.hpp"
+#include "skynet_mid/push_flow_processor.hpp"
+#include "skynet_mid/sum_processor.hpp"
+#include "skynet_mid/quacc_processor.hpp"
 #include "skynet_mid/asynchronous_iterative.hpp"
 #include "skynet_mid/data_input.hpp"
 #include "skynet_mid/stop_policies.hpp"
 #include "skynet_mid/publish_policies.hpp"
 #include "skynet_mid/big_float.hpp"
+
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -63,10 +67,11 @@ double obtain_exact_average(int size_of_system)
   return average;
 }
 
-void machine_task(int machine_number, int size_of_system, int number_of_neighbors,
+void machine_task(int machine_number, int size_of_system,
+                  int number_of_neighbors,
                   double starting_value, std::vector<std::uint16_t> ports,
                   std::vector<std::string> machine_names,
-                  std::string pubTagID, std::vector<std::string> subTagIDs)
+                  std::string pubTagID, std::vector<std::string> tagIDs)
 {
   skynet::Master master{ports[machine_number], machine_names[machine_number]};
 
@@ -82,30 +87,68 @@ void machine_task(int machine_number, int size_of_system, int number_of_neighbor
     }
   }
 
-  using IterMethod = AsynchronousIterative<PushSumProcessor<double>,
-                                           PublishOnRatioShift<double, 0, 1>,
-                                           StopAfterTime, TrivialResiliencePolicy>;
+  // make gossip connections in a circle
+  (void)number_of_neighbors;
+  int i = machine_number;
+  size_t number_of_neighbors = 2;
+  
+  auto wrap_ind = [&](int ind){ return (ind % size_of_system + size_of_system) % size_of_system; };
+  std::vector<std::string> tagIDs_for_sub
+  {tagIDs[wrap_ind(i-1)], tagIDs[i], tagIDs[wrap_ind(i+1)]};
+
+
+  (void)number_of_neighbors;
+  using MeanMethod = PushFlowProcessor<BigFloat, BigFloat>;
+  using IterMethod = AsynchronousIterative
+    <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, subTagIDs)
-    .set_processor(number_of_neighbors, starting_value)
-    .set_publish_policy(1e-4)
-    .set_stop_policy(std::chrono::seconds(5))
+    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+    .set_processor(starting_value)
+    .set_publish_policy()
+    .set_stop_policy(std::chrono::seconds(10))
     .set_resilience_policy()
     .build_waiter();
-  IterMethod push_sum = iter_waiter.get();
 
-  push_sum.run(
-      [&](const decltype(push_sum)& p)
+  // using MeanMethod = PushSumProcessor<double>;
+  // using IterMethod = AsynchronousIterative
+  //   <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+  // Waiter<IterMethod> iter_waiter =
+  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+  //   .set_processor(starting_value, number_of_neighbors)
+  //   .set_publish_policy()
+  //   .set_stop_policy(std::chrono::seconds(5))
+  //   .set_resilience_policy()
+  //   .build_waiter();
+
+  // (void)number_of_neighbors;
+  // using CountProcessor = QUACCProcessor<BigFloat, MinProcessor<BigFloat>,
+  //                                       PushFlowProcessor<BigFloat>>;
+  // using SumMethod = SumProcessor<double, PushFlowProcessor<double>,
+  //                                CountProcessor>;
+  // using IterMethod = AsynchronousIterative
+  //   <SumMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+  // Waiter<IterMethod> iter_waiter =
+  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+  //   .set_processor(starting_value)
+  //   .set_publish_policy()
+  //   .set_stop_policy(std::chrono::seconds(5))
+  //   .set_resilience_policy()
+  //   .build_waiter();
+
+  IterMethod mean_or_sum = iter_waiter.get();
+
+  mean_or_sum.run(
+      [&](const decltype(mean_or_sum)& p)
       {
-        std::cout << p.run_time().count() << "ms: Machine " << machine_number << " has value " <<
-          p.get_processor().return_solution() << " and vals ";
-        std::cout << p.get_processor().get_x() << ", " << p.get_processor().get_y() << std::endl;
+        std::cout << p.run_time().count() << "ms: Machine " << machine_number
+                  << " has value " << p.get_processor().get_value()
+                  << std::endl;
       } );
 
-  double consensus_value = push_sum.get_processor().return_solution();
+  double consensus_value = static_cast<double>(mean_or_sum.get_processor().get_value());
   double exact_solution = obtain_exact_average(size_of_system);
-  double run_time_count = push_sum.run_time().count();
-  double new_information_count = push_sum.get_processor().return_new_information_count();
+  double run_time_count = mean_or_sum.run_time().count();
+  double new_information_count = mean_or_sum.get_processor().get_information_count();
 
   std::cout << "machine " << machine_number << "\tconsensus value: " << consensus_value << "\texact solution: " << exact_solution << "\truntime: " << run_time_count << "\tnew info count: " << new_information_count << std::endl;
   
