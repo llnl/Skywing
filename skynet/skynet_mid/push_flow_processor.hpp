@@ -78,12 +78,10 @@ public:
     }
 
     curr_num_ = my_weight_ * my_val_;
-    for (const auto& nbr_val : f_ij_num_)
-      curr_num_ = curr_num_ - nbr_val.second;
+    for (const auto& nbr_val : f_ij_num_) curr_num_ -= nbr_val.second;
     
     curr_denom_ = my_weight_;
-    for (const auto& nbr_val : f_ij_denom_)
-      curr_denom_ = curr_denom_ - nbr_val.second;
+    for (const auto& nbr_val : f_ij_denom_) curr_denom_ -= nbr_val.second;
   }
 
   ValueType prepare_for_publication(ValueType)
@@ -115,9 +113,9 @@ private:
     {
       // update all neighbors
       for (auto& iter : f_ij_num_)
-        iter.second = iter.second + curr_num_ / (1 + f_ij_num_.size());
+        iter.second += curr_num_ / (1 + f_ij_num_.size());
       for (auto& iter : f_ij_denom_)
-        iter.second = iter.second + curr_denom_ / (1 + f_ij_denom_.size());
+        iter.second += curr_denom_ / (1 + f_ij_denom_.size());
     }
     else
     {
