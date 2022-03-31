@@ -24,6 +24,7 @@ core_tests = {
     'stoppolicy_send',
     'asynchronous_iterative',
     'max_test',
+    'associative_vector'
 #    'count_test'
   ]
 }
