@@ -3,6 +3,7 @@
 
 #include "skynet_mid/push_sum_processor.hpp"
 #include "skynet_mid/quacc_processor.hpp"
+#include <iostream>
 
 namespace skynet
 {
@@ -31,10 +32,11 @@ public:
   template<typename... Args>
   SumProcessor(data_t my_value,
                Args&&... args)
-    : my_value_(my_value),
-      mean_processor_(my_value, std::forward<Args>(args)...),
+    : mean_processor_(my_value, std::forward<Args>(args)...),
       count_processor_(std::forward<Args>(args)...)
-  {}
+  {
+    std::cout << "Starting value " << my_value << std::endl;
+  }
 
   ValueType get_init_publish_values()
   {
@@ -62,12 +64,15 @@ public:
   {
     return count_processor_.get_count() * mean_processor_.get_value();
   }
+  void set_value(data_t new_val)
+  {
+    mean_processor_.set_value(std::move(new_val));
+  }
 
   size_t get_information_count() const
   { return mean_processor_.get_information_count(); }
 
 private:
-  data_t my_value_;
   MeanProcessor mean_processor_;
   CountProcessor count_processor_;
 }; // class SumProcessor

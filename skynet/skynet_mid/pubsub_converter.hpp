@@ -224,6 +224,7 @@ namespace skynet
   {
     using tuple_type = std::tuple<Ts...>;
     using input_type = std::vector<std::tuple<Ts...>>;
+    using swapped_input_t = std::tuple<std::vector<Ts>...>;
     using before_final_t = std::tuple<PubSub_t<std::vector<Ts>>...>;
     using pubsub_type = PubSub_t<before_final_t>;
 
@@ -257,37 +258,110 @@ namespace skynet
       return PubSubConverter<before_final_t>::convert(bf_tup);
     }
 
-
+    // template<typename S, std::size_t ind>
+    // static S get_vector_element
+    // (before_final_t& tup, std::size_t i)
+    // {
+    //   return PubSubConverter<std::vector<S>>::deconvert(std::get<ind>(tup)).at(i);
+    //   // return PubSubConverter<S>::deconvert(std::get<ind>(tup).at(i));
+    // }
 
     template<typename S, std::size_t ind>
-    static S get_vector_element(pubsub_type& tup, std::size_t i)
+    static std::vector<S> deconvert_vec(before_final_t& tup)
     {
-      return PubSubConverter<S>::deconvert(std::get<ind>(tup).at(i));
+      return PubSubConverter<std::vector<S>>::deconvert(std::get<ind>(tup));
+      // return PubSubConverter<S>::deconvert(std::get<ind>(tup).at(i));
     }
-    
+
     template<std::size_t... I>
     static input_type deconvert_impl(pubsub_type tup,
                                      std::index_sequence<I...>)
     {
-      before_final_t bf_tup = PubSubConverter<before_final_t>::deconvert(tup);
-      
+      before_final_t bf_tup
+        = PubSubConverter<before_final_t>::deconvert(tup);
+      swapped_input_t swapped_to_ret
+        = std::make_tuple
+        (deconvert_vec<std::tuple_element_t<I, tuple_type>, I>(bf_tup)...);
       input_type to_ret;
       for (size_t i = 0; i < std::get<0>(tup).size(); i++)
       {
         to_ret.push_back
-          (std::make_tuple
-           (get_vector_element<std::tuple_element_t<I, tuple_type>, I>(bf_tup, i)...));
+          (std::make_tuple(std::get<I>(swapped_to_ret).at(i)...));
       }
+      // input_type to_ret;
+      // for (size_t i = 0; i < std::get<0>(tup).size(); i++)
+      // {
+      //   to_ret.push_back
+      //     (std::make_tuple
+      //      (get_vector_element<std::tuple_element_t<I, tuple_type>, I>(bf_tup, i)...));
+      // }
       return to_ret;
     }
 
     
   }; // struct PubSubConverter<std::vector<std::tuple<Ts...>>>
 
+
+  /** @brief PubSubConverter specialization for nested vectors.
+   *
+   *  We unroll the vector into a single flat vector, with a vector of
+   *  size_t's telling us how many elements are in each sub-vector.
+   */
+  template<typename T>
+  struct PubSubConverter<std::vector<std::vector<T>>>
+  {
+    using input_type = std::vector<std::vector<T>>;
+    using vecPsT_t = std::vector<PubSub_t<T>>;
+    using psVecPsT_t = PubSub_t<vecPsT_t>;
+    using before_final_t = std::tuple<std::vector<std::size_t>, psVecPsT_t>;
+    using pubsub_type = PubSub_t<before_final_t>;
+
+    static pubsub_type convert(input_type input)
+    {
+      std::vector<std::size_t> vec_sizes;
+      vecPsT_t flat_vec;
+      for (const auto& outerVec : input)
+      {
+        vec_sizes.push_back(outerVec.size());
+        for (const T& elem : outerVec)
+          flat_vec.push_back(PubSubConverter<T>::convert(elem));
+      }
+      psVecPsT_t converted_flattened_vec
+        = PubSubConverter<vecPsT_t>::convert(flat_vec);
+      before_final_t bf(vec_sizes, converted_flattened_vec);
+      return PubSubConverter<before_final_t>::convert(bf);
+    }
+
+    static input_type deconvert(pubsub_type input)
+    {
+      before_final_t bf = PubSubConverter<before_final_t>::deconvert(input);
+      std::vector<std::size_t> vec_sizes = std::get<0>(bf);
+      vecPsT_t flat_vec = PubSubConverter<vecPsT_t>::deconvert(std::get<1>(bf));
+      std::vector<std::vector<T>> to_ret;
+      auto flat_iter = flat_vec.cbegin();
+      for (const auto& i : vec_sizes)
+      {
+        std::vector<T> subvec;
+        for (std::size_t j = 0; j < i; j++)
+        {
+          subvec.push_back(PubSubConverter<T>::deconvert(*flat_iter));
+          ++flat_iter;
+        }
+        to_ret.push_back(subvec);
+      }
+      return to_ret;
+    }
+  }; // struct PubSubConverter<std::vector<std::vector<T>>
+
+  /** @brief PubSubConverter specialization for vectors of types that
+   * are not native to Skynet and that are not tuples.
+   */
   template<typename T>
   struct PubSubConverter<
     std::vector<T>,
-    std::enable_if_t<!IsNativeToSkynet_v<std::vector<T>> && !IsTuple_v<T>>>
+    std::enable_if_t<!IsNativeToSkynet_v<std::vector<T>>
+                     && !IsTuple_v<T>
+                     && !IsSpecialization_v<T, std::vector>>>
   {
     using input_type = std::vector<T>;
     using before_final_t = std::vector<PubSub_t<T>>;
@@ -313,68 +387,72 @@ namespace skynet
 
 
   
-  struct Colin { int c; };
+  // struct Colin { int c; };
     
-  template<>
-  struct PubSubConverter<Colin>
-  {
-    using pubsub_type = int;
-    static pubsub_type convert(Colin c) { return c.c; }
-    static Colin deconvert(pubsub_type in) { return Colin{in}; }
-  };
+  // template<>
+  // struct PubSubConverter<Colin>
+  // {
+  //   using pubsub_type = int;
+  //   static pubsub_type convert(Colin c) { return c.c; }
+  //   static Colin deconvert(pubsub_type in) { return Colin{in}; }
+  // };
 
-  struct SirWalter { std::int64_t a; double b; };
+  // struct SirWalter { std::int64_t a; double b; };
 
-  template<>
-  struct PubSubConverter<SirWalter>
-  {
-    using pubsub_type = std::tuple<std::int64_t, double>;
-    static pubsub_type convert(SirWalter sw) { return std::make_tuple(sw.a, sw.b); }
-    static SirWalter deconvert(pubsub_type in)
-    { return SirWalter{std::get<0>(in), std::get<1>(in)}; }
-  };
+  // template<>
+  // struct PubSubConverter<SirWalter>
+  // {
+  //   using pubsub_type = std::tuple<std::int64_t, double>;
+  //   static pubsub_type convert(SirWalter sw) { return std::make_tuple(sw.a, sw.b); }
+  //   static SirWalter deconvert(pubsub_type in)
+  //   { return SirWalter{std::get<0>(in), std::get<1>(in)}; }
+  // };
 
-  void test()
-  {
-    double d = 2.0;
-    unsigned u = 3;
+  // void test()
+  // {
+  //   double d = 2.0;
+  //   unsigned u = 3;
 
-    char colin_arr[] = "colin";
-    std::string colin_s = PubSubConverter<char*>::convert(colin_arr);
-    (void)colin_s;
+  //   char colin_arr[] = "colin";
+  //   std::string colin_s = PubSubConverter<char*>::convert(colin_arr);
+  //   (void)colin_s;
 
-    using MyTup = std::tuple<double, unsigned, int, std::tuple<double, char*>>;
-    MyTup tup(d, u, 3, {1.2, colin_arr});
-    //    d = tup;
-    PubSub_t<MyTup> ps_tup = PubSubConverter<MyTup>::convert(tup);
-    //    d = ps_tup;
-    (void)ps_tup;
+  //   using MyTup = std::tuple<double, unsigned, int, std::tuple<double, char*>>;
+  //   MyTup tup(d, u, 3, {1.2, colin_arr});
+  //   //    d = tup;
+  //   PubSub_t<MyTup> ps_tup = PubSubConverter<MyTup>::convert(tup);
+  //   //    d = ps_tup;
+  //   (void)ps_tup;
 
-    MyTup t3 = PubSubConverter<MyTup>::deconvert(ps_tup);
-    (void)t3;
+  //   MyTup t3 = PubSubConverter<MyTup>::deconvert(ps_tup);
+  //   (void)t3;
 
-    using vec_tup_t = std::vector<std::tuple<int, bool>>;
-    vec_tup_t vt = {{1, true}, {2, false}};
-    PubSub_t<vec_tup_t> ps_vt = PubSubConverter<vec_tup_t>::convert(vt);
-    vec_tup_t vt2 = PubSubConverter<vec_tup_t>::deconvert(ps_vt);
+  //   using vec_tup_t = std::vector<std::tuple<int, bool>>;
+  //   vec_tup_t vt = {{1, true}, {2, false}};
+  //   PubSub_t<vec_tup_t> ps_vt = PubSubConverter<vec_tup_t>::convert(vt);
+  //   vec_tup_t vt2 = PubSubConverter<vec_tup_t>::deconvert(ps_vt);
     
-    using ps_Colin = PubSub_t<Colin>;
-    Colin cc{3};
-    ps_Colin pscc = PubSubConverter<Colin>::convert(cc);
-    Colin cc2 = PubSubConverter<Colin>::deconvert(pscc);
-    (void)cc2;
+  //   using ps_Colin = PubSub_t<Colin>;
+  //   Colin cc{3};
+  //   ps_Colin pscc = PubSubConverter<Colin>::convert(cc);
+  //   Colin cc2 = PubSubConverter<Colin>::deconvert(pscc);
+  //   (void)cc2;
 
-    using vec_bool_Colin = std::vector<std::tuple<bool, Colin>>;
-    using ps_vec_Colin = PubSub_t<vec_bool_Colin>;
-    vec_bool_Colin vtbC{{true, Colin{1}}, {false, Colin{0}}};
-    ps_vec_Colin p = PubSubConverter<vec_bool_Colin>::convert(vtbC);
-    vec_bool_Colin vtvC2 = PubSubConverter<vec_bool_Colin>::deconvert(p);
+  //   using vec_bool_Colin = std::vector<std::tuple<bool, Colin>>;
+  //   using ps_vec_Colin = PubSub_t<vec_bool_Colin>;
+  //   vec_bool_Colin vtbC{{true, Colin{1}}, {false, Colin{0}}};
+  //   ps_vec_Colin p = PubSubConverter<vec_bool_Colin>::convert(vtbC);
+  //   vec_bool_Colin vtvC2 = PubSubConverter<vec_bool_Colin>::deconvert(p);
 
-    // using ValueType = std::tuple<std::unordered_map<int, SirWalter>,
-    //                              std::unordered_map<int, SirWalter>>;
-    // using ps_ValueType = PubSub_t<ValueType>;
-    
-  }
+  //   using myVec_t = std::vector<int>;
+  //   using nestedVec_t = std::vector<myVec_t>;
+  //   myVec_t mv1{1, 2};
+  //   myVec_t mv2{3, 4};
+  //   nestedVec_t nestedv{mv1, mv2};
+  //   using psNestedV_t = std::tuple<std::vector<size_t>, std::vector<int>>;
+  //   psNestedV_t ps = PubSubConverter<nestedVec_t>::convert(nestedv);
+  //   nestedVec_t retNestedv = PubSubConverter<nestedVec_t>::deconvert(ps);
+  // }
 }
 
 #endif // SKYNET_PUBSUB_CONVERTER_HPP

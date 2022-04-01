@@ -11,6 +11,7 @@ subdir('async_jacobi')
 subdir('mean_or_sum')
 subdir('collective_count')
 subdir('bigfloat')
+subdir('power_method')
 
 if use_helics
   subdir('helics_hello_world')

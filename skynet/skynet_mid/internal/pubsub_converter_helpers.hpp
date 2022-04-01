@@ -8,6 +8,19 @@ namespace skynet
   // template metaprogramming structs
 
   /*********************************************************************
+   * @brief Checks if a type is a specialization
+   *********************************************************************/  
+
+  template<typename Test, template<typename...> typename Ref>
+  struct IsSpecialization : std::false_type {};
+
+  template<template<typename...> typename Ref, typename... Args>
+  struct IsSpecialization<Ref<Args...>, Ref> : std::true_type {};
+
+  template<typename Test, template<typename...> typename Ref>
+  inline constexpr bool IsSpecialization_v = IsSpecialization<Test, Ref>::value;
+
+  /*********************************************************************
    * @brief Checks if a type is a tuple
    *********************************************************************/  
 

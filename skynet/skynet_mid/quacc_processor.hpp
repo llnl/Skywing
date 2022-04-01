@@ -12,6 +12,8 @@
 
 namespace skynet
 {
+  using std::exp;
+  using std::log;
 
 /** @brief QUasi-Arithmetic Collective Counter
  *
@@ -53,7 +55,7 @@ namespace skynet
  */
 template<typename real_t = BigFloat,
          typename MinProc = MinProcessor<real_t>,
-         typename MeanProc = PushSumProcessor<real_t>>
+         typename MeanProc = PushFlowProcessor<real_t>>
 class QUACCProcessor
 {
 public:
@@ -69,9 +71,7 @@ public:
     : my_val_(get_exponential_dist_value()),
       min_processor_(my_val_),
       mean_processor_(exp(-my_val_), std::forward<Args>(args)...)
-  {
-    std::cout << "Have my_val_=" << my_val_ << " and exp=" << exp(-my_val_) << std::endl;
-  }
+  { }
   
   ValueType get_init_publish_values()
   {
@@ -102,15 +102,17 @@ public:
   }
   size_t get_count() const
   {
-    return static_cast<size_t>(round(static_cast<double>(get_raw_count())));
+    size_t count = static_cast<size_t>(round(static_cast<double>(get_raw_count())));
+    return count == 0 ? 1 : count;
   }
 
   real_t get_min() const {return min_processor_.get_value();}
   real_t get_mean() const
   {
-    real_t x_val = mean_processor_.get_x();
-    real_t y_val = mean_processor_.get_y();
-    return x_val / y_val;
+    return mean_processor_.get_value();
+    // real_t x_val = mean_processor_.get_x();
+    // real_t y_val = mean_processor_.get_y();
+    // return x_val / y_val;
   }
 
 private:

@@ -67,7 +67,7 @@ public:
     for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
       if (*pTag == iter_method.my_tag()) continue;
-      
+
       const ValueType& nbr_data = nbr_data_handler.get_data_unsafe(*pTag);
       f_ij_num_[pTag->id()]
         = -get_if_present_or_default<0>(nbr_data, my_id);
@@ -79,7 +79,6 @@ public:
 
     curr_num_ = my_weight_ * my_val_;
     for (const auto& nbr_val : f_ij_num_) curr_num_ -= nbr_val.second;
-    
     curr_denom_ = my_weight_;
     for (const auto& nbr_val : f_ij_denom_) curr_denom_ -= nbr_val.second;
   }
@@ -93,13 +92,14 @@ public:
   data_t get_value() const { return curr_num_ / curr_denom_; }
   size_t get_information_count() const { return information_count_; }
 
-  void set_my_value(data_t new_val) { my_val_ = new_val; }
-  void set_my_weight(data_t new_weight) { my_weight_ = new_weight; }
+  void set_value(data_t new_val) { my_val_ = new_val; }
+  void set_weight(data_t new_weight) { my_weight_ = new_weight; }
 
 private:
   template<int index>
-  data_t get_if_present_or_default(const ValueType& nbr_data,
-                                   const std::string& my_id)
+  std::conditional_t<index==0, data_t, weight_t>
+  get_if_present_or_default(const ValueType& nbr_data,
+                            const std::string& my_id)
   {
     if (std::get<index>(nbr_data).count(my_id))
       return std::get<index>(nbr_data).at(my_id);
@@ -113,9 +113,9 @@ private:
     {
       // update all neighbors
       for (auto& iter : f_ij_num_)
-        iter.second += curr_num_ / (1 + f_ij_num_.size());
+        iter.second = iter.second + (curr_num_ / (1 + f_ij_num_.size()));
       for (auto& iter : f_ij_denom_)
-        iter.second += curr_denom_ / (1 + f_ij_denom_.size());
+        iter.second = iter.second + (curr_denom_ / (1 + f_ij_denom_.size()));
     }
     else
     {
@@ -125,8 +125,8 @@ private:
       std::uniform_int_distribution<>
         dis(0, std::distance(iter, f_ij_num_.end()) - 1);
       std::advance(iter, dis(gen));
-      f_ij_num_[iter->first] += curr_num_ / 2;
-      f_ij_denom_[iter->first] += curr_denom_ / 2;
+      f_ij_num_[iter->first] = f_ij_num_[iter->first] + (curr_num_ / 2);
+      f_ij_denom_[iter->first] = f_ij_denom_[iter->first] + (curr_denom_ / 2);
     }
   }
   

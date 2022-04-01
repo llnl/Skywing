@@ -2,17 +2,20 @@
 #define ASSOCIATIVE_VECTOR_HPP
 
 #include "skynet_mid/pubsub_converter.hpp"
+#include <iostream>
 
 namespace skynet
 {
 
-template<typename index_t = size_t, typename val_t = double, bool isOpen=true>
+template<typename index_t = size_t,
+         typename val_t = double,
+         bool isOpen=true>
 class AssociativeVector
 {
 public:
   AssociativeVector(val_t default_value = 0)
     : default_value_(default_value)
-  {}
+  { }
   
   template<template<typename> typename Container, typename T>
   AssociativeVector(Container<T>&& keys, val_t default_value = 0)
@@ -25,7 +28,11 @@ public:
   AssociativeVector(std::unordered_map<index_t, val_t> data,
                     val_t default_value = 0)
     : default_value_(default_value), data_(std::move(data))
-  {}
+  { }
+
+  AssociativeVector(AssociativeVector<index_t, val_t, !isOpen> other)
+    : default_value_(other.default_value_), data_(other.data_)
+  { }
 
   val_t& operator[](const index_t& ind)
   {
@@ -46,7 +53,9 @@ public:
   { return data_.at(ind); }
 
   bool contains(const index_t& ind) const
-  { return data_.count(ind) == 1; }
+  {
+    return data_.count(ind) == 1;
+  }
 
   std::vector<index_t> get_keys() const
   {
@@ -72,10 +81,10 @@ public:
     {
       const index_t& ind = iter.first;
       if constexpr (isOpen)
-        { // add key k to data_ if it isn't there already
-          if (!contains(ind)) data_[ind] = default_value_;
-          data_[ind] += b.at(ind);
-        }
+      { // add key k to data_ if it isn't there already
+        if (!contains(ind)) data_[ind] = default_value_;
+        data_[ind] += b.at(ind);
+      }
       else
       {
         // is !isOpen, only add on this index if it's already in data_
@@ -91,10 +100,10 @@ public:
     {
       const index_t& ind = iter.first;
       if constexpr (isOpen)
-        { // add key k to data_ if it isn't there already
-          if (!contains(ind)) data_[ind] = default_value_;
-          data_[ind] -= b.at(ind);
-        }
+      { // add key k to data_ if it isn't there already
+        if (!contains(ind)) data_[ind] = default_value_;
+        data_[ind] -= b.at(ind);
+      }
       else
       {
         // is !isOpen, only subtract on this index if it's already in data_
@@ -112,6 +121,14 @@ public:
     return *this;
   }
 
+  template<typename float_t>
+  AssociativeVector& operator/=(float_t f)
+  {
+    for (auto&& iter : data_)
+      iter.second /= f;
+    return *this;
+  }
+
   val_t get_default_value() const { return default_value_; }
   size_t size() const { return data_.size(); }
   
@@ -124,6 +141,7 @@ private:
   template<typename I, typename V, bool O>
   friend std::ostream& operator<< (std::ostream &out,
                                    const AssociativeVector<I, V, O>& a);
+  friend class AssociativeVector<index_t, val_t, !isOpen>;
   friend class PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>;
 }; // class AssociativeVector
 
@@ -132,8 +150,9 @@ AssociativeVector<index_t, val_t, isOpen>
 operator+(const AssociativeVector<index_t, val_t, isOpen>& a,
           const AssociativeVector<index_t, val_t, isOpen>& b)
 {
-  AssociativeVector<index_t, val_t, isOpen> c = a;
-  return c += b;
+  AssociativeVector<index_t, val_t, true> c(a);
+  c += b;
+  return AssociativeVector<index_t, val_t, isOpen>(c);
 }
 
 template<typename index_t, typename val_t, bool isOpen>
@@ -141,8 +160,9 @@ AssociativeVector<index_t, val_t, isOpen>
 operator-(const AssociativeVector<index_t, val_t, isOpen>& a,
           const AssociativeVector<index_t, val_t, isOpen>& b)
 {
-  AssociativeVector<index_t, val_t, isOpen> c = a;
-  return c -= b;
+  AssociativeVector<index_t, val_t, true> c(a);
+  c -= b;
+  return AssociativeVector<index_t, val_t, isOpen>(c);
 }
 
 template<typename index_t, typename val_t, bool isOpen>
@@ -164,12 +184,21 @@ operator*(float_t f,
   return c *= f;
 }
 
+template<typename index_t, typename val_t, bool isOpen, typename float_t>
+AssociativeVector<index_t, val_t, isOpen>
+operator/(const AssociativeVector<index_t, val_t, isOpen>& b,
+          float_t f)
+{
+  AssociativeVector<index_t, val_t, isOpen> c = b;
+  return c /= f;
+}
+
 template<typename index_t, typename val_t, bool isOpen>
 std::ostream& operator<< (std::ostream &out,
                           const AssociativeVector<index_t, val_t, isOpen>& a)
 {
   out << "[ ";
-  for (const auto&& iter : a.data_)
+  for (const auto& iter : a.data_)
   {
     out << "(";
     out << iter.first;
