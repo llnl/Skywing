@@ -105,15 +105,17 @@ void machine_task(int machine_number, int size_of_system,
   //     else return MyAssocVec({{0, 0}, {1, 0}, {2, 1}, {3, 0.1}});
   //   }();
 
-  // make gossip connections in a line
+  // make gossip connections in a circle
+  size_t sos = static_cast<size_t>(size_of_system);
   std::vector<std::string> tagIDs_for_sub = [&]()
     {
-      if (i == 0) return std::vector<std::string>({tagIDs[i], tagIDs[i+1]});
-      else if (i == static_cast<size_t>(size_of_system-1))
-        return std::vector<std::string>({tagIDs[i-1], tagIDs[i]});
+      if (i == 0)
+        return std::vector<std::string>({tagIDs[i], tagIDs[i+1], tagIDs[sos-1]});
+      else if (i == sos-1)
+        return std::vector<std::string>({tagIDs[0], tagIDs[i-1], tagIDs[i]});
       else return std::vector<std::string>({tagIDs[i-1], tagIDs[i], tagIDs[i+1]});
     }();
-  
+  // tagIDs_for_sub.push_back(tagIDs[(i + (sos/2)) % sos]);
 
   // using SumMethod
   //   = SumProcessor<MyAssocVec, PushFlowProcessor<MyAssocVec>>;
@@ -124,7 +126,7 @@ void machine_task(int machine_number, int size_of_system,
     WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
     .set_processor(matrix_column, i)
     .set_publish_policy()
-    .set_stop_policy(std::chrono::seconds(25))
+    .set_stop_policy(std::chrono::seconds(180))
     .set_resilience_policy()
     .build_waiter();
   

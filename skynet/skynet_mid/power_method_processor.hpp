@@ -72,7 +72,7 @@ public:
     // update estimate of normalized eigenvector element
     scalar_t my_Ax = Ax.at(my_index_);
     if (abs(eigenvalue_estimate_) > 1e-2)
-      my_eigvec_element_ = 0.95 * my_eigvec_element_ + 0.05 * (my_Ax / eigenvalue_estimate_);
+      my_eigvec_element_ = 0.75 * my_eigvec_element_ + 0.25 * (my_Ax / eigenvalue_estimate_);
       // my_eigvec_element_ = my_Ax / eigenvalue_estimate_;
 
     // update contribution to norm of matvec output

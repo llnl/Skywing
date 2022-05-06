@@ -41,14 +41,14 @@ void machine_task(const NetworkInfo* const info, const int index)
     using IterMethod = AsynchronousIterative
       <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
-      .set_processor() //num_machines-1)
+      .set_processor(num_machines-1)
       .set_publish_policy()
       .set_stop_policy(std::chrono::seconds(3))
       .set_resilience_policy()
       .build_waiter().get();
     std::cout << "Machine " << index << " finished building itermethod." << std::endl;
-    // iter_method.run();
-    // REQUIRE(iter_method.get_processor().get_value() == (num_machines-1));
+    iter_method.run();
+    REQUIRE(iter_method.get_processor().get_count() == num_machines);
     });
   base_master.run();
 }

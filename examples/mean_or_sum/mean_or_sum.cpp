@@ -97,17 +97,17 @@ void machine_task(int machine_number, int size_of_system,
   {tagIDs[wrap_ind(i-1)], tagIDs[i], tagIDs[wrap_ind(i+1)]};
 
 
-  (void)number_of_neighbors;
-  using MeanMethod = PushFlowProcessor<BigFloat, BigFloat>;
-  using IterMethod = AsynchronousIterative
-    <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
-  Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
-    .set_processor(starting_value)
-    .set_publish_policy()
-    .set_stop_policy(std::chrono::seconds(10))
-    .set_resilience_policy()
-    .build_waiter();
+  // (void)number_of_neighbors;
+  // using MeanMethod = PushFlowProcessor<BigFloat, BigFloat>;
+  // using IterMethod = AsynchronousIterative
+  //   <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+  // Waiter<IterMethod> iter_waiter =
+  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+  //   .set_processor(starting_value)
+  //   .set_publish_policy()
+  //   .set_stop_policy(std::chrono::seconds(10))
+  //   .set_resilience_policy()
+  //   .build_waiter();
 
   // using MeanMethod = PushSumProcessor<double>;
   // using IterMethod = AsynchronousIterative
@@ -120,20 +120,20 @@ void machine_task(int machine_number, int size_of_system,
   //   .set_resilience_policy()
   //   .build_waiter();
 
-  // (void)number_of_neighbors;
-  // using CountProcessor = QUACCProcessor<BigFloat, MinProcessor<BigFloat>,
-  //                                       PushFlowProcessor<BigFloat>>;
-  // using SumMethod = SumProcessor<double, PushFlowProcessor<double>,
-  //                                CountProcessor>;
-  // using IterMethod = AsynchronousIterative
-  //   <SumMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
-  // Waiter<IterMethod> iter_waiter =
-  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
-  //   .set_processor(starting_value)
-  //   .set_publish_policy()
-  //   .set_stop_policy(std::chrono::seconds(5))
-  //   .set_resilience_policy()
-  //   .build_waiter();
+  (void)number_of_neighbors;
+  using CountProcessor = QUACCProcessor<BigFloat, MinProcessor<BigFloat>,
+                                        PushFlowProcessor<BigFloat>>;
+  using SumMethod = SumProcessor<double, PushFlowProcessor<double>,
+                                 CountProcessor>;
+  using IterMethod = AsynchronousIterative
+    <SumMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+    .set_processor(starting_value)
+    .set_publish_policy()
+    .set_stop_policy(std::chrono::seconds(50))
+    .set_resilience_policy()
+    .build_waiter();
 
   IterMethod mean_or_sum = iter_waiter.get();
 

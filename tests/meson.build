@@ -25,8 +25,8 @@ core_tests = {
     'asynchronous_iterative',
     'max_test',
     'associative_vector',
-    'pubsub'
-#    'count_test'
+    'pubsub',
+    'count_test'
   ]
 }
 
