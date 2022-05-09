@@ -3,11 +3,27 @@
 
 #include <tuple>
 #include <type_traits>
+#include "skynet_core/internal/tag_buffer.hpp"
 
 namespace skynet
 {
   template<typename TagType, typename T>
   using tag_map = std::unordered_map<TagType, T, skynet::internal::hash<TagType>>;
+
+  /*************************************************************************
+   * @brief struct that checks if a type is one of the ones that
+   * Skynet sends natively. The list of native types is the
+   * PublishValueTypeList in skynet_core/types.hpp
+   **************************************************************************/
+
+  template<typename T>
+  struct IsNativeToSkynet
+  {
+    static constexpr bool value = internal::index_of<T, PublishValueTypeList> != internal::size<PublishValueTypeList>;
+  };
+
+  template<typename T>
+  inline constexpr bool IsNativeToSkynet_v = IsNativeToSkynet<T>::value;  
   
   /*************************************************************************
    * @brief struct that wraps a type in a tuple if it isn't already a tuple.
@@ -42,8 +58,8 @@ namespace skynet
   template<typename T>
   struct IfHasValueType<T, std::void_t<typename T::ValueType>>
   {
-    using tuple_of_value_type = typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
-    using tuple_of_type = typename TupleIfNotAlready<T>::tuple_type;
+    using tuple_of_value_type = std::tuple<typename T::ValueType>; //typename TupleIfNotAlready<typename T::ValueType>::tuple_type;
+    using tuple_of_type = std::tuple<T>; //typename TupleIfNotAlready<T>::tuple_type;
   };
 
   /** @brief Get std::tuple<T1::ValueType, T2::ValueType, ...> if all ValueTypes are tuples.

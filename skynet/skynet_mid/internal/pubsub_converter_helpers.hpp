@@ -8,6 +8,32 @@ namespace skynet
   // template metaprogramming structs
 
   /*********************************************************************
+   * @brief Checks if a type is a specialization
+   *********************************************************************/  
+
+  template<typename Test, template<typename...> typename Ref>
+  struct IsSpecialization : std::false_type {};
+
+  template<template<typename...> typename Ref, typename... Args>
+  struct IsSpecialization<Ref<Args...>, Ref> : std::true_type {};
+
+  template<typename Test, template<typename...> typename Ref>
+  inline constexpr bool IsSpecialization_v = IsSpecialization<Test, Ref>::value;
+
+  /*********************************************************************
+   * @brief Checks if a type is a tuple
+   *********************************************************************/  
+
+  template<typename T>
+  struct IsTuple : std::false_type { };
+
+  template<typename... Ts>
+  struct IsTuple<std::tuple<Ts...>> : std::true_type { };
+
+  template<typename T>
+  inline constexpr bool IsTuple_v = IsTuple<T>::value;
+  
+  /*********************************************************************
    * @brief Checks if a type is a native Skynet pubsub type.
    *********************************************************************/  
   template<typename T>

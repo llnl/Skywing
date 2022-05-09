@@ -4,7 +4,8 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 
-using namespace skynet;
+namespace skynet
+{
 
 /** 
  * @brief A Processor used in an IterativeMethod for solving square linear systems of equations Ax=b.
@@ -198,5 +199,6 @@ private:
   std::vector<element_t> publish_values_;
 }; // class JacobiProcessor
 
+}
 
 #endif 

@@ -35,7 +35,7 @@ error_happened = False
 err_log = []
 # For more randomness, and to try and allow consecutive runs to work, distribute the ports from
 # 1500-65000 in groups of 10
-ports = [*range(1500, 65000, 10)]
+ports = [*range(15005, 65000, 10)]
 random.shuffle(ports)
 port_index = 0
 

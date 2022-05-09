@@ -27,7 +27,7 @@ do
   echo "Trial: " $counter_for_trials
   for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
   do
-    "@push_sum_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} &
+    "@collective_count_exe@" ${counter_for_network_elements} ${STARTING_PORT} ${size_of_network} &
     declare "erase${counter_for_network_elements}=$!"
   done
   sleep 10

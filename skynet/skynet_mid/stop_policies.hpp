@@ -5,6 +5,9 @@
 #include "skynet_core/master.hpp"
 #include <chrono>
 
+namespace skynet
+{
+  
 /* This file contains a number of common iterative methods StopPolicy
    (stopping criteria) options.
  */
@@ -77,5 +80,7 @@ private:
 
 //   LocalStopPolicy local_stop_policy_;
 // } // class SynchronousConsensusStop
+
+} // namespace skynet
 
 #endif

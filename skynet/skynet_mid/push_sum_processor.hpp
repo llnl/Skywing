@@ -4,7 +4,8 @@
 #include "skynet_core/job.hpp"
 #include "skynet_core/master.hpp"
 
-using namespace skynet;
+namespace skynet
+{
 
 /**
  * Push Sum is an asynchronous distributed averaging algorithm that
@@ -25,38 +26,25 @@ class PushSumProcessor
 {
 public:
   using scalar_t = S;
-  using ValueType = std::vector<scalar_t>;
+  using ValueType = std::tuple<S, S, unsigned>;
   using ValueTag = skynet::PublishTag<ValueType>;
 
   /**
    * @param number_of_neighbors Number of neighboring agents.
    * @param starting_values This agent's contribution to the average.
-   * @param tags The <em>assumed already subscribed</em> tags of neighbors.
    */
-  template<typename Range>
-  PushSumProcessor(size_t number_of_neighbors,
-                   scalar_t starting_value,
-                   Range& tag_ids)
-    : number_of_neighbors_(number_of_neighbors),
-      x_value_(starting_value)
+  PushSumProcessor(scalar_t starting_value,
+                   size_t number_of_neighbors)
+    : x_value_(starting_value)
   {
-    // TODO do we need these tags in the constructor? Maybe we can
-    // just initialize on-the-go during processing.
-    for (const auto& id : tag_ids)
-    {
-      rho_x_[id] = 0.0;
-      rho_y_[id] = 0.0;
-      rho_x_previous_[id] = 0.0;
-      rho_y_previous_[id] = 0.0;
-    }
-    in_nodes_plus_one_ = number_of_neighbors_ + 1.0;
+    in_nodes_plus_one_ = number_of_neighbors + 1.0;
     // Local weights -> This is the information passed to neighbors.
     sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
     sigma_y_ = sigma_y_ + (y_value_ / in_nodes_plus_one_);
   }
 
   ValueType get_init_publish_values()
-  { return {sigma_x_, sigma_y_, new_information_count_}; }
+  { return {sigma_x_, sigma_y_, information_count_}; }
 
   /** @brief Perform the push-sum update computation.
    *
@@ -69,16 +57,20 @@ public:
   {
     for (const auto& pTag : nbr_data_handler.get_updated_tags())
     {
-      if (*pTag == iter_method.my_tag())
-        continue;
+      if (*pTag == iter_method.my_tag()) continue;
 
       std::string nbr_tag_id = pTag->id();
       ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
 
+      if (rho_x_.count(nbr_tag_id) == 0)
+      {
+        rho_x_[nbr_tag_id] = 0.0;
+        rho_y_[nbr_tag_id] = 0.0;
+      } 
       rho_x_previous_[nbr_tag_id] = rho_x_[nbr_tag_id];
       rho_y_previous_[nbr_tag_id] = rho_y_[nbr_tag_id];
-      rho_x_[nbr_tag_id] = nbr_value[0];
-      rho_y_[nbr_tag_id] = nbr_value[1];
+      rho_x_[nbr_tag_id] = std::get<0>(nbr_value);
+      rho_y_[nbr_tag_id] = std::get<1>(nbr_value);
 
       x_value_ = x_value_ + rho_x_[nbr_tag_id] - rho_x_previous_[nbr_tag_id];
       y_value_ = y_value_ + rho_y_[nbr_tag_id] - rho_y_previous_[nbr_tag_id];
@@ -90,46 +82,39 @@ public:
       x_value_ = x_value_ / in_nodes_plus_one_;
       y_value_ = y_value_ / in_nodes_plus_one_;
       
-      // Checks the max neighbor iterations for terminal checks.
-      // TODO: is this needed?
-      if (nbr_value[2] > max_neighbor_received_)
-      {
-        max_neighbor_received_ = nbr_value[2];
-      }
-      new_information_count_ +=1.0;
+      ++information_count_;
     }
   }
 
   /** @brief Prepare values to send to neighbors.
    */
-  ValueType prepare_for_publication(ValueType vals_to_publish)
+  ValueType prepare_for_publication(ValueType)
   {
-    vals_to_publish[0] = sigma_x_;
-    vals_to_publish[1] = sigma_y_;
-    vals_to_publish[2] = new_information_count_;
-    return vals_to_publish;
+    return {sigma_x_, sigma_y_, information_count_};
+    // vals_to_publish[0] = sigma_x_;
+    // vals_to_publish[1] = sigma_y_;
+    // vals_to_publish[2] = information_count_;
+    // return vals_to_publish;
   }
 
   /** @brief Returns the current estimate of the global average.
    */
-  scalar_t return_solution() const
+  scalar_t get_value() const
   {
     scalar_t consensus_value = x_value_/y_value_;
     return consensus_value;
   }
 
- double return_new_information_count() const
+  unsigned get_information_count() const
   {
-    return new_information_count_;
+    return information_count_;
   }
 
   scalar_t get_x() const {return x_value_;}
   scalar_t get_y() const {return y_value_;}
   
 private:
-  size_t number_of_neighbors_;
-  double new_information_count_ = 0.0;
-  double max_neighbor_received_ = 0.0;
+  unsigned information_count_ = 0;
   scalar_t x_value_;
   scalar_t y_value_ = 1.0;
   // this is the number of neighbors plus one needed for the update
@@ -146,5 +131,6 @@ private:
   data_id_map rho_y_previous_;
 };  // class PushSumProcessor
 
+} // namespace skynet
 
 #endif
