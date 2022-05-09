@@ -1,5 +1,5 @@
 #include "skynet_core/skynet.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include "skynet_mid/jacobi_processor.hpp"
 #include "skynet_mid/asynchronous_iterative.hpp"
 #include "skynet_mid/data_input.hpp"
@@ -72,14 +72,14 @@ void machine_task(
     std::string save_directory)
 {
 
-  skynet::Master master{ports[machine_number], machine_names[machine_number]};
+  skynet::Manager manager{ports[machine_number], machine_names[machine_number]};
 
-  master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle) {
+  manager.submit_job("job", [&](skynet::Job& job, ManagerHandle manager_handle) {
 
   if (machine_number != static_cast<int>((ports.size()) - 1) )
   {
     // Connecting to the server is an asynchronous operation and can fail.
-    while (!master_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
+    while (!manager_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
     {
       std::cout << "Machine " << machine_number << " trying to connect to " << ports[machine_number+1] << std::endl;
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -91,7 +91,7 @@ void machine_task(
   using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>,
                                            StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, tag_ids[machine_number], tag_ids)
+    WaiterBuilder<IterMethod>(manager_handle, job, tag_ids[machine_number], tag_ids)
     .set_processor(A_partition, b_partition, row_indices)
     .set_publish_policy(1e-6)
     .set_stop_policy(std::chrono::seconds(5))
@@ -147,7 +147,7 @@ void machine_task(
 
   std::this_thread::sleep_for(std::chrono::seconds(10));
   });
-  master.run();
+  manager.run();
 }
 
 

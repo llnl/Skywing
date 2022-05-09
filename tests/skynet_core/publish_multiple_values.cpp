@@ -34,9 +34,9 @@ const ReduceGroupTag<int, double> reduce_group_name{"reduce"};
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master base_master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  base_master.submit_job("job", [&](Job& job, MasterHandle master) {
-    connect_network(*info, master, index, [](MasterHandle& m, const int i) {
+  Manager base_manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
+    connect_network(*info, manager, index, [](ManagerHandle& m, const int i) {
       return m.connect_to_server("127.0.0.1", base_port + i).get();
     });
     if (index == 0) {
@@ -62,7 +62,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     REQUIRE(value);
     REQUIRE(*value == reduce_result);
   });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Publishing multiple values works", "[Skynet_MultiplePublish]")

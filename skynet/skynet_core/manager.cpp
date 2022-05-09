@@ -1,4 +1,4 @@
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "skynet_core/internal/utility/algorithms.hpp"
 #include "skynet_core/internal/utility/logging.hpp"
@@ -17,41 +17,41 @@ std::vector<std::uint8_t> make_need_one_pub(const std::vector<TagID>& tags) noex
 } // namespace
 
 namespace internal {
-ExternalMaster::ExternalMaster(
+ExternalManager::ExternalManager(
   SocketCommunicator conn,
   const MachineID& id,
   const std::vector<MachineID>& neighbors,
-  Master& master,
+  Manager& manager,
   const std::uint16_t port) noexcept
   : id_{id}
   , last_heard_{std::chrono::steady_clock::now()}
   , neighbors_{neighbors}
-  , master_{&master}
+  , manager_{&manager}
   , port_{port}
 {
   conns_.push_back(std::move(conn));
 }
 
-void ExternalMaster::get_and_handle_messages() noexcept
+void ExternalManager::get_and_handle_messages() noexcept
 {
-  //  std::cout << "Agent " << master_->id() << " handling neighbor messages from " << id() << " with dead status" << dead_ << std::endl;
+  //  std::cout << "Agent " << manager_->id() << " handling neighbor messages from " << id() << " with dead status" << dead_ << std::endl;
   if (dead_) { return; }
   for (auto& socket_comm : conns_)
   {
-    //    std::cout << "Agent " << master_->id() << " about to try to get a message from " << id() << std::endl;
+    //    std::cout << "Agent " << manager_->id() << " about to try to get a message from " << id() << std::endl;
     while (auto handler = try_to_get_message(socket_comm)) {
       // Update the last time something was heard
       last_heard_ = std::chrono::steady_clock::now();
       // Handle the message
-      //      std::cout << "Agent " << master_->id() << " got a message from " << id() << ", about to handle it. " << std::endl;
+      //      std::cout << "Agent " << manager_->id() << " got a message from " << id() << ", about to handle it. " << std::endl;
       handle_message(*handler);
-      //      std::cout << "Agent " << master_->id() << " finished handling message from " << id() << std::endl;
+      //      std::cout << "Agent " << manager_->id() << " finished handling message from " << id() << std::endl;
     }
   }
-  //  std::cout << "Agent " << master_->id() << " done handling messages from the live " << id() << std::endl;
+  //  std::cout << "Agent " << manager_->id() << " done handling messages from the live " << id() << std::endl;
 }
 
-void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
+void ExternalManager::send_message(const std::vector<std::byte>& c) noexcept
 {
   if (dead_) { return; }
   // TODO: Maybe don't just use the first socket communicator if there are multiple
@@ -59,45 +59,45 @@ void ExternalMaster::send_message(const std::vector<std::byte>& c) noexcept
   if (conns_[0].send_message(c.data(), c.size()) != ConnectionError::no_error) { dead_ = true; }
 }
 
-MachineID ExternalMaster::id() const noexcept { return id_; }
+MachineID ExternalManager::id() const noexcept { return id_; }
 
-bool ExternalMaster::is_dead() const noexcept { return dead_; }
+bool ExternalManager::is_dead() const noexcept { return dead_; }
 
-void ExternalMaster::mark_as_dead() noexcept { dead_ = true; }
+void ExternalManager::mark_as_dead() noexcept { dead_ = true; }
 
-void ExternalMaster::ignore_cache_on_next_request() noexcept { ignore_cache_on_next_request_ = true; }
+void ExternalManager::ignore_cache_on_next_request() noexcept { ignore_cache_on_next_request_ = true; }
 
-bool ExternalMaster::is_subscribed_to(const TagID& tag) const noexcept
+bool ExternalManager::is_subscribed_to(const TagID& tag) const noexcept
 {
   return remote_subscriptions_.find(tag) != remote_subscriptions_.cend();
 }
 
-bool ExternalMaster::should_ask_for_tags() const noexcept
+bool ExternalManager::should_ask_for_tags() const noexcept
 {
   return !pending_tag_request_ && std::chrono::steady_clock::now() > request_tags_time_;
 }
 
-bool ExternalMaster::has_pending_tag_request() const noexcept { return pending_tag_request_; }
+bool ExternalManager::has_pending_tag_request() const noexcept { return pending_tag_request_; }
 
-void ExternalMaster::reset_backoff_counter() noexcept
+void ExternalManager::reset_backoff_counter() noexcept
 {
   backoff_counter_ = 0;
   request_tags_time_ = calc_next_request_time();
 }
 
-void ExternalMaster::increase_backoff_counter() noexcept
+void ExternalManager::increase_backoff_counter() noexcept
 {
   ++backoff_counter_;
   request_tags_time_ = calc_next_request_time();
 }
 
-bool ExternalMaster::has_neighbor(const MachineID& id) const noexcept
+bool ExternalManager::has_neighbor(const MachineID& id) const noexcept
 {
   const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), id);
   return loc != neighbors_.cend() && *loc == id;
 }
 
-void ExternalMaster::send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept
+void ExternalManager::send_heartbeat_if_past_interval(std::chrono::milliseconds interval) noexcept
 {
   using namespace std::chrono;
   const auto time_expired = steady_clock::now() - last_heard_;
@@ -109,12 +109,12 @@ void ExternalMaster::send_heartbeat_if_past_interval(std::chrono::milliseconds i
   }
 }
 
-void ExternalMaster::find_publishers_for_tags(
+void ExternalManager::find_publishers_for_tags(
   const std::vector<TagID>& tags, const std::vector<std::uint8_t>& publishers_needed) noexcept
 {
   SKYNET_TRACE_LOG(
     "\"{}\" asking \"{}\" for tags {}{}",
-    master_->id(),
+    manager_->id(),
     id_,
     tags,
     pending_tag_request_ ? ", but ignored due to already pending request" : "");
@@ -125,14 +125,14 @@ void ExternalMaster::find_publishers_for_tags(
   }
 }
 
-std::string ExternalMaster::address() const noexcept
+std::string ExternalManager::address() const noexcept
 {
   const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
   (void)dummy;
   return ip_address + ':' + std::to_string(port_);
 }
 
-AddrPortPair ExternalMaster::address_pair() const noexcept
+AddrPortPair ExternalManager::address_pair() const noexcept
 {
   const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
   (void)dummy;
@@ -140,7 +140,7 @@ AddrPortPair ExternalMaster::address_pair() const noexcept
 }
 
 // // Read some bytes from the connection, returning false if the read failed
-// bool ExternalMaster::read_from_conn(std::byte* const buffer, const std::size_t count) noexcept
+// bool ExternalManager::read_from_conn(std::byte* const buffer, const std::size_t count) noexcept
 // {
 //   const auto err = conns_[0].read_message(buffer, count);
 //   switch (err) {
@@ -152,30 +152,30 @@ AddrPortPair ExternalMaster::address_pair() const noexcept
 //   case ConnectionError::closed:
 //     // [[fallthrough]];
 //   case ConnectionError::unrecoverable:
-//     SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error upon message read", master_->id(), id_);
+//     SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error upon message read", manager_->id(), id_);
 //     dead_ = true;
 //     return false;
 //   }
 //   return true;
 // }
 
-std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunicator& socket_comm) noexcept
+std::optional<MessageHandler> ExternalManager::try_to_get_message(SocketCommunicator& socket_comm) noexcept
 {
-  //std::cout << "Agent " << master_->id() << " trying to get messages from " << id() << std::endl;
+  //std::cout << "Agent " << manager_->id() << " trying to get messages from " << id() << std::endl;
   const auto bytes_to_read_or_error = read_network_size(socket_comm);
-  //std::cout << "Agent " << master_->id() << " got bytes to read from " << id() << std::endl;
+  //std::cout << "Agent " << manager_->id() << " got bytes to read from " << id() << std::endl;
   if (std::holds_alternative<NetworkSizeType>(bytes_to_read_or_error)) {
-    //std::cout << "Agent " << master_->id() << " about to read message size from " << id() << std::endl;
+    //std::cout << "Agent " << manager_->id() << " about to read message size from " << id() << std::endl;
     const auto bytes_to_read = *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
-    //std::cout << "Agent " << master_->id() << " successfully read message size from " << id() << std::endl;
+    //std::cout << "Agent " << manager_->id() << " successfully read message size from " << id() << std::endl;
     // Then read the actual message and parse it
     if (const auto message_buffer = read_chunked(socket_comm, bytes_to_read); !message_buffer.empty()) {
-      //std::cout << "Agent " << master_->id() << " read the actual message from " << id() << std::endl;
+      //std::cout << "Agent " << manager_->id() << " read the actual message from " << id() << std::endl;
       return MessageHandler::try_to_create(message_buffer);
     }
     else {
       // Couldn't read the size bytes - bad message
-      SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to bad message", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to bad message", manager_->id(), id_);
       dead_ = true;
       return {};
     }
@@ -184,34 +184,34 @@ std::optional<MessageHandler> ExternalMaster::try_to_get_message(SocketCommunica
     const auto err = *std::get_if<ConnectionError>(&bytes_to_read_or_error);
     if (err == ConnectionError::closed)
     {
-      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has closed", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has closed", manager_->id(), id_);
       dead_ = true;
     }
     else if (err != ConnectionError::would_block)
     {
-      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some unknwon error, perhaps received an RST packer", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" setting {} to dead because connection has some unknwon error, perhaps received an RST packer", manager_->id(), id_);
       dead_ = true;
     }
     // we get here if attempting to read_network_size returned
     // ConnectionError::would_block, which indicates there's the
     // connection is fine and there's just nothing currently on the
     // wire
-    //std::cout << "Agent " << master_->id() << " didn't receive anything from " << id() << std::endl;
+    //std::cout << "Agent " << manager_->id() << " didn't receive anything from " << id() << std::endl;
     return {};
   }
 }
 
 // Handle status messages
-void ExternalMaster::handle_message(MessageHandler& handle) noexcept
+void ExternalManager::handle_message(MessageHandler& handle) noexcept
 {
   const auto okay = handle.do_callback(
     [&](const Greeting&) {
       // shouldn't be seeing a greeting here
-      SKYNET_WARN_LOG("\"{}\" received an unexpected greeting from \"{}\"", master_->id(), id_);
+      SKYNET_WARN_LOG("\"{}\" received an unexpected greeting from \"{}\"", manager_->id(), id_);
       return false;
     },
     [&](const Goodbye&) {
-      SKYNET_TRACE_LOG("\"{}\" received goodbye from \"{}\"", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" received goodbye from \"{}\"", manager_->id(), id_);
       dead_ = true;
       return true;
     },
@@ -221,14 +221,14 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
       // NewNeighbor message with a repeated ID
       const auto loc = std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id());
       SKYNET_TRACE_LOG(
-        "\"{}\" received new neighbor from \"{}\" with id \"{}\"", master_->id(), id_, msg.neighbor_id());
+        "\"{}\" received new neighbor from \"{}\" with id \"{}\"", manager_->id(), id_, msg.neighbor_id());
       // Insert it if it isn't already present
       if (loc == neighbors_.cend() || *loc != msg.neighbor_id()) { neighbors_.insert(loc, msg.neighbor_id()); }
       return true;
     },
     [&](const RemoveNeighbor& msg) {
       SKYNET_TRACE_LOG(
-        "\"{}\" received remove neighbor from \"{}\" with id \"{}\"", master_->id(), id_, msg.neighbor_id());
+        "\"{}\" received remove neighbor from \"{}\" with id \"{}\"", manager_->id(), id_, msg.neighbor_id());
       const auto loc = std::lower_bound(neighbors_.begin(), neighbors_.end(), msg.neighbor_id());
       // Neighbors that don't exist will often be reported if it's a shared neighbor and
       // it has already been removed due to the goodbye message
@@ -246,13 +246,13 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
       (void)this;
       // Nothing to do; this is just to acknowledge it exists
       // (Last heard time was already updated)
-      SKYNET_TRACE_LOG("\"{}\" received heartbeat from \"{}\"", master_->id(), id_);
+      SKYNET_TRACE_LOG("\"{}\" received heartbeat from \"{}\"", manager_->id(), id_);
       return true;
     },
     [&](const ReportPublishers& msg) {
       SKYNET_TRACE_LOG(
         "\"{}\" received report publishers from \"{}\" with remote tags \"{}\" and local tags \"{}\"",
-        master_->id(),
+        manager_->id(),
         id_,
         msg.tags(),
         msg.locally_produced_tags());
@@ -262,69 +262,69 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
           if (!tag_name_okay(tag)) {
             SKYNET_WARN_LOG(
               "\"{}\" dropping connection with \"{}\" due to bad tag \"{}\" in report publishers.",
-              master_->id(),
+              manager_->id(),
               id_,
               tag);
             return false;
           }
         }
       }
-      Master::ExternalMasterAccessor::add_publishers_and_propagate(*master_, msg, *this);
+      Manager::ExternalManagerAccessor::add_publishers_and_propagate(*manager_, msg, *this);
       // Mark there as not being a request out there and update the time to send out
       pending_tag_request_ = false;
       request_tags_time_ = calc_next_request_time();
       return true;
     },
     [&](const GetPublishers& msg) {
-      SKYNET_TRACE_LOG("\"{}\" received get publishers from \"{}\" requesting tags {}", master_->id(), id_, msg.tags());
+      SKYNET_TRACE_LOG("\"{}\" received get publishers from \"{}\" requesting tags {}", manager_->id(), id_, msg.tags());
       for (const auto& tag : msg.tags()) {
         if (!tag_name_okay(tag)) {
           SKYNET_WARN_LOG(
-            "\"{}\" discarded connection with \"{}\" due to bad tag name \"{}\"", master_->id(), id_, tag);
+            "\"{}\" discarded connection with \"{}\" due to bad tag name \"{}\"", manager_->id(), id_, tag);
           return false;
         }
       }
-      Master::ExternalMasterAccessor::handle_get_publishers(*master_, msg, *this);
+      Manager::ExternalManagerAccessor::handle_get_publishers(*manager_, msg, *this);
       return true;
     },
     [&](const JoinReduceGroup& msg) {
       SKYNET_TRACE_LOG(
         "\"{}\" received join reduce group from \"{}\" for group \"{}\", producing tag \"{}\"",
-        master_->id(),
+        manager_->id(),
         id_,
         msg.reduce_tag(),
         msg.tag_produced());
       if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.tag_produced())) { return false; }
-      return Master::ExternalMasterAccessor::handle_join_reduce_group(*master_, msg, *this);
+      return Manager::ExternalManagerAccessor::handle_join_reduce_group(*manager_, msg, *this);
     },
     [&](const SubmitReduceValue& msg) {
       SKYNET_TRACE_LOG(
         "\"{}\" received submit reduce value from \"{}\" for group \"{}\", tag \"{}\", version {}",
-        master_->id(),
+        manager_->id(),
         id_,
         msg.reduce_tag(),
         msg.data().tag_id(),
         msg.data().version());
       if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id())) { return false; }
-      return Master::ExternalMasterAccessor::handle_submit_reduce_value(*master_, msg, *this);
+      return Manager::ExternalManagerAccessor::handle_submit_reduce_value(*manager_, msg, *this);
     },
     [&](const ReportReduceDisconnection& msg) {
       if (!tag_name_okay(msg.reduce_tag())) { return false; }
-      return Master::ExternalMasterAccessor::handle_report_reduce_disconnection(*master_, msg, *this);
+      return Manager::ExternalManagerAccessor::handle_report_reduce_disconnection(*manager_, msg, *this);
     },
     [&](const PublishData& msg) {
       if (!tag_name_okay(msg.tag_id())) { return false; }
-      return Master::ExternalMasterAccessor::handle_publish_data(*master_, msg, *this);
+      return Manager::ExternalManagerAccessor::handle_publish_data(*manager_, msg, *this);
     },
     [&](const SubscriptionNotice& msg) {
       SKYNET_TRACE_LOG(
         "\"{}\" received subscription notice from \"{}\" for tags {}, is unsubscribe: {}",
-        master_->id(),
+        manager_->id(),
         id_,
         msg.tags(),
         msg.is_unsubscribe());
       const auto reject_notice = [&]([[maybe_unused]] const std::string& why) {
-        SKYNET_TRACE_LOG("\"{}\" rejected subscription notice from \"{}\" as {}", master_->id(), id_, why);
+        SKYNET_TRACE_LOG("\"{}\" rejected subscription notice from \"{}\" as {}", manager_->id(), id_, why);
       };
       for (const auto& tag : msg.tags()) {
         if (!tag_name_okay(tag)) {
@@ -339,30 +339,30 @@ void ExternalMaster::handle_message(MessageHandler& handle) noexcept
           return false;
         }
       }
-      if (!Master::ExternalMasterAccessor::subscription_tags_are_produced(*master_, msg)) {
+      if (!Manager::ExternalManagerAccessor::subscription_tags_are_produced(*manager_, msg)) {
         // TODO: Send a cancellation notice instead for the tags that aren't there
         // when this happens
         reject_notice(fmt::format("machine does not produce asked for tags {}", msg.tags()));
         return false;
       }
-      Master::ExternalMasterAccessor::notify_subscriptions(*master_);
-      SKYNET_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"", master_->id(), id_);
+      Manager::ExternalManagerAccessor::notify_subscriptions(*manager_);
+      SKYNET_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"", manager_->id(), id_);
       return true;
     },
     [](...) {
       // Anything else is a programming bug, this shouldn't be reached
-      assert(false && "Missing message type in ExternalMaster::handle_message");
+      assert(false && "Missing message type in ExternalManager::handle_message");
       return false;
     });
   // Something incorrect happened
   if (!okay)
   {
-    SKYNET_TRACE_LOG("\"{}\" setting {} to dead because something incorrect happened upon message handle", master_->id(), id_);
+    SKYNET_TRACE_LOG("\"{}\" setting {} to dead because something incorrect happened upon message handle", manager_->id(), id_);
     dead_ = true;
   }
 }
 
-std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() const noexcept
+std::chrono::steady_clock::time_point ExternalManager::calc_next_request_time() const noexcept
 {
   using namespace std::chrono_literals;
   static constexpr std::array<std::chrono::milliseconds, 10> backoff_times{
@@ -374,18 +374,18 @@ std::chrono::steady_clock::time_point ExternalMaster::calc_next_request_time() c
 } // namespace internal
 
 ////////////////////////////////////////////////
-// Class Master
+// Class Manager
 ////////////////////////////////////////////////
 
-Master::Master(
+Manager::Manager(
   const std::uint16_t port, const MachineID& id, const std::chrono::milliseconds heartbeat_interval) noexcept
   : id_{id}, heartbeat_interval_{heartbeat_interval}, port_{port}
 {
   if (server_socket_.set_to_listen(port) != internal::ConnectionError::no_error) { std::exit(1); }
 }
 
-// Master::Master(const BuildMasterInfo& info) noexcept
-//   : Master{info.port, info.name, std::chrono::milliseconds{info.heartbeat_interval_in_ms}}
+// Manager::Manager(const BuildManagerInfo& info) noexcept
+//   : Manager{info.port, info.name, std::chrono::milliseconds{info.heartbeat_interval_in_ms}}
 // {
 //   // TODO: This blocks until it is ready.  I guess that's fine though?
 //   // Connect to the other machines now
@@ -417,9 +417,9 @@ Master::Master(
 //   }
 // }
 
-Master::~Master() { send_to_neighbors(internal::make_goodbye()); }
+Manager::~Manager() { send_to_neighbors(internal::make_goodbye()); }
 
-Waiter<bool> Master::connect_to_server(const char* const address, const std::uint16_t port) noexcept
+Waiter<bool> Manager::connect_to_server(const char* const address, const std::uint16_t port) noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto canonical = internal::to_canonical(AddrPortPair{address, port});
@@ -440,17 +440,17 @@ Waiter<bool> Master::connect_to_server(const char* const address, const std::uin
   return make_waiter<bool>(
     job_mut_,
     connection_cv_,
-    internal::MasterConnectionIsComplete{*this, canonical.first, canonical.second},
-    internal::MasterGetConnectionSuccess{*this, canonical.first, canonical.second});
+    internal::ManagerConnectionIsComplete{*this, canonical.first, canonical.second},
+    internal::ManagerGetConnectionSuccess{*this, canonical.first, canonical.second});
 }
 
-Waiter<bool> Master::connect_to_server(std::string_view address) noexcept
+Waiter<bool> Manager::connect_to_server(std::string_view address) noexcept
 {
   const auto [addr, port] = internal::split_address(address);
   return connect_to_server(addr.c_str(), port);
 }
 
-void Master::accept_pending_connections() noexcept
+void Manager::accept_pending_connections() noexcept
 {
   while (auto conn = server_socket_.accept()) {
     // This feels gross since it's basically the same thing as above, but I'm not
@@ -475,19 +475,19 @@ void Master::accept_pending_connections() noexcept
   }
 }
 
-size_t Master::number_of_neighbors() const noexcept
+size_t Manager::number_of_neighbors() const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   return neighbors_.size();
 }
 
-bool Master::submit_job(JobID name, std::function<void(Job&, MasterHandle)> to_run) noexcept
+bool Manager::submit_job(JobID name, std::function<void(Job&, ManagerHandle)> to_run) noexcept
 {
   const auto res = jobs_.try_emplace(name, Job::Accessor::AllowConstruction{}, name, *this, std::move(to_run));
   return res.second;
 }
 
-void Master::run() noexcept
+void Manager::run() noexcept
 {
   using namespace std::chrono_literals;
   std::vector<std::thread> threads;
@@ -554,9 +554,9 @@ void Master::run() noexcept
   //std::cout << "Agent " << id() << " is shutting down." << std::endl;
 }
 
-const std::string& Master::id() const noexcept { return id_; }
+const std::string& Manager::id() const noexcept { return id_; }
 
-size_t Master::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+size_t Manager::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
   const auto self_iter = self_sub_count_.find(tag.id());
@@ -567,9 +567,9 @@ size_t Master::number_of_subscribers(const internal::PublishTagBase& tag) const 
     });
 }
 
-std::uint16_t Master::port() const noexcept { return port_; }
+std::uint16_t Manager::port() const noexcept { return port_; }
 
-void Master::handle_neighbor_messages() noexcept
+void Manager::handle_neighbor_messages() noexcept
 {
   //std::cout << "Agent " << id() << " handling neighbor messages." << std::endl;
   for (auto&& neighbor : neighbors_) {
@@ -577,7 +577,7 @@ void Master::handle_neighbor_messages() noexcept
   }
 }
 
-void Master::publish(const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
+void Manager::publish(const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
 {
   const auto msg = internal::make_publish(version, tag_id, value);
   (void)msg;
@@ -589,7 +589,7 @@ void Master::publish(const VersionID version, const TagID& tag_id, gsl::span<Pub
   send_to_neighbors_if(msg, [&](const auto& neighbor) { return neighbor.is_subscribed_to(tag_id); });
 }
 
-bool Master::add_data_to_queue(const internal::PublishData& msg) noexcept
+bool Manager::add_data_to_queue(const internal::PublishData& msg) noexcept
 {
   for (auto& [name, job] : jobs_) {
     (void)name;
@@ -600,13 +600,13 @@ bool Master::add_data_to_queue(const internal::PublishData& msg) noexcept
   return true;
 }
 
-void Master::notify_of_new_neighbor(const MachineID& id) noexcept
+void Manager::notify_of_new_neighbor(const MachineID& id) noexcept
 {
   send_to_neighbors_if(
-    internal::make_new_neighbor(id), [&](const internal::ExternalMaster& neighbor) { return neighbor.id() != id; });
+    internal::make_new_neighbor(id), [&](const internal::ExternalManager& neighbor) { return neighbor.id() != id; });
 }
 
-void Master::remove_dead_neighbors() noexcept
+void Manager::remove_dead_neighbors() noexcept
 {
   bool new_tags = false;
   for (auto it = neighbors_.begin(); it != neighbors_.end(); /* nothing */) {
@@ -666,19 +666,19 @@ void Master::remove_dead_neighbors() noexcept
   }
 }
 
-std::vector<MachineID> Master::make_neighbor_vector() const noexcept
+std::vector<MachineID> Manager::make_neighbor_vector() const noexcept
 {
   std::vector<MachineID> to_ret(neighbors_.size());
   std::transform(neighbors_.cbegin(), neighbors_.cend(), to_ret.begin(), [](const auto& val) { return val.first; });
   return to_ret;
 }
 
-void Master::send_to_neighbors(const std::vector<std::byte>& to_send) noexcept
+void Manager::send_to_neighbors(const std::vector<std::byte>& to_send) noexcept
 {
-  send_to_neighbors_if(to_send, [](const internal::ExternalMaster&) { return true; });
+  send_to_neighbors_if(to_send, [](const internal::ExternalManager&) { return true; });
 }
 
-bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept
+bool Manager::subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept
 {
   for (const auto& tag : required_tags) {
     if (self_sub_count_.find(tag) != self_sub_count_.cend()) { continue; }
@@ -689,7 +689,7 @@ bool Master::subscribe_is_done(const std::vector<TagID>& required_tags) const no
   return true;
 }
 
-Waiter<void> Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
+Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
 {
   SKYNET_DEBUG_LOG("\"{}\" initializing subscription for tags {}", id_, tag_ids);
   std::copy_if(tag_ids.cbegin(), tag_ids.cend(), std::back_inserter(pending_tags_), [&](const TagID& to_find) {
@@ -707,10 +707,10 @@ Waiter<void> Master::subscribe(const std::vector<TagID>& tag_ids) noexcept
   }
   // Can potentially finish subscribing right away, so notify things
   notify_subscriptions_ = true;
-  return make_waiter(job_mut_, subscription_cv_, internal::MasterSubscribeIsDone{*this, tag_ids});
+  return make_waiter(job_mut_, subscription_cv_, internal::ManagerSubscribeIsDone{*this, tag_ids});
 }
 
-Waiter<bool> Master::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
+Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
 {
   const auto canonical_addr = internal::to_canonical(addr);
   const auto iter = addr_to_machine_.find(canonical_addr);
@@ -749,11 +749,11 @@ Waiter<bool> Master::ip_subscribe(const AddrPortPair& addr, const std::vector<Ta
   return make_waiter<bool>(
     job_mut_,
     subscription_cv_,
-    internal::MasterIPSubscribeComplete{*this, canonical_addr, tag_ids, is_self_sub},
-    internal::MasterIPSubscribeSuccess{*this, canonical_addr, tag_ids, is_self_sub});
+    internal::ManagerIPSubscribeComplete{*this, canonical_addr, tag_ids, is_self_sub},
+    internal::ManagerIPSubscribeSuccess{*this, canonical_addr, tag_ids, is_self_sub});
 }
 
-void Master::handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept
+void Manager::handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalManager& from) noexcept
 {
   // If all of the tag requirements are fulfilled then
   const auto [remaining_tags, num_left] = remove_tags_with_enough_publishers(msg);
@@ -819,7 +819,7 @@ void Master::handle_get_publishers(const internal::GetPublishers& msg, internal:
   }
 }
 
-auto Master::remove_tags_with_enough_publishers(const internal::GetPublishers& msg) noexcept
+auto Manager::remove_tags_with_enough_publishers(const internal::GetPublishers& msg) noexcept
   -> std::pair<std::vector<TagID>, std::vector<std::uint8_t>>
 {
   auto tags_left = msg.tags();
@@ -846,8 +846,8 @@ auto Master::remove_tags_with_enough_publishers(const internal::GetPublishers& m
   return {tags_left, publishers_needed};
 }
 
-void Master::add_publishers_and_propagate(
-  const internal::ReportPublishers& msg, const internal::ExternalMaster& from) noexcept
+void Manager::add_publishers_and_propagate(
+  const internal::ReportPublishers& msg, const internal::ExternalManager& from) noexcept
 {
   const auto insert_publisher_infos = [](
                                         decltype(publishers_for_tag_)::iterator iter,
@@ -886,7 +886,7 @@ void Master::add_publishers_and_propagate(
     }();
     insert_publisher_infos(iter, publishers, machines);
   }
-  // Add the tags that the external master produced
+  // Add the tags that the external manager produced
   const auto external_tags = msg.locally_produced_tags();
   for (const auto& tag : external_tags) {
     const decltype(publishers_for_tag_)::iterator iter = [&]() noexcept {
@@ -925,7 +925,7 @@ void Master::add_publishers_and_propagate(
   init_connections_for_pending_tags();
 }
 
-std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
+std::vector<std::byte> Manager::make_known_tag_publisher_message() const noexcept
 {
   // Produce vectors for the machines and tags
   std::vector<TagID> tags_to_send;
@@ -948,7 +948,7 @@ std::vector<std::byte> Master::make_known_tag_publisher_message() const noexcept
   return internal::make_report_publishers(tags_to_send, addresses_to_send, machines_to_send, local_tags());
 }
 
-void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
+void Manager::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
 {
   SKYNET_TRACE_LOG("\"{}\" adding tags produced: {}", id_, tags);
   // Mark the tags produced by this job
@@ -956,7 +956,7 @@ void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
     const auto [iter, inserted] = self_sub_count_.emplace(tag, 0);
     (void)iter;
     if (!inserted) {
-      // Two jobs on the same master can't produce the same tag; fail loudly
+      // Two jobs on the same manager can't produce the same tag; fail loudly
       std::cerr << "The tag " << std::quoted(tag) << " was reported for publication more than once!\n";
       std::exit(1);
     }
@@ -965,7 +965,7 @@ void Master::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   notify_subscriptions_ = true;
 }
 
-Waiter<internal::ReduceGroupBase&> Master::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
+Waiter<internal::ReduceGroupBase&> Manager::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
 {
   const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
   const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
@@ -999,11 +999,11 @@ Waiter<internal::ReduceGroupBase&> Master::create_reduce_group(std::unique_ptr<i
   return make_waiter<internal::ReduceGroupBase&>(
     job_mut_,
     reduce_group_cv_,
-    internal::MasterReduceGroupIsCreated{*this, group_id},
-    internal::MasterGetReduceGroup{*this, group_id});
+    internal::ManagerReduceGroupIsCreated{*this, group_id},
+    internal::ManagerGetReduceGroup{*this, group_id});
 }
 
-Waiter<void> Master::rebuild_reduce_group(const TagID& group_id) noexcept
+Waiter<void> Manager::rebuild_reduce_group(const TagID& group_id) noexcept
 {
   SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
   const auto iter = reduce_tag_data_.find(group_id);
@@ -1019,10 +1019,10 @@ Waiter<void> Master::rebuild_reduce_group(const TagID& group_id) noexcept
       }
     }
   }
-  return make_waiter(job_mut_, reduce_group_cv_, internal::MasterReduceGroupIsCreated{*this, group_id});
+  return make_waiter(job_mut_, reduce_group_cv_, internal::ManagerReduceGroupIsCreated{*this, group_id});
 }
 
-bool Master::reduce_group_is_created(const TagID& group_id) noexcept
+bool Manager::reduce_group_is_created(const TagID& group_id) noexcept
 {
   // See if the parent has a connection
   const auto group_iter = reduce_tag_data_.find(group_id);
@@ -1055,8 +1055,8 @@ bool Master::reduce_group_is_created(const TagID& group_id) noexcept
   return true;
 }
 
-bool Master::handle_join_reduce_group(
-  const internal::JoinReduceGroup& msg, const internal::ExternalMaster& from) noexcept
+bool Manager::handle_join_reduce_group(
+  const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept
 {
   // Check if the reduce group exists
   const auto reduce_group_loc = reduce_tag_data_.find(msg.reduce_tag());
@@ -1101,14 +1101,14 @@ bool Master::handle_join_reduce_group(
   return false;
 }
 
-internal::ReduceGroupBase& Master::get_reduce_group(const TagID& group_id) noexcept
+internal::ReduceGroupBase& Manager::get_reduce_group(const TagID& group_id) noexcept
 {
   const auto loc = reduce_tag_data_.find(group_id);
   assert(loc != reduce_tag_data_.cend());
   return *loc->second.group;
 }
 
-void Master::reduce_send_data_and_remove_missing(
+void Manager::reduce_send_data_and_remove_missing(
   std::vector<MachineID>& machines, const std::vector<std::byte>& message) noexcept
 {
   for (auto iter = machines.begin(); iter != machines.end();) {
@@ -1121,7 +1121,7 @@ void Master::reduce_send_data_and_remove_missing(
   }
 }
 
-void Master::send_reduce_data_to_parent(
+void Manager::send_reduce_data_to_parent(
   const TagID& group_id,
   const VersionID version,
   const TagID& reduce_tag,
@@ -1135,7 +1135,7 @@ void Master::send_reduce_data_to_parent(
   // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
 }
 
-void Master::send_reduce_data_to_children(
+void Manager::send_reduce_data_to_children(
   const TagID& group_id,
   const VersionID version,
   const TagID& reduce_tag,
@@ -1151,7 +1151,7 @@ void Master::send_reduce_data_to_children(
   // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
 }
 
-void Master::send_report_disconnection(
+void Manager::send_report_disconnection(
   const TagID& group_id, const MachineID& initiating_machine, const ReductionDisconnectID disconnect_id) noexcept
 {
   const auto loc = reduce_tag_data_.find(group_id);
@@ -1163,14 +1163,14 @@ void Master::send_report_disconnection(
   }
 }
 
-bool Master::handle_submit_reduce_value(
-  const internal::SubmitReduceValue& msg, const internal::ExternalMaster& from) noexcept
+bool Manager::handle_submit_reduce_value(
+  const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept
 {
   return handle_reduce_value(msg.reduce_tag(), msg.data(), from);
 }
 
-bool Master::handle_reduce_value(
-  const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalMaster& from) noexcept
+bool Manager::handle_reduce_value(
+  const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalManager& from) noexcept
 {
   // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
   (void)from;
@@ -1201,8 +1201,8 @@ bool Master::handle_reduce_value(
     *group_loc->second.group, value.tag_id(), *var_opt, value.version());
 }
 
-bool Master::handle_report_reduce_disconnection(
-  const internal::ReportReduceDisconnection& msg, const internal::ExternalMaster& from) noexcept
+bool Manager::handle_report_reduce_disconnection(
+  const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept
 {
   // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
   (void)from;
@@ -1223,7 +1223,7 @@ bool Master::handle_report_reduce_disconnection(
   return true;
 }
 
-void Master::init_connections_for_pending_tags() noexcept
+void Manager::init_connections_for_pending_tags() noexcept
 {
   if (!pending_tags_.empty()) { SKYNET_TRACE_LOG("\"{}\" is initiating connections for tags {}", id_, pending_tags_);}
   // A single connection can supply multiple tags, so look through all the pending tags
@@ -1337,19 +1337,19 @@ void Master::init_connections_for_pending_tags() noexcept
   std::for_each(to_delete.rbegin(), to_delete.rend(), [&](const auto& iter) { pending_tags_.erase(iter); });
 }
 
-bool Master::conn_is_complete(const AddrPortPair& address) noexcept
+bool Manager::conn_is_complete(const AddrPortPair& address) noexcept
 {
   return pending_conns_.find(address) == pending_conns_.cend();
 }
 
-bool Master::addr_is_connected(const AddrPortPair& address) const noexcept
+bool Manager::addr_is_connected(const AddrPortPair& address) const noexcept
 {
   const auto iter = addr_to_machine_.find(address);
   if (iter == addr_to_machine_.cend()) { return false; }
   return !iter->second->is_dead();
 }
 
-const char* Master::to_c_str(ConnType type) noexcept
+const char* Manager::to_c_str(ConnType type) noexcept
 {
   switch (type) {
   case ConnType::user_requested:
@@ -1368,7 +1368,7 @@ const char* Master::to_c_str(ConnType type) noexcept
   return "unknown type";
 }
 
-void Master::process_pending_conns() noexcept
+void Manager::process_pending_conns() noexcept
 {
   bool new_pending_tags = false;
   // TODO: Move this into its own function?  It isn't used anywhere else...
@@ -1444,7 +1444,7 @@ void Master::process_pending_conns() noexcept
 
       // Anything else is an error
       default:
-        if (iter->second.type == Master::ConnType::subscription)
+        if (iter->second.type == Manager::ConnType::subscription)
           SKYNET_WARN_LOG(
                           "\"{}\" errored trying to connect to {}, type {}, tag {}", id_, iter->first, to_c_str(info.type), info.tag);
         else
@@ -1564,12 +1564,12 @@ void Master::process_pending_conns() noexcept
   }
 }
 
-std::vector<std::byte> Master::make_handshake() const noexcept
+std::vector<std::byte> Manager::make_handshake() const noexcept
 {
   return internal::make_greeting(id_, make_neighbor_vector(), port_);
 }
 
-void Master::finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept
+void Manager::finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept
 {
   const auto iter = reduce_tag_data_.find(group_tag);
   assert(iter != reduce_tag_data_.cend());
@@ -1582,7 +1582,7 @@ void Master::finalize_reduce_group(const MachineID& parent_machine_id, const Tag
   notify_reduce_group_ = true;
 }
 
-bool Master::subscription_tags_are_produced(const internal::SubscriptionNotice& msg) const noexcept
+bool Manager::subscription_tags_are_produced(const internal::SubscriptionNotice& msg) const noexcept
 {
   const auto& tags = msg.tags();
   for (const auto& tag : tags) {
@@ -1591,7 +1591,7 @@ bool Master::subscription_tags_are_produced(const internal::SubscriptionNotice& 
   return true;
 }
 
-bool Master::handle_publish_data(const internal::PublishData& msg, const internal::ExternalMaster& from) noexcept
+bool Manager::handle_publish_data(const internal::PublishData& msg, const internal::ExternalManager& from) noexcept
 {
   (void)from;
   if (const auto value = msg.value()) {
@@ -1614,7 +1614,7 @@ bool Master::handle_publish_data(const internal::PublishData& msg, const interna
   }
 }
 
-void Master::finalize_subscription(const std::string& tags, internal::ExternalMaster& source) noexcept
+void Manager::finalize_subscription(const std::string& tags, internal::ExternalManager& source) noexcept
 {
   const auto tags_str_view = internal::split(tags, '\0');
   SKYNET_TRACE_LOG("\"{}\" finalizing subscription for tags {} with machine {}", id_, tags_str_view, source.id());
@@ -1631,7 +1631,7 @@ void Master::finalize_subscription(const std::string& tags, internal::ExternalMa
   notify_subscriptions_ = true;
 }
 
-void Master::find_publishers_for_pending_tags(const bool force_ask) noexcept
+void Manager::find_publishers_for_pending_tags(const bool force_ask) noexcept
 {
   if (force_ask) {
     SKYNET_TRACE_LOG("\"{}\" forcefully asking for {}", id_, pending_tags_);
@@ -1660,7 +1660,7 @@ void Master::find_publishers_for_pending_tags(const bool force_ask) noexcept
   }
 }
 
-std::vector<TagID> Master::local_tags() const noexcept
+std::vector<TagID> Manager::local_tags() const noexcept
 {
   std::vector<TagID> to_ret(self_sub_count_.size());
   std::transform(self_sub_count_.cbegin(), self_sub_count_.cend(), to_ret.begin(), [](const auto& tag_pair) {

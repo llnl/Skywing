@@ -2,7 +2,7 @@
 #define SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
 
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include "skynet_mid/pubsub_converter.hpp"
 #include "skynet_mid/internal/iterative_helpers.hpp"
 #include "skynet_mid/neighbor_data_handler.hpp"

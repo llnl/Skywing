@@ -1,6 +1,6 @@
-#include "skynet_core/basic_master_config.hpp"
+#include "skynet_core/basic_manager_config.hpp"
 
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 // #include <charconv>
 #include <cstdint>
@@ -35,9 +35,9 @@ std::optional<T> parse_integer_line(std::istream& in) noexcept
 }
 } // end anonymous namespace
 
-std::optional<BuildMasterInfo> read_master_config(std::istream& in) noexcept
+std::optional<BuildManagerInfo> read_manager_config(std::istream& in) noexcept
 {
-  BuildMasterInfo to_ret;
+  BuildManagerInfo to_ret;
   // Machine name
   if (!std::getline(in, to_ret.name)) { return {}; }
   const auto port = parse_integer_line<std::uint16_t>(in);

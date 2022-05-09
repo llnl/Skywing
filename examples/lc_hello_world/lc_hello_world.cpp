@@ -64,8 +64,8 @@ void runJob(
 )
 {
   std::cout << "Agent " << config.name << " is listening on port " << config.port << std::endl;
-  skynet::Master master(config.port, config.name);
-  master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle masterHandle){
+  skynet::Manager manager(config.port, config.name);
+  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle managerHandle){
     std::cout << "Agent " << agent_id << " beginning the job." << std::endl;
       
     // standard connectivity boilerplate, should get a convenience function
@@ -77,7 +77,7 @@ void runJob(
         std::cerr << "Could not find machine \"" << serverMachineName << "\" to connect to.\n";
       }
       const auto timeLimit = std::chrono::steady_clock::now() + std::chrono::seconds{30};
-      while (!masterHandle.connect_to_server(serverMachineNameIter->second.remoteAddress.c_str(),
+      while (!managerHandle.connect_to_server(serverMachineNameIter->second.remoteAddress.c_str(),
                                              serverMachineNameIter->second.port).get())
       {
         if (std::chrono::steady_clock::now() > timeLimit)
@@ -141,7 +141,7 @@ void runJob(
       }
     }
   });
-  master.run();
+  manager.run();
 }
 
 int main(const int argc, const char* const argv[])

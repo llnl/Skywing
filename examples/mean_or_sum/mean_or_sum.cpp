@@ -1,5 +1,5 @@
 #include "skynet_core/skynet.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include "skynet_mid/push_sum_processor.hpp"
 #include "skynet_mid/push_flow_processor.hpp"
 #include "skynet_mid/sum_processor.hpp"
@@ -73,15 +73,15 @@ void machine_task(int machine_number, int size_of_system,
                   std::vector<std::string> machine_names,
                   std::string pubTagID, std::vector<std::string> tagIDs)
 {
-  skynet::Master master{ports[machine_number], machine_names[machine_number]};
+  skynet::Manager manager{ports[machine_number], machine_names[machine_number]};
 
-  master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle){
+  manager.submit_job("job", [&](skynet::Job& job, ManagerHandle manager_handle){
 
   if (machine_number != static_cast<int>((ports.size()) - 1) )
   {
     // Connecting to the server is an asynchronous operation and can fail.
     // Wait for the result each time and keep attempting to connect until it does
-    while (!master_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
+    while (!manager_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
     {
       // Empty
     }
@@ -102,7 +102,7 @@ void machine_task(int machine_number, int size_of_system,
   // using IterMethod = AsynchronousIterative
   //   <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   // Waiter<IterMethod> iter_waiter =
-  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+  //   WaiterBuilder<IterMethod>(manager_handle, job, pubTagID, tagIDs_for_sub)
   //   .set_processor(starting_value)
   //   .set_publish_policy()
   //   .set_stop_policy(std::chrono::seconds(10))
@@ -113,7 +113,7 @@ void machine_task(int machine_number, int size_of_system,
   // using IterMethod = AsynchronousIterative
   //   <MeanMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   // Waiter<IterMethod> iter_waiter =
-  //   WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+  //   WaiterBuilder<IterMethod>(manager_handle, job, pubTagID, tagIDs_for_sub)
   //   .set_processor(starting_value, number_of_neighbors)
   //   .set_publish_policy()
   //   .set_stop_policy(std::chrono::seconds(5))
@@ -128,7 +128,7 @@ void machine_task(int machine_number, int size_of_system,
   using IterMethod = AsynchronousIterative
     <SumMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, pubTagID, tagIDs_for_sub)
+    WaiterBuilder<IterMethod>(manager_handle, job, pubTagID, tagIDs_for_sub)
     .set_processor(starting_value)
     .set_publish_policy()
     .set_stop_policy(std::chrono::seconds(50))
@@ -154,7 +154,7 @@ void machine_task(int machine_number, int size_of_system,
   
   std::this_thread::sleep_for(std::chrono::seconds(10));
   });
-  master.run();
+  manager.run();
 }
 
 int main(int argc, char* argv[])

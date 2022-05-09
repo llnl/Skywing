@@ -207,9 +207,9 @@ void machine_task(const int index)
 {
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
-  master.submit_job("job", [&](Job& the_job, MasterHandle master_handle) {
-    if (index != 0) { master_handle.connect_to_server("127.0.0.1", base_port + index - 1).get(); }
+  Manager manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  manager.submit_job("job", [&](Job& the_job, ManagerHandle manager_handle) {
+    if (index != 0) { manager_handle.connect_to_server("127.0.0.1", base_port + index - 1).get(); }
 
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
@@ -248,7 +248,7 @@ void machine_task(const int index)
       std::this_thread::sleep_for(std::chrono::milliseconds{10});
     }
   });
-  master.run();
+  manager.run();
 }
 
 void run_locally(const int index)

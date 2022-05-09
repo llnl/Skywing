@@ -19,8 +19,8 @@ std::atomic<bool> ready_for_publication = false;
 
 void publisher()
 {
-  Master master{publisher_port, std::to_string(publisher_port)};
-  master.submit_job("publisher", [&](Job& job, MasterHandle handle) {
+  Manager manager{publisher_port, std::to_string(publisher_port)};
+  manager.submit_job("publisher", [&](Job& job, ManagerHandle handle) {
     job.declare_publication_intent(tag);
     ready_for_subscription = true;
     handle.waiter_on_subscription_change([&]() { return handle.number_of_subscribers(tag) > 0; }).wait();
@@ -29,13 +29,13 @@ void publisher()
     }
     job.publish(tag, tag_value);
   });
-  master.run();
+  manager.run();
 }
 
 void subscriber()
 {
-  Master master{subscriber_port, std::to_string(subscriber_port)};
-  master.submit_job("subscriber", [&](Job& job, MasterHandle) {
+  Manager manager{subscriber_port, std::to_string(subscriber_port)};
+  manager.submit_job("subscriber", [&](Job& job, ManagerHandle) {
     while (!ready_for_subscription) {
       std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
@@ -45,7 +45,7 @@ void subscriber()
     REQUIRE(value);
     REQUIRE(*value == tag_value);
   });
-  master.run();
+  manager.run();
 }
 
 TEST_CASE("Subscribe to specific IP works", "[Skynet_IPSubscribe]")

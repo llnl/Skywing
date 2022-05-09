@@ -9,14 +9,14 @@ namespace skynet::helper
   constexpr std::chrono::milliseconds LOOP_DELAY =
     std::chrono::milliseconds(10);
 
-  inline void connect_to_neighbors(skynet::MasterHandle master_handle,
+  inline void connect_to_neighbors(skynet::ManagerHandle manager_handle,
     const std::vector<std::tuple<std::string, uint16_t>>& neighbor_addresses, 
     std::chrono::seconds timeout)
   {
     std::chrono::time_point<std::chrono::steady_clock> time_limit = 
       std::chrono::steady_clock::now() + timeout;
     for (const auto& [ip, port] : neighbor_addresses) {
-      while (!master_handle.connect_to_server(ip.data(), port).get()) {
+      while (!manager_handle.connect_to_server(ip.data(), port).get()) {
         if (std::chrono::steady_clock::now() > time_limit) {
           std::cerr << "Took too long to connect to " << port << std::endl;
           std::exit(-1);

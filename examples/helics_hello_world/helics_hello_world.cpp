@@ -20,22 +20,22 @@ void simulate_agent(
   DataTag skynet_publication,
   std::vector<DataTag>& skynet_subscriptions)
 {
-  // Create a Skynet Master; the Master is responsible for handling communication
+  // Create a Skynet Manager; the Manager is responsible for handling communication
   // and other such supporting tasks in the background
-  skynet::Master master(local_port, name);
-  // Submit work to the master, each job must have a unique name locally, but can be
-  // duplicated on other instances.  Jobs run on separate threads than the master and
+  skynet::Manager manager(local_port, name);
+  // Submit work to the manager, each job must have a unique name locally, but can be
+  // duplicated on other instances.  Jobs run on separate threads than the manager and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
   // be copyable and the signature must be compatible with the function signature
-  // void(skynet::Job&, skynet::MasterHandle)
-  master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle master_handle) {
+  // void(skynet::Job&, skynet::ManagerHandle)
+  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle manager_handle) {
     // Connect to other Skynet agents
     for (auto& remote_port : remote_ports) {
       if (remote_port < local_port) continue;
       // Connecting to the server is an asynchronous operation and can fail.
       // Wait for the result each time and keep attempting to connect until it does
-      while (!master_handle.connect_to_server("127.0.0.1", remote_port).get()) {
+      while (!manager_handle.connect_to_server("127.0.0.1", remote_port).get()) {
         // Empty
       }
     }
@@ -153,9 +153,9 @@ void simulate_agent(
     helicsFederateFree(value_fed);
     helicsCloseLibrary();
   });
-  // Start running the master, this will start all submitted jobs and continue
+  // Start running the manager, this will start all submitted jobs and continue
   // running until all jobs are finished, at which point it will return
-  master.run();
+  manager.run();
 }
 
 int main(const int argc, const char* const argv[])

@@ -19,9 +19,9 @@ constexpr std::chrono::milliseconds wait_time{1000};
 
 TEST_CASE("Self-subscription works", "[Skynet_SelfSubscribe]")
 {
-  Master base_master{get_starting_port(), "Lonely"};
+  Manager base_manager{get_starting_port(), "Lonely"};
 
-  base_master.submit_job("job", [&](Job& job, MasterHandle) {
+  base_manager.submit_job("job", [&](Job& job, ManagerHandle) {
     // Publish/Subscribe
     const PubTag pub_tag{"integer"};
     job.declare_publication_intent(pub_tag);
@@ -60,5 +60,5 @@ TEST_CASE("Self-subscription works", "[Skynet_SelfSubscribe]")
     // REQUIRE(value1 == 7);
   });
 
-  base_master.run();
+  base_manager.run();
 }

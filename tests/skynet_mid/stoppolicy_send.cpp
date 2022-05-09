@@ -42,9 +42,9 @@ std::mutex catch_mutex;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master base_master{ports[index], std::to_string(index)};
-  base_master.submit_job("job", [&](Job& job_handle, MasterHandle master) {
-    connect_network(*info, master, index, [](MasterHandle m, const int i) {
+  Manager base_manager{ports[index], std::to_string(index)};
+  base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
+    connect_network(*info, manager, index, [](ManagerHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
     ///////////////////////////////
@@ -52,7 +52,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     ///////////////////////////////
     size_t NUM_ITERS = 20;
     using IterMethod = SynchronousIterative<TestAsyncProcessor, TestWaitForNbrsStopPolicy, TrivialResiliencePolicy>;
-    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
+    IterMethod iter_method = WaiterBuilder<IterMethod>(manager, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, num_machines)
       .set_stop_policy(static_cast<double>(index+1), static_cast<double>(NUM_ITERS), index)
       .set_resilience_policy()
@@ -64,7 +64,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     REQUIRE(iter_count < (NUM_ITERS+3));
     REQUIRE(fabs(iter_method.get_processor().get_curr_average() - iter_method.get_processor().get_target()) < 0.1);
     });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("StopPolicy Send", "[Skynet_StopPolicy_Send]")

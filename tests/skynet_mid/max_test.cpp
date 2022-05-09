@@ -31,14 +31,14 @@ std::mutex catch_mutex;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master base_master{ports[index], std::to_string(index)};
-  base_master.submit_job("job", [&](Job& job_handle, MasterHandle master) {
-    connect_network(*info, master, index, [](MasterHandle m, const int i) {
+  Manager base_manager{ports[index], std::to_string(index)};
+  base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
+    connect_network(*info, manager, index, [](ManagerHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
 
     using IterMethod = AsynchronousIterative<MaxProcessor<int>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
-    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
+    IterMethod iter_method = WaiterBuilder<IterMethod>(manager, job_handle, tag_ids[index], tag_ids)
       .set_processor(index)
       .set_publish_policy()
       .set_stop_policy(std::chrono::seconds(3))
@@ -47,7 +47,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     iter_method.run();
     REQUIRE(iter_method.get_processor().get_value() == (num_machines-1));
     });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Gossip Max", "[Skynet_GossipMax]")

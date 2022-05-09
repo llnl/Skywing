@@ -2,7 +2,7 @@
 
 #include "skynet_core/enable_logging.hpp"
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "utils.hpp"
 
@@ -45,27 +45,27 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
 
 using Uint64Tag = PublishTag<std::uint64_t>;
 
-void setup_network(MasterHandle master, const std::size_t index)
+void setup_network(ManagerHandle manager, const std::size_t index)
 {
   using namespace std::chrono_literals;
   // Connect to the corresponding machines (if any)
   for (const auto& machine : to_connect[index]) {
     if (machine == -1) { break; }
-    while (!master.connect_to_server("127.0.0.1", ports[machine]).get()) { /* nothing */
+    while (!manager.connect_to_server("127.0.0.1", ports[machine]).get()) { /* nothing */
     }
   }
   // Wait until all machines have connected
-  while (master.number_of_neighbors() != machine_counts[index]) {
+  while (manager.number_of_neighbors() != machine_counts[index]) {
     std::this_thread::sleep_for(10ms);
   }
 }
 
 void machine_task(const std::size_t index)
 {
-  Master base_master{ports[index], machine_names[index]};
+  Manager base_manager{ports[index], machine_names[index]};
   // Submit job and broadcast on the job using each machine
-  base_master.submit_job("job 0", [index](Job& the_job, MasterHandle master) {
-    setup_network(master, index);
+  base_manager.submit_job("job 0", [index](Job& the_job, ManagerHandle manager) {
+    setup_network(manager, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
     // Things trying to subscribe to each other concurrently can cause the subscription to
@@ -74,7 +74,7 @@ void machine_task(const std::size_t index)
     for (std::size_t send_index = 0; send_index < machine_counts.size(); ++send_index) {
       if (index != send_index) { the_job.subscribe(Uint64Tag{tag_names[send_index]}).wait(); }
       else {
-        while (master.number_of_subscribers(Uint64Tag{tag_names[index]})
+        while (manager.number_of_subscribers(Uint64Tag{tag_names[index]})
                != static_cast<int>(machine_counts.size() - 1)) {
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -93,7 +93,7 @@ void machine_task(const std::size_t index)
     }
   });
   // Start processing messages
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Broadcast works", "[Skynet_Broadcast]")

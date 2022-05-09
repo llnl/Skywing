@@ -1,7 +1,7 @@
 #ifndef SKYNET_INTERNAL_REDUCE_GROUP_HPP
 #define SKYNET_INTERNAL_REDUCE_GROUP_HPP
 
-#include "skynet_core/internal/master_waiter_callables.hpp"
+#include "skynet_core/internal/manager_waiter_callables.hpp"
 #include "skynet_core/internal/tag_buffer.hpp"
 #include "skynet_core/types.hpp"
 #include "skynet_core/waiter.hpp"
@@ -17,7 +17,7 @@
 #include <unordered_map>
 
 namespace skynet {
-class Master;
+class Manager;
 
 namespace internal {
 // TODO: Can maybe make this deal with a variant of pointers instead of a variant
@@ -34,7 +34,7 @@ public:
 
   struct Accessor {
   private:
-    friend skynet::Master;
+    friend skynet::Manager;
 
     static void report_disconnection(ReduceGroupBase& g) noexcept { return g.report_disconnection(); }
     static const ReduceGroupNeighbors& tag_neighbors(const ReduceGroupBase& g) noexcept { return g.tag_neighbors(); }
@@ -55,13 +55,13 @@ public:
 protected:
   ReduceGroupBase(
     const ReduceGroupNeighbors& tag_neighbors,
-    Master& master,
+    Manager& manager,
     const TagID& group_id,
     const TagID& produced_tag,
     gsl::span<const std::uint8_t> expected_types) noexcept;
 
   /////////////////////////////////
-  // Master accessible functions
+  // Manager accessible functions
   /////////////////////////////////
 
   // Create a disconnection notice and send it to connected machines
@@ -126,7 +126,7 @@ protected:
   /////////////////////////////////
 
   ReduceGroupNeighbors tag_neighbors_;
-  Master* master_;
+  Manager* manager_;
   std::unordered_map<MachineID, ReductionDisconnectID> last_heard_disconnect_;
   TagID group_id_;
   TagID produced_tag_;
@@ -155,10 +155,10 @@ public:
 
   ReduceGroup(
     const internal::ReduceGroupNeighbors& tag_neighbors,
-    Master& master,
+    Manager& manager,
     const TagID& group_id,
     const TagID& produced_tag) noexcept
-    : ReduceGroupBase{tag_neighbors, master, group_id, produced_tag, internal::expected_type_for<Ts...>}
+    : ReduceGroupBase{tag_neighbors, manager, group_id, produced_tag, internal::expected_type_for<Ts...>}
   {}
 
   // Make these functions available publicly

@@ -1,19 +1,19 @@
 #include "skynet_core/internal/reduce_group.hpp"
 
 #include "skynet_core/internal/utility/logging.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "gsl/span"
 
 namespace skynet::internal {
 ReduceGroupBase::ReduceGroupBase(
   const ReduceGroupNeighbors& tag_neighbors,
-  Master& master,
+  Manager& manager,
   const TagID& group_id,
   const TagID& produced_tag,
   const gsl::span<const std::uint8_t> expected_types) noexcept
   : tag_neighbors_{tag_neighbors}
-  , master_{&master}
+  , manager_{&manager}
   , group_id_{group_id}
   , produced_tag_{produced_tag}
   , expected_types_{expected_types}
@@ -28,7 +28,7 @@ bool ReduceGroupBase::add_data(
   if (!std::equal(value.cbegin(), value.cend(), expected_types_.cbegin(), expected_types_.cend(), comparer)) {
     SKYNET_WARN_LOG(
       "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to wrong type",
-      master_->id(),
+      manager_->id(),
       group_id_,
       tag,
       version);
@@ -37,7 +37,7 @@ bool ReduceGroupBase::add_data(
   for (std::size_t i = 0; i < tag_neighbors_.tags.size(); ++i) {
     if (tag == tag_neighbors_.tags[i]) {
       SKYNET_TRACE_LOG(
-        "\"{}\" added data for reduce group \"{}\" for tag \"{}\" version {}", master_->id(), group_id_, tag, version);
+        "\"{}\" added data for reduce group \"{}\" for tag \"{}\" version {}", manager_->id(), group_id_, tag, version);
       {
         std::lock_guard<std::mutex> lock{buffer_mutex_};
         add_data_index(i, value, version);
@@ -48,12 +48,12 @@ bool ReduceGroupBase::add_data(
       return true;
     }
   }
-  // There's not good way for the master to know ahead of time if the tag should
+  // There's not good way for the manager to know ahead of time if the tag should
   // be supplied so only output this if it really is unexpected
   if (tag != produced_tag_) {
     SKYNET_WARN_LOG(
       "\"{}\" rejected data for reduce group \"{}\" for tag \"{}\" version {} due to not matching any buffer",
-      master_->id(),
+      manager_->id(),
       group_id_,
       tag,
       version);
@@ -94,7 +94,7 @@ void ReduceGroupBase::report_disconnection() noexcept
     std::lock_guard g{buffer_mutex_};
     is_valid = false;
     ++conn_counter;
-    send_disconnection(master_->id(), prng());
+    send_disconnection(manager_->id(), prng());
   }
   future_info_cv_.notify_all();
 }
@@ -117,23 +117,23 @@ Waiter<void> ReduceGroupBase::rebuild() noexcept
     is_valid = true;
     do_reset_buffers();
   }
-  return Master::ReduceGroupAccessor::rebuild_reduce_group(*master_, group_id_);
+  return Manager::ReduceGroupAccessor::rebuild_reduce_group(*manager_, group_id_);
 }
 
 void ReduceGroupBase::send_value_to_parent(
   gsl::span<const PublishValueVariant> value_to_send, const VersionID version) noexcept
 {
-  Master::ReduceGroupAccessor::send_reduce_data_to_parent(*master_, group_id_, version, produced_tag_, value_to_send);
+  Manager::ReduceGroupAccessor::send_reduce_data_to_parent(*manager_, group_id_, version, produced_tag_, value_to_send);
 }
 
 void ReduceGroupBase::send_value_to_children(
   gsl::span<const PublishValueVariant> value_to_send, VersionID version) noexcept
 {
-  Master::ReduceGroupAccessor::send_reduce_data_to_children(*master_, group_id_, version, produced_tag_, value_to_send);
+  Manager::ReduceGroupAccessor::send_reduce_data_to_children(*manager_, group_id_, version, produced_tag_, value_to_send);
 }
 
 void ReduceGroupBase::send_disconnection(const MachineID& initiating_machine, ReductionDisconnectID disconn_id) noexcept
 {
-  Master::ReduceGroupAccessor::send_report_disconnection(*master_, group_id_, initiating_machine, disconn_id);
+  Manager::ReduceGroupAccessor::send_report_disconnection(*manager_, group_id_, initiating_machine, disconn_id);
 }
 } // namespace skynet::internal
