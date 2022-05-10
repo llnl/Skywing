@@ -1,17 +1,17 @@
 #error This header is not yet supported
 
-#ifndef SKYNET_BASIC_MASTER_CONFIG_HPP
-  #define SKYNET_BASIC_MASTER_CONFIG_HPP
+#ifndef SKYNET_BASIC_MANAGER_CONFIG_HPP
+  #define SKYNET_BASIC_MANAGER_CONFIG_HPP
 
   #include <iosfwd>
   #include <optional>
   #include <vector>
 
 namespace skynet {
-class Master;
-struct BuildMasterInfo;
+class Manager;
+struct BuildManagerInfo;
 
-/** \brief EXTREMELY simple Master setup config files.
+/** \brief EXTREMELY simple Manager setup config files.
  *
  * The format is very limited:
  * ```
@@ -22,19 +22,19 @@ struct BuildMasterInfo;
  * address to connect to 2
  * ...
  * ```
- * The master must be passed in by reference as it is non-movable.
+ * The manager must be passed in by reference as it is non-movable.
  *
  * \returns True if reading is successful, false otherwise.
  */
-std::optional<BuildMasterInfo> read_master_config(std::istream& in) noexcept;
+std::optional<BuildManagerInfo> read_manager_config(std::istream& in) noexcept;
 
-/** \brief Class representing information to build a Master.
+/** \brief Class representing information to build a Manager.
  *
  * This two-step process is required because reading information from the file
- * can fail, but an optional can't be returned due to a Master not being
+ * can fail, but an optional can't be returned due to a Manager not being
  * move-able.
  */
-struct BuildMasterInfo {
+struct BuildManagerInfo {
   std::string name;
   std::vector<std::string> to_connect_to;
   std::uint32_t heartbeat_interval_in_ms;
@@ -42,12 +42,12 @@ struct BuildMasterInfo {
 
   // Declared as an inline friend so it can only be found via ADL.
   // Simple calls the below function
-  friend std::istream& operator>>(std::istream& in, BuildMasterInfo& info)
+  friend std::istream& operator>>(std::istream& in, BuildManagerInfo& info)
   {
-    if (auto new_info = read_master_config(in)) { info = std::move(*new_info); }
+    if (auto new_info = read_manager_config(in)) { info = std::move(*new_info); }
     return in;
   }
 };
 } // namespace skynet
 
-#endif // SKYNET_BASIC_MASTER_CONFIG_HPP
+#endif // SKYNET_BASIC_MANAGER_CONFIG_HPP

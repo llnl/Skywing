@@ -4,7 +4,7 @@
 // Just include all of the common files here
 #include "enable_logging.hpp"
 #include "job.hpp"
-#include "master.hpp"
+#include "manager.hpp"
 #include "types.hpp"
 #include "waiter.hpp"
 

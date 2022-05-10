@@ -1,12 +1,12 @@
-#ifndef SKYNET_MASTER_HPP
-#define SKYNET_MASTER_HPP
+#ifndef SKYNET_MANAGER_HPP
+#define SKYNET_MANAGER_HPP
 
 #include "skynet_core/internal/capn_proto_wrapper.hpp"
 #include "skynet_core/internal/devices/socket_communicator.hpp"
-#include "skynet_core/internal/master_waiter_callables.hpp"
+#include "skynet_core/internal/manager_waiter_callables.hpp"
 #include "skynet_core/internal/message_creators.hpp"
 #include "skynet_core/internal/reduce_group.hpp"
-// #include "skynet_core/basic_master_config.hpp"
+// #include "skynet_core/basic_manager_config.hpp"
 #include "skynet_core/job.hpp"
 #include "skynet_core/types.hpp"
 
@@ -29,7 +29,7 @@
 // This has to be separate due to requiring hashing support for the structure
 namespace skynet::internal {
 /** \brief Class for publisher names / addresses; would be a local structure inside
- * the master class, but hashing support is needed
+ * the manager class, but hashing support is needed
  */
 struct PublisherInfo {
   std::string address;
@@ -52,8 +52,8 @@ struct std::hash<skynet::internal::PublisherInfo> {
 }; // struct std::hash
 
 namespace skynet {
-class Master;
-class MasterHandle;
+class Manager;
+class ManagerHandle;
 class Job;
 
 namespace internal {
@@ -70,20 +70,20 @@ struct ByRequest {};
 
 /** \brief The handle used for external Skynet instances that are connected
  */
-class ExternalMaster {
+class ExternalManager {
 public:
-  ExternalMaster(
+  ExternalManager(
     SocketCommunicator comm,
     const MachineID& id,
     const std::vector<MachineID>& neighbors,
-    Master& master,
+    Manager& manager,
     std::uint16_t port) noexcept;
 
   /** \brief Handles any messages sent from the connection
    */
   void get_and_handle_messages() noexcept;
 
-  /** \brief Sends a raw message to the other master
+  /** \brief Sends a raw message to the other manager
    *
    * Also marks the connection as dead if any errors occur.  Does nothing
    * if the connection is marked as dead.
@@ -115,7 +115,7 @@ public:
   void find_publishers_for_tags(
     const std::vector<TagID>& tags, const std::vector<std::uint8_t>& publishers_needed) noexcept;
 
-  /** \brief The address for communication with the external master
+  /** \brief The address for communication with the external manager
    */
   std::string address() const noexcept;
 
@@ -123,12 +123,12 @@ public:
    */
   AddrPortPair address_pair() const noexcept;
 
-  /** \brief Sets the external master to ignore the cache on the next request
+  /** \brief Sets the external manager to ignore the cache on the next request
    * for publishers
    */
   void ignore_cache_on_next_request() noexcept;
 
-  /** \brief Returns true if the external master is subscribed to the tag,
+  /** \brief Returns true if the external manager is subscribed to the tag,
    * returns false if it is not.
    */
   bool is_subscribed_to(const TagID& tag) const noexcept;
@@ -172,7 +172,7 @@ private:
   // Calculate the next time tags should be requested
   std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
 
-  // For talking with the external master.  
+  // For talking with the external manager.  
   // See you'd think there would only be one SocketCommunicator for
   // talking to another agent, so why the vector? It's because
   // sometimes agents initiate connections with each other
@@ -182,7 +182,7 @@ private:
   // to both.
   std::vector<SocketCommunicator> conns_;
 
-  // The id of the external master
+  // The id of the external manager
   MachineID id_;
 
   // The last time the machine was heard from
@@ -191,8 +191,8 @@ private:
   // The neighbors that the external machine has
   std::vector<MachineID> neighbors_;
 
-  // The owning master
-  Master* master_;
+  // The owning manager
+  Manager* manager_;
 
   // The time that will be waited until requesting tags again
   std::chrono::steady_clock::time_point request_tags_time_;
@@ -215,15 +215,15 @@ private:
 
   // If there is a request out for tags or not
   bool pending_tag_request_ = false;
-}; // class ExternalMaster
+}; // class ExternalManager
 } // namespace internal
 
-/** \brief The master Skynet instance used for communication
+/** \brief The manager Skynet instance used for communication
  */
-class Master {
+class Manager {
 public:
-  friend class MasterHandle;
-  /** \brief Creates a Master instance that listens on the specified
+  friend class ManagerHandle;
+  /** \brief Creates a Manager instance that listens on the specified
    * port for connections.
    *
    * \param port The port to listen on
@@ -233,40 +233,40 @@ public:
   template<
     typename Rep = decltype(internal::default_heartbeat_interval)::rep,
     typename Period = decltype(internal::default_heartbeat_interval)::period>
-  Master(
+  Manager(
     const std::uint16_t port,
     const MachineID& id,
     const std::chrono::duration<Rep, Period> heartbeat_interval = internal::default_heartbeat_interval) noexcept
-    : Master{port, id, std::chrono::duration_cast<std::chrono::milliseconds>(heartbeat_interval)}
+    : Manager{port, id, std::chrono::duration_cast<std::chrono::milliseconds>(heartbeat_interval)}
   {}
 
   /** \brief Constructor specifically for milliseconds
    */
-  Master(const std::uint16_t port, const MachineID& id, const std::chrono::milliseconds heartbeat_interval) noexcept;
+  Manager(const std::uint16_t port, const MachineID& id, const std::chrono::milliseconds heartbeat_interval) noexcept;
 
   // /** \brief Constructor for building from a file format specified in
-  //  * basic_master_config.hpp
+  //  * basic_manager_config.hpp
   //  *
   //  * This will block until all of the specified connections have been made
   //  */
-  // Master(const BuildMasterInfo& info) noexcept;
+  // Manager(const BuildManagerInfo& info) noexcept;
 
   /** \brief Destructor; tells all neighbors that the device is dead
    */
-  ~Master();
+  ~Manager();
 
-  /** \brief Creates a job for the master to execute that produces the
+  /** \brief Creates a job for the manager to execute that produces the
    * specified tags.
    *
    * Returns false if the job could not be inserted (only happens on name collision)
    */
-  bool submit_job(JobID name, std::function<void(Job&, MasterHandle)> to_run) noexcept;
+  bool submit_job(JobID name, std::function<void(Job&, ManagerHandle)> to_run) noexcept;
 
   /** \brief Start running all submitted jobs
    */
   void run() noexcept;
 
-  /** \brief Gets the id of the master
+  /** \brief Gets the id of the manager
    */
   const std::string& id() const noexcept;
 
@@ -276,92 +276,92 @@ public:
     friend class Job;
 
     static void
-      publish(Master& m, const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
+      publish(Manager& m, const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       m.publish(version, tag_id, value);
     }
 
-    static void report_new_publish_tags(Master& m, const std::vector<TagID>& tags) noexcept
+    static void report_new_publish_tags(Manager& m, const std::vector<TagID>& tags) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       m.report_new_publish_tags(tags);
     }
 
-    static auto subscribe(Master& m, const std::vector<TagID>& tag_ids) noexcept
+    static auto subscribe(Manager& m, const std::vector<TagID>& tag_ids) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       return m.subscribe(tag_ids);
     }
 
-    static auto create_reduce_group(Master& m, std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
+    static auto create_reduce_group(Manager& m, std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       return m.create_reduce_group(std::move(group_ptr));
     }
 
-    static auto ip_subscribe(Master& m, const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
+    static auto ip_subscribe(Manager& m, const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       return m.ip_subscribe(addr, tag_ids);
     }
   }; // struct JobAccessor
 
-  // Accessor for the ExternalMaster class
-  struct ExternalMasterAccessor {
+  // Accessor for the ExternalManager class
+  struct ExternalManagerAccessor {
   private:
-    friend class internal::ExternalMaster;
+    friend class internal::ExternalManager;
 
     static void
-      handle_get_publishers(Master& m, const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept
+      handle_get_publishers(Manager& m, const internal::GetPublishers& msg, internal::ExternalManager& from) noexcept
     {
       m.handle_get_publishers(msg, from);
     }
 
     static void add_publishers_and_propagate(
-      Master& m, const internal::ReportPublishers& msg, const internal::ExternalMaster& from) noexcept
+      Manager& m, const internal::ReportPublishers& msg, const internal::ExternalManager& from) noexcept
     {
       m.add_publishers_and_propagate(msg, from);
     }
 
     static bool handle_join_reduce_group(
-      Master& m, const internal::JoinReduceGroup& msg, const internal::ExternalMaster& from) noexcept
+      Manager& m, const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept
     {
       return m.handle_join_reduce_group(msg, from);
     }
 
     static bool handle_submit_reduce_value(
-      Master& m, const internal::SubmitReduceValue& msg, const internal::ExternalMaster& from) noexcept
+      Manager& m, const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept
     {
       return m.handle_submit_reduce_value(msg, from);
     }
 
     static bool handle_report_reduce_disconnection(
-      Master& m, const internal::ReportReduceDisconnection& msg, const internal::ExternalMaster& from) noexcept
+      Manager& m, const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept
     {
       return m.handle_report_reduce_disconnection(msg, from);
     }
 
-    static bool subscription_tags_are_produced(Master& m, const internal::SubscriptionNotice& msg) noexcept
+    static bool subscription_tags_are_produced(Manager& m, const internal::SubscriptionNotice& msg) noexcept
     {
       return m.subscription_tags_are_produced(msg);
     }
 
     static bool
-      handle_publish_data(Master& m, const internal::PublishData& msg, const internal::ExternalMaster& from) noexcept
+      handle_publish_data(Manager& m, const internal::PublishData& msg, const internal::ExternalManager& from) noexcept
     {
       return m.handle_publish_data(msg, from);
     }
 
-    static void notify_subscriptions(Master& m) noexcept { m.notify_subscriptions_ = true; }
-  }; // struct ExternalMasterAccessor
+    static void notify_subscriptions(Manager& m) noexcept { m.notify_subscriptions_ = true; }
+  }; // struct ExternalManagerAccessor
 
   struct ReduceGroupAccessor {
   private:
     friend class internal::ReduceGroupBase;
 
     static void send_reduce_data_to_parent(
-      Master& m,
+      Manager& m,
       const TagID& group_id,
       const VersionID version,
       const TagID& reduce_tag,
@@ -371,7 +371,7 @@ public:
     }
 
     static void send_reduce_data_to_children(
-      Master& m,
+      Manager& m,
       const TagID& group_id,
       const VersionID version,
       const TagID& reduce_tag,
@@ -381,7 +381,7 @@ public:
     }
 
     static void send_report_disconnection(
-      Master& m,
+      Manager& m,
       const TagID& group_id,
       const MachineID& initiating_machine,
       const ReductionDisconnectID disconnect_id) noexcept
@@ -389,7 +389,7 @@ public:
       m.send_report_disconnection(group_id, initiating_machine, disconnect_id);
     }
 
-    static auto rebuild_reduce_group(Master& m, const TagID& group_id) noexcept
+    static auto rebuild_reduce_group(Manager& m, const TagID& group_id) noexcept
     {
       std::lock_guard<std::mutex> lock{m.job_mut_};
       return m.rebuild_reduce_group(group_id);
@@ -398,35 +398,35 @@ public:
 
   struct WaiterAccessor {
   private:
-    friend class internal::MasterSubscribeIsDone;
-    friend class internal::MasterReduceGroupIsCreated;
-    friend class internal::MasterGetReduceGroup;
-    friend class internal::MasterConnectionIsComplete;
-    friend class internal::MasterGetConnectionSuccess;
-    friend class internal::MasterIPSubscribeComplete;
-    friend class internal::MasterIPSubscribeSuccess;
+    friend class internal::ManagerSubscribeIsDone;
+    friend class internal::ManagerReduceGroupIsCreated;
+    friend class internal::ManagerGetReduceGroup;
+    friend class internal::ManagerConnectionIsComplete;
+    friend class internal::ManagerGetConnectionSuccess;
+    friend class internal::ManagerIPSubscribeComplete;
+    friend class internal::ManagerIPSubscribeSuccess;
 
-    static bool subscribe_is_done(Master& m, const std::vector<TagID>& tags) noexcept
+    static bool subscribe_is_done(Manager& m, const std::vector<TagID>& tags) noexcept
     {
       return m.subscribe_is_done(tags);
     }
 
-    static bool reduce_group_is_created(Master& m, const TagID& group_id) noexcept
+    static bool reduce_group_is_created(Manager& m, const TagID& group_id) noexcept
     {
       return m.reduce_group_is_created(group_id);
     }
 
-    static internal::ReduceGroupBase& get_reduce_group(Master& m, const TagID& group_id) noexcept
+    static internal::ReduceGroupBase& get_reduce_group(Manager& m, const TagID& group_id) noexcept
     {
       return m.get_reduce_group(group_id);
     }
 
-    static bool conn_is_complete(Master& m, const AddrPortPair& address) noexcept
+    static bool conn_is_complete(Manager& m, const AddrPortPair& address) noexcept
     {
       return m.conn_is_complete(address);
     }
 
-    static bool conn_get_success(Master& m, const AddrPortPair& address) noexcept
+    static bool conn_get_success(Manager& m, const AddrPortPair& address) noexcept
     {
       return m.addr_is_connected(address);
     }
@@ -434,7 +434,7 @@ public:
 
 private:
   ///////////////////////////////////////
-  // Interface for MasterHandle
+  // Interface for ManagerHandle
   ///////////////////////////////////////
 
   Waiter<bool> connect_to_server(const char* const address, const std::uint16_t port) noexcept;
@@ -458,7 +458,7 @@ private:
 
 
   ///////////////////////////////////////
-  // End Interface for MasterHandle
+  // End Interface for ManagerHandle
   ///////////////////////////////////////
 
   /** \brief See if there are any pending connections and accept them if so
@@ -521,7 +521,7 @@ private:
 
   /** \brief Handles the get_publishers message
    */
-  void handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalMaster& from) noexcept;
+  void handle_get_publishers(const internal::GetPublishers& msg, internal::ExternalManager& from) noexcept;
 
   /** \brief Removes any tags that have enough publishers, returning the tags that
    * remain and the number of publishers that they need
@@ -534,7 +534,7 @@ private:
    * Returns a bool indicating if the next request for publishers should ignore the cache
    */
   void
-    add_publishers_and_propagate(const internal::ReportPublishers& msg, const internal::ExternalMaster& from) noexcept;
+    add_publishers_and_propagate(const internal::ReportPublishers& msg, const internal::ExternalManager& from) noexcept;
 
   /** \brief Produce a message containing the known publishers and tags
    */
@@ -561,7 +561,7 @@ private:
 
   /** \brief Handles a message that a child is joining a reduce group
    */
-  bool handle_join_reduce_group(const internal::JoinReduceGroup& msg, const internal::ExternalMaster& from) noexcept;
+  bool handle_join_reduce_group(const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept;
 
   /** \brief Returns a reference to a created reduce group
    *
@@ -595,17 +595,17 @@ private:
   /** \brief Handles a submit reduce value message
    */
   bool
-    handle_submit_reduce_value(const internal::SubmitReduceValue& msg, const internal::ExternalMaster& from) noexcept;
+    handle_submit_reduce_value(const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept;
 
   /** \brief Implementation of the two above functions
    */
   bool handle_reduce_value(
-    const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalMaster& from) noexcept;
+    const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalManager& from) noexcept;
 
   /** \brief Handle a reduce disconnect notification
    */
   bool handle_report_reduce_disconnection(
-    const internal::ReportReduceDisconnection& msg, const internal::ExternalMaster& from) noexcept;
+    const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept;
 
   /** \brief Attempt to create connections for any pending tags.
    */
@@ -656,13 +656,13 @@ private:
 
   /** \brief Handles published information
    */
-  bool handle_publish_data(const internal::PublishData& msg, const internal::ExternalMaster& from) noexcept;
+  bool handle_publish_data(const internal::PublishData& msg, const internal::ExternalManager& from) noexcept;
 
   /** \brief Finalizes a subscription connection.
    *
    * \param tags '\0' seperated list of tags
    */
-  void finalize_subscription(const std::string& tags, internal::ExternalMaster& source) noexcept;
+  void finalize_subscription(const std::string& tags, internal::ExternalManager& source) noexcept;
 
   /** \brief Asks neighbors for publishers for pending tags with no know publishers
    */
@@ -679,7 +679,7 @@ private:
   std::unordered_map<JobID, Job> jobs_;
 
   // List of neighboring connections
-  std::unordered_map<MachineID, internal::ExternalMaster> neighbors_;
+  std::unordered_map<MachineID, internal::ExternalManager> neighbors_;
 
   // List of publishers that are known for each tag
   std::unordered_map<TagID, std::unordered_set<internal::PublisherInfo>> publishers_for_tag_;
@@ -707,7 +707,7 @@ private:
   // The time to send a heartbeat if nothing has been heard in the time
   std::chrono::milliseconds heartbeat_interval_;
 
-  // Only allow one job access to the master at a time
+  // Only allow one job access to the manager at a time
   mutable std::mutex job_mut_;
 
   // Dummy mutex - only used for custom waiters created by users
@@ -715,7 +715,7 @@ private:
 
   // List of machines that are waiting for information for producers of a certain tag
   // Uses MachineID's instead of pointers in case the remote machine disconnects and
-  // the ExternalMaster is deleted between the time a request is started and a response
+  // the ExternalManager is deleted between the time a request is started and a response
   // is received
   // TODO: Maybe move to pointers and just make sure to remove them when the neighbor is removed?
   // Also potentially combine with tag_to_machine_ since they are tags into the same thing
@@ -727,15 +727,15 @@ private:
   // The port used for communications
   std::uint16_t port_;
 
-  // Mapping from a machine address to a pointer to the external master
+  // Mapping from a machine address to a pointer to the external manager
   // This is also used for testing that a connection has completed
-  std::unordered_map<AddrPortPair, internal::ExternalMaster*> addr_to_machine_;
+  std::unordered_map<AddrPortPair, internal::ExternalManager*> addr_to_machine_;
 
   // Mapping from a tag to the ID used for the subscription to the tag
   // Used to know when a subscription is done and for if multiple jobs
   // subscribe to the same tag
   // This is also use to mark when a pending connection is for a tag
-  std::unordered_map<TagID, internal::ExternalMaster*> tag_to_machine_;
+  std::unordered_map<TagID, internal::ExternalManager*> tag_to_machine_;
 
   /** \brief Connection status for pending connections
    */
@@ -779,9 +779,9 @@ private:
   bool notify_subscriptions_ = false;
   bool notify_reduce_group_ = false;
   bool notify_connection_ = false;
-}; // class Master
+}; // class Manager
 
-class MasterHandle {
+class ManagerHandle {
 public:
   /** \brief Connects to another instance at the specified address on
    * the specified port
@@ -805,7 +805,7 @@ public:
    */
   int number_of_neighbors() const noexcept { return handle_->number_of_neighbors(); }
 
-  /** \brief Returns the id of the master
+  /** \brief Returns the id of the manager
    */
   const std::string& id() const noexcept { return handle_->id(); }
 
@@ -834,7 +834,7 @@ public:
   }
 
 
-  /** \brief Returns the port the master is listening on
+  /** \brief Returns the port the manager is listening on
    */
   std::uint16_t port() const noexcept { return handle_->port(); }
 
@@ -842,10 +842,10 @@ private:
   friend class Job;
 
   // Private so that only jobs can create a handle
-  explicit MasterHandle(Master& m) noexcept : handle_{&m} {}
+  explicit ManagerHandle(Manager& m) noexcept : handle_{&m} {}
 
-  Master* handle_;
-}; // class MasterHandle
+  Manager* handle_;
+}; // class ManagerHandle
 } // namespace skynet
 
-#endif // SKYNET_MASTER_HPP
+#endif // SKYNET_MANAGER_HPP

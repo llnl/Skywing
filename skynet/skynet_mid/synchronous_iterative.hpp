@@ -3,7 +3,7 @@
 
 #include "skynet_core/internal/devices/socket_communicator.hpp"
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include "skynet_mid/iterative_method.hpp"
 #include "skynet_mid/iterative_resilience_policies.hpp"
 #include "skynet_mid/internal/iterative_helpers.hpp"
@@ -253,7 +253,7 @@ private:
  * @code
  * using IterMethod = SynchronousIterative<JacobiProcessor<double>, StopAfterTime, TrivialResiliencePolicy>;
  * Waiter<IterMethod> iter_waiter =
- *  WaiterBuilder<IterMethod>(master_handle, job, my_tag, nbr_tags)
+ *  WaiterBuilder<IterMethod>(manager_handle, job, my_tag, nbr_tags)
  *  .set_processor(A, b, row_inds)
  *  .set_stop_policy(std::chrono::seconds(5))
  *  .set_resilience_policy()
@@ -278,13 +278,13 @@ public:
    * policies used. So, let Skynet worry about building the correct
    * tag type.
    *
-   * @param handle MasterHandle object running this agent.
+   * @param handle ManagerHandle object running this agent.
    * @param job The job running the iteration.
    * @param produced_tag_id The string ID of the tag of the data produced by this agent.
    * @param sub_tag_ids An iteration-capable container of string IDs of tags of neighboring data from which this agent will collect updates.
    */
   template<typename Range>
-  WaiterBuilder(MasterHandle handle, Job& job,
+  WaiterBuilder(ManagerHandle handle, Job& job,
                 const std::string produced_tag_id,
                 const Range& sub_tag_ids)
     : handle_(handle), job_(job),
@@ -357,7 +357,7 @@ public:
   }
 
 private:
-  MasterHandle handle_;
+  ManagerHandle handle_;
   Job& job_;
   TagType produced_tag_;
   std::vector<TagType> tags_vec_;

@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "utils.hpp"
 
@@ -18,10 +18,10 @@ constexpr std::chrono::milliseconds wait_period{200};
 
 const std::uint16_t base_port = get_starting_port();
 
-bool try_conn(MasterHandle master, int connecting_index)
+bool try_conn(ManagerHandle manager, int connecting_index)
 {
   for (int i = 0; i < max_conn_attempts; ++i) {
-    if (master.connect_to_server("localhost", base_port + connecting_index).get()) { return true; }
+    if (manager.connect_to_server("localhost", base_port + connecting_index).get()) { return true; }
     std::this_thread::sleep_for(wait_period);
   }
   return false;
@@ -29,9 +29,9 @@ bool try_conn(MasterHandle master, int connecting_index)
 
 void machine_task(const int index)
 {
-  Master base_master{
+  Manager base_manager{
     static_cast<std::uint16_t>(base_port + index), std::to_string(index), std::chrono::milliseconds{100}};
-  base_master.submit_job("job", [&](Job&, MasterHandle master) {
+  base_manager.submit_job("job", [&](Job&, ManagerHandle manager) {
     std::ranlux48 prng{std::random_device{}()};
     for (int i = 0; i < num_conns; ++i) {
       std::uniform_int_distribution<int> dist{0, num_machines - 1};
@@ -40,11 +40,11 @@ void machine_task(const int index)
       while (conn_index == index) {
         conn_index = dist(prng);
       }
-      REQUIRE(try_conn(master, conn_index));
+      REQUIRE(try_conn(manager, conn_index));
     }
     SKYNET_SYNCHRONIZE_MACHINES(num_machines);
   });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Heartbeats are sent", "[Heartbeat_basic]")

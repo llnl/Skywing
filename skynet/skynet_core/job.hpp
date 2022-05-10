@@ -1,7 +1,7 @@
 #ifndef SKYNET_JOB_HPP
 #define SKYNET_JOB_HPP
 
-#include "skynet_core/internal/master_waiter_callables.hpp"
+#include "skynet_core/internal/manager_waiter_callables.hpp"
 #include "skynet_core/internal/reduce_group.hpp"
 #include "skynet_core/internal/tag_buffer.hpp"
 #include "skynet_core/internal/utility/mutex_guarded.hpp"
@@ -23,9 +23,9 @@
 #include <vector>
 
 namespace skynet {
-//  A Job needs to be able to communicate with the Master so forward declare it
-class Master;
-class MasterHandle;
+//  A Job needs to be able to communicate with the Manager so forward declare it
+class Manager;
+class ManagerHandle;
 
 /** \brief Tag for pub/sub values
  */
@@ -108,10 +108,10 @@ public:
  */
 class Job {
 public:
-  // Allow the master to call process data and run
+  // Allow the manager to call process data and run
   struct Accessor {
   private:
-    friend class Master;
+    friend class Manager;
     friend class Job;
 
     static bool process_data(
@@ -126,7 +126,7 @@ public:
 
     static void report_dead_tag(Job& j, const TagID& tag) noexcept { j.mark_tag_as_dead(tag); }
 
-    // Work around to disallow construction of Jobs outside of the master
+    // Work around to disallow construction of Jobs outside of the manager
     // A public constructor is needed due to it being emplaced into a map
     struct AllowConstruction {
       // Explicit constructor so that it has to be named, but the name is private
@@ -134,13 +134,13 @@ public:
     };
   };
 
-  /** \brief Creates a job with the specified master and work
+  /** \brief Creates a job with the specified manager and work
    */
   Job(
     Accessor::AllowConstruction,
     const std::string& id,
-    Master& master,
-    std::function<void(Job&, MasterHandle)> to_run) noexcept;
+    Manager& manager,
+    std::function<void(Job&, ManagerHandle)> to_run) noexcept;
 
   /** \brief Declare intent to publish on tags, this must be done before publishing
    * on a tag
@@ -269,7 +269,7 @@ public:
     const auto tags_to_find
       = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_types());
     auto group_ptr
-      = std::make_unique<ReduceGroup<Ts...>>(tags_to_find, *master_, group_tag.id(), tag_produced_for_group.id());
+      = std::make_unique<ReduceGroup<Ts...>>(tags_to_find, *manager_, group_tag.id(), tag_produced_for_group.id());
     return create_reduce_group_future(std::move(group_ptr))
       .then([](internal::ReduceGroupBase& group) -> ReduceGroup<Ts...>& {
         assert(dynamic_cast<ReduceGroup<Ts...>*>(&group) != nullptr);
@@ -495,11 +495,11 @@ private:
   // The last version published on each tag
   std::unordered_map<std::string, VersionID> last_published_version_;
 
-  // The master that this job is working with
-  Master* master_;
+  // The manager that this job is working with
+  Manager* manager_;
 
   // The function this job will run
-  std::function<void(Job&, MasterHandle)> to_run_;
+  std::function<void(Job&, ManagerHandle)> to_run_;
 
   // The list of tags this job produces and the expected types
   std::unordered_map<TagID, gsl::span<const std::uint8_t>> tags_produced_;

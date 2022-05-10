@@ -34,7 +34,7 @@ class future {
 
 class instance
 {
-  job& get_job(); // RPC with skynet job master on same device
+  job& get_job(); // RPC with skynet job manager on same device
 }
 
 class job {

@@ -15,12 +15,12 @@ skynet_core_lib = static_library('skynet_core',
     'internal/devices/socket_communicator.cpp',
     'internal/utility/network_conv.cpp',
     'internal/capn_proto_wrapper.cpp',
-    'internal/master_waiter_callables.cpp',
+    'internal/manager_waiter_callables.cpp',
     'internal/message_creators.cpp',
     'internal/reduce_group.cpp',
-    # 'basic_master_config.cpp',
+    # 'basic_manager_config.cpp',
     'job.cpp',
-    'master.cpp'
+    'manager.cpp'
   ] + platform_specific_sources,
   dependencies : [skynet_core_internal_dep],
   include_directories : include_directories('include')

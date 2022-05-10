@@ -35,30 +35,30 @@ const std::vector<I32ValueTag> reduce_group_tags{
 // All of the Skynet specific code is located in this function.
 void simulate_machine(const int machine_number)
 {
-  // Create a Skynet Master; the Master is responsible for handling communication
+  // Create a Skynet Manager; the Manager is responsible for handling communication
   // and other such supporting tasks in the background
-  skynet::Master master{// The port that the Master will listen for connections on
+  skynet::Manager manager{// The port that the Manager will listen for connections on
                         node_ports[machine_number],
-                        // The name of the Master, each instance in the network must have a unique name
+                        // The name of the Manager, each instance in the network must have a unique name
                         node_names[machine_number]};
-  // Submit work to the master, each job must have a unique name locally, but can be
-  // duplicated on other instances.  Jobs run on separate threads than the master and
+  // Submit work to the manager, each job must have a unique name locally, but can be
+  // duplicated on other instances.  Jobs run on separate threads than the manager and
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
   // be copyable and the signature must be compatible with the function signature
-  // void(skynet::Job&, skynet::MasterHandle)
-  master.submit_job("job", [&](skynet::Job& job, skynet::MasterHandle master_handle) {
+  // void(skynet::Job&, skynet::ManagerHandle)
+  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle manager_handle) {
     // Skynet currently has no way of automatically scanning for new machines while running
     // It will accept any connection requests made to it, however, and the only requirement
     // for it to function is that all nodes have paths to other nodes. To accomplish this,
     // have each instance connect to the higher numbered one, or for the highest numbered
     // one, just advance to the job so the connection can be accepted.
     // This must be done in the job, as it is an asynchronous operation, which requires
-    // the master to be running as well.
+    // the manager to be running as well.
     if (machine_number != static_cast<int>(node_ports.size() - 1)) {
       // Connecting to the server is an asynchronous operation and can fail.
       // Wait for the result each time and keep attempting to connect until it does
-      while (!master_handle.connect_to_server("localhost", node_ports[machine_number + 1]).get()) {
+      while (!manager_handle.connect_to_server("localhost", node_ports[machine_number + 1]).get()) {
         // Empty
       }
     }
@@ -128,9 +128,9 @@ void simulate_machine(const int machine_number)
       }
     }
   });
-  // Start running the master, this will start all submitted jobs and continue
+  // Start running the manager, this will start all submitted jobs and continue
   // running until all jobs are finished, at which point it will return
-  master.run();
+  manager.run();
 }
 
 int main(const int argc, const char* const argv[])

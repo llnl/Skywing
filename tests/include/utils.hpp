@@ -1,7 +1,7 @@
 #ifndef SKYNET_TEST_UTILS_HPP
 #define SKYNET_TEST_UTILS_HPP
 
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -137,19 +137,19 @@ NetworkInfo make_network(const int num_machines, const int num_connections)
 }
 
 // Performs the required steps to create the network from a NetworkInfo
-// The connection argument should have the signature `void(MasterHandle, int)`
+// The connection argument should have the signature `void(ManagerHandle, int)`
 // with the int parameter corresponding to the index of the machine to
 // connect to, and blocking until connected
 // Connect should return a bool indicating if the connection was successful
 template<typename Callable>
-void connect_network(const NetworkInfo& info, MasterHandle& master, const int index, Callable connect)
+void connect_network(const NetworkInfo& info, ManagerHandle& manager, const int index, Callable connect)
 {
   using namespace std::chrono_literals;
   for (const auto connect_to : info.connect_to[index]) {
-    while (!connect(master, connect_to)) { /* nothing */
+    while (!connect(manager, connect_to)) { /* nothing */
     }
   }
-  while (master.number_of_neighbors() != info.num_connections[index]) {
+  while (manager.number_of_neighbors() != info.num_connections[index]) {
     std::this_thread::sleep_for(1ms);
   }
 }

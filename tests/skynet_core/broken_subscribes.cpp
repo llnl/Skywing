@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "skynet_core/enable_logging.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "utils.hpp"
 
@@ -28,13 +28,13 @@ void publish_once(int publish_number, std::uint16_t publish_port)
   // Wait to start to allow the subscriber to notice that the publisher has
   // disconnected so it won't discard this connection for re-using the id
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  Master base_master{publish_port, publisher_id};
-  base_master.submit_job("job", [&](Job& job, MasterHandle master) {
+  Manager base_manager{publish_port, publisher_id};
+  base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    while (!master.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */
+    while (!manager.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */
     }
     job.declare_publication_intent(value_tag);
-    while (master.number_of_subscribers(value_tag) == 0) {
+    while (manager.number_of_subscribers(value_tag) == 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     job.publish(value_tag, value_to_publish);
@@ -43,13 +43,13 @@ void publish_once(int publish_number, std::uint16_t publish_port)
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
-  base_master.run();
+  base_manager.run();
 }
 
 void subscriber()
 {
-  Master base_master{subscriber_port, subscriber_id};
-  base_master.submit_job("job", [&](Job& job, MasterHandle) {
+  Manager base_manager{subscriber_port, subscriber_id};
+  base_manager.submit_job("job", [&](Job& job, ManagerHandle) {
     std::cout << "Starting subscribe job" << std::endl;
     job.subscribe(value_tag).get();
     std::cout << "Subscriber finished first subscription" << std::endl;
@@ -78,7 +78,7 @@ void subscriber()
       REQUIRE_FALSE(failed_value);
     }
   });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Subscribe channels breaking is fine", "[Skynet_BrokenSubscribe]")

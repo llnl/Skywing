@@ -31,16 +31,16 @@ std::mutex catch_mutex;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Master base_master{ports[index], std::to_string(index)};
-  base_master.submit_job("job", [&](Job& job_handle, MasterHandle master) {
+  Manager base_manager{ports[index], std::to_string(index)};
+  base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
       std::cout << "Machine " << index << " about to make connections." << std::endl;
-    connect_network(*info, master, index, [](MasterHandle m, const int i) {
+    connect_network(*info, manager, index, [](ManagerHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
     std::cout << "Machine " << index << " about to build itermethod." << std::endl;
     using IterMethod = AsynchronousIterative
       <QUACCProcessor<>, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
-    IterMethod iter_method = WaiterBuilder<IterMethod>(master, job_handle, tag_ids[index], tag_ids)
+    IterMethod iter_method = WaiterBuilder<IterMethod>(manager, job_handle, tag_ids[index], tag_ids)
       .set_processor(num_machines-1)
       .set_publish_policy()
       .set_stop_policy(std::chrono::seconds(3))
@@ -50,7 +50,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     iter_method.run();
     REQUIRE(iter_method.get_processor().get_count() == num_machines);
     });
-  base_master.run();
+  base_manager.run();
 }
 
 TEST_CASE("Count Test", "[Skynet_CountTest]")

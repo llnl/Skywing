@@ -2,7 +2,7 @@
 #define SKYNET_UPPER_ASYNCHRONOUS_JACOBI_HPP
 
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 namespace skynet
 {

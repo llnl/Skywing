@@ -2,7 +2,7 @@
 
 #include "skynet_core/enable_logging.hpp"
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include "utils.hpp"
 
@@ -19,7 +19,7 @@ constexpr int num_machines = 4;
 
 using Int32Tag = PublishTag<std::int32_t>;
 
-void setup_network(const int index, MasterHandle master)
+void setup_network(const int index, ManagerHandle manager)
 {
   using namespace std::chrono_literals;
   // Give some time to allow all of the servers to start
@@ -27,10 +27,10 @@ void setup_network(const int index, MasterHandle master)
   // Fully connect the network to ensure that at any point all machines can have a
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i) {
-    while (!master.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */
+    while (!manager.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */
     }
   }
-  while (master.number_of_neighbors() != num_machines - 1) {
+  while (manager.number_of_neighbors() != num_machines - 1) {
     std::this_thread::sleep_for(1ms);
   }
 }
@@ -39,17 +39,17 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
 {
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
-  Master master{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  Manager manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
-  master.submit_job("Job 0", [&](Job& my_job, MasterHandle master) {
-    setup_network(index, master);
+  manager.submit_job("Job 0", [&](Job& my_job, ManagerHandle manager) {
+    setup_network(index, manager);
     my_job.declare_publication_intent(publish_tag);
     std::vector<std::string> subscribe_to;
     for (int i = 0; i < num_machines; ++i) {
       if (i != publish_num) { my_job.subscribe(Int32Tag{std::to_string(i)}).wait(); }
       else {
-        while (master.number_of_subscribers(publish_tag) != static_cast<int>(num_machines - 1)) {
+        while (manager.number_of_subscribers(publish_tag) != static_cast<int>(num_machines - 1)) {
           std::this_thread::sleep_for(10ms);
         }
       }
@@ -65,7 +65,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
     for (std::size_t i = 0; i < disconnect_order.size(); ++i) {
       const auto to_remove = disconnect_order[i];
       if (to_remove == index) {
-        // Leaving the loop will cause the master to destruct, automatically
+        // Leaving the loop will cause the manager to destruct, automatically
         // disconnecting
         break;
       }
@@ -77,7 +77,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
       }
     }
   });
-  master.run();
+  manager.run();
   // // Make sure the threads don't exit too soon
   // std::this_thread::sleep_for(1000ms);
 }

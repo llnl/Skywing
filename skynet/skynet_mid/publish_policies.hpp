@@ -2,7 +2,7 @@
 #define UPDATE_NBRS_CRITERION_HPP
 
 #include "skynet_core/job.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include <cmath>
 #include <iostream>
 

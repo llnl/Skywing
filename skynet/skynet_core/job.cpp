@@ -1,7 +1,7 @@
 #include "skynet_core/job.hpp"
 
 #include "skynet_core/internal/utility/logging.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 
 #include <iostream>
 
@@ -9,7 +9,7 @@ namespace skynet {
 std::thread Job::Accessor::run(Job& j) noexcept
 {
   return std::thread{[&j]() {
-    j.to_run_(j, MasterHandle{*j.master_});
+    j.to_run_(j, ManagerHandle{*j.manager_});
     // Re-use the buffer mutex here
     std::lock_guard lock{j.bufs_.mutex()};
     // Signify that the work is done
@@ -20,9 +20,9 @@ std::thread Job::Accessor::run(Job& j) noexcept
 Job::Job(
   Accessor::AllowConstruction,
   const std::string& id,
-  Master& master,
-  std::function<void(Job&, MasterHandle)> to_run) noexcept
-  : id_{id}, master_{&master}, to_run_{std::move(to_run)}
+  Manager& manager,
+  std::function<void(Job&, ManagerHandle)> to_run) noexcept
+  : id_{id}, manager_{&manager}, to_run_{std::move(to_run)}
 {
   assert(!id.empty());
 }
@@ -43,7 +43,7 @@ bool Job::process_data(const TagID& tag_id, gsl::span<const PublishValueVariant>
   if (loc == buffers.cend()) {
     SKYNET_TRACE_LOG(
       "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
-      master_->id(),
+      manager_->id(),
       id_,
       tag_id,
       version,
@@ -56,7 +56,7 @@ bool Job::process_data(const TagID& tag_id, gsl::span<const PublishValueVariant>
   if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer)) {
     SKYNET_WARN_LOG(
       "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index",
-      master_->id(),
+      manager_->id(),
       id_,
       tag_id,
       version,
@@ -66,7 +66,7 @@ bool Job::process_data(const TagID& tag_id, gsl::span<const PublishValueVariant>
     return false;
   }
   SKYNET_TRACE_LOG(
-    "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}", master_->id(), id_, tag_id, version, data);
+    "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}", manager_->id(), id_, tag_id, version, data);
   // Otherwise just make it the current value
   loc->second.buffer->add(data, version);
   data_buffer_modified_cv_.notify_all();
@@ -94,7 +94,7 @@ bool Job::tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase>
 
 size_t Job::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 {
-  return MasterHandle{*master_}.number_of_subscribers(tag);
+  return ManagerHandle{*manager_}.number_of_subscribers(tag);
 }
 
 void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
@@ -123,7 +123,7 @@ void Job::publish_impl(const internal::PublishTagBase& tag, const gsl::span<Publ
   // Find / create the last version and obtain a reference to it
   auto& last_version = last_published_version_.try_emplace(tag.id(), internal::tag_no_data).first->second;
   last_version = last_version + 1;
-  Master::JobAccessor::publish(*master_, last_version, tag.id(), to_send);
+  Manager::JobAccessor::publish(*manager_, last_version, tag.id(), to_send);
 }
 
 // Private implementation of public functions
@@ -178,7 +178,7 @@ Waiter<void> Job::get_subscribe_future(const gsl::span<const internal::PublishTa
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
-  return Master::JobAccessor::subscribe(*master_, tag_ids);
+  return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
 Waiter<bool> Job::get_ip_subscribe_future(
@@ -192,7 +192,7 @@ Waiter<bool> Job::get_ip_subscribe_future(
       "Invalid address \"{}\" for Job::ip_subscribe!  Note that a port must be specified.\n", address);
     std::exit(1);
   }
-  return Master::JobAccessor::ip_subscribe(*master_, addr_pair, tag_ids);
+  return Manager::JobAccessor::ip_subscribe(*manager_, addr_pair, tag_ids);
 }
 
 void Job::declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept
@@ -207,7 +207,7 @@ void Job::declare_publication_intent_impl(gsl::span<const internal::PublishTagBa
       tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase& t) { return t.id(); });
     return tag_ids;
   }();
-  Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
+  Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
 void Job::declare_publication_intent_impl(const gsl::span<const internal::PublishTagBase* const> tags) noexcept
@@ -222,7 +222,7 @@ void Job::declare_publication_intent_impl(const gsl::span<const internal::Publis
       tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase* t) { return t->id(); });
     return tag_ids;
   }();
-  Master::JobAccessor::report_new_publish_tags(*master_, tag_ids);
+  Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
 // void Job::unsubscribe_impl(const TagID& tag_id) noexcept
@@ -260,7 +260,7 @@ internal::ReduceGroupNeighbors Job::create_reduce_group_init(
   SKYNET_TRACE_LOG(
     "\"{}\", job \"{}\", created a reduce group; produced tag is \"{}\", parent tag is \"{}\", child tags are \"{}\", "
     "\"{}\"",
-    master_->id(),
+    manager_->id(),
     id_,
     tag_produced,
     tags_to_find.parent(),
@@ -272,7 +272,7 @@ internal::ReduceGroupNeighbors Job::create_reduce_group_init(
 Waiter<internal::ReduceGroupBase&>
 Job::create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
 {
-  return Master::JobAccessor::create_reduce_group(*master_, std::move(group_ptr));
+  return Manager::JobAccessor::create_reduce_group(*manager_, std::move(group_ptr));
 }
 
 bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept

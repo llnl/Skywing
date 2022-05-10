@@ -1,5 +1,5 @@
 #include "skynet_core/skynet.hpp"
-#include "skynet_core/master.hpp"
+#include "skynet_core/manager.hpp"
 #include "skynet_mid/synchronous_iterative.hpp"
 #include "skynet_mid/asynchronous_iterative.hpp"
 #include "skynet_mid/jacobi_processor.hpp"
@@ -65,16 +65,16 @@ void machine_task(const int machine_number, int trial,
                   std::string save_directory)
 {
 
-  skynet::Master master{ports[machine_number], machine_names[machine_number]};
+  skynet::Manager manager{ports[machine_number], machine_names[machine_number]};
 
-  master.submit_job("job", [&](skynet::Job& job, MasterHandle master_handle) {
+  manager.submit_job("job", [&](skynet::Job& job, ManagerHandle manager_handle) {
 
   std::cout << "Agent " << machine_number << " about to connect to neighbors." << std::endl;
   if (machine_number != (static_cast<int>(ports.size()) - 1))
   {
     // Connecting to the server is an asynchronous operation and can fail.
     // Wait for the result each time and keep attempting to connect until it does
-    while (!master_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
+    while (!manager_handle.connect_to_server("127.0.0.1", ports[machine_number + 1]).get())
     {
       // Empty
     }
@@ -85,7 +85,7 @@ void machine_task(const int machine_number, int trial,
   // using IterMethod = AsynchronousIterative<JacobiProcessor<double>, PublishOnLinfShift<double>,
   //                                          StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =
-    WaiterBuilder<IterMethod>(master_handle, job, tag_ids[machine_number], tag_ids)
+    WaiterBuilder<IterMethod>(manager_handle, job, tag_ids[machine_number], tag_ids)
     .set_processor(A_partition, b_partition, row_indices)
     .set_stop_policy(std::chrono::seconds(5))
     .set_resilience_policy()
@@ -138,7 +138,7 @@ void machine_task(const int machine_number, int trial,
   std::cout << std::endl;
   std::cout << "--------------------------------------------" << std::endl;
   });
-  master.run();
+  manager.run();
 }
 
 
