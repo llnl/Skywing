@@ -5,12 +5,12 @@
 
 using namespace skynet;
 
-  struct Colin { int age; };
+  struct Colin { std::int32_t age; };
     
   template<>
   struct skynet::PubSubConverter<Colin>
   {
-    using pubsub_type = int;
+    using pubsub_type = std::int32_t;
     static pubsub_type convert(Colin c) { return c.age; }
     static Colin deconvert(pubsub_type in) { return Colin{in}; }
   };
@@ -34,7 +34,7 @@ TEST_CASE("PubSub Converter", "[Skynet_PubSubConverter]")
   myVec_t mv1{Colin{1}, Colin{2}};
   myVec_t mv2{Colin{3}, Colin{4}};
   nestedVec_t nestedv{mv1, mv2};
-  using psNestedV_t = std::tuple<std::vector<size_t>, std::vector<int>>;
+  using psNestedV_t = std::tuple<std::vector<std::uint32_t>, std::vector<std::int32_t>>;
   psNestedV_t ps = PubSubConverter<nestedVec_t>::convert(nestedv);
 
   REQUIRE(std::get<0>(ps).size() == 2);
@@ -60,7 +60,7 @@ TEST_CASE("PubSub Converter", "[Skynet_PubSubConverter]")
   mySWVec_t swv1{SirWalter{1, 1.5}, SirWalter{2, 2.5}};
   mySWVec_t swv2{SirWalter{3, 3.5}, SirWalter{4, 4.5}};
   nestedSWVec_t nestedswv{swv1, swv2};
-  using psNestedSWV_t = std::tuple<std::vector<size_t>, std::vector<std::int64_t>, std::vector<double>>;
+  using psNestedSWV_t = std::tuple<std::vector<std::uint32_t>, std::vector<std::int64_t>, std::vector<double>>;
   psNestedSWV_t swps = PubSubConverter<nestedSWVec_t>::convert(nestedswv);
 
   REQUIRE(std::get<0>(swps).size() == 2);

@@ -2,6 +2,7 @@
 #define SKYNET_ITERATIVE_HELPERS_HPP
 
 #include <tuple>
+#include <unordered_map>
 #include <type_traits>
 #include "skynet_core/internal/tag_buffer.hpp"
 
