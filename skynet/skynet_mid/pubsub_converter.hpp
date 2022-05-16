@@ -61,7 +61,7 @@ namespace skynet
   {
     using pubsub_type = std::string;
     static pubsub_type convert(char* c_arr) { return std::string(c_arr); }
-    static char* deconvert(std::string s) { return s.data(); }
+    static char* deconvert(std::string& s) { return s.data(); }
   }; // struct PubSubConverter<char*>
 } // namespace skynet
 
@@ -313,12 +313,12 @@ namespace skynet
     using input_type = std::vector<std::vector<T>>;
     using vecPsT_t = std::vector<PubSub_t<T>>;
     using psVecPsT_t = PubSub_t<vecPsT_t>;
-    using before_final_t = std::tuple<std::vector<std::size_t>, psVecPsT_t>;
+    using before_final_t = std::tuple<std::vector<std::uint32_t>, psVecPsT_t>;
     using pubsub_type = PubSub_t<before_final_t>;
 
     static pubsub_type convert(input_type input)
     {
-      std::vector<std::size_t> vec_sizes;
+      std::vector<std::uint32_t> vec_sizes;
       vecPsT_t flat_vec;
       for (const auto& outerVec : input)
       {
@@ -335,7 +335,7 @@ namespace skynet
     static input_type deconvert(pubsub_type input)
     {
       before_final_t bf = PubSubConverter<before_final_t>::deconvert(input);
-      std::vector<std::size_t> vec_sizes = std::get<0>(bf);
+      std::vector<std::uint32_t> vec_sizes = std::get<0>(bf);
       vecPsT_t flat_vec = PubSubConverter<vecPsT_t>::deconvert(std::get<1>(bf));
       std::vector<std::vector<T>> to_ret;
       auto flat_iter = flat_vec.cbegin();

@@ -88,7 +88,7 @@ void machine_task(int machine_number, int size_of_system,
 
   (void)number_of_neighbors;
   size_t i = static_cast<size_t>(machine_number);
-  using MyAssocVec = AssociativeVector<size_t, double, false>;
+  using MyAssocVec = AssociativeVector<std::uint32_t, double, false>;
   MyAssocVec matrix_column = [&]()
     {
       if (i == 0) return MyAssocVec({{i, 0.1}, {i+1, 1}});
@@ -119,7 +119,7 @@ void machine_task(int machine_number, int size_of_system,
 
   // using SumMethod
   //   = SumProcessor<MyAssocVec, PushFlowProcessor<MyAssocVec>>;
-  using PowerMethod = PowerMethodProcessor<size_t, double>;
+  using PowerMethod = PowerMethodProcessor<std::uint32_t, double>;
   using IterMethod = AsynchronousIterative
     <PowerMethod, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
   Waiter<IterMethod> iter_waiter =

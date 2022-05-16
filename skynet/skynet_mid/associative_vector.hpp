@@ -7,7 +7,7 @@
 namespace skynet
 {
 
-template<typename index_t = size_t,
+template<typename index_t = std::uint32_t,
          typename val_t = double,
          bool isOpen=true>
 class AssociativeVector
@@ -17,8 +17,7 @@ public:
     : default_value_(default_value)
   { }
   
-  template<template<typename> typename Container, typename T>
-  AssociativeVector(Container<T>&& keys, val_t default_value = 0)
+  AssociativeVector(std::vector<index_t>&& keys, val_t default_value = 0)
     : default_value_(default_value)
   {
     for (auto it : keys)

@@ -7,7 +7,7 @@ using namespace skynet;
 
 TEST_CASE("Associative Vector", "[Skynet_AssociativeVector]")
 {
-  using AV1 = AssociativeVector<size_t, int, true>;
+  using AV1 = AssociativeVector<std::uint32_t, std::int32_t, true>;
   AV1 a;
   REQUIRE(a.get_default_value() == 0);
   a[1] = 1;
@@ -66,14 +66,14 @@ TEST_CASE("Associative Vector", "[Skynet_AssociativeVector]")
 
 
 
-  using AV2 = AssociativeVector<size_t, int, false>; // closed AssociativeVector
-  AV2 aa(std::vector<size_t>{1, 2, 4});
+  using AV2 = AssociativeVector<std::uint32_t, std::int32_t, false>; // closed AssociativeVector
+  AV2 aa(std::vector<std::uint32_t>{1, 2, 4}, 0);
   REQUIRE(aa.get_default_value() == 0);
   REQUIRE(aa.size() == 3);
   aa[1] = 1;
   aa[2] = 1;
   aa[4] = 1;
-  AV2 bb(std::vector<size_t>{1, 2, 3});
+  AV2 bb(std::vector<std::uint32_t>{1, 2, 3}, 0);
   REQUIRE(bb.size() == 3);
   aa += bb;
   REQUIRE(aa.size() == 3);
@@ -101,7 +101,7 @@ TEST_CASE("Associative Vector", "[Skynet_AssociativeVector]")
 
   // testing pubsub conversion
   aa += bb;
-  using pubsub_type = std::tuple<int, std::vector<size_t>, std::vector<int>>;
+  using pubsub_type = std::tuple<std::int32_t, std::vector<std::uint32_t>, std::vector<std::int32_t>>;
   pubsub_type ps = PubSubConverter<AV2>::convert(aa);
   REQUIRE(std::get<0>(ps) == 0);
   REQUIRE(std::get<1>(ps).size() == 3);
