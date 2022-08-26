@@ -2,9 +2,9 @@
 double do_dist_dot_product()
 {
   double my_sum = ai * bi;
-  auto fut = skynet::reduce(my_sum, skynet::plus)
+  auto fut = skywing::reduce(my_sum, skywing::plus)
 
-  fut.wait(skynet::ec::throw_on_err{});
+  fut.wait(skywing::ec::throw_on_err{});
 
   return fut.get();
 }
@@ -12,26 +12,26 @@ double do_dist_dot_product()
 bool do_dist_broadcast()
 {
   double my_val;
-  skynet::tag tag = skynet::job::tags(27);
+  skywing::tag tag = skywing::job::tags(27);
 
-  auto fut = skynet::broadcast::send(my_val, tag);
+  auto fut = skywing::broadcast::send(my_val, tag);
 
-  skynet::ec ec;
+  skywing::ec ec;
   fut.wait(ec);
   // send() syscalls to neighbors have completed at this point, if ec == nil
 
-  return ec != skynet::ec::nil;
+  return ec != skywing::ec::nil;
 }
 
 double get_broadcast_val()
 {
-  skynet::tag tag = skynet::job::tags(27);
-  auto fut = skynet::broadcast::receive<double>(tag);
+  skywing::tag tag = skywing::job::tags(27);
+  auto fut = skywing::broadcast::receive<double>(tag);
 
   using namespace std::chrono_literals;
-  skynet::timeout timeout = 5ms;
+  skywing::timeout timeout = 5ms;
 
-  fut.wait(skynet::ec::throw_on_err{}, timeout);
+  fut.wait(skywing::ec::throw_on_err{}, timeout);
 
   return fut.get();
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -N 4
-#SBATCH -J skynet_LC_hello_world
+#SBATCH -J skywing_LC_hello_world
 #SBATCH -t 00:05:00
 #SBATCH -p pbatch
 #SBATCH -o lc_hello_world_out.txt

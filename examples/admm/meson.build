@@ -1,5 +1,5 @@
 admm = executable(
   'admm',
   ['admm.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )

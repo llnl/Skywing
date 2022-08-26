@@ -1,7 +1,7 @@
 helics_hello_world_exe = executable(
   'helics_hello_world',
   ['helics_hello_world.cpp'],
-  dependencies : [skynet_core_dep, helics_dep]
+  dependencies : [skywing_core_dep, helics_dep]
 )
 
 conf_data = configuration_data()

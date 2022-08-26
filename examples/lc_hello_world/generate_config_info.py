@@ -44,10 +44,10 @@ def parse_node_list(node_list_string):
     return node_names_list
     
 def generate_config_file(num_agents, node_names_list, filename, port_start):
-    """Generate a file containing Skynet agent configuration data.
+    """Generate a file containing Skywing agent configuration data.
 
     Inputs:
-    num_agents - (int) The number of agents in the Skynet network
+    num_agents - (int) The number of agents in the Skywing network
     node_names_list - (list of strings) The names of the LC nodes in the job
     filename - (string) Where to write this file.
     port_start - (int) The port to begin counting at for each node.

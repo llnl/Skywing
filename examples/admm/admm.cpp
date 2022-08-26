@@ -1,4 +1,4 @@
-#include "skynet_core/skynet.hpp"
+#include "skywing_core/skywing.hpp"
 
 #include <array>
 #include <atomic>
@@ -9,7 +9,7 @@
 #include <numeric>
 #include <random>
 
-using namespace skynet;
+using namespace skywing;
 
 constexpr int num_machines = 5;
 constexpr std::uint16_t base_port = 25000;
@@ -297,7 +297,7 @@ void run_locally(const int index)
 int main(const int argc, const char* const argv[])
 {
   if (argc > 2) {
-    std::cerr << "Usage:\n" << argv[0] << "[pass something to run without Skynet]\n";
+    std::cerr << "Usage:\n" << argv[0] << "[pass something to run without Skywing]\n";
     return 1;
   }
   std::vector<std::thread> threads;

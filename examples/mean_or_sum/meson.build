@@ -1,7 +1,7 @@
 mean_or_sum_exe = executable(
   'mean_or_sum',
   ['mean_or_sum.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

@@ -11,7 +11,7 @@
 ## Push-Sum 
 
 ## Summary 
-This is example showcases a decentralized implementation of the asynchronous push-sum algorithm implemented in the Skynet upper found in "Full Asynchronous Push-sum with growing Intercommunication intervals for Olshevsky, et al. 
+This is example showcases a decentralized implementation of the asynchronous push-sum algorithm implemented in the Skywing upper found in "Full Asynchronous Push-sum with growing Intercommunication intervals for Olshevsky, et al. 
 Push-sum is an asynchronous distributed averaging algorithm which takes a set of initial values as doubles, and outputs the average of the initial values.
 The auxiliary variables are handled internally.
 In this example, 4 agents store it's machine number + 1 as a double, hence the average is (1+2+3+4)/4 = 2.5, which is output at terminal.

@@ -1,11 +1,11 @@
-#include "skynet_core/skynet.hpp"
-#include "skynet_core/manager.hpp"
-#include "skynet_mid/synchronous_iterative.hpp"
-#include "skynet_mid/asynchronous_iterative.hpp"
-#include "skynet_mid/jacobi_processor.hpp"
-#include "skynet_mid/data_input.hpp"
-#include "skynet_mid/stop_policies.hpp"
-#include "skynet_mid/publish_policies.hpp"
+#include "skywing_core/skywing.hpp"
+#include "skywing_core/manager.hpp"
+#include "skywing_mid/synchronous_iterative.hpp"
+#include "skywing_mid/asynchronous_iterative.hpp"
+#include "skywing_mid/jacobi_processor.hpp"
+#include "skywing_mid/data_input.hpp"
+#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/publish_policies.hpp"
 
 #include <array>
 #include <chrono>
@@ -19,10 +19,10 @@
 // all jacobi_include files for matrix input and data aggregation.
 #include "jacobi_data_output.hpp"
 
-using namespace skynet;
-//using ValueTag = skynet::PublishTag<std::vector<double>>;
+using namespace skywing;
+//using ValueTag = skywing::PublishTag<std::vector<double>>;
 
-// First three functions are for the Skynet setup step.
+// First three functions are for the Skywing setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_network)
 {
   std::vector<std::string > machine_names;
@@ -56,7 +56,7 @@ std::vector<std::string> obtain_tag_ids(std::uint16_t size_of_network)
   return tag_ids;
 }
 
-// All of the Skynet specific code is located in this function.
+// All of the Skywing specific code is located in this function.
 void machine_task(const int machine_number, int trial,
                   std::vector<std::vector<double>> A_partition, std::vector<double> b_partition,
                   std::vector<double> x_partition_solution, std::vector<double> x_full_solution,
@@ -65,9 +65,9 @@ void machine_task(const int machine_number, int trial,
                   std::string save_directory)
 {
 
-  skynet::Manager manager{ports[machine_number], machine_names[machine_number]};
+  skywing::Manager manager{ports[machine_number], machine_names[machine_number]};
 
-  manager.submit_job("job", [&](skynet::Job& job, ManagerHandle manager_handle) {
+  manager.submit_job("job", [&](skywing::Job& job, ManagerHandle manager_handle) {
 
   std::cout << "Agent " << machine_number << " about to connect to neighbors." << std::endl;
   if (machine_number != (static_cast<int>(ports.size()) - 1))
@@ -110,7 +110,7 @@ void machine_task(const int machine_number, int trial,
   double partial_forward_error = calculate_partial_forward_error(row_indices, x_partition_estimate, x_partition_solution);
   double forward_error = calculate_local_forward_error(x_local_estimate, x_full_solution);
 
-  // Saves information from each Skynet machine for post processing, if wanted.
+  // Saves information from each Skywing machine for post processing, if wanted.
   collect_data_each_component(machine_number, 1, trial, partial_forward_error, partial_residual, information_received, run_time, save_directory);
 
 
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
   std::string directory = argv[5];
   int trial = std::stoi(argv[6]);
   std::string save_directory = argv[7];
-  //This creates the relevant vectors needed to interact with skynet.
+  //This creates the relevant vectors needed to interact with skywing.
   auto ports = set_port(starting_port_number, size_of_network);
   auto machine_names = obtain_machine_names(size_of_network);
   std::vector<std::string> tag_ids = obtain_tag_ids(size_of_network);
@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
   std::string x_sol_name =  "x_sol_" + matrix_name ;
   std::vector<double> x_full_solution = input_vector_from_matrix_market<double>("../../../examples/sync_jacobi/system", x_sol_name);
 
-  // Skynet call
+  // Skywing call
   machine_task(machine_number, trial, A_partition, b_partition, x_partition_solution, x_full_solution, row_indices, ports, machine_names, tag_ids, save_directory);
   return 0;
 }

@@ -1,7 +1,7 @@
 lc_hello_world_exe = executable(
   'lc_hello_world',
   ['lc_hello_world.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

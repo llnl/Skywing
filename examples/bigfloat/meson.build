@@ -1,7 +1,7 @@
 bigfloat_exe = executable(
   'big_float',
   ['bigfloat.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 # conf_data = configuration_data()

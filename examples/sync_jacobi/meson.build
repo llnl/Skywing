@@ -1,7 +1,7 @@
 sync_jacobi_exe = executable(
   'sync_jacobi',
   ['sync_jacobi.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

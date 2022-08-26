@@ -1,4 +1,4 @@
-#include "skynet_core/skynet.hpp"
+#include "skywing_core/skywing.hpp"
 
 #include <array>
 #include <chrono>
@@ -20,11 +20,11 @@ constexpr std::array<std::uint16_t, node_names.size()> node_ports{10000, 11000, 
 
 // Tag that can be used to send a value for a reduce operation
 // This tag uses a signed 32-bit integer for the value to send
-using I32ValueTag = skynet::ReduceValueTag<std::int32_t>;
+using I32ValueTag = skywing::ReduceValueTag<std::int32_t>;
 
 // Tag that is used for creating reduction groups that can perform reduce operations
 // The type used for this tag must match the type used for the value tags
-using I32GroupTag = skynet::ReduceGroupTag<std::int32_t>;
+using I32GroupTag = skywing::ReduceGroupTag<std::int32_t>;
 
 // The tags that will be participating in the reduce group
 // Each machine can only produce one tag for the reduce group, but all
@@ -32,12 +32,12 @@ using I32GroupTag = skynet::ReduceGroupTag<std::int32_t>;
 const std::vector<I32ValueTag> reduce_group_tags{
   I32ValueTag{"tag1"}, I32ValueTag{"tag2"}, I32ValueTag{"tag3"}, I32ValueTag{"tag4"}, I32ValueTag{"tag5"}};
 
-// All of the Skynet specific code is located in this function.
+// All of the Skywing specific code is located in this function.
 void simulate_machine(const int machine_number)
 {
-  // Create a Skynet Manager; the Manager is responsible for handling communication
+  // Create a Skywing Manager; the Manager is responsible for handling communication
   // and other such supporting tasks in the background
-  skynet::Manager manager{// The port that the Manager will listen for connections on
+  skywing::Manager manager{// The port that the Manager will listen for connections on
                         node_ports[machine_number],
                         // The name of the Manager, each instance in the network must have a unique name
                         node_names[machine_number]};
@@ -46,9 +46,9 @@ void simulate_machine(const int machine_number)
   // are intended to be where computation and user-defined tasks are done.  Any
   // callable object can be passed as a job, the only restrictions are that it must
   // be copyable and the signature must be compatible with the function signature
-  // void(skynet::Job&, skynet::ManagerHandle)
-  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle manager_handle) {
-    // Skynet currently has no way of automatically scanning for new machines while running
+  // void(skywing::Job&, skywing::ManagerHandle)
+  manager.submit_job("job", [&](skywing::Job& job, skywing::ManagerHandle manager_handle) {
+    // Skywing currently has no way of automatically scanning for new machines while running
     // It will accept any connection requests made to it, however, and the only requirement
     // for it to function is that all nodes have paths to other nodes. To accomplish this,
     // have each instance connect to the higher numbered one, or for the highest numbered
@@ -66,7 +66,7 @@ void simulate_machine(const int machine_number)
     // As creating this group is an expensive operation with a lot of communication,
     // groups should be kept as long as they are needed and not be discarded as soon
     // as a single reduce operation is finished
-    // This function also does not return the group itself, but a skynet::Waiter,
+    // This function also does not return the group itself, but a skywing::Waiter,
     // meaning that the work has been initiated and will be finished on a separate thread
     auto reduce_group_waiter = job.create_reduce_group(
       // The tag for the reduce group, the same group tag and tags used for the

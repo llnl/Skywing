@@ -1,4 +1,4 @@
-#include "skynet_core/skynet.hpp"
+#include "skywing_core/skywing.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -10,10 +10,10 @@
 #include <thread>
 #include <fstream>
 
-using namespace skynet;
+using namespace skywing;
 
-using I32ValueTag = skynet::ReduceValueTag<std::int32_t>;
-using I32GroupTag = skynet::ReduceGroupTag<std::int32_t>;
+using I32ValueTag = skywing::ReduceValueTag<std::int32_t>;
+using I32GroupTag = skywing::ReduceGroupTag<std::int32_t>;
 
 
 struct MachineConfig
@@ -64,8 +64,8 @@ void runJob(
 )
 {
   std::cout << "Agent " << config.name << " is listening on port " << config.port << std::endl;
-  skynet::Manager manager(config.port, config.name);
-  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle managerHandle){
+  skywing::Manager manager(config.port, config.name);
+  manager.submit_job("job", [&](skywing::Job& job, skywing::ManagerHandle managerHandle){
     std::cout << "Agent " << agent_id << " beginning the job." << std::endl;
       
     // standard connectivity boilerplate, should get a convenience function

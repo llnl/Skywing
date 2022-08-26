@@ -1,4 +1,4 @@
-project('skynet', 'cpp',
+project('skywing', 'cpp',
   version: '0.1',
   default_options : [
     'cpp_std=c++17',
@@ -50,23 +50,23 @@ endif
 
 subdir('generated_files/generated')
 
-skynet_core_inc = include_directories('skynet', 'generated_files')
-skynet_core_internal_dep = declare_dependency(
-  include_directories : skynet_core_inc,
+skywing_core_inc = include_directories('skywing', 'generated_files')
+skywing_core_internal_dep = declare_dependency(
+  include_directories : skywing_core_inc,
   dependencies : [thread_dep, capnproto_dep, spdlog_dep, gsl_dep],
   sources : [generated_sources]
 )
 
-subdir('skynet/skynet_core')
+subdir('skywing/skywing_core')
 
-skynet_core_dep = declare_dependency(
-  dependencies : skynet_core_internal_dep,
-  link_with : skynet_core_lib
+skywing_core_dep = declare_dependency(
+  dependencies : skywing_core_internal_dep,
+  link_with : skywing_core_lib
 )
 
-subdir('skynet/skynet_mid')
-skynet_upper_dep = declare_dependency(
-  dependencies : skynet_core_dep
+subdir('skywing/skywing_mid')
+skywing_upper_dep = declare_dependency(
+  dependencies : skywing_core_dep
 )
 
 if build_tests

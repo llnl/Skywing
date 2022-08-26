@@ -1,7 +1,7 @@
 #ifndef SKYNET_TEST_UTILS_HPP
 #define SKYNET_TEST_UTILS_HPP
 
-#include "skynet_core/manager.hpp"
+#include "skywing_core/manager.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -11,7 +11,7 @@
 #include <random>
 #include <vector>
 
-namespace skynet {
+namespace skywing {
 std::mt19937_64 make_prng() noexcept
 {
   // The number of bytes required for initilizing a Mersenne Twister
@@ -153,7 +153,7 @@ void connect_network(const NetworkInfo& info, ManagerHandle& manager, const int 
     std::this_thread::sleep_for(1ms);
   }
 }
-} // namespace skynet
+} // namespace skywing
 
 // Macro to synchronize all machines
 #define SKYNET_SYNCHRONIZE_MACHINES(machine_count)                                          \

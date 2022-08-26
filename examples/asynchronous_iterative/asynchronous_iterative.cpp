@@ -1,4 +1,4 @@
-#include "skynet_core/skynet.hpp"
+#include "skywing_core/skywing.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -10,9 +10,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "skynet_core/enable_logging.hpp"
+#include "skywing_core/enable_logging.hpp"
 
-using DataTag = skynet::PublishTag<double>;
+using DataTag = skywing::PublishTag<double>;
 
 struct MachineConfig {
   std::string name;
@@ -54,12 +54,12 @@ void asynchronous_iterative(
   const double initial_value,
   Callable act_on)
 {
-  skynet::Manager manager(config.port, config.name);
+  skywing::Manager manager(config.port, config.name);
   if (config.tags_produced.empty()) {
     std::cerr << config.name << ": Must produce at least one tag\n";
     std::exit(1);
   }
-  manager.submit_job("job", [&](skynet::Job& job, skynet::ManagerHandle manager_handle) {
+  manager.submit_job("job", [&](skywing::Job& job, skywing::ManagerHandle manager_handle) {
     for (const auto& connect_to_name : config.machines_to_connect_to) {
       const auto conn_to_iter = machines.find(connect_to_name);
       if (conn_to_iter == machines.cend()) {
