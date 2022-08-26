@@ -1,7 +1,7 @@
 async_jacobi_example_exe = executable(
   'async_jacobi',
   ['async_jacobi.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

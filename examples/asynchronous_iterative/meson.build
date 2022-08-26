@@ -7,7 +7,7 @@ config = configure_file(
 async_iterative = executable(
   'asynchronous_iterative',
   ['asynchronous_iterative.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

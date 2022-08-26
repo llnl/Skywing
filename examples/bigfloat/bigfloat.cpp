@@ -1,7 +1,7 @@
 #include <iostream>
-#include "skynet_mid/big_float.hpp"
+#include "skywing_mid/big_float.hpp"
 
-using skynet::BigFloat;
+using skywing::BigFloat;
 
 int main(int, char**)
 {

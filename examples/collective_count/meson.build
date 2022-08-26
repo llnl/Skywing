@@ -1,7 +1,7 @@
 collective_count_exe = executable(
   'collective_count',
   ['collective_count.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

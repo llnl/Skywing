@@ -1,13 +1,13 @@
-#include "skynet_core/skynet.hpp"
-#include "skynet_core/manager.hpp"
-#include "skynet_mid/push_flow_processor.hpp"
-#include "skynet_mid/sum_processor.hpp"
-#include "skynet_mid/power_method_processor.hpp"
-#include "skynet_mid/asynchronous_iterative.hpp"
-#include "skynet_mid/data_input.hpp"
-#include "skynet_mid/stop_policies.hpp"
-#include "skynet_mid/publish_policies.hpp"
-#include "skynet_mid/associative_vector.hpp"
+#include "skywing_core/skywing.hpp"
+#include "skywing_core/manager.hpp"
+#include "skywing_mid/push_flow_processor.hpp"
+#include "skywing_mid/sum_processor.hpp"
+#include "skywing_mid/power_method_processor.hpp"
+#include "skywing_mid/asynchronous_iterative.hpp"
+#include "skywing_mid/data_input.hpp"
+#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/publish_policies.hpp"
+#include "skywing_mid/associative_vector.hpp"
 
 #include <array>
 #include <chrono>
@@ -17,10 +17,10 @@
 #include <iostream>
 #include <thread>
 
-using namespace skynet;
-using ValueTag = skynet::PublishTag<std::vector<double>>;
+using namespace skywing;
+using ValueTag = skywing::PublishTag<std::vector<double>>;
 
-// First three functions are for the Skynet setup step.
+// First three functions are for the Skywing setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_system)
 {
   std::vector<std::string > machine_names;
@@ -72,9 +72,9 @@ void machine_task(int machine_number, int size_of_system,
                   std::vector<std::string> machine_names,
                   std::string pubTagID, std::vector<std::string> tagIDs)
 {
-  skynet::Manager manager{ports[machine_number], machine_names[machine_number]};
+  skywing::Manager manager{ports[machine_number], machine_names[machine_number]};
 
-  manager.submit_job("job", [&](skynet::Job& job, ManagerHandle manager_handle){
+  manager.submit_job("job", [&](skywing::Job& job, ManagerHandle manager_handle){
 
   if (machine_number != static_cast<int>((ports.size()) - 1) )
   {
@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
     return -1;
   }
   
-  // Skynet setup
+  // Skywing setup
   std::vector<std::uint16_t> ports = set_port(starting_port_number, size_of_system);
   std::vector<std::string> machine_names = obtain_machine_names(size_of_system);
   std::vector<std::string> subTagIDs = obtain_tag_ids(size_of_system);
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
   // Push sum variables -> initialized by user
   int number_of_neighbors = size_of_system - 1;
 
-  // Skynet job
+  // Skywing job
   machine_task(machine_number, size_of_system, number_of_neighbors,
                ports, machine_names, pubTagID, subTagIDs);
   return 0;

@@ -1,4 +1,4 @@
-namespace skynet
+namespace skywing
 {
 
 struct tag {
@@ -34,7 +34,7 @@ class future {
 
 class instance
 {
-  job& get_job(); // RPC with skynet job manager on same device
+  job& get_job(); // RPC with skywing job manager on same device
 }
 
 class job {
@@ -50,10 +50,10 @@ class job {
 namespace broadcast
 {
 template<typename MessageT>
-skynet::future<void> send(MessageT val, tag t);
+skywing::future<void> send(MessageT val, tag t);
 
 template<typename MessageT>
-skynet::future<MessageT> receive(tag t);
+skywing::future<MessageT> receive(tag t);
 } // namespace broadcast;
 
 namespace operators
@@ -65,6 +65,6 @@ struct multiply : operator {};
 using namespace operators;
 
 template<typename MessageT>
-skynet::future<MessageT> reduce(MessageT val, operator op);
+skywing::future<MessageT> reduce(MessageT val, operator op);
 
-} // namespace skynet
+} // namespace skywing

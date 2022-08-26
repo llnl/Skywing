@@ -1,7 +1,7 @@
 power_method_exe = executable(
   'power_method',
   ['power_method.cpp'],
-  dependencies : [skynet_core_dep]
+  dependencies : [skywing_core_dep]
 )
 
 conf_data = configuration_data()

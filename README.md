@@ -37,7 +37,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
  * Create build files
    * `mkdir build`
    * `meson build`
- * Build Skynet
+ * Build Skywing
    * `cd build`
    * `ninja`
  * Run tests
@@ -59,7 +59,7 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * `./configure --prefix=capnp_build_dir`
    * This will create subdirectories `capnp_build_dir/bin`, `capnp_build_dir/include`, and `capnp_build_dir/lib`
 
-### Building Skynet
+### Building Skywing
  * Load meson (python), ninja, and switch to more recent version of gcc
    * 'ml python/3.8.2`
    * `ml ninja`
@@ -68,18 +68,18 @@ A high-reliability, real-time, decentralized platform for collaborative autonomy
    * `export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:capnp_build_dir/lib/pkgconfig`
  * Follow build instructions as normal
  * To build the LC Hello World example, also include `-Dbuild_lc_examples=true` in the meson options.
- * To run the LC example, go to `(skynet_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
+ * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
 
-### Running Skynet
+### Running Skywing
  * Add capnp shared library to LD_LIBRARY_PATH
    * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib`
  * Run as normal for running on login node. Note: can't run long jobs on login nodes!
- * Skynet configurations that involve many connections between agents can run into a file descriptor limit.  The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which is determined by executing `ulimit -Hn`) 
+ * Skywing configurations that involve many connections between agents can run into a file descriptor limit.  The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which is determined by executing `ulimit -Hn`) 
 
-Note that Skynet configurations that involve many connections between agents can run into a file descriptor limit.
+Note that Skywing configurations that involve many connections between agents can run into a file descriptor limit.
 The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)
 
 
 ---
 
-The skynet_upper name is a temporary placeholder name for higher parts of the library that build on the lower parts, which are in skynet_core.
+The skywing_upper name is a temporary placeholder name for higher parts of the library that build on the lower parts, which are in skywing_core.

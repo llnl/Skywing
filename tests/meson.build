@@ -36,8 +36,8 @@ foreach directory, test_names : core_tests
   foreach test_name : test_names
     exe = executable(
       test_name,
-      ['skynet_' + directory + '/' + test_name + '.cpp', 'catch_main.cpp'],
-      dependencies : [catch2_dep, skynet_core_dep],
+      ['skywing_' + directory + '/' + test_name + '.cpp', 'catch_main.cpp'],
+      dependencies : [catch2_dep, skywing_core_dep],
       include_directories : include_directories('include')
     )
     write_to_file += directory + '/' + test_name + '\0' + exe.full_path() + '\n'
