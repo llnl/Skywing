@@ -1,5 +1,5 @@
-#ifndef SKYNET_SKYNET_HPP
-#define SKYNET_SKYNET_HPP
+#ifndef SKYWING_SKYWING_HPP
+#define SKYWING_SKYWING_HPP
 
 // Just include all of the common files here
 #include "enable_logging.hpp"
@@ -8,4 +8,4 @@
 #include "types.hpp"
 #include "waiter.hpp"
 
-#endif // SKYNET_SKYNET_HPP
+#endif // SKYWING_SKYWING_HPP
