@@ -21,7 +21,13 @@ std::vector<std::byte> finalize_message(capnp::MallocMessageBuilder& builder) no
 {
   // Calculate the sizes
   constexpr auto net_size = sizeof(NetworkSizeType);
+
+#if __arm__ //32bit ARM
+  const std::size_t msg_size = capnp::computeSerializedSizeInWords(builder) * 8 + 8;
+#else
   const std::size_t msg_size = capnp::computeSerializedSizeInWords(builder) * sizeof(std::size_t);
+#endif
+
   const std::size_t buf_size = net_size + msg_size;
 
   // Write the message to a buffer
