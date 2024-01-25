@@ -11,6 +11,8 @@
 using namespace skywing;
 using namespace skywing::internal;
 
+namespace {
+
 constexpr std::uint16_t port = 40000;
 constexpr int value_to_send = 3871;
 std::mutex catch_mutex;
@@ -87,7 +89,7 @@ void client()
           return;
 
         default:
-          std::cerr << "Error returned from conn.connection_progress_status()\n";
+          std::cerr << "Error returned from conn.connection_progress_status()" << std::endl;
           std::exit(1);
           break;
         }
@@ -96,8 +98,9 @@ void client()
     do_send(conn);
   }
 }
+} // namespace
 
-TEST_CASE("Communicating between sockets works", "[Skywing_SocketCommunicator]")
+TEST_CASE("Communicating between sockets works", "[core]")
 {
   using namespace std::chrono_literals;
   std::thread s(server);

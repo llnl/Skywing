@@ -1,13 +1,16 @@
-#ifndef IDEMPOTENT_PROCESSOR_HPP
-#define IDEMPOTENT_PROCESSOR_HPP
+#ifndef SKYWING_MID_IDEMPOTENT_PROCESSOR_HPP
+#define SKYWING_MID_IDEMPOTENT_PROCESSOR_HPP
 
-using namespace skywing;
+#include <functional>
+
+namespace skywing
+{
 
 /**
  * An idempotent operation is one that can be applied multiple times
  * without changing the result. This processor can be used to
  * collectively compute operations in which the local update is
- * idempotent. 
+ * idempotent.
  *
  * Some examples include maximum, minimum, unions, logical-AND,
  * logical-OR, and projections. This does not include operations such
@@ -71,5 +74,5 @@ using LogicalAndProcessor = IdempotentProcessor<T, std::logical_and<T>>;
 template<typename T>
 using LogicalOrProcessor = IdempotentProcessor<T, std::logical_or<T>>;
 
-
-#endif // IDEMPOTENT_PROCESSOR_HPP
+}// namespace skywing
+#endif // SKYWING_MID_IDEMPOTENT_PROCESSOR_HPP

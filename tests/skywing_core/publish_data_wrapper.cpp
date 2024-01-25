@@ -8,6 +8,7 @@
 
 using namespace skywing::internal;
 
+namespace {
 template<typename T>
 bool roundtrip_value(const T& val)
 {
@@ -22,8 +23,9 @@ bool roundtrip_value(const T& val)
   REQUIRE(value);
   return *value == val;
 }
+} // namespace
 
-TEST_CASE("Cap'n Proto Wrappers Work", "[Skywing_CapnProto_Wrappers]")
+TEST_CASE("Cap'n Proto Wrappers Work", "[core][unit]")
 {
   using namespace std::string_literals;
 

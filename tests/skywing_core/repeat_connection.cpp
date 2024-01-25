@@ -11,17 +11,16 @@
 
 using namespace skywing;
 
+namespace {
 constexpr int num_machines = 3;
 constexpr int num_conns = 10;
 constexpr int max_conn_attempts = 5;
 constexpr std::chrono::milliseconds wait_period{200};
 
-const std::uint16_t base_port = get_starting_port();
-
 bool try_conn(ManagerHandle manager, int connecting_index)
 {
   for (int i = 0; i < max_conn_attempts; ++i) {
-    if (manager.connect_to_server("localhost", base_port + connecting_index).get()) { return true; }
+    if (manager.connect_to_server("localhost", get_starting_port() + connecting_index).get()) { return true; }
     std::this_thread::sleep_for(wait_period);
   }
   return false;
@@ -30,7 +29,7 @@ bool try_conn(ManagerHandle manager, int connecting_index)
 void machine_task(const int index)
 {
   Manager base_manager{
-    static_cast<std::uint16_t>(base_port + index), std::to_string(index), std::chrono::milliseconds{100}};
+    static_cast<std::uint16_t>(get_starting_port() + index), std::to_string(index), std::chrono::milliseconds{100}};
   base_manager.submit_job("job", [&](Job&, ManagerHandle manager) {
     std::ranlux48 prng{std::random_device{}()};
     for (int i = 0; i < num_conns; ++i) {
@@ -46,8 +45,9 @@ void machine_task(const int index)
   });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Heartbeats are sent", "[Heartbeat_basic]")
+TEST_CASE("Repeat connection test", "[core]")
 {
   using namespace std::chrono_literals;
   std::vector<std::thread> threads;

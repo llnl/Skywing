@@ -14,6 +14,7 @@
 
 using namespace skywing;
 
+namespace {
 // Emulate multiple machines with multiple threads at this point
 // The network looks like this:
 //  M0   +--M1
@@ -32,9 +33,6 @@ constexpr std::array<const char*, 5> machine_names{"m0", "m1", "m2", "m3", "m4"}
 // The names of the tags
 constexpr std::array<const char*, 5> tag_names{"t0", "t1", "t2", "t3", "t4"};
 
-// The port each machine is on
-auto ports = create_ports(5);
-
 // machine connections to make
 constexpr std::array<std::array<int, 3>, 5> to_connect{
   std::array<int, 3>{-1, -1, -1},
@@ -45,7 +43,9 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
 
 using Uint64Tag = PublishTag<std::uint64_t>;
 
-void setup_network(ManagerHandle manager, const std::size_t index)
+void setup_network(ManagerHandle manager,
+                   std::vector<std::uint16_t> const& ports,
+                   const std::size_t index)
 {
   using namespace std::chrono_literals;
   // Connect to the corresponding machines (if any)
@@ -60,12 +60,12 @@ void setup_network(ManagerHandle manager, const std::size_t index)
   }
 }
 
-void machine_task(const std::size_t index)
+void machine_task(const std::size_t index, std::vector<std::uint16_t> const& ports)
 {
   Manager base_manager{ports[index], machine_names[index]};
   // Submit job and broadcast on the job using each machine
-  base_manager.submit_job("job 0", [index](Job& the_job, ManagerHandle manager) {
-    setup_network(manager, index);
+  base_manager.submit_job("job 0", [&](Job& the_job, ManagerHandle manager) {
+    setup_network(manager, ports, index);
     the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
     // Subscribe to everything ahead of time
     // Things trying to subscribe to each other concurrently can cause the subscription to
@@ -95,13 +95,17 @@ void machine_task(const std::size_t index)
   // Start processing messages
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Broadcast works", "[Skywing_Broadcast]")
+TEST_CASE("Broadcast works", "[core]")
 {
   using namespace std::chrono_literals;
-  std::vector<std::thread> threads;
+  // The port each machine is on
+  auto const ports = create_ports(5);
+
+ std::vector<std::thread> threads;
   for (std::size_t i = 0; i < machine_counts.size(); ++i) {
-    threads.emplace_back(machine_task, i);
+    threads.emplace_back(machine_task, i, ports);
   }
   for (auto&& thread : threads) {
     thread.join();

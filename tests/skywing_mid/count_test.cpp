@@ -15,26 +15,26 @@
 #include <map>
 
 using namespace skywing;
-
+namespace {
 constexpr int num_machines = 4;
 constexpr int num_connections = 1;
-
-const std::uint16_t start_port = get_starting_port();
-
-std::vector<std::string> tag_ids{"tag0", "tag1", "tag2", "tag3"};
-
-const std::array<std::uint16_t, 4> ports{
-  start_port, static_cast<std::uint16_t>(start_port + 1),
-    static_cast<std::uint16_t>(start_port + 2), static_cast<std::uint16_t>(start_port + 3)};
 
 std::mutex catch_mutex;
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
+  const std::uint16_t start_port = get_starting_port();
+  const std::array<std::uint16_t, 4> ports{
+    start_port,
+    static_cast<std::uint16_t>(start_port + 1),
+    static_cast<std::uint16_t>(start_port + 2),
+    static_cast<std::uint16_t>(start_port + 3)};
+  const std::vector<std::string> tag_ids{"tag0", "tag1", "tag2", "tag3"};
+
   Manager base_manager{ports[index], std::to_string(index)};
   base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
       std::cout << "Machine " << index << " about to make connections." << std::endl;
-    connect_network(*info, manager, index, [](ManagerHandle m, const int i) {
+    connect_network(*info, manager, index, [&](ManagerHandle m, const int i) {
       return m.connect_to_server("127.0.0.1", ports[i]).get();
     });
     std::cout << "Machine " << index << " about to build itermethod." << std::endl;
@@ -52,8 +52,9 @@ void machine_task(const NetworkInfo* const info, const int index)
     });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Count Test", "[Skywing_CountTest]")
+TEST_CASE("Count Test", "[mid]")
 {
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;

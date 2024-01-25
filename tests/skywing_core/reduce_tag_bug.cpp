@@ -9,13 +9,15 @@
 
 using namespace skywing;
 
+namespace {
 using ValueTag = ReduceValueTag<std::int32_t>;
 const ReduceGroupTag<std::int32_t> reduce_tag1{"reduce op1"};
 const std::vector<ValueTag> tags1{ValueTag{"tag1"}, ValueTag{"tag2"}};
 const ReduceGroupTag<std::int32_t> reduce_tag2{"reduce op2"};
 const std::vector<ValueTag> tags2{ValueTag{"tag3"}, ValueTag{"tag4"}};
+} // namespace
 
-TEST_CASE("Reduce groups with same machines work", "[Skywing_ReduceTagBug]")
+TEST_CASE("Reduce groups with same machines work", "[core]")
 {
   const auto make_task = [&](int index, std::uint16_t port) -> std::thread {
     return std::thread{[index, port]() {

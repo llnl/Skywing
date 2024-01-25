@@ -8,7 +8,7 @@
 
 namespace skywing
 {
-  
+
 class BigFloat
 {
 public:
@@ -41,7 +41,7 @@ public:
   { return std::make_tuple(exp_, fraction_); }
 
   explicit operator double() const { return BigFloat::to_double(*this); }
-  
+
 private:
   /** @brief Construct a BigFloat from an exponent and a fraction.
    */
@@ -76,19 +76,19 @@ private:
   friend BigFloat log2(const BigFloat& input);
   friend BigFloat exp(const BigFloat& input);
   friend BigFloat log(const BigFloat& input);
-  friend class PubSubConverter<BigFloat>;
+  friend struct PubSubConverter<BigFloat>;
 }; // class BigFloat
 
 
 /**************************************************
  * Arithmetic operators
  *************************************************/
-  
+
 BigFloat operator+(const BigFloat& a, const BigFloat& b)
 {
   if (a.fraction_ == 0) return b;
   if (b.fraction_ == 0) return a;
-  
+
   double mag_diff = a.exp_ - b.exp_;
   if (mag_diff > 0)
   {
@@ -135,7 +135,7 @@ BigFloat operator/(const BigFloat& a, double d)
 bool operator<(const BigFloat& a, const BigFloat& b)
 {
   if (a.fraction_ == 0) return (0 < b.fraction_);
-  if (b.fraction_ == 0) return (a.fraction_ < 0);  
+  if (b.fraction_ == 0) return (a.fraction_ < 0);
   if (a.exp_ == b.exp_) return (a.fraction_ < b.fraction_);
   if ((a.fraction_ * b.fraction_) < 0) return a.fraction_ < b.fraction_;
 
@@ -156,7 +156,7 @@ std::ostream& operator << (std::ostream &out, const BigFloat& b)
   out << b.exp_;
   return out;
 }
-  
+
 /**************************************************
  * Useful functions
  *************************************************/
@@ -184,7 +184,7 @@ BigFloat pow2(const BigFloat& input)
   // small numbers that easily overflow double.
   // need to compute
   // 2^(2^exp_ * fraction_) = (2^fraction_)^(2^exp_)
-    
+
   // abs(input.fraction_) is between 0.5 and 1.0 so this is
   // within bounds of double, so we can use std::pow(double, double).
   BigFloat new_base(std::pow(2.0, input.fraction_));
@@ -209,7 +209,7 @@ BigFloat pow2(const BigFloat& input)
 }
 
 /** @brief Compute log_2(input)
- */ 
+ */
 BigFloat log2(const BigFloat& input)
 {
   // log_2(2^exp_ * fraction_) = exp_ + log_2(fraction_)

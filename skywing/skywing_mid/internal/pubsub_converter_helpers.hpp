@@ -9,7 +9,7 @@ namespace skywing
 
   /*********************************************************************
    * @brief Checks if a type is a specialization
-   *********************************************************************/  
+   *********************************************************************/
 
   template<typename Test, template<typename...> typename Ref>
   struct IsSpecialization : std::false_type {};
@@ -22,7 +22,7 @@ namespace skywing
 
   /*********************************************************************
    * @brief Checks if a type is a tuple
-   *********************************************************************/  
+   *********************************************************************/
 
   template<typename T>
   struct IsTuple : std::false_type { };
@@ -32,10 +32,10 @@ namespace skywing
 
   template<typename T>
   inline constexpr bool IsTuple_v = IsTuple<T>::value;
-  
+
   /*********************************************************************
    * @brief Checks if a type is a native Skywing pubsub type.
-   *********************************************************************/  
+   *********************************************************************/
   template<typename T>
   struct IsPubSubType
   {
@@ -45,7 +45,7 @@ namespace skywing
   };
   template<typename T>
   using IsPubSubType_v = typename IsPubSubType<T>::value;
-    
+
   /*********************************************************************
    * @brief Get the number of tuple elements, after conversion to
    * pubsub type, of I'th element of the Ts.
@@ -62,7 +62,7 @@ namespace skywing
   inline constexpr std::size_t size_of_converted_v =
     size_of_converted<I, Ts...>::size;
 
-  
+
   /**********************************************************************
    * @brief Get the number of tuple elements, after conversion to
    * pubsub type, of first N Ts
@@ -80,7 +80,7 @@ namespace skywing
   };
   template<int N, typename... Ts>
   inline constexpr std::size_t size_of_first_N_v =
-    size_of_first_N<N, Ts...>::size;  
+    size_of_first_N<N, Ts...>::size;
 
 
   // functions for use during conversion
@@ -109,7 +109,7 @@ namespace skywing
    * pre-conversion tuple.
    *
    * For example, suppose we want to send something of original type
-   * \c std::tuple<T1, T2, T3>, and suppose 
+   * \c std::tuple<T1, T2, T3>, and suppose
    *
    * \code{.cpp}
    * PS1 = PubSubConverter<T1>::pubsub_type
@@ -121,7 +121,7 @@ namespace skywing
    * \code{.cpp}
    * std::tuple<PS1, PS21, PS22, PS3> = PubSubConverter<std::tuple<T1, T2, T3>>::pubsub_type
    * \endcode
-   * 
+   *
    * Now suppose we have a runtime object ps_tup of type
    * \c std::tuple<PS1, PS21, PS22, PS3>. To perform deconversion, we'll
    * need to extract each sub-tuple associated with the original

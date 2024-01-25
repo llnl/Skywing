@@ -2,3 +2,7 @@
 .nfs*
 build*/
 .vscode
+.cache/
+*/.backup/
+.backup/
+*~

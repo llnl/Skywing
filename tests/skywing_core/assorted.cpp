@@ -9,7 +9,7 @@
 
 using namespace skywing::internal;
 
-TEST_CASE("Split", "[Skywing_Split]")
+TEST_CASE("Split", "[core][unit]")
 {
   using namespace std::literals;
   using vec = std::vector<std::string_view>;
@@ -21,7 +21,7 @@ TEST_CASE("Split", "[Skywing_Split]")
   REQUIRE(split("test limit of 2"s, ' ', 2) == vec{"test"sv, "limit of 2"sv});
 }
 
-TEST_CASE("Concatenate", "[Skywing_Concatenate]")
+TEST_CASE("Concatenate", "[core][unit]")
 {
   std::vector<int> vals1{1, 2, 3};
   std::array<int, 3> vals2{4, 5, 6};

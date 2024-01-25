@@ -11,9 +11,9 @@
 
 using namespace skywing;
 
+namespace {
 constexpr int num_machines = 5;
 constexpr int num_connections = 1;
-const std::uint16_t base_port = get_starting_port();
 
 using ValueTag = ReduceValueTag<std::int32_t>;
 
@@ -49,10 +49,10 @@ void machine_task(const NetworkInfo* const info, const int index)
 {
   static std::atomic<int> counter{0};
   using namespace std::chrono_literals;
-  Manager base_manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  Manager base_manager{static_cast<std::uint16_t>(get_starting_port() + index), std::to_string(index)};
   base_manager.submit_job("job", [&](Job& the_job, ManagerHandle manager) {
     connect_network(*info, manager, index, [&](ManagerHandle& m, const int i) {
-      return m.connect_to_server("127.0.0.1", base_port + i).get();
+      return m.connect_to_server("127.0.0.1", get_starting_port() + i).get();
     });
     // Create the reduce group
     auto fut = the_job.create_reduce_group(reduce_tag, tags[index], {tags.begin(), tags.end()});
@@ -75,8 +75,9 @@ void machine_task(const NetworkInfo* const info, const int index)
   });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Reduce works", "[Skywing_SimpleReduce]")
+TEST_CASE("Simple reduce works", "[core]")
 {
   const auto network_info = make_network(num_machines, num_connections);
   std::vector<std::thread> threads;
