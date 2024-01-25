@@ -1,7 +1,7 @@
 #ifndef SKYNET_GENERATED_ENDIAN_HPP
 #define SKYNET_GENERATED_ENDIAN_HPP
 
-#include @endian_include@
+#include "@endian_include@"
 
 namespace skywing::internal
 {

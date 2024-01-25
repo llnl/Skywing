@@ -14,7 +14,7 @@
 
 using namespace skywing;
 
-const std::uint16_t base_port = get_starting_port();
+namespace {
 constexpr int num_machines = 4;
 
 using Int32Tag = PublishTag<std::int32_t>;
@@ -27,7 +27,7 @@ void setup_network(const int index, ManagerHandle manager)
   // Fully connect the network to ensure that at any point all machines can have a
   // broadcast reach every other machine
   for (int i = 0; i < index; ++i) {
-    while (!manager.connect_to_server("127.0.0.1", base_port + i).get()) { /* nothing */
+    while (!manager.connect_to_server("127.0.0.1", get_starting_port() + i).get()) { /* nothing */
     }
   }
   while (manager.number_of_neighbors() != num_machines - 1) {
@@ -39,7 +39,7 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
 {
   const auto& disconnect_order = *disconnect_order_ptr;
   using namespace std::chrono_literals;
-  Manager manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  Manager manager{static_cast<std::uint16_t>(get_starting_port() + index), std::to_string(index)};
   const auto publish_num = *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
   const Int32Tag publish_tag{std::to_string(publish_num)};
   manager.submit_job("Job 0", [&](Job& my_job, ManagerHandle manager) {
@@ -81,8 +81,9 @@ void machine_task(const int index, const std::array<int, num_machines>* const di
   // // Make sure the threads don't exit too soon
   // std::this_thread::sleep_for(1000ms);
 }
+} // namespace
 
-TEST_CASE("Disconnecting machines don't break commuincations.", "[Skywing_Disconnect]")
+TEST_CASE("Disconnecting machines doesn't break commuincations.", "[core]")
 {
   // Make a random order to disconnect in
   std::array<int, num_machines> disconnect_order;

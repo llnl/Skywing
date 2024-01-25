@@ -16,7 +16,7 @@ public:
   AssociativeVector(val_t default_value = 0)
     : default_value_(default_value)
   { }
-  
+
   AssociativeVector(std::vector<index_t>&& keys, val_t default_value = 0)
     : default_value_(default_value)
   {
@@ -130,7 +130,7 @@ public:
 
   val_t get_default_value() const { return default_value_; }
   size_t size() const { return data_.size(); }
-  
+
 private:
   val_t default_value_;
   std::unordered_map<index_t, val_t> data_;
@@ -141,7 +141,7 @@ private:
   friend std::ostream& operator<< (std::ostream &out,
                                    const AssociativeVector<I, V, O>& a);
   friend class AssociativeVector<index_t, val_t, !isOpen>;
-  friend class PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>;
+  friend struct PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>;
 }; // class AssociativeVector
 
 template<typename index_t, typename val_t, bool isOpen>
@@ -171,9 +171,9 @@ operator-(const AssociativeVector<index_t, val_t, isOpen>& a)
   AssociativeVector<index_t, val_t, isOpen> new_vec(a.data_);
   for (auto&& iter : new_vec.data_)
     iter.second = -iter.second;
-  return new_vec;  
+  return new_vec;
 }
-  
+
 template<typename index_t, typename val_t, bool isOpen, typename float_t>
 AssociativeVector<index_t, val_t, isOpen>
 operator*(float_t f,

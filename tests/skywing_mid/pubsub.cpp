@@ -5,29 +5,30 @@
 
 using namespace skywing;
 
-  struct Colin { std::int32_t age; };
-    
-  template<>
-  struct skywing::PubSubConverter<Colin>
-  {
-    using pubsub_type = std::int32_t;
-    static pubsub_type convert(Colin c) { return c.age; }
-    static Colin deconvert(pubsub_type in) { return Colin{in}; }
-  };
+struct Colin {
+  std::int32_t age;
+};
 
-  struct SirWalter { std::int64_t meows; double purrs; };
+template<>
+struct skywing::PubSubConverter<Colin> {
+  using pubsub_type = std::int32_t;
+  static pubsub_type convert(Colin c) { return c.age; }
+  static Colin deconvert(pubsub_type in) { return Colin{in}; }
+};
 
-  template<>
-  struct skywing::PubSubConverter<SirWalter>
-  {
-    using pubsub_type = std::tuple<std::int64_t, double>;
-    static pubsub_type convert(SirWalter sw) { return std::make_tuple(sw.meows, sw.purrs); }
-    static SirWalter deconvert(pubsub_type in)
-    { return SirWalter{std::get<0>(in), std::get<1>(in)}; }
-  };
+struct SirWalter {
+  std::int64_t meows;
+  double purrs;
+};
 
+template<>
+struct skywing::PubSubConverter<SirWalter> {
+  using pubsub_type = std::tuple<std::int64_t, double>;
+  static pubsub_type convert(SirWalter sw) { return std::make_tuple(sw.meows, sw.purrs); }
+  static SirWalter deconvert(pubsub_type in) { return SirWalter{std::get<0>(in), std::get<1>(in)}; }
+};
 
-TEST_CASE("PubSub Converter", "[Skywing_PubSubConverter]")
+TEST_CASE("PubSub Converter", "[mid]")
 {
   using myVec_t = std::vector<Colin>;
   using nestedVec_t = std::vector<myVec_t>;
@@ -89,6 +90,4 @@ TEST_CASE("PubSub Converter", "[Skywing_PubSubConverter]")
   REQUIRE(swrv[0][1].purrs == 2.5);
   REQUIRE(swrv[1][0].purrs == 3.5);
   REQUIRE(swrv[1][1].purrs == 4.5);
-  
 }
-

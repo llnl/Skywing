@@ -9,8 +9,8 @@
 
 using namespace skywing;
 
-const std::uint16_t subscriber_port = get_starting_port();
-const std::uint16_t publisher_start_port = subscriber_port + 1;
+namespace {
+
 constexpr const char* publisher_id = "publisher";
 constexpr const char* subscriber_id = "subscriber";
 
@@ -23,6 +23,9 @@ const Int64Tag value_tag{"value"};
 std::mutex catch_mutex;
 std::atomic<int> values_retrieved = 0;
 
+std::uint16_t subscriber_start_port() { return get_starting_port(); }
+std::uint16_t publisher_start_port() { return get_starting_port() + 1; }
+
 void publish_once(int publish_number, std::uint16_t publish_port)
 {
   // Wait to start to allow the subscriber to notice that the publisher has
@@ -31,7 +34,7 @@ void publish_once(int publish_number, std::uint16_t publish_port)
   Manager base_manager{publish_port, publisher_id};
   base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    while (!manager.connect_to_server("127.0.0.1", subscriber_port).get()) { /* nothing */
+    while (!manager.connect_to_server("127.0.0.1", subscriber_start_port()).get()) { /* nothing */
     }
     job.declare_publication_intent(value_tag);
     while (manager.number_of_subscribers(value_tag) == 0) {
@@ -48,7 +51,7 @@ void publish_once(int publish_number, std::uint16_t publish_port)
 
 void subscriber()
 {
-  Manager base_manager{subscriber_port, subscriber_id};
+  Manager base_manager{subscriber_start_port(), subscriber_id};
   base_manager.submit_job("job", [&](Job& job, ManagerHandle) {
     std::cout << "Starting subscribe job" << std::endl;
     job.subscribe(value_tag).get();
@@ -80,13 +83,14 @@ void subscriber()
   });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Subscribe channels breaking is fine", "[Skywing_BrokenSubscribe]")
+TEST_CASE("Subscribe channels breaking is fine", "[core]")
 {
   std::thread subscriber_thread{subscriber};
   for (int i = 0; i < num_values_to_publish; ++i) {
     std::cout << "Starting publisher " << i << std::endl;
-    std::thread publish_thread{publish_once, i, publisher_start_port+i};
+    std::thread publish_thread{publish_once, i, publisher_start_port() + i};
     publish_thread.join();
   }
   subscriber_thread.join();

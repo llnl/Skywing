@@ -1,0 +1,13 @@
+add_subdirectory(admm)
+add_subdirectory(async_jacobi)
+add_subdirectory(asynchronous_iterative)
+add_subdirectory(bigfloat)
+add_subdirectory(collective_count)
+add_subdirectory(hello_world)
+add_subdirectory(mean_or_sum)
+add_subdirectory(power_method)
+add_subdirectory(sync_jacobi)
+
+if (SKYWING_BUILD_LC_EXAMPLES)
+  add_subdirectory(lc_hello_world)
+endif ()

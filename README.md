@@ -19,70 +19,80 @@ Some dependencies are managed by Skywing's build process, and some you
 need to acquire yourself beforehand.
 
 ## Dependencies Not Automatically Managed
- * compiler that supports c++17 library
-   * tested: GCC/g++ (8.3.0) and LLVM/clang (6.0.0, 10.0.0, 11.0.0)
- * meson (https://mesonbuild.com/)
-   * requires Python >= 3.8.0
+ * compiler that supports C++17 library
+   * tested: GCC/g++ (10.3.0) and LLVM/clang (14.0.6)
  * CMake (https://cmake.org/)
- * ninja (https://ninja-build.org/)
  * Cap'n Proto (https://capnproto.org/)
-   * requires version 0.8.0 or newer
+   * requires version 1.0 or newer
 
 ## Dependencies Managed as Git Submodules
 
    You do not need to acquire these yourself.
 
  * Catch2
+   * requires version 2.9.0 or newer
  * spdlog
+   * requires version 1.0 or newer
  * Guidelines Support Library (GSL)
 
 ## Build instructions
 
-   Follow these instructions to build a "barebones" version of Skywing without any tests or examples.
+   Follow these instructions to build a "barebones" version of Skywing
+   without any tests or examples. If any dependencies have been
+   installed to nonstandard locations, remember to add the appropriate
+   paths to `CMAKE_PREFIX_PATH` and/or `PKG_CONFIG_PATH`. E.g., for
+   CapnProto and a Bourne-like shell, `export
+   CMAKE_PREFIX_PATH=/path/to/capnproto/install:${CMAKE_PREFIX_PATH}`
+   (prepending ensures your version will be found before any system install).
 
  * Build non-managed dependencies separately
  * Get dependencies
    * `git submodule update --init`
- * Create build files
-   * `mkdir build`
-   * `meson build`
- * Build Skywing
-   * `cd build`
-   * `ninja`
+ * Configure the project
+   * `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSKYWING_BUILD_TESTS=ON`
+ * Build the project
+   * `cmake --build build`
  * Run tests
-   * `meson test --print-errorlogs -t 5.0`
+   * `python3 scripts/tester_script.py build/tests/test_runner.txt`
+ * Optionally install the project. Note that the default installation
+   prefix is `/usr/local` but it can be changed by passing any desired
+   prefix to CMake with `cmake ...
+   -DCMAKE_INSTALL_PREFIX=/path/to/prefix ...`
 
 ## Enabling Tests and Examples
 
-Before creating the build directory, replace the `meson build` command with
+Tests will be built if `SKYWING_BUILD_TESTS` is enabled, and examples
+will be built if `SKYWING_BUILD_EXAMPLES` is enabled in the CMake
+configuration. For example, using the CMake CLI:
 
-`meson build -Dbuild_tests=true -Dbuild_examples=true`
+`cmake -DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON`
 
 ## Guidance for building on LC
 
 If you are running on LLNL's LC clusters, these instructions can help you get set up.
 
 ### Building capnp
- * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must build to a local directory. To do this, on the configure step, use
-   * `./configure --prefix=capnp_build_dir`
-   * This will create subdirectories `capnp_build_dir/bin`, `capnp_build_dir/include`, and `capnp_build_dir/lib`
+ * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must install to a local directory. To do this, on the configure step, use
+   * `./configure --prefix=/path/to/capnp-prefix && make install`
+   * This will create subdirectories `/path/to/capnp-prefix/{bin,include,lib}`
 
 ### Building Skywing
- * Load meson (python), ninja, and switch to more recent version of gcc
-   * 'ml python/3.8.2`
-   * `ml ninja`
-   * `ml gcc/9.3.1`
- * Add capnp pkgconfig directory to PKG_CONFIG_PATH
-   * `export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:capnp_build_dir/lib/pkgconfig`
+ * Load a more recent CMake and switch to more recent version of gcc
+   * `ml cmake/3.26.3`
+   * `ml gcc/11.2.1-magic`
+ * Add capnp prefix directory to `CMAKE_PREFIX_PATH`
+   * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/capnp-prefix`
  * Follow build instructions as normal
- * To build the LC Hello World example, also include `-Dbuild_lc_examples=true` in the meson options.
+ * To build the LC Hello World example, also include `-DSKYWING_BUILD_LC_EXAMPLES=ON` in the CMake options.
  * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
 
 ### Running Skywing
- * Add capnp shared library to LD_LIBRARY_PATH
-   * `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:capnp_build_dir/lib`
+ * If there are issues finding CapnProto libraries at runtime, please
+   file a bug with the development team. In the meantime, adding the
+   appropriate path to `LD_LIBRARY_PATH` can often get you moving:
+   * `export LD_LIBRARY_PATH=/path/to/capnp-prefix/lib64:${LD_LIBRARY_PATH}`
  * Run as normal for running on login node. Note: can't run long jobs on login nodes!
- * Skywing configurations that involve many connections between agents can run into a file descriptor limit.  The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which is determined by executing `ulimit -Hn`) 
+ * Skywing configurations that involve many connections between agents can run into a file descriptor limit.  The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which is determined by executing `ulimit -Hn`)
 
 Note that Skywing configurations that involve many connections between agents can run into a file descriptor limit.
 The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)

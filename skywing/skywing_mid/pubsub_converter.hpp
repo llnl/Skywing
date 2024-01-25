@@ -1,11 +1,12 @@
 #ifndef SKYNET_PUBSUB_CONVERTER_HPP
 #define SKYNET_PUBSUB_CONVERTER_HPP
 
+#include "skywing_core/types.hpp"
+#include "skywing_mid/internal/iterative_helpers.hpp"
+
 #include <tuple>
 #include <utility>
 #include <type_traits>
-#include "skywing_core/types.hpp"
-#include "skywing_mid/internal/iterative_helpers.hpp"
 
 namespace skywing
 {
@@ -26,7 +27,7 @@ namespace skywing
   {
     static_assert(internal::index_of<T, PublishValueTypeList> != internal::size<PublishValueTypeList>,
                   "Looks like you want Skywing to send messages with a new data type. For Skywing to do this, you must implement a specialization of PubSubConverter<T> to translate it into something Skywing knows how to send. See skywing/skywing_mid/pubsub_converter.hpp for more information.");
-    
+
     using input_type = T;
     using pubsub_type = T;
 
@@ -38,7 +39,7 @@ namespace skywing
      */
     static pubsub_type convert(T t) { return t; }
 
-    
+
     /** @brief Convert a Skywing pubsub type back into an original data type.
      *
      * In the default, T is already of that type, so just return the
@@ -91,7 +92,7 @@ namespace skywing
     /** @brief Convert an input of type \c input_type into a tuple of type \c pusub_type.
      *
      * For example, suppose we want to send something of original type
-     * \c std::tuple<T1, T2, T3>, and suppose 
+     * \c std::tuple<T1, T2, T3>, and suppose
      *
      * \code{.cpp}
      * PS1 = PubSubConverter<T1>::pubsub_type
@@ -103,7 +104,7 @@ namespace skywing
      * \code{.cpp}
      * std::tuple<PS1, PS21, PS22, PS3> = PubSubConverter<std::tuple<T1, T2, T3>>::pubsub_type
      * \endcode
-     * 
+     *
      * Now suppose we have a runtime \c my_tup of type \c std::tuple<T1, T2, T3>. Then we have
      * \code{.cpp}
      * using pubsub_t = typename PubSubConverter<std::tuple<T1, T2, T3>>::pubsub_type;
@@ -112,14 +113,14 @@ namespace skywing
      */
     template<typename Indices = std::make_index_sequence<sizeof...(Ts)>>
     static pubsub_type convert(std::tuple<Ts...> tup)
-    { 
+    {
       return convert_impl(std::move(tup), Indices{});
     }
 
     /** @brief Convert an input of type \c pubsub_type into something of type \c input_type.
      *
      * For example, suppose we are sending and receiving information of type
-     * \c std::tuple<T1, T2, T3>, and suppose 
+     * \c std::tuple<T1, T2, T3>, and suppose
      *
      * \code{.cpp}
      * PS1 = PubSubConverter<T1>::pubsub_type
@@ -131,7 +132,7 @@ namespace skywing
      * \code{.cpp}
      * std::tuple<PS1, PS21, PS22, PS3> = PubSubConverter<std::tuple<T1, T2, T3>>::pubsub_type
      * \endcode
-     * 
+     *
      * Now suppose we have a runtime \c ps_tup of type \c
      * std::tuple<PS1, PS21, PS22, PS3> that we received from another
      * agent. Then we have
@@ -142,7 +143,7 @@ namespace skywing
      */
     template<typename Indices = std::make_index_sequence<sizeof...(Ts)>>
     static input_type deconvert(pubsub_type ps_tup)
-    { 
+    {
       return deconvert_impl(std::move(ps_tup), Indices{});
     }
 
@@ -152,7 +153,7 @@ namespace skywing
     {
       return std::tuple_cat(convert_and_tuplify(std::move(std::get<I>(tup)))...);
     }
-    
+
 
     template<std::size_t I>
     static auto extract_and_deconvert(pubsub_type& tup)
@@ -170,7 +171,7 @@ namespace skywing
   }; // struct PubSubConverter<std::tuple<Ts...>>
 
 
-  
+
   /** @brief PubSubConverter specialization for unordered_maps
    *
    * Converts it into a tuple of parallel vectors.
@@ -198,11 +199,11 @@ namespace skywing
                          PubSubConverter<std::vector<S>>::convert(vals_vec)));
     }
 
-    
+
     static input_type deconvert(pubsub_type out)
     {
       before_final_t bf_out = PubSubConverter<before_final_t>::deconvert(out);
-      
+
       std::vector<T> keys_vec
         = PubSubConverter<std::vector<T>>::deconvert(std::get<0>(bf_out));
       std::vector<S> vals_vec
@@ -212,7 +213,7 @@ namespace skywing
         map_to_ret[keys_vec[i]] = vals_vec[i];
       return map_to_ret;
     }
-    
+
   }; // struct PubSubConverter<std::unordered_map<T, S>>
 
   /** template specialization for PubSubConverter for
@@ -298,7 +299,7 @@ namespace skywing
       return to_ret;
     }
 
-    
+
   }; // struct PubSubConverter<std::vector<std::tuple<Ts...>>>
 
 
@@ -366,7 +367,7 @@ namespace skywing
     using input_type = std::vector<T>;
     using before_final_t = std::vector<PubSub_t<T>>;
     using pubsub_type = PubSub_t<before_final_t>;
-      
+
     static pubsub_type convert(std::vector<T> input)
     {
       before_final_t before_final_vec;
@@ -374,7 +375,7 @@ namespace skywing
         before_final_vec.push_back(PubSubConverter<T>::convert(it));
       return PubSubConverter<before_final_t>::convert(before_final_vec);
     }
-      
+
     static input_type deconvert(pubsub_type ps_input)
     {
       before_final_t before_final_vec = PubSubConverter<before_final_t>::deconvert(ps_input);
@@ -386,9 +387,9 @@ namespace skywing
   }; // struct PubSubConverter<std::vector<T>>
 
 
-  
+
   // struct Colin { int c; };
-    
+
   // template<>
   // struct PubSubConverter<Colin>
   // {
@@ -431,7 +432,7 @@ namespace skywing
   //   vec_tup_t vt = {{1, true}, {2, false}};
   //   PubSub_t<vec_tup_t> ps_vt = PubSubConverter<vec_tup_t>::convert(vt);
   //   vec_tup_t vt2 = PubSubConverter<vec_tup_t>::deconvert(ps_vt);
-    
+
   //   using ps_Colin = PubSub_t<Colin>;
   //   Colin cc{3};
   //   ps_Colin pscc = PubSubConverter<Colin>::convert(cc);

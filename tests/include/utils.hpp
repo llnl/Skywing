@@ -9,10 +9,12 @@
 #include <iostream>
 #include <numeric>
 #include <random>
+#include <sstream>
+#include <stdexcept>
 #include <vector>
 
 namespace skywing {
-std::mt19937_64 make_prng() noexcept
+inline std::mt19937_64 make_prng() noexcept
 {
   // The number of bytes required for initilizing a Mersenne Twister
   constexpr auto bytes_needed = std::mt19937_64::word_size * std::mt19937_64::state_size;
@@ -27,28 +29,32 @@ std::mt19937_64 make_prng() noexcept
 }
 
 // Reads the starting port number from the environment, exiting the program on failure
-std::uint16_t get_starting_port() noexcept
+inline std::uint16_t get_starting_port()
 {
-  const auto port_str = std::getenv("START_PORT");
-  if (!port_str) {
-    std::cerr << "Could not find environment variable START_PORT\n";
-    std::exit(1);
-  }
-  char* end_ptr;
-  const auto port = std::strtol(port_str, &end_ptr, 10);
-  if (end_ptr == port_str) {
-    std::cerr << "Error parsing START_PORT (value is \"" << port_str << "\")\n";
-    std::exit(1);
-  }
-  if (port > 0xFFFF) {
-    std::cerr << "START_PORT value is too high (value is \"" << port_str << "\")\n";
-    std::exit(1);
+  std::uint16_t port = 0;
+  if (port == 0) {
+    char const* const port_str = std::getenv("START_PORT");
+    if (!port_str) {
+      throw std::runtime_error("Could not find environment variable START_PORT");
+    }
+    auto const candidate = std::atol(port_str);
+    if (candidate == 0) {
+      std::ostringstream msg;
+      msg << "Error parsing START_PORT (value is \"" << port_str << "\")";
+      throw std::runtime_error(msg.str());
+    }
+    if (candidate > 0xFFFF || candidate < 0) {
+      std::ostringstream msg;
+      msg << "START_PORT value is too high (value is \"" << port_str << "\")";
+      throw std::runtime_error(msg.str());
+    }
+    port = static_cast<std::uint16_t>(candidate);
   }
   return port;
 }
 
 // Creates a container of the specified type for ports to connect to
-std::vector<std::uint16_t> create_ports(std::size_t num) noexcept
+inline std::vector<std::uint16_t> create_ports(std::size_t num)
 {
   const auto start_port = get_starting_port();
   std::vector<std::uint16_t> ports(num);
@@ -85,7 +91,7 @@ struct NetworkInfo {
 
 // Returns the maximum number of connections possible for a given number of
 // machines
-constexpr int maximum_connections(const int num_machines)
+inline constexpr int maximum_connections(const int num_machines)
 {
   // The total number of connections possible is the sum from 1 to
   // (number of machines - 1) which is equal to n * (n + 1) / 2
@@ -97,7 +103,7 @@ constexpr int maximum_connections(const int num_machines)
 // the number of connections.  The number of connections will generally exceed
 // the given amount as a random path is done at the end to make sure there are
 // no "islands" in the graph
-NetworkInfo make_network(const int num_machines, const int num_connections)
+inline NetworkInfo make_network(const int num_machines, const int num_connections)
 {
   assert(num_machines > 1);
   assert(num_connections <= maximum_connections(num_machines));

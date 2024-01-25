@@ -5,7 +5,7 @@
 
 using namespace skywing;
 
-TEST_CASE("Associative Vector", "[Skywing_AssociativeVector]")
+TEST_CASE("Associative Vector", "[mid][unit]")
 {
   using AV1 = AssociativeVector<std::uint32_t, std::int32_t, true>;
   AV1 a;
@@ -112,6 +112,5 @@ TEST_CASE("Associative Vector", "[Skywing_AssociativeVector]")
   REQUIRE(cc[2] == 3);
   REQUIRE(cc[4] == 1);
   REQUIRE(cc.get_keys().size() == 3);
-  
-}
 
+}

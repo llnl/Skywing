@@ -5,7 +5,7 @@
 #include "utils.hpp"
 
 using namespace skywing;
-
+namespace {
 using PubTag = PublishTag<std::int32_t>;
 using PrivatePubTag = PrivateTag<std::int32_t>;
 using GroupTag = ReduceGroupTag<std::int32_t>;
@@ -13,11 +13,13 @@ using ValueTag = ReduceValueTag<std::int32_t>;
 
 const std::array<ValueTag, 2> tags{ValueTag{"Tag 0"}, ValueTag{"Tag 1"}};
 
-std::int32_t reduce_op(std::int32_t a, std::int32_t b) { return a + b; }
+// FIXME (trb 2024/01/03): Unused, but used in commented-out code below.
+// std::int32_t reduce_op(std::int32_t a, std::int32_t b) { return a + b; }
 
 constexpr std::chrono::milliseconds wait_time{1000};
+} // namespace
 
-TEST_CASE("Self-subscription works", "[Skywing_SelfSubscribe]")
+TEST_CASE("Self-subscription works", "[core]")
 {
   Manager base_manager{get_starting_port(), "Lonely"};
 

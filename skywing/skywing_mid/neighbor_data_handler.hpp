@@ -1,6 +1,7 @@
 #ifndef SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 #define SKYNET_NEIGHBOR_DATA_HANDLER_HPP
 
+#include "skywing_core/job.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
 #include "skywing_mid/pubsub_converter.hpp"
 
@@ -178,7 +179,7 @@ namespace skywing
     /* @brief Get the tags that have been updated since the last data "get".
      */
     const std::vector<const TagType*>& get_updated_tags() const { return updated_tags_; }
-    
+
   private:
 
     //TODO: Improve efficiency of these functions to not look up keys
@@ -204,7 +205,7 @@ namespace skywing
       auto tag_iter = tags_.cbegin();
       while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = binary_op(*shift, coef(*tag_iter) * f(neighbor_values_[*tag_iter]));
-      
+
       ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
       {
@@ -231,7 +232,7 @@ namespace skywing
       auto tag_iter = tags_.cbegin();
       while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = coef(*tag_iter) * f(neighbor_values_.at(*tag_iter));
-      
+
       ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
       {
@@ -256,7 +257,7 @@ namespace skywing
       auto tag_iter = tags_.cbegin();
       while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = f(neighbor_values_.at(*tag_iter));
-      
+
       ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
       {
@@ -285,7 +286,7 @@ namespace skywing
       auto tag_iter = tags_.cbegin();
       while (neighbor_values_.find(*tag_iter) == neighbor_values_.end()) ++tag_iter;
       R val = coef(*tag_iter);
-      
+
       ++tag_iter;
       for (; tag_iter != tags_.cend(); ++tag_iter)
       {

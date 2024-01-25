@@ -73,7 +73,7 @@ void merge_associative_containers(T& lhs, T& rhs) noexcept
  * \param split_char The char to split on
  * \param max_count The maximum number of times to split
  */
-std::vector<std::string_view>
+inline std::vector<std::string_view>
   split(const std::string& to_split, const char split_char, const std::size_t max_count = 0) noexcept
 {
   std::vector<std::string_view> to_ret;

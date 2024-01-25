@@ -11,8 +11,8 @@
 
 using namespace skywing;
 
+namespace {
 constexpr int num_machines = 2;
-const std::uint16_t base_port = get_starting_port();
 
 using ValueTag = PublishTag<int, double>;
 using NotifyTag = PublishTag<>;
@@ -34,10 +34,10 @@ const ReduceGroupTag<int, double> reduce_group_name{"reduce"};
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Manager base_manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index)};
+  Manager base_manager{static_cast<std::uint16_t>(get_starting_port() + index), std::to_string(index)};
   base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
     connect_network(*info, manager, index, [](ManagerHandle& m, const int i) {
-      return m.connect_to_server("127.0.0.1", base_port + i).get();
+      return m.connect_to_server("127.0.0.1", get_starting_port() + i).get();
     });
     if (index == 0) {
       job.subscribe(tag1).get();
@@ -64,8 +64,9 @@ void machine_task(const NetworkInfo* const info, const int index)
   });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Publishing multiple values works", "[Skywing_MultiplePublish]")
+TEST_CASE("Publishing multiple values works", "[core]")
 {
   using namespace std::chrono_literals;
   const auto network_info = make_network(num_machines, 1);

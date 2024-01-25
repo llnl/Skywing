@@ -15,23 +15,24 @@
 
 using namespace skywing;
 
+namespace {
 constexpr int num_machines = 5;
 constexpr std::chrono::milliseconds heartbeat_interval{100};
-const std::uint16_t base_port = get_starting_port();
 
 void machine_task(const NetworkInfo* const info, const int index)
 {
-  Manager base_manager{static_cast<std::uint16_t>(base_port + index), std::to_string(index), heartbeat_interval};
+  Manager base_manager{static_cast<std::uint16_t>(get_starting_port() + index), std::to_string(index), heartbeat_interval};
   base_manager.submit_job("dummy job", [&](Job&, ManagerHandle manager) {
     connect_network(*info, manager, index, [&](ManagerHandle m, const int i) {
-      return m.connect_to_server("127.0.0.1", base_port + i).get();
+      return m.connect_to_server("127.0.0.1", get_starting_port() + i).get();
     });
     std::this_thread::sleep_for(heartbeat_interval * 10);
   });
   base_manager.run();
 }
+} // namespace
 
-TEST_CASE("Heartbeats are sent", "[Heartbeat_basic]")
+TEST_CASE("Heartbeats are sent", "[core]")
 {
   using namespace std::chrono_literals;
   const auto network_info = make_network(num_machines, maximum_connections(num_machines));

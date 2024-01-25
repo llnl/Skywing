@@ -9,17 +9,19 @@
 
 using namespace skywing;
 
+namespace {
 using ValueTag = PrivateTag<std::int32_t>;
 const ValueTag tag{"Test IP Tag"};
 const std::int32_t tag_value = 10;
-const std::uint16_t subscriber_port = get_starting_port();
-const std::uint16_t publisher_port = subscriber_port + 1;
 std::atomic<bool> ready_for_subscription = false;
 std::atomic<bool> ready_for_publication = false;
 
+std::uint16_t subscriber_port() { return get_starting_port(); }
+std::uint16_t publisher_port() { return subscriber_port() + 1; }
+
 void publisher()
 {
-  Manager manager{publisher_port, std::to_string(publisher_port)};
+  Manager manager{publisher_port(), std::to_string(publisher_port())};
   manager.submit_job("publisher", [&](Job& job, ManagerHandle handle) {
     job.declare_publication_intent(tag);
     ready_for_subscription = true;
@@ -34,12 +36,12 @@ void publisher()
 
 void subscriber()
 {
-  Manager manager{subscriber_port, std::to_string(subscriber_port)};
+  Manager manager{subscriber_port(), std::to_string(subscriber_port())};
   manager.submit_job("subscriber", [&](Job& job, ManagerHandle) {
     while (!ready_for_subscription) {
       std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
-    job.ip_subscribe("127.0.0.1:" + std::to_string(publisher_port), tag).wait();
+    job.ip_subscribe("127.0.0.1:" + std::to_string(publisher_port()), tag).wait();
     ready_for_publication = true;
     const auto value = job.get_waiter(tag).get();
     REQUIRE(value);
@@ -47,8 +49,9 @@ void subscriber()
   });
   manager.run();
 }
+} // namespace
 
-TEST_CASE("Subscribe to specific IP works", "[Skywing_IPSubscribe]")
+TEST_CASE("Subscribe to specific IP works", "[core]")
 {
   std::thread t1{publisher};
   std::thread t2{subscriber};

@@ -19,7 +19,7 @@ if len(sys.argv) != 2:
 
 with open(sys.argv[1]) as f:
     def parse_line(line):
-        split_line = [x.strip() for x in line.split('\0')]
+        split_line = [x.strip() for x in line.split(' ')]
         return {
             'name': split_line[0],
             'command': split_line[1:]
