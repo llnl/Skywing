@@ -24,6 +24,7 @@ bool span_is_valid(const gsl::span<const PublishValueVariant> value, std::index_
 template<typename... Ts, std::size_t... Is>
 ValueOrTuple<Ts...> make_value(gsl::span<PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
 {
+  (void) seq; // avoid compiler warning in release buiild
   assert(span_is_valid<Ts...>(value, seq));
   if constexpr (sizeof...(Ts) == 1) {
     assert(std::get_if<Ts...>(&value[0]));
@@ -40,6 +41,7 @@ ValueOrTuple<Ts...> make_value(gsl::span<PublishValueVariant> value, std::index_
 template<typename... Ts, std::size_t... Is>
 ValueOrTuple<Ts...> make_value(gsl::span<const PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
 {
+  (void) seq; // avoid compiler warning in release buiild
   assert(span_is_valid<Ts...>(value, seq));
   if constexpr (sizeof...(Ts) == 1) {
     assert(std::get_if<Ts...>(&value[0]));

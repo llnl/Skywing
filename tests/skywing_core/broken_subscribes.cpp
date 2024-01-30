@@ -20,7 +20,6 @@ constexpr std::int64_t value_to_publish = 10;
 using Int64Tag = PublishTag<std::int64_t>;
 const Int64Tag value_tag{"value"};
 
-std::mutex catch_mutex;
 std::atomic<int> values_retrieved = 0;
 
 std::uint16_t subscriber_start_port() { return get_starting_port(); }

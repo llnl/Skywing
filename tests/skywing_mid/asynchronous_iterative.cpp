@@ -31,8 +31,6 @@ std::unordered_map<std::size_t, std::vector<int>> publish_values
 //   return publish_values[tag][ind];
 // }
 
-std::mutex catch_mutex;
-
 void machine_task(const NetworkInfo* const info, const int index)
 {
   const std::uint16_t start_port = get_starting_port();

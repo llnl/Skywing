@@ -218,6 +218,8 @@ public:
       (void)lock;
       return buffers.find(tag.id()) == buffers.cend();
     };
+    (void) tag_is_not_subscribed; // avoid compiler warning in release buiild
+
     // TODO: Make this std::terminate or something instead?
     assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
@@ -419,7 +421,7 @@ public:
   {
     data_buffer_modified_cv_.notify_all();
   }
-  
+
 private:
   /** \brief Checks if a buffer has data without locking
    */

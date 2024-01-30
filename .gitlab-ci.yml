@@ -1,0 +1,64 @@
+stages:
+  - everything
+
+.build-and-test:
+
+  stage: everything
+
+  tags: [quartz, batch]
+
+  variables:
+    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr -p pbatch"
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_DEPTH: 5
+
+  script:
+    - printenv > ${CI_PROJECT_DIR}/ci_environment.log
+    - ${CI_PROJECT_DIR}/.gitlab/build-and-test.sh
+
+  artifacts:
+    when: always
+    paths:
+      - "${CI_PROJECT_DIR}/ci_environment.log"
+      - "${CI_PROJECT_DIR}/configure-outerr.log"
+      - "${CI_PROJECT_DIR}/build-outerr.log"
+      - "${CI_PROJECT_DIR}/testing-outerr.log"
+      - "${CI_PROJECT_DIR}/install-outerr.log"
+    reports:
+      junit: "${CI_PROJECT_DIR}/*junit.xml"
+
+# Extra compilers may be added if you care.
+gcc-10-3-1:
+  variables:
+    MODULES: "gcc/10.3.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "g++"
+  extends: .build-and-test
+
+# NOTE: At time of writing, there is an issue with the LC
+# gcc/11.2.1-magic compiler wrapper with respect to linking ASAN
+# support. I don't believe there's enough value at this time to GCC11
+# (vs just GCC10) to warrant more heroic attempts to force flags
+# through here to make this work until they have fixed the wrapper.
+
+# gcc-11-2-1:
+#   variables:
+#     MODULES: "gcc/11.2.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+#     CXX_COMPILER: "g++"
+#   extends: .build-and-test
+
+clang-14-0-6:
+  variables:
+    MODULES: "clang/14.0.6-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "clang++"
+  extends: .build-and-test
+
+# NOTE: The Intel build fails at the testing stage with Capn Proto
+# exceptions that do not appear in the other builds. For the sake of
+# expediency of merging, I have commented this out until this has been
+# debugged.
+
+# intel-2023-2-1:
+#   variables:
+#     MODULES: "intel/2023.2.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+#     CXX_COMPILER: "icpx"
+#   extends: .build-and-test
