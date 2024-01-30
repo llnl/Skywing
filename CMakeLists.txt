@@ -80,6 +80,7 @@ if (SKYWING_DEVELOPER_BUILD)
     add_compile_options(-Wall -Wextra)
     if (CMAKE_CXX_COMPILER_ID MATCHES "Intel.*")
       add_compile_options(-pedantic)
+      add_compile_options(-fp-model=strict) # NOTE: May impact performance!
     else ()
       add_compile_options(-Wpedantic)
     endif ()

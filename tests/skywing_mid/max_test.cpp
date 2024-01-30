@@ -19,8 +19,6 @@ namespace {
 constexpr int num_machines = 4;
 constexpr int num_connections = 1;
 
-std::mutex catch_mutex;
-
 void machine_task(const NetworkInfo* const info, const int index)
 {
   const std::uint16_t start_port = get_starting_port();

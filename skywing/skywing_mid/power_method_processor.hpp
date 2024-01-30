@@ -71,7 +71,7 @@ public:
 
     // update estimate of normalized eigenvector element
     scalar_t my_Ax = Ax.at(my_index_);
-    if (abs(eigenvalue_estimate_) > 1e-2)
+    if (std::abs(eigenvalue_estimate_) > 1e-2)
       my_eigvec_element_ = 0.75 * my_eigvec_element_ + 0.25 * (my_Ax / eigenvalue_estimate_);
       // my_eigvec_element_ = my_Ax / eigenvalue_estimate_;
 
@@ -87,7 +87,7 @@ public:
 
   scalar_t get_eigenvalue() const { return eigenvalue_estimate_; }
   scalar_t get_eigenvector_element() const { return my_eigvec_element_; }
-  
+
 private:
   // my index in the eigenvector
   index_t my_index_;
@@ -100,7 +100,7 @@ private:
 
   SqNormSumProc_t sqnorm_sum_processor_;
 }; // class PowerMethodProcessor
-  
+
 } // namespace skywing
 
 #endif // POWER_METHOD_HPP
