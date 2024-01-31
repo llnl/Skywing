@@ -52,23 +52,14 @@ set(TEST_SRCS
   skywing_mid/synchronous_iterative.cpp
 )
 
-add_library(catch-main OBJECT
-  catch_main.cpp
-)
-target_link_libraries(catch-main
-  PUBLIC
-  Catch2::Catch2
-)
-
 add_executable(catch-tests
   ${TEST_HDRS}
 )
 target_link_libraries(catch-tests
   PRIVATE
-  catch-main
+  Catch2::Catch2WithMain
 )
 
-target_compile_features(catch-main PUBLIC cxx_std_17)
 target_compile_features(catch-tests PUBLIC cxx_std_17)
 
 set(_test_list)
@@ -85,7 +76,7 @@ foreach (src IN LISTS TEST_SRCS)
   )
   target_link_libraries(${TEST_NAME}-lib
     PUBLIC
-    Catch2::Catch2
+    Catch2::Catch2WithMain
     skywing_mid
   )
 
@@ -93,7 +84,7 @@ foreach (src IN LISTS TEST_SRCS)
   target_link_libraries(${TEST_NAME}
     PRIVATE
     ${TEST_NAME}-lib
-    catch-main
+    Catch2::Catch2WithMain
   )
 
   # C++17

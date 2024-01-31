@@ -1,6 +1,6 @@
 // Tests various assorted things that don't really belong in their own tests
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "skywing_core/internal/utility/algorithms.hpp"
 
