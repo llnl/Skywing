@@ -58,18 +58,31 @@ echo "----------------------------------------------------------------------"
 echo "----------------------------------------------------------------------"
 echo "Building dependencies"
 echo "----------------------------------------------------------------------"
-echo "----------------------------------------------------------------------"
-echo "  Building CapnProto"
-echo "----------------------------------------------------------------------"
 
-CAPNPROTO_PREFIX=${project_dir}/capnproto-ci-install
+CAPNPROTO_PREFIX=${project_dir}/capnproto-${CI_JOB_NAME_SLUG}
 
 cd ${project_dir}
-wget https://capnproto.org/capnproto-c++-1.0.1.1.tar.gz
-tar xf capnproto-c++-1.0.1.1.tar.gz
-cd capnproto-c++-1.0.1.1
-./configure --prefix=${CAPNPROTO_PREFIX}
-make -j 36 install
+if [[ -d ${CAPNPROTO_PREFIX} ]]; then
+    # CapnProto's CMake uses pkg-config under the hood, but doesn't
+    # export relocatable pkg-config files. So we have to create our
+    # own relocatability. This is necessary because ${project_dir} has
+    # at least a runner-specific component that can change run-to-run.
+    find ${CAPNPROTO_PREFIX} -iname '*.pc' | xargs sed -i -e "s|^prefix=.*|prefix=${CAPNPROTO_PREFIX}|"
+
+    # This seems easier than rewriting all of the RPATHs.
+    export LD_LIBRARY_PATH=${CAPNPROTO_PREFIX}/lib:${LD_LIBRARY_PATH}
+else
+    # No CapnProto, so build it.
+    echo "----------------------------------------------------------------------"
+    echo "  Building CapnProto"
+    echo "----------------------------------------------------------------------"
+
+    wget https://capnproto.org/capnproto-c++-1.0.1.1.tar.gz
+    tar xf capnproto-c++-1.0.1.1.tar.gz
+    cd capnproto-c++-1.0.1.1
+    ./configure --prefix=${CAPNPROTO_PREFIX}
+    make -j 36 install
+fi
 
 echo "----------------------------------------------------------------------"
 echo "Building and testing Skywing"
