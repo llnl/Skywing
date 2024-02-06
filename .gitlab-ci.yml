@@ -1,9 +1,10 @@
 stages:
-  - everything
+  - build-and-test
+  - documentation
 
 .build-and-test:
 
-  stage: everything
+  stage: build-and-test
 
   tags: [quartz, batch]
 
@@ -64,3 +65,35 @@ clang-14-0-6:
 #     MODULES: "intel/2023.2.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
 #     CXX_COMPILER: "icpx"
 #   extends: .build-and-test
+
+.build-documentation:
+  stage: documentation
+  tags:
+    - oslic
+    - shell
+  script:
+  - rm -rf public/
+  - cd documentation
+  - doxygen
+  - cd ..
+  - mv documentation/html/ public/
+
+# This builds the documentation for commits that are not on the 'main'
+# branch. This is an important test that a given commit doesn't break
+# the build of the documentation, but these docs should not be
+# published as they would override the main project docs. This should
+# only happen when things are added to the main branch.
+test-build-docs:
+  extends: .build-documentation
+  rules:
+    - if: $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH
+
+# This builds the documentation for commits to the main branch and
+# updates the main project documentation upon success.
+pages:
+  extends: .build-documentation
+  artifacts:
+    paths:
+    - public
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
