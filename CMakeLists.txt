@@ -175,10 +175,11 @@ target_link_libraries(skywing_mid
   skywing_core)
 
 # Setup the C++ standard. Should be at least C++17.
-if (NOT CMAKE_CXX_STANDARD
-    OR CMAKE_CXX_STANDARD EQUAL 98
-    OR CMAKE_CXX_STANDARD LESS 17)
-  target_compile_features(skywing_core PUBLIC cxx_std_17)
+if (CMAKE_CXX_STANDARD)
+  target_compile_features(skywing_core INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
+  target_compile_features(skywing_mid INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
+else ()
+  target_compile_features(skywing_core INTERFACE cxx_std_17)
   target_compile_features(skywing_mid INTERFACE cxx_std_17)
 endif ()
 
@@ -190,6 +191,10 @@ add_subdirectory(skywing/skywing_mid)
 # Helper targets for consistent view of linking
 add_library(skywing::core ALIAS skywing_core)
 add_library(skywing::mid ALIAS skywing_mid)
+
+add_library(skywing::skywing IMPORTED INTERFACE)
+target_link_libraries(skywing::skywing INTERFACE skywing::mid)
+target_link_libraries(skywing::skywing INTERFACE skywing::core)
 
 set_target_properties(skywing_core PROPERTIES
   EXPORT_NAME core)
@@ -208,13 +213,36 @@ if (SKYWING_BUILD_TESTS)
 endif ()
 
 # Install target
+if (CMAKE_INSTALL_PREFIX)
+  message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
+endif ()
+
+set(INCLUDE_INSTALL_DIRS ${CMAKE_INSTALL_INCLUDEDIR})
+set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+set(CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/skywing)
+
+write_basic_package_version_file(
+  "${CMAKE_BINARY_DIR}/SkywingConfigVersion.cmake"
+  COMPATIBILITY SameMinorVersion)
+
+configure_package_config_file(
+  "cmake/SkywingConfig.cmake.in"
+  "${CMAKE_BINARY_DIR}/SkywingConfig.install.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_DIR}
+  PATH_VARS INCLUDE_INSTALL_DIRS LIB_INSTALL_DIR)
 
 install(TARGETS skywing_core skywing_mid
-  EXPORT skywing
+  EXPORT SkywingTargets
   FILE_SET capnp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing"
   FILE_SET core_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing"
   FILE_SET mid_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing")
-
-install(EXPORT skywing
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/skywing
+install(FILES
+  "${PROJECT_BINARY_DIR}/SkywingConfig.install.cmake"
+  RENAME "SkywingConfig.cmake"
+  DESTINATION ${CMAKE_INSTALL_DIR})
+install(FILES
+  "${PROJECT_BINARY_DIR}/SkywingConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_DIR})
+install(EXPORT SkywingTargets
+  DESTINATION ${CMAKE_INSTALL_DIR}
   NAMESPACE skywing::)

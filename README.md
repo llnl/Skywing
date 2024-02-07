@@ -58,6 +58,7 @@ need to acquire yourself beforehand.
    prefix is `/usr/local` but it can be changed by passing any desired
    prefix to CMake with `cmake ...
    -DCMAKE_INSTALL_PREFIX=/path/to/prefix ...`
+   * `cmake --install build`
 
 ## Enabling Tests and Examples
 
