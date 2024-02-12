@@ -103,7 +103,7 @@ endif (SKYWING_DEVELOPER_BUILD)
 
 # Possible submodule dependencies
 if (SKYWING_BUILD_TESTS AND SKYWING_EXTERNAL_CATCH2)
-  find_package(Catch2 2.9.0 REQUIRED CONFIG)
+  find_package(Catch2 3.0.0 REQUIRED CONFIG)
 elseif (SKYWING_BUILD_TESTS)
   add_subdirectory(subprojects/catch2/Catch2)
 endif ()
