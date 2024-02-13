@@ -67,59 +67,6 @@ enum class TagType : char
     publish_tag = publish_tag_marker,
 };
 
-// The implementation for all tags would be the same,
-// so abstract it into a base
-template <TagType BaseTagType>
-class TagBase
-{
-public:
-    TagBase(const TagID& id,
-            const std::span<const std::uint8_t> expected_types) noexcept
-        : id_{static_cast<char>(BaseTagType) + id},
-          expected_types_{expected_types}
-    {}
-
-    const TagID& id() const noexcept { return id_; }
-    const std::span<const std::uint8_t>& expected_types() const noexcept
-    {
-        return expected_types_;
-    }
-
-    friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
-    {
-        return lhs.id_ == rhs.id_
-               && elements_same(lhs.expected_types_, rhs.expected_types_);
-    }
-    friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept
-    {
-        return !(lhs == rhs);
-    }
-
-protected:
-    // Allow private being a publish tag support
-    struct OverridePrefix
-    {};
-    TagBase(OverridePrefix,
-            const TagID& id,
-            const std::span<const std::uint8_t> expected_types) noexcept
-        : id_{id}, expected_types_{expected_types}
-    {}
-
-private:
-    // "deep" comparison of the spans
-    static bool elements_same(std::span<const std::uint8_t> const& lhs,
-                              std::span<const std::uint8_t> const& rhs)
-    {
-        return (lhs.size() == rhs.size())
-               && (std::memcmp(lhs.data(), rhs.data(), lhs.size_bytes()) == 0);
-    }
-
-private:
-    TagID id_;
-    // FIXME (trb 2024/01/16): why is this a view? and of what?
-    std::span<const std::uint8_t> expected_types_;
-}; // class TagBase
-
 template <typename TagT>
 struct hash
 {
@@ -128,18 +75,6 @@ struct hash
         return std::hash<TagID>{}(tb.id());
     }
 }; // struct hash<TagBase<BaseTagType>>
-
-template <typename... Ts>
-inline static constexpr std::array<std::uint8_t, sizeof...(Ts)>
-    expected_type_for{
-        static_cast<std::uint8_t>(index_of<Ts, PublishValueTypeList>)...};
-
-// Convenience aliases
-using PublishTagBase = internal::TagBase<TagType::publish_tag>;
-
-// Empty class for determining if something is a private tag at compile-time
-class PrivateTagBase
-{};
 
 inline static constexpr VersionID tag_no_data = -1;
 

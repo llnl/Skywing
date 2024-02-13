@@ -13,14 +13,13 @@
 namespace skywing::skywing_core {
 
   template<typename T>
-  concept Vector = std::same_as<T, std::vector<typename T::value_type>>
+  concept Vector = std::same_as<T, std::vector<typename T::value_type>>;
 
   template<typename T>
   concept BasicPublishable = std::floating_point<T> || std::signed_integral<T> || std::unsigned_integral<T>;
 
   template<typename T>
-  // concept Publishable = BasicPublishable<T> || Vector<T>
-  concept Publishable = BasicPublishable<T>
+  concept Publishable = BasicPublishable<T>;
 
   /** @brief A collective-global unique identifier for a publication stream.
   *
@@ -60,9 +59,9 @@ namespace skywing::skywing_core {
       std::vector<DataTypeRef> expected_types_{};
 
       template<Publishable... Ts>
-      inline static void set_expected_types(Ts&&... ts)
+      void set_expected_types(Ts&&... ts)
       {
-        (expected_types_.push_back(static_cast<DataTypeRef>(index_of<ts, PublishValueTypeList>)), ...);
+        (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<ts, PublishValueTypeList>)), ...);
       }
   };
 

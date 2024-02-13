@@ -19,6 +19,7 @@
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/types.hpp"
 #include "skywing_core/waiter.hpp"
+#include "tag.hpp"
 
 namespace skywing
 {
@@ -26,61 +27,6 @@ namespace skywing
 class Manager;
 class ManagerHandle;
 
-/** \brief Tag for pub/sub values
- */
-template <typename... Ts>
-// requires ((internal::index_of<Ts, PublishValueTypeList> !=
-// internal::size<PublishValueTypeList>) && ...)
-class PublishTag : public internal::PublishTagBase
-{
-public:
-    explicit PublishTag(const TagID& id) noexcept
-        : internal::PublishTagBase{id, internal::expected_type_for<Ts...>}
-    {
-        assert(!id.empty());
-    }
-
-    explicit PublishTag() noexcept
-      : PublishTag("")
-    { }
-    
-
-    using ValueType = ValueOrTuple<Ts...>;
-    using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
-
-protected:
-    using OverridePrefix = internal::PublishTagBase::OverridePrefix;
-    // For PrivateTag
-    PublishTag(OverridePrefix, const TagID& id)
-        : internal::PublishTagBase{
-              OverridePrefix{}, id, internal::expected_type_for<Ts...>}
-    {}
-}; // class PublishTag
-
-/** \brief Tag for private publish tags
- */
-template <typename... Ts>
-class PrivateTag : public internal::PrivateTagBase, public PublishTag<Ts...>
-{
-private:
-    using Base = PublishTag<Ts...>;
-    using OverridePrefix = typename Base::OverridePrefix;
-
-public:
-    explicit PrivateTag(const TagID& id) noexcept
-        : Base{OverridePrefix{}, skywing::internal::private_tag_marker + id}
-    {
-        assert(!id.empty());
-    }
-
-    friend bool operator<(const PrivateTag& lhs, const PrivateTag& rhs) noexcept
-    {
-        return lhs.id() < rhs.id();
-    }
-
-    using ValueType = ValueOrTuple<Ts...>;
-    using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
-};
 
 /** \brief Job with known tags
  */
@@ -158,46 +104,41 @@ public:
         declare_publication_intent_impl(tags);
     }
 
-    /** \brief Retrieves the specified version for the tag, or latest if no
-     * version is specified
-     *
-     * \return A Waiter for the value
-     * \pre The tag is subscribed to
-     */
-    template <typename... Ts>
-    Waiter<std::optional<ValueOrTuple<Ts...>>>
-    get_waiter(const PublishTag<Ts...>& tag) noexcept
-    {
-        using ValueType = ValueOrTuple<Ts...>;
-        // Can just capture the reference to the value as it
-        // will never get invalidated except when the element is deleted
-        // due to being in an unordered_map
-        auto [buffers, lock] = bufs_.get();
-        (void) lock;
-        const auto tag_iter = buffers.find(tag.id());
-        assert(tag_iter != buffers.cend());
-        auto& tag_info = tag_iter->second;
-        const auto tag_conn_id = tag_info.connection_id;
-        return make_waiter<std::optional<ValueType>>(
-            bufs_.mutex(),
-            data_buffer_modified_cv_,
-            [&tag_info, tag_conn_id]() {
-                return tag_info.buffer->has_data()
-                       || tag_info.error_occurred != TagInfo::Error::no_error
-                       || tag_info.connection_id != tag_conn_id;
-            },
-            [&tag_info]() mutable -> std::optional<ValueType> {
-                // Don't check error information because the connection could
-                // have errored between storing the value in the buffer and then
-                // retrieving it
-                if (tag_info.buffer->has_data()) {
-                    return *static_cast<ValueType*>(tag_info.buffer->get());
-                }
-                else {
-                    return std::nullopt;
-                }
-            });
-    }
+  /** \brief Retrieves the specified version for the tag, or latest if no version
+   * is specified
+   *
+   * \return A Waiter for the value
+   * \pre The tag is subscribed to
+   */
+  template<typename... Ts>
+  Waiter<std::optional<ValueOrTuple<Ts...>>> get_waiter(const skywing_core::Tag<Ts...>& tag) noexcept
+  {
+    using ValueType = ValueOrTuple<Ts...>;
+    // Can just capture the reference to the value as it
+    // will never get invalidated except when the element is deleted
+    // due to being in an unordered_map
+    auto [buffers, lock] = bufs_.get();
+    (void)lock;
+    const auto tag_iter = buffers.find(tag.id());
+    assert(tag_iter != buffers.cend());
+    auto& tag_info = tag_iter->second;
+    const auto tag_conn_id = tag_info.connection_id;
+    return make_waiter<std::optional<ValueType>>(
+      bufs_.mutex(),
+      data_buffer_modified_cv_,
+      [&tag_info, tag_conn_id]() {
+        return tag_info.buffer->has_data() || tag_info.error_occurred != TagInfo::Error::no_error
+            || tag_info.connection_id != tag_conn_id;
+      },
+      [&tag_info]() mutable -> std::optional<ValueType> {
+        // Don't check error information because the connection could have
+        // errored between storing the value in the buffer and then retrieving it
+        if (tag_info.buffer->has_data()) { return *static_cast<ValueType*>(tag_info.buffer->get()); }
+        else {
+          return std::nullopt;
+        }
+      });
+  }
 
   /** \brief Get a value from a subscription, if there is data to get.
 
@@ -216,9 +157,9 @@ public:
 	return std::nullopt;
     }
 
-    /** \brief Checks if a tag buffer has data or not
-     */
-    bool has_data(const internal::PublishTagBase& tag) noexcept;
+  /** \brief Checks if a tag buffer has data or not
+   */
+  bool has_data(const AbstractTag& tag) noexcept;
 
     /** \brief Subscribe to all tags passed into the vector.
      *
@@ -237,21 +178,14 @@ public:
         (void)
             tag_is_not_subscribed; // avoid compiler warning in release buiild
 
-        // TODO: Make this std::terminate or something instead?
-        assert("Tag attempted to be subscribed to twice!"
-               && (... && tag_is_not_subscribed(tags)));
-        using BufferPtr =
-            std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-        const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{
-            tags...};
-        std::array<BufferPtr, sizeof...(Ts)> ptrs{
-            std::make_unique<typename Ts::BufferType>()...};
-        init_or_update_subscribe(
-            std::span<const internal::PublishTagBase>{tag_array},
-            std::span<BufferPtr>{ptrs});
-        return get_subscribe_future(
-            std::span<const internal::PublishTagBase>{tag_array});
-    }
+    // TODO: Make this std::terminate or something instead?
+    assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
+    using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+    const std::array<skywing_core::Tag<>, sizeof...(Ts)> tag_array{tags...};
+    std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
+    init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
+    return get_subscribe_future(std::span<const internal::PublishTagBase>{tag_array});
+  }
 
     /** \brief Subscribes to a range of tags.
      */
@@ -276,25 +210,18 @@ public:
         return get_subscribe_future(tag_span);
     }
 
-    /** \brief Subscribe to a set of tags from a specific IP
-     */
-    template <typename... Ts>
-    Waiter<bool> ip_subscribe(const std::string& address,
-                              const Ts&... tags) noexcept
-    // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
-    {
-        using BufferPtr =
-            std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-        const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{
-            tags...};
-        std::array<BufferPtr, sizeof...(Ts)> ptrs{
-            std::make_unique<typename Ts::BufferType>()...};
-        init_or_update_subscribe(
-            std::span<const internal::PublishTagBase>{tag_array},
-            std::span<BufferPtr>{ptrs});
-        return get_ip_subscribe_future(
-            address, std::span<const internal::PublishTagBase>{tag_array});
-    }
+  /** \brief Subscribe to a set of tags from a specific IP
+   */
+  template<typename... Ts>
+  Waiter<bool> ip_subscribe(const std::string& address, const Ts&... tags) noexcept
+  // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
+  {
+    using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+    const std::array<skywing_core::Tag<>, sizeof...(Ts)> tag_array{tags...};
+    std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
+    init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
+    return get_ip_subscribe_future(address, std::span<const internal::PublishTagBase>{tag_array});
+  }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
     //  * subscribed to the tag
@@ -313,42 +240,35 @@ public:
     //   (unsubscribe(tags), ...);
     // }
 
-    /** \brief Publish data on the passed tag
-     *
-     * Will abort in debug mode if the tag has not been declared for publication
-     */
-    template <typename... PublishTagTypes, typename... ArgTypes>
-    void publish(const PublishTag<PublishTagTypes...>& tag,
-                 ArgTypes&&... values) noexcept
-    {
-        static_assert(
-            sizeof...(PublishTagTypes) == sizeof...(ArgTypes)
-                && (... && std::is_convertible_v<ArgTypes, PublishTagTypes>),
-            "Argument values can not be converted to tag types!");
-        std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
-            static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
-        publish_impl(tag, std::span<PublishValueVariant>{variants});
-    }
+  /** \brief Publish data on the passed tag
+   *
+   * Will abort in debug mode if the tag has not been declared for publication
+   */
+  template<typename... PublishTagTypes, typename... ArgTypes>
+  void publish(const skywing_core::Tag<PublishTagTypes...>& tag, ArgTypes&&... values) noexcept
+  {
+    static_assert(
+      sizeof...(PublishTagTypes) == sizeof...(ArgTypes) && (... && std::is_convertible_v<ArgTypes, PublishTagTypes>),
+      "Argument values can not be converted to tag types!");
+    std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
+      static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
+    publish_impl(tag, std::span<PublishValueVariant>{variants});
+  }
 
-    template <typename... PublishTagTypes, typename... TupleTypes>
-    void publish(const PublishTag<PublishTagTypes...>& tag,
-                 const std::tuple<TupleTypes...>& value_tuple) noexcept
-    {
-        const auto apply_to = [&](const auto&... values) {
-            publish(tag, values...);
-        };
-        std::apply(apply_to, value_tuple);
-    }
+  template<typename... PublishTagTypes, typename... TupleTypes>
+  void publish(const skywing_core::Tag<PublishTagTypes...>& tag, const std::tuple<TupleTypes...>& value_tuple) noexcept
+  {
+    const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
+    std::apply(apply_to, value_tuple);
+  }
 
-    template <typename... PublishTagTypes, typename... TupleTypes>
-    void publish_tuple(const PublishTag<PublishTagTypes...>& tag,
-                       const std::tuple<TupleTypes...>& value_tuple) noexcept
-    {
-        const auto apply_to = [&](const auto&... values) {
-            publish(tag, values...);
-        };
-        std::apply(apply_to, value_tuple);
-    }
+  template<typename... PublishTagTypes, typename... TupleTypes>
+  void publish_tuple(const skywing_core::Tag<PublishTagTypes...>& tag,
+                     const std::tuple<TupleTypes...>& value_tuple) noexcept
+  {
+    const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
+    std::apply(apply_to, value_tuple);
+  }
 
     /** \brief Returns true if the job is finished, false if it is not
      */
@@ -387,37 +307,34 @@ public:
             std::span<const internal::PublishTagBase>{tags});
     }
 
-    /** \brief Rebuilds connections for any missing tags
-     *
-     * \return A future for when the tags are re-connected
-     */
-    Waiter<void> rebuild_missing_tag_connections() noexcept
-    {
-        // init_or_update_subscribe obtains a lock, so might as well just
-        // init this in a lambda (since it can then be const)
-        const std::vector<internal::PublishTagBase> tags = [&]() {
-            const auto [buffers, lock] = bufs_.get();
-            (void) lock;
-            std::vector<internal::PublishTagBase> tags;
-            for (const auto& tag_pair : buffers) {
-                if (tag_pair.second.error_occurred != TagInfo::Error::no_error)
-                {
-                    // The expected type here doesn't matter
-                    // Also have to remove the first letter as it identifies the
-                    // type of tag, but it will just get added again later
-                    tags.emplace_back(tag_pair.first.substr(1),
-                                      std::span<const std::uint8_t>{});
-                }
-            }
-            return tags;
-        }();
-        return rebuild_tags(tags);
-    }
+  /** \brief Rebuilds connections for any missing tags
+   *
+   * \return A future for when the tags are re-connected
+   */
+  Waiter<void> rebuild_missing_tag_connections() noexcept
+  {
+    // init_or_update_subscribe obtains a lock, so might as well just
+    // init this in a lambda (since it can then be const)
+    const std::vector<skywing_core::Tag<>> tags = [&]() {
+      const auto [buffers, lock] = bufs_.get();
+      (void)lock;
+      std::vector<skywing_core::Tag<>> tags;
+      for (const auto& tag_pair : buffers) {
+        if (tag_pair.second.error_occurred != TagInfo::Error::no_error) {
+          // The expected type here doesn't matter
+          // Also have to remove the first letter as it identifies the type of
+          // tag, but it will just get added again later
+          tags.emplace_back(tag_pair.first.substr(1), std::span<const std::uint8_t>{});
+        }
+      }
+      return tags;
+    }();
+    return rebuild_tags(tags);
+  }
 
-    /** \brief Check if a tag's subscription is valid or not
-     */
-    bool
-    tag_has_subscription(const internal::PublishTagBase& tag) const noexcept;
+  /** \brief Check if a tag's subscription is valid or not
+   */
+  bool tag_has_subscription(const skywing_core::Tag<>& tag) const noexcept;
 
     template <typename Range>
     bool tags_have_subscriptions(const Range& tags) const noexcept
@@ -426,14 +343,13 @@ public:
             std::span<const internal::PublishTagBase>{begin(tags), end(tags)});
     }
 
-    /** \brief Returns the number of subscriptions that a tag has
-     *
-     * TODO: There's currently no distinction between tags for a subscription,
-     * add a way to do this and also only send data on tags which machines are
-     * subscribed to.
-     */
-    size_t
-    number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+  /** \brief Returns the number of subscriptions that a tag has
+   *
+   * TODO: There's currently no distinction between tags for a subscription,
+   * add a way to do this and also only send data on tags which machines are
+   * subscribed to.
+   */
+  size_t number_of_subscribers(const skywing_core::Tag<>& tag) const noexcept;
 
     void wait_for_update()
     {
@@ -453,9 +369,9 @@ public:
     void notify_of_update() { data_buffer_modified_cv_.notify_all(); }
 
 private:
-    /** \brief Checks if a buffer has data without locking
-     */
-    bool has_data_no_lock(const internal::PublishTagBase& tag) noexcept;
+  /** \brief Checks if a buffer has data without locking
+   */
+  bool has_data_no_lock(const skywing_core::Tag<>& tag) noexcept;
 
     /** \brief Processes the raw information sent from a job on another instance
      *
@@ -544,13 +460,12 @@ private:
 } // namespace skywing
 
 // Probably want to add hashing/less than support for all tag types
-template <typename... Ts>
-struct std::hash<skywing::PrivateTag<Ts...>>
-{
-    std::size_t operator()(const skywing::PrivateTag<Ts...>& tag) const noexcept
-    {
-        return std::hash<std::string>{}(tag.id());
-    }
+template<typename... Ts>
+struct std::hash<skywing::skywing_core::Tag<Ts...>> {
+  std::size_t operator()(const skywing::skywing_core::Tag<Ts...>& tag) const noexcept
+  {
+    return std::hash<std::string>{}(tag.id());
+  }
 };
 
 #endif // SKYWING_JOB_HPP
