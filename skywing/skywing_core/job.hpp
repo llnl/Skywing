@@ -111,7 +111,7 @@ public:
    * \pre The tag is subscribed to
    */
   template<typename... Ts>
-  Waiter<std::optional<ValueOrTuple<Ts...>>> get_waiter(const skywing_core::Tag<Ts...>& tag) noexcept
+  Waiter<std::optional<ValueOrTuple<Ts...>>> get_waiter(const skywing_core::Tag& tag) noexcept
   {
     using ValueType = ValueOrTuple<Ts...>;
     // Can just capture the reference to the value as it
@@ -119,7 +119,7 @@ public:
     // due to being in an unordered_map
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    const auto tag_iter = buffers.find(tag.id());
+    const auto tag_iter = buffers.find(tag.get_id());
     assert(tag_iter != buffers.cend());
     auto& tag_info = tag_iter->second;
     const auto tag_conn_id = tag_info.connection_id;
@@ -161,27 +161,26 @@ public:
    */
   bool has_data(const AbstractTag& tag) noexcept;
 
-    /** \brief Subscribe to all tags passed into the vector.
-     *
-     * \pre The tags are not currently subscribed to
-     * \return A future for when the tags have been subscribed to
-     */
-    template <typename... Ts>
-    Waiter<void> subscribe(const Ts&... tags) noexcept
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    {
-        const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
-            const auto [buffers, lock] = bufs_.get();
-            (void) lock;
-            return buffers.find(tag.id()) == buffers.cend();
-        };
-        (void)
-            tag_is_not_subscribed; // avoid compiler warning in release buiild
+  /** \brief Subscribe to all tags passed into the vector.
+   *
+   * \pre The tags are not currently subscribed to
+   * \return A future for when the tags have been subscribed to
+   */
+  template<typename... Ts>
+  Waiter<void> subscribe(const Ts&... tags) noexcept
+  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+  {
+    const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
+      const auto [buffers, lock] = bufs_.get();
+      (void)lock;
+      return buffers.find(tag.id()) == buffers.cend();
+    };
+    (void)tag_is_not_subscribed; // avoid compiler warning in release buiild
 
     // TODO: Make this std::terminate or something instead?
     assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    const std::array<skywing_core::Tag<>, sizeof...(Ts)> tag_array{tags...};
+    const std::array<skywing_core::Tag, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
     init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
     return get_subscribe_future(std::span<const internal::PublishTagBase>{tag_array});
@@ -217,7 +216,7 @@ public:
   // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    const std::array<skywing_core::Tag<>, sizeof...(Ts)> tag_array{tags...};
+    const std::array<skywing_core::Tag, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
     init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
     return get_ip_subscribe_future(address, std::span<const internal::PublishTagBase>{tag_array});
@@ -263,8 +262,8 @@ public:
   }
 
   template<typename... PublishTagTypes, typename... TupleTypes>
-  void publish_tuple(const skywing_core::Tag<PublishTagTypes...>& tag,
-                     const std::tuple<TupleTypes...>& value_tuple) noexcept
+  void publish_tuple(
+    const skywing_core::Tag<PublishTagTypes...>& tag, const std::tuple<TupleTypes...>& value_tuple) noexcept
   {
     const auto apply_to = [&](const auto&... values) { publish(tag, values...); };
     std::apply(apply_to, value_tuple);
@@ -315,10 +314,10 @@ public:
   {
     // init_or_update_subscribe obtains a lock, so might as well just
     // init this in a lambda (since it can then be const)
-    const std::vector<skywing_core::Tag<>> tags = [&]() {
+    const std::vector<skywing_core::Tag> tags = [&]() {
       const auto [buffers, lock] = bufs_.get();
       (void)lock;
-      std::vector<skywing_core::Tag<>> tags;
+      std::vector<skywing_core::Tag> tags;
       for (const auto& tag_pair : buffers) {
         if (tag_pair.second.error_occurred != TagInfo::Error::no_error) {
           // The expected type here doesn't matter
@@ -334,7 +333,7 @@ public:
 
   /** \brief Check if a tag's subscription is valid or not
    */
-  bool tag_has_subscription(const skywing_core::Tag<>& tag) const noexcept;
+  bool tag_has_subscription(const skywing_core::Tag& tag) const noexcept;
 
     template <typename Range>
     bool tags_have_subscriptions(const Range& tags) const noexcept
@@ -349,7 +348,7 @@ public:
    * add a way to do this and also only send data on tags which machines are
    * subscribed to.
    */
-  size_t number_of_subscribers(const skywing_core::Tag<>& tag) const noexcept;
+  size_t number_of_subscribers(const skywing_core::Tag& tag) const noexcept;
 
     void wait_for_update()
     {
@@ -366,12 +365,12 @@ public:
         lock.unlock();
     }
 
-    void notify_of_update() { data_buffer_modified_cv_.notify_all(); }
+  void notify_of_update() { data_buffer_modified_cv_.notify_all(); }
 
 private:
   /** \brief Checks if a buffer has data without locking
    */
-  bool has_data_no_lock(const skywing_core::Tag<>& tag) noexcept;
+  bool has_data_no_lock(const skywing_core::Tag& tag) noexcept;
 
     /** \brief Processes the raw information sent from a job on another instance
      *
@@ -458,14 +457,5 @@ private:
     std::condition_variable data_buffer_modified_cv_;
 }; // Class Job
 } // namespace skywing
-
-// Probably want to add hashing/less than support for all tag types
-template<typename... Ts>
-struct std::hash<skywing::skywing_core::Tag<Ts...>> {
-  std::size_t operator()(const skywing::skywing_core::Tag<Ts...>& tag) const noexcept
-  {
-    return std::hash<std::string>{}(tag.id());
-  }
-};
 
 #endif // SKYWING_JOB_HPP

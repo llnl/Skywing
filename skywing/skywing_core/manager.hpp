@@ -715,7 +715,7 @@ public:
 
   /** \brief Returns the number of subscribers that a tag has
    */
-  int number_of_subscribers(const skywing_core::Tag<>& tag) const noexcept
+  int number_of_subscribers(const skywing_core::Tag& tag) const noexcept
   {
     return handle_->number_of_subscribers(tag);
   }

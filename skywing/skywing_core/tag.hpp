@@ -12,6 +12,8 @@
 
 namespace skywing::skywing_core {
 
+using DataTypeRef = std::uint8_t;
+
 template<typename T>
 concept Vector = std::same_as<T, std::vector<typename T::value_type>>;
 
@@ -37,6 +39,13 @@ concept BasicPublishable = IsAnyOf<
 template<typename T>
 concept Publishable = BasicPublishable<T>;
 
+template<typename T>
+concept HasToInt = requires(T t) {
+  {
+    t.to_int()
+  } -> std::same_as<std::vector<DataTypeRef>>;
+};
+
 /** @brief A collective-global unique identifier for a publication stream.
  *
  * A Tag consists of (a) one or more data types that will be
@@ -47,13 +56,12 @@ concept Publishable = BasicPublishable<T>;
  * @tparam Ts Set of data types that will be sent with each
  * publication in the publication stream.
  */
-template<Publishable... Ts>
+
 class Tag {
 public:
-  using DataTypeRef = std::uint8_t;
-
   Tag() = default;
-  Tag(std::string id) : id_{std::move('p' + id)} { set_expected_types<Ts...>(); }
+  Tag(std::string id) : id_{std::move('p' + id)} {}
+  Tag(std::string id, HasToInt auto expected_types) : Tag(id) { expected_types_ = expected_types.to_int(); }
   auto operator<=>(const Tag&) const = default;
 
   /** @brief Get the string TagID for this Tag. */
@@ -62,20 +70,34 @@ public:
   /** @brief Get a vector representing the one or more data types associated with this Subscription's Tag. */
   const std::vector<DataTypeRef>& get_expected_types() const { return expected_types_; }
 
-  const std::size_t get_hash() const { return std::hash<std::string>{}(get_id()); }
-
 private:
   std::string id_{};
   std::vector<DataTypeRef> expected_types_{};
+};
 
-  template<Publishable... Types>
-  void set_expected_types(Types... args)
+struct hash {
+  std::size_t operator()(const Tag& tag) const { return std::hash<std::string>{}(tag.get_id()); }
+};
+
+template<Publishable... Types>
+class PublishDataTypes {
+public:
+  PublishDataTypes() = default;
+
+  // template<typename... Types>
+  std::vector<DataTypeRef> to_int()
   {
-    if constexpr (sizeof...(args) > 0) {
-      (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
-       ...);
-    }
+    std::vector<DataTypeRef> tmp{};
+    std::apply(
+      [&tmp]() {
+        ((tmp.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>))), ...);
+      },
+      expected_types_);
+    return tmp;
   }
+
+private:
+  std::tuple<Types...> expected_types_;
 };
 
 } // namespace skywing::skywing_core
