@@ -15,31 +15,6 @@ namespace skywing::skywing_core {
 using DataTypeRef = std::uint8_t;
 
 template<typename T>
-concept Vector = std::same_as<T, std::vector<typename T::value_type>>;
-
-template<typename T, typename... U>
-concept IsAnyOf = (std::same_as<T, U> || ...);
-
-template<typename T>
-concept BasicPublishable = IsAnyOf<
-  T,
-  float,
-  double,
-  std::int8_t,
-  std::int16_t,
-  std::int32_t,
-  std::int64_t,
-  std::uint8_t,
-  std::uint16_t,
-  std::uint32_t,
-  std::uint64_t,
-  std::string,
-  bool>;
-
-template<typename T>
-concept Publishable = BasicPublishable<T>;
-
-template<typename T>
 concept HasToInt = requires(T t) {
   {
     t.to_int()
@@ -79,18 +54,50 @@ struct hash {
   std::size_t operator()(const Tag& tag) const { return std::hash<std::string>{}(tag.get_id()); }
 };
 
+template<typename T, typename... U>
+concept IsAnyOf = (std::same_as<T, U> || ...);
+
+template<typename T>
+concept Publishable = IsAnyOf<
+  T,
+  float,
+  std::vector<float>,
+  double,
+  std::vector<double>,
+  std::int8_t,
+  std::vector<std::int8_t>,
+  std::int16_t,
+  std::vector<std::int16_t>,
+  std::int32_t,
+  std::vector<std::int32_t>,
+  std::int64_t,
+  std::vector<std::int64_t>,
+  std::uint8_t,
+  std::vector<std::uint8_t>,
+  std::uint16_t,
+  std::vector<std::uint16_t>,
+  std::uint32_t,
+  std::vector<std::uint32_t>,
+  std::uint64_t,
+  std::vector<std::uint64_t>,
+  std::string,
+  std::vector<std::string>,
+  std::vector<std::byte>,
+  bool,
+  std::vector<bool>>;
+
 template<Publishable... Types>
 class PublishDataTypes {
 public:
   PublishDataTypes() = default;
 
-  // template<typename... Types>
+  template<Publishable... Ts>
   std::vector<DataTypeRef> to_int()
   {
     std::vector<DataTypeRef> tmp{};
     std::apply(
       [&tmp]() {
-        ((tmp.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>))), ...);
+        ((tmp.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Ts, PublishValueTypeList>))), ...);
       },
       expected_types_);
     return tmp;
