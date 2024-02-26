@@ -12,7 +12,6 @@ namespace skywing {
 class Manager;
 
 namespace internal {
-class ReduceGroupBase;
 
 class ManagerSubscribeIsDone {
 public:
@@ -23,26 +22,6 @@ private:
   Manager* manager_;
   std::vector<TagID> tags_;
 }; // class ManagerSubscribeIsDone
-
-class ManagerReduceGroupIsCreated {
-public:
-  ManagerReduceGroupIsCreated(Manager& manager, const TagID& group_id) noexcept;
-  bool operator()() const noexcept;
-
-private:
-  Manager* manager_;
-  TagID group_id_;
-}; // class ManagerReduceGroupIsCreated
-
-class ManagerGetReduceGroup {
-public:
-  ManagerGetReduceGroup(Manager& manager, const TagID& group_id) noexcept;
-  ReduceGroupBase& operator()() const noexcept;
-
-private:
-  Manager* manager_;
-  TagID group_id_;
-}; // class ManagerGetReduceGroup
 
 class ManagerConnectionIsComplete {
 public:

@@ -233,48 +233,6 @@ void Job::declare_publication_intent_impl(const gsl::span<const internal::Publis
 //   buffers.erase(tag_id);
 // }
 
-internal::ReduceGroupNeighbors Job::create_reduce_group_init(
-  const TagID& tag_produced,
-  const std::vector<TagID>& reduce_over_tags,
-  gsl::span<const std::uint8_t> expected_types) noexcept
-{
-  assert(
-    tags_produced_.find(tag_produced) == tags_produced_.cend()
-    && "Attempted to create a reduce group with a tag that's published on by this type!");
-  tags_produced_.try_emplace(tag_produced, expected_types);
-  auto bin_tree = reduce_over_tags;
-  // A heap can't be used; can produce different ordering depending on the input order
-  std::sort(bin_tree.begin(), bin_tree.end());
-  const auto index = std::distance(bin_tree.cbegin(), std::find(bin_tree.cbegin(), bin_tree.cend(), tag_produced));
-  const auto parent_index = (index - 1) / 2;
-  const auto lchild_index = (2 * index) + 1;
-  const auto rchild_index = (2 * index) + 2;
-  internal::ReduceGroupNeighbors tags_to_find;
-  if (index != 0) { tags_to_find.parent() = bin_tree[parent_index]; }
-  for (const auto child_index : {lchild_index, rchild_index}) {
-    const auto write_index = (child_index == lchild_index ? 1 : 2);
-    if (child_index < static_cast<std::remove_const_t<decltype(child_index)>>(bin_tree.size())) {
-      tags_to_find.tags[write_index] = bin_tree[child_index];
-    }
-  }
-  SKYNET_TRACE_LOG(
-    "\"{}\", job \"{}\", created a reduce group; produced tag is \"{}\", parent tag is \"{}\", child tags are \"{}\", "
-    "\"{}\"",
-    manager_->id(),
-    id_,
-    tag_produced,
-    tags_to_find.parent(),
-    tags_to_find.left_child(),
-    tags_to_find.right_child());
-  return tags_to_find;
-}
-
-Waiter<internal::ReduceGroupBase&>
-Job::create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-{
-  return Manager::JobAccessor::create_reduce_group(*manager_, std::move(group_ptr));
-}
-
 bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept
 {
   auto [buffers, lock] = bufs_.get();

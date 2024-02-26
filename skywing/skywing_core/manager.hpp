@@ -5,7 +5,6 @@
 #include "skywing_core/internal/devices/socket_communicator.hpp"
 #include "skywing_core/internal/manager_waiter_callables.hpp"
 #include "skywing_core/internal/message_creators.hpp"
-#include "skywing_core/internal/reduce_group.hpp"
 // #include "skywing_core/basic_manager_config.hpp"
 #include "skywing_core/job.hpp"
 #include "skywing_core/types.hpp"
@@ -294,12 +293,6 @@ public:
       return m.subscribe(tag_ids);
     }
 
-    static auto create_reduce_group(Manager& m, std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-    {
-      std::lock_guard lock{m.job_mut_};
-      return m.create_reduce_group(std::move(group_ptr));
-    }
-
     static auto ip_subscribe(Manager& m, const AddrPortPair& addr, const std::vector<TagID>& tag_ids) noexcept
     {
       std::lock_guard lock{m.job_mut_};
@@ -324,24 +317,6 @@ public:
       m.add_publishers_and_propagate(msg, from);
     }
 
-    static bool handle_join_reduce_group(
-      Manager& m, const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept
-    {
-      return m.handle_join_reduce_group(msg, from);
-    }
-
-    static bool handle_submit_reduce_value(
-      Manager& m, const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept
-    {
-      return m.handle_submit_reduce_value(msg, from);
-    }
-
-    static bool handle_report_reduce_disconnection(
-      Manager& m, const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept
-    {
-      return m.handle_report_reduce_disconnection(msg, from);
-    }
-
     static bool subscription_tags_are_produced(Manager& m, const internal::SubscriptionNotice& msg) noexcept
     {
       return m.subscription_tags_are_produced(msg);
@@ -356,51 +331,9 @@ public:
     static void notify_subscriptions(Manager& m) noexcept { m.notify_subscriptions_ = true; }
   }; // struct ExternalManagerAccessor
 
-  struct ReduceGroupAccessor {
-  private:
-    friend class internal::ReduceGroupBase;
-
-    static void send_reduce_data_to_parent(
-      Manager& m,
-      const TagID& group_id,
-      const VersionID version,
-      const TagID& reduce_tag,
-      gsl::span<const PublishValueVariant> value) noexcept
-    {
-      m.send_reduce_data_to_parent(group_id, version, reduce_tag, value);
-    }
-
-    static void send_reduce_data_to_children(
-      Manager& m,
-      const TagID& group_id,
-      const VersionID version,
-      const TagID& reduce_tag,
-      gsl::span<const PublishValueVariant> value) noexcept
-    {
-      m.send_reduce_data_to_children(group_id, version, reduce_tag, value);
-    }
-
-    static void send_report_disconnection(
-      Manager& m,
-      const TagID& group_id,
-      const MachineID& initiating_machine,
-      const ReductionDisconnectID disconnect_id) noexcept
-    {
-      m.send_report_disconnection(group_id, initiating_machine, disconnect_id);
-    }
-
-    static auto rebuild_reduce_group(Manager& m, const TagID& group_id) noexcept
-    {
-      std::lock_guard<std::mutex> lock{m.job_mut_};
-      return m.rebuild_reduce_group(group_id);
-    }
-  }; // struct ReduceGroupAccessor
-
   struct WaiterAccessor {
   private:
     friend class internal::ManagerSubscribeIsDone;
-    friend class internal::ManagerReduceGroupIsCreated;
-    friend class internal::ManagerGetReduceGroup;
     friend class internal::ManagerConnectionIsComplete;
     friend class internal::ManagerGetConnectionSuccess;
     friend class internal::ManagerIPSubscribeComplete;
@@ -409,16 +342,6 @@ public:
     static bool subscribe_is_done(Manager& m, const std::vector<TagID>& tags) noexcept
     {
       return m.subscribe_is_done(tags);
-    }
-
-    static bool reduce_group_is_created(Manager& m, const TagID& group_id) noexcept
-    {
-      return m.reduce_group_is_created(group_id);
-    }
-
-    static internal::ReduceGroupBase& get_reduce_group(Manager& m, const TagID& group_id) noexcept
-    {
-      return m.get_reduce_group(group_id);
     }
 
     static bool conn_is_complete(Manager& m, const AddrPortPair& address) noexcept
@@ -544,69 +467,6 @@ private:
    */
   void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
 
-  /** \brief Starts the process of creating a reduce group
-   */
-  Waiter<internal::ReduceGroupBase&> create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept;
-
-  /** \brief Gets a future for when a reduce group has been re-built.
-   */
-  Waiter<void> rebuild_reduce_group(const TagID& group_id) noexcept;
-
-  /** \brief Returns true if the specified reduce group has been successfully created.
-   *
-   * "Success" in this case means that a connection with a parent and both children
-   * has been established; there is no way to determine if the entire tree has been established.
-   */
-  bool reduce_group_is_created(const TagID& group_id) noexcept;
-
-  /** \brief Handles a message that a child is joining a reduce group
-   */
-  bool handle_join_reduce_group(const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept;
-
-  /** \brief Returns a reference to a created reduce group
-   *
-   * \pre The reduce group exists
-   */
-  internal::ReduceGroupBase& get_reduce_group(const TagID& group_id) noexcept;
-
-  /** \brief Sends a raw message to the specified ID's, removing the ID's from
-   * the array if not present
-   */
-  void reduce_send_data_and_remove_missing(
-    std::vector<MachineID>& machines, const std::vector<std::byte>& message) noexcept;
-
-  /** \brief Sends a value for a reduce to the corresponding parents
-   */
-  void send_reduce_data_to_parent(
-    const TagID& group_id,
-    const VersionID version,
-    const TagID& reduce_tag,
-    gsl::span<const PublishValueVariant> value) noexcept;
-
-  void send_reduce_data_to_children(
-    const TagID& group_id,
-    const VersionID version,
-    const TagID& reduce_tag,
-    gsl::span<const PublishValueVariant> value) noexcept;
-
-  void send_report_disconnection(
-    const TagID& group_id, const MachineID& initiating_machine, const ReductionDisconnectID disconnect_id) noexcept;
-
-  /** \brief Handles a submit reduce value message
-   */
-  bool
-    handle_submit_reduce_value(const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept;
-
-  /** \brief Implementation of the two above functions
-   */
-  bool handle_reduce_value(
-    const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalManager& from) noexcept;
-
-  /** \brief Handle a reduce disconnect notification
-   */
-  bool handle_report_reduce_disconnection(
-    const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept;
-
   /** \brief Attempt to create connections for any pending tags.
    */
   void init_connections_for_pending_tags() noexcept;
@@ -629,26 +489,6 @@ private:
   /** \brief Creates the message for the initial handshake
    */
   std::vector<std::byte> make_handshake() const noexcept;
-
-  /** \brief Does the final steps needed for creating a reduce group
-   */
-  void finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept;
-
-  /** \brief Returns a reduce_tag_data_ iterator from the parent machine
-   *
-   * Implemented in here since it would have to be below the member variables otherwise
-   */
-  decltype(auto) group_from_parent_tag(const TagID& parent_tag) noexcept
-  {
-    // TODO: Keep a look-up map if this becomes a performance issue
-    for (auto& data_pair : reduce_tag_data_) {
-      const auto& group_data = data_pair.second;
-      const auto& parent = internal::ReduceGroupBase::Accessor::tag_neighbors(*group_data.group).parent();
-      if (parent == parent_tag) { return data_pair; }
-    }
-    assert(false && "No group matching the produced tag found?");
-    return *reduce_tag_data_.begin();
-  }
 
   /** \brief Returns true if the subscription tags are all produced
    */
@@ -686,20 +526,6 @@ private:
 
   // A list of tags that still need to have publishers found
   std::vector<std::string> pending_tags_;
-
-  // Information for reduce groups, holds the tags that each group has and
-  // ID for the machines that produce those tags for the group
-  struct ReduceGroupData {
-    explicit ReduceGroupData(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-      : group{std::move(group_ptr)}
-    {}
-
-    // unique_ptr so that this is a movable type
-    std::unique_ptr<internal::ReduceGroupBase> group;
-    std::vector<MachineID> parent_machines;
-    std::array<std::vector<MachineID>, 2> child_machines;
-  };
-  std::unordered_map<TagID, ReduceGroupData> reduce_tag_data_;
 
   // The id of this machine
   MachineID id_;
@@ -752,7 +578,6 @@ private:
     user_requested,
     by_accept,
     subscription,
-    reduce_group,
     specific_ip
   };
   static const char* to_c_str(ConnType type) noexcept;
@@ -768,16 +593,12 @@ private:
   // Notification for when new subscriptions are created
   std::condition_variable subscription_cv_;
 
-  // Notification for when reduce group related connections are made
-  std::condition_variable reduce_group_cv_;
-
   // Notification for when connections are complete
   std::condition_variable connection_cv_;
 
   // Booleans separate for if notifications should be raised so that
   // the CV's can use notifications while the mutex is released
   bool notify_subscriptions_ = false;
-  bool notify_reduce_group_ = false;
   bool notify_connection_ = false;
 }; // class Manager
 

@@ -34,7 +34,6 @@ private:
   cpnpro::PublishData::Reader r;
 
   friend class MessageHandler;
-  friend class SubmitReduceValue;
   friend class Publish;
   explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
 };
@@ -123,49 +122,6 @@ private:
   explicit GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept;
 };
 
-/** \brief Message for when a machine join a reduce group
- */
-class JoinReduceGroup {
-public:
-  TagID reduce_tag() const noexcept;
-  TagID tag_produced() const noexcept;
-
-private:
-  cpnpro::JoinReduceGroup::Reader r;
-
-  friend class MessageHandler;
-  explicit JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept;
-};
-
-/** \brief Message for submitting a value for reduction to the parent/children
- */
-class SubmitReduceValue {
-public:
-  TagID reduce_tag() const noexcept;
-  PublishData data() const noexcept;
-
-private:
-  cpnpro::SubmitReduceValue::Reader r;
-
-  friend class MessageHandler;
-  explicit SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept;
-};
-
-/** \brief Message for reporting that a machine disconnected
- */
-class ReportReduceDisconnection {
-public:
-  TagID reduce_tag() const noexcept;
-  MachineID initiating_machine() const noexcept;
-  ReductionDisconnectID id() const noexcept;
-
-private:
-  cpnpro::ReportReduceDisconnection::Reader r;
-
-  friend class MessageHandler;
-  explicit ReportReduceDisconnection(cpnpro::ReportReduceDisconnection::Reader reader) noexcept;
-};
-
 /** \brief Message for subscribing/unsubscibing to a tag
  */
 class SubscriptionNotice {
@@ -218,9 +174,6 @@ private:
     Heartbeat,
     ReportPublishers,
     GetPublishers,
-    JoinReduceGroup,
-    SubmitReduceValue,
-    ReportReduceDisconnection,
     SubscriptionNotice,
     PublishData>;
 

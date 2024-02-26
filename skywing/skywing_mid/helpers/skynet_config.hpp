@@ -47,8 +47,8 @@ namespace skywing::internal {
     : std::integral_constant<
       bool,
       std::is_base_of_v<PublishTagBase, T> || 
-      std::is_base_of_v<ReduceValueTagBase, T> || 
-      std::is_base_of_v<ReduceGroupTagBase, T> ||
+    //      std::is_base_of_v<ReduceValueTagBase, T> || 
+    //      std::is_base_of_v<ReduceGroupTagBase, T> ||
       std::is_base_of_v<PrivateTagBase, T>
     > {};
 
@@ -198,26 +198,6 @@ inline decltype(auto) extract_ip_and_port(const std::string &value) {
   return std::make_tuple(ip, port);
 }
 
-template<typename TagType>
-struct ReduceGroupConfig {
-  using GroupTag = skywing::ReduceGroupTag<TagType>;
-  using ValueTag = skywing::ReduceValueTag<TagType>;
-  ReduceGroupConfig(const GroupTag& reduce_group_tag, int reduce_value_tag_index, const std::vector<ValueTag>& reduce_value_tags)
-  : reduce_group_tag(reduce_group_tag),
-    index(reduce_value_tag_index),
-    reduce_value_tags(reduce_value_tags)
-  {}
-
-  auto get_group_tag() const { return reduce_group_tag; }
-  auto get_value_tag() const { return reduce_value_tags[index]; }
-  auto get_value_tags() const { return reduce_value_tags; }
-private:
-  const int index;
-  const skywing::ReduceGroupTag<TagType> reduce_group_tag;
-  const std::vector<skywing::ReduceValueTag<TagType>> reduce_value_tags;
-};
-
-
 class Config
 {
 public:
@@ -320,34 +300,34 @@ public:
     return addresses;
   }
 
-  template<typename TagType>
-  ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) const {
-    const auto& sec = sections.at(sec_name);
+  // template<typename TagType>
+  // ReduceGroupConfig<TagType> get_reduce_group(std::string sec_name) const {
+  //   const auto& sec = sections.at(sec_name);
 
-    const auto it1 = sec.find("reduce_value_tag");
-    if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name + ".");
-    const auto reduce_value_tag_name = it1->second;
+  //   const auto it1 = sec.find("reduce_value_tag");
+  //   if (it1 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tag' key in reduce group section " + sec_name + ".");
+  //   const auto reduce_value_tag_name = it1->second;
 
-    const auto it2 = sec.find("reduce_value_tags");
-    if (it2 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tags' key in reduce group section " + sec_name + ".");
-    const auto reduce_value_tags_names = it2->second;
+  //   const auto it2 = sec.find("reduce_value_tags");
+  //   if (it2 == sec.end()) throw std::out_of_range("Missing 'reduce_value_tags' key in reduce group section " + sec_name + ".");
+  //   const auto reduce_value_tags_names = it2->second;
 
-    skywing::ReduceGroupTag<TagType> reduce_group_tag{sec_name};
-    std::vector<skywing::ReduceValueTag<TagType>> reduce_value_tags;
-    std::istringstream list(reduce_value_tags_names);
+  //   skywing::ReduceGroupTag<TagType> reduce_group_tag{sec_name};
+  //   std::vector<skywing::ReduceValueTag<TagType>> reduce_value_tags;
+  //   std::istringstream list(reduce_value_tags_names);
 
-    int index = 0, i = 0;
-    std::string val_str;
-    while (list >> val_str) {
-      if (val_str == reduce_value_tag_name) {
-        index = i;
-      }
-      reduce_value_tags.emplace_back(val_str);
-      i++;
-    }
+  //   int index = 0, i = 0;
+  //   std::string val_str;
+  //   while (list >> val_str) {
+  //     if (val_str == reduce_value_tag_name) {
+  //       index = i;
+  //     }
+  //     reduce_value_tags.emplace_back(val_str);
+  //     i++;
+  //   }
 
-    return {reduce_group_tag, index, reduce_value_tags};
-  }
+  //   return {reduce_group_tag, index, reduce_value_tags};
+  // }
 
   void generate(std::ostream& os) const {
     for (auto const & sec : sections) {

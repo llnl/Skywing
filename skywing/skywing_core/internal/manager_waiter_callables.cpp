@@ -12,24 +12,6 @@ bool ManagerSubscribeIsDone::operator()() const noexcept
   return Manager::WaiterAccessor::subscribe_is_done(*manager_, tags_);
 }
 
-ManagerReduceGroupIsCreated::ManagerReduceGroupIsCreated(Manager& manager, const TagID& group_id) noexcept
-  : manager_{&manager}, group_id_{group_id}
-{}
-
-bool ManagerReduceGroupIsCreated::operator()() const noexcept
-{
-  return Manager::WaiterAccessor::reduce_group_is_created(*manager_, group_id_);
-}
-
-ManagerGetReduceGroup::ManagerGetReduceGroup(Manager& manager, const TagID& group_id) noexcept
-  : manager_{&manager}, group_id_{group_id}
-{}
-
-ReduceGroupBase& ManagerGetReduceGroup::operator()() const noexcept
-{
-  return Manager::WaiterAccessor::get_reduce_group(*manager_, group_id_);
-}
-
 ManagerConnectionIsComplete::ManagerConnectionIsComplete(
   Manager& manager, const std::string& address, std::uint16_t port) noexcept
   : manager_{&manager}, address_{address, port}

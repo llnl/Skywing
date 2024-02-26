@@ -2,7 +2,6 @@
 #define SKYNET_JOB_HPP
 
 #include "skywing_core/internal/manager_waiter_callables.hpp"
-#include "skywing_core/internal/reduce_group.hpp"
 #include "skywing_core/internal/tag_buffer.hpp"
 #include "skywing_core/internal/utility/mutex_guarded.hpp"
 #include "skywing_core/internal/utility/type_list.hpp"
@@ -48,36 +47,6 @@ protected:
     : internal::PublishTagBase{OverridePrefix{}, id, internal::expected_type_for<Ts...>}
   {}
 }; // class PublishTag
-
-/** \brief Tag for reduce values
- */
-template<typename... Ts>
-// requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
-class ReduceValueTag : public internal::ReduceValueTagBase {
-public:
-  explicit ReduceValueTag(const TagID& id) noexcept
-    : internal::ReduceValueTagBase{id, internal::expected_type_for<Ts...>}
-  {
-    assert(!id.empty());
-  }
-
-  using ValueType = ValueOrTuple<Ts...>;
-}; // class ReduceValueTag
-
-/** \brief Tag for reduce groups
- */
-template<typename... Ts>
-// requires ((internal::index_of<Ts, PublishValueTypeList> != internal::size<PublishValueTypeList>) && ...)
-class ReduceGroupTag : public internal::ReduceGroupTagBase {
-public:
-  explicit ReduceGroupTag(const TagID& id) noexcept
-    : internal::ReduceGroupTagBase{id, internal::expected_type_for<Ts...>}
-  {
-    assert(!id.empty());
-  }
-
-  using ValueType = ValueOrTuple<Ts...>;
-}; // class ReduceGroupTag
 
 /** \brief Tag for private publish tags
  */
@@ -258,27 +227,6 @@ public:
     return get_ip_subscribe_future(address, gsl::span<const internal::PublishTagBase>{tag_array});
   }
 
-  /** \brief Create a reduce group over the specified tags
-   */
-  template<typename... Ts>
-  auto create_reduce_group(
-    const ReduceGroupTag<Ts...>& group_tag,
-    const ReduceValueTag<Ts...>& tag_produced_for_group,
-    const std::vector<ReduceValueTag<Ts...>>& tags) noexcept
-  {
-    std::vector<TagID> tag_ids(tags.size());
-    std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const auto& t) { return t.id(); });
-    const auto tags_to_find
-      = create_reduce_group_init(tag_produced_for_group.id(), tag_ids, group_tag.expected_types());
-    auto group_ptr
-      = std::make_unique<ReduceGroup<Ts...>>(tags_to_find, *manager_, group_tag.id(), tag_produced_for_group.id());
-    return create_reduce_group_future(std::move(group_ptr))
-      .then([](internal::ReduceGroupBase& group) -> ReduceGroup<Ts...>& {
-        assert(dynamic_cast<ReduceGroup<Ts...>*>(&group) != nullptr);
-        return static_cast<ReduceGroup<Ts...>&>(group);
-      });
-  }
-
   // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
   //  * subscribed to the tag
   //  */
@@ -457,14 +405,6 @@ private:
   void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const> tags) noexcept;
 
   // void unsubscribe_impl(const TagID& tag_id) noexcept;
-
-  // Returns the tags that connections need to be made with
-  internal::ReduceGroupNeighbors create_reduce_group_init(
-    const TagID& tag_produced,
-    const std::vector<TagID>& reduce_over_tags,
-    gsl::span<const std::uint8_t> expected_type) noexcept;
-
-  Waiter<internal::ReduceGroupBase&> create_reduce_group_future(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept;
 
   bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
   bool tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept;
