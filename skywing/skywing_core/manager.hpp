@@ -9,8 +9,6 @@
 #include "skywing_core/job.hpp"
 #include "skywing_core/types.hpp"
 
-#include "gsl/span"
-
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -20,6 +18,7 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <span>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -171,7 +170,7 @@ private:
   // Calculate the next time tags should be requested
   std::chrono::steady_clock::time_point calc_next_request_time() const noexcept;
 
-  // For talking with the external manager.  
+  // For talking with the external manager.
   // See you'd think there would only be one SocketCommunicator for
   // talking to another agent, so why the vector? It's because
   // sometimes agents initiate connections with each other
@@ -275,7 +274,7 @@ public:
     friend class Job;
 
     static void
-      publish(Manager& m, const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
+      publish(Manager& m, const VersionID version, const TagID& tag_id, std::span<PublishValueVariant> value) noexcept
     {
       std::lock_guard lock{m.job_mut_};
       m.publish(version, tag_id, value);
@@ -399,7 +398,7 @@ private:
    * \param tag_id The id of the tag the message is for
    * \param value The value to send
    */
-  void publish(const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept;
+  void publish(const VersionID version, const TagID& tag_id, std::span<PublishValueVariant> value) noexcept;
 
   // Adds data to the tag queue for a job from a message
   // Returns true if it was successful, false if something went wrong

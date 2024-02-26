@@ -8,8 +8,6 @@
 #include "skywing_core/types.hpp"
 #include "skywing_core/waiter.hpp"
 
-#include "gsl/span"
-
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -17,6 +15,7 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -84,7 +83,7 @@ public:
     friend class Job;
 
     static bool process_data(
-      Job& j, const TagID& tag, gsl::span<const PublishValueVariant> data, const VersionID version) noexcept
+      Job& j, const TagID& tag, std::span<const PublishValueVariant> data, const VersionID version) noexcept
     {
       return j.process_data(tag, data, version);
     }
@@ -119,18 +118,20 @@ public:
   void declare_publication_intent(const Ts&... tags) noexcept
   {
     const std::array<const internal::PublishTagBase*, sizeof...(Ts)> tag_ptrs{&tags...};
-    declare_publication_intent_impl(
-      gsl::span<const internal::PublishTagBase* const>{tag_ptrs.data(), static_cast<gsl::index>(tag_ptrs.size())});
+    declare_publication_intent_impl(std::span<const internal::PublishTagBase* const>{tag_ptrs.data(), tag_ptrs.size()});
   }
 
   /** \brief Declare publication intent for a range
    */
   template<typename Range>
-  void declare_publication_intent_range(const Range& tags) noexcept
+  void declare_publication_intent_range(const Range& tags_in) noexcept
   // requires std::ranges::contiguous_range<Range>
   {
-    declare_publication_intent_impl(
-      gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())});
+    std::vector<internal::PublishTagBase const*> tags;
+    tags.reserve(tags_in.size());
+    for (auto const& t : tags_in)
+      tags.push_back(&t);
+    declare_publication_intent_impl(tags);
   }
 
   /** \brief Retrieves the specified version for the tag, or latest if no version
@@ -194,8 +195,8 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
-    return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tag_array});
+    init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
+    return get_subscribe_future(std::span<const internal::PublishTagBase>{tag_array});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -207,10 +208,14 @@ public:
     using IterType = std::decay_t<decltype(tags.begin())>;
     using TagType = typename std::iterator_traits<IterType>::value_type;
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    std::vector<BufferPtr> ptrs(static_cast<std::size_t>(tags.size()));
+    std::vector<BufferPtr> ptrs(tags.size());
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<typename TagType::BufferType>(); });
-    const auto tag_span = gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())};
-    init_or_update_subscribe(tag_span, gsl::span<BufferPtr>{ptrs});
+    // FIXME (trb 2024/01/17): This is absolutely awful but currently
+    // the only subclass of PublishTagBase is PublishTag, which
+    // doesn't add data fields. So this works, despite being terrible.
+    const auto tag_span
+      = std::span<const internal::PublishTagBase>{(const internal::PublishTagBase*)tags.data(), tags.size()};
+    init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
     return get_subscribe_future(tag_span);
   }
 
@@ -223,8 +228,8 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     const std::array<internal::PublishTagBase, sizeof...(Ts)> tag_array{tags...};
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    init_or_update_subscribe(gsl::span<const internal::PublishTagBase>{tag_array}, gsl::span<BufferPtr>{ptrs});
-    return get_ip_subscribe_future(address, gsl::span<const internal::PublishTagBase>{tag_array});
+    init_or_update_subscribe(std::span<const internal::PublishTagBase>{tag_array}, std::span<BufferPtr>{ptrs});
+    return get_ip_subscribe_future(address, std::span<const internal::PublishTagBase>{tag_array});
   }
 
   // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
@@ -256,7 +261,7 @@ public:
       "Argument values can not be converted to tag types!");
     std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
       static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
-    publish_impl(tag, gsl::span<PublishValueVariant>{variants});
+    publish_impl(tag, std::span<PublishValueVariant>{variants});
   }
 
   template<typename... PublishTagTypes, typename... TupleTypes>
@@ -280,7 +285,7 @@ public:
 
   /** \brief Returns a list of the produced tags
    */
-  const std::unordered_map<TagID, gsl::span<const std::uint8_t>>& tags_produced() const noexcept;
+  const std::unordered_map<TagID, std::span<const std::uint8_t>>& tags_produced() const noexcept;
 
   /** \brief Returns the job's id
    */
@@ -301,9 +306,9 @@ public:
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
     init_or_update_subscribe(
-      gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())},
-      gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
-    return get_subscribe_future(gsl::span<const internal::PublishTagBase>{tags});
+      std::span<const internal::PublishTagBase>{tags.data(), tags.size()},
+      std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
+    return get_subscribe_future(std::span<const internal::PublishTagBase>{tags});
   }
 
   /** \brief Rebuilds connections for any missing tags
@@ -323,7 +328,7 @@ public:
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          tags.emplace_back(tag_pair.first.substr(1), gsl::span<const std::uint8_t>{});
+          tags.emplace_back(tag_pair.first.substr(1), std::span<const std::uint8_t>{});
         }
       }
       return tags;
@@ -338,8 +343,7 @@ public:
   template<typename Range>
   bool tags_have_subscriptions(const Range& tags) const noexcept
   {
-    return tags_have_subscriptions_impl(
-      gsl::span<const internal::PublishTagBase>{tags.data(), static_cast<gsl::index>(tags.size())});
+    return tags_have_subscriptions_impl(std::span<const internal::PublishTagBase>{begin(tags), end(tags)});
   }
 
   /** \brief Returns the number of subscriptions that a tag has
@@ -382,7 +386,7 @@ private:
    * \param version The version of the data
    * \return True if processing went fine, false if there was an error
    */
-  bool process_data(const TagID& tag_id, gsl::span<const PublishValueVariant> data, VersionID version) noexcept;
+  bool process_data(const TagID& tag_id, std::span<const PublishValueVariant> data, VersionID version) noexcept;
 
   /** \brief Marks a tag as dead due to connection issues
    *
@@ -390,24 +394,24 @@ private:
    */
   void mark_tag_as_dead(const TagID& tag_id) noexcept;
 
-  void publish_impl(const internal::PublishTagBase& tag, gsl::span<PublishValueVariant> to_send) noexcept;
+  void publish_impl(const internal::PublishTagBase& tag, std::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    gsl::span<const internal::PublishTagBase> tags,
-    gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
+    std::span<const internal::PublishTagBase> tags,
+    std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  Waiter<void> get_subscribe_future(gsl::span<const internal::PublishTagBase> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<const internal::PublishTagBase> tags) noexcept;
 
-  Waiter<bool> get_ip_subscribe_future(
-    const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept;
+  Waiter<bool>
+    get_ip_subscribe_future(const std::string& address, const std::span<const internal::PublishTagBase> tags) noexcept;
 
-  void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept;
-  void declare_publication_intent_impl(gsl::span<const internal::PublishTagBase* const> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const internal::PublishTagBase> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const internal::PublishTagBase* const> tags) noexcept;
 
   // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
   bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
-  bool tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept;
+  bool tags_have_subscriptions_impl(std::span<const internal::PublishTagBase> tags) const noexcept;
 
   // The id of the job
   JobID id_;
@@ -425,7 +429,7 @@ private:
     // The buffer
     std::unique_ptr<internal::DiscardOldVersionTagBufferBase> buffer;
     // The expected type
-    gsl::span<const std::uint8_t> expected_types;
+    std::span<const std::uint8_t> expected_types;
     // ID for the connection so if a subscription is broken then reformed
     // they can be differentiated
     std::uint16_t connection_id;
@@ -444,7 +448,7 @@ private:
   std::function<void(Job&, ManagerHandle)> to_run_;
 
   // The list of tags this job produces and the expected types
-  std::unordered_map<TagID, gsl::span<const std::uint8_t>> tags_produced_;
+  std::unordered_map<TagID, std::span<const std::uint8_t>> tags_produced_;
 
   // Condition variable when data is added to buffers or an error occurs
   std::condition_variable data_buffer_modified_cv_;

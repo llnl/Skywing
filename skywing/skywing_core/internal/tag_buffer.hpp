@@ -4,17 +4,17 @@
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/types.hpp"
 
-#include "gsl/span"
-
 #include <cassert>
+#include <cstring>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace skywing::internal {
 namespace detail {
 // Checks if a span representing a tag's value is valid compared to what is expected
 template<typename... Ts, std::size_t... Is>
-bool span_is_valid(const gsl::span<const PublishValueVariant> value, std::index_sequence<Is...>) noexcept
+bool span_is_valid(const std::span<const PublishValueVariant> value, std::index_sequence<Is...>) noexcept
 {
   return value.size() == sizeof...(Ts) && (... && (value[Is].index() == index_of<Ts, PublishValueTypeList>));
 }
@@ -22,7 +22,7 @@ bool span_is_valid(const gsl::span<const PublishValueVariant> value, std::index_
 // Takes a tag value and turns it into either a value (single element) or tuple
 // non-const version
 template<typename... Ts, std::size_t... Is>
-ValueOrTuple<Ts...> make_value(gsl::span<PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
+ValueOrTuple<Ts...> make_value(std::span<PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
 {
   (void) seq; // avoid compiler warning in release buiild
   assert(span_is_valid<Ts...>(value, seq));
@@ -39,7 +39,7 @@ ValueOrTuple<Ts...> make_value(gsl::span<PublishValueVariant> value, std::index_
 
 // Const version of the above
 template<typename... Ts, std::size_t... Is>
-ValueOrTuple<Ts...> make_value(gsl::span<const PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
+ValueOrTuple<Ts...> make_value(std::span<const PublishValueVariant> value, std::index_sequence<Is...> seq) noexcept
 {
   (void) seq; // avoid compiler warning in release buiild
   assert(span_is_valid<Ts...>(value, seq));
@@ -64,29 +64,37 @@ enum class TagType : char
 template<TagType BaseTagType>
 class TagBase {
 public:
-  TagBase(const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+  TagBase(const TagID& id, const std::span<const std::uint8_t> expected_types) noexcept
     : id_{static_cast<char>(BaseTagType) + id}, expected_types_{expected_types}
   {}
 
   const TagID& id() const noexcept { return id_; }
-  const gsl::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
+  const std::span<const std::uint8_t>& expected_types() const noexcept { return expected_types_; }
 
   friend bool operator==(const TagBase& lhs, const TagBase& rhs) noexcept
   {
-    return lhs.id_ == rhs.id_ && lhs.expected_types_ == rhs.expected_types_;
+    return lhs.id_ == rhs.id_ && elements_same(lhs.expected_types_, rhs.expected_types_);
   }
   friend bool operator!=(const TagBase& lhs, const TagBase& rhs) noexcept { return !(lhs == rhs); }
 
 protected:
   // Allow private being a publish tag support
   struct OverridePrefix {};
-  TagBase(OverridePrefix, const TagID& id, const gsl::span<const std::uint8_t> expected_types) noexcept
+  TagBase(OverridePrefix, const TagID& id, const std::span<const std::uint8_t> expected_types) noexcept
     : id_{id}, expected_types_{expected_types}
   {}
 
 private:
+  // "deep" comparison of the spans
+  static bool elements_same(std::span<const std::uint8_t> const& lhs, std::span<const std::uint8_t> const& rhs)
+  {
+    return (lhs.size() == rhs.size()) && (std::memcmp(lhs.data(), rhs.data(), lhs.size_bytes()) == 0);
+  }
+
+private:
   TagID id_;
-  gsl::span<const std::uint8_t> expected_types_;
+  // FIXME (trb 2024/01/16): why is this a view? and of what?
+  std::span<const std::uint8_t> expected_types_;
 }; // class TagBase
 
 template<typename TagT>
@@ -128,8 +136,8 @@ public:
 
   /** \brief Adds data if the version is newer
    */
-  void add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept { return do_add(value, version); }
-  void add(gsl::span<const PublishValueVariant> value, const VersionID version) noexcept
+  void add(std::span<PublishValueVariant> value, const VersionID version) noexcept { return do_add(value, version); }
+  void add(std::span<const PublishValueVariant> value, const VersionID version) noexcept
   {
     return do_add(value, version);
   }
@@ -143,8 +151,8 @@ public:
 private:
   virtual bool do_has_data() const noexcept = 0;
   virtual void* do_get() noexcept = 0;
-  virtual void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept = 0;
-  virtual void do_add(gsl::span<const PublishValueVariant> value, const VersionID version) noexcept = 0;
+  virtual void do_add(std::span<PublishValueVariant> value, const VersionID version) noexcept = 0;
+  virtual void do_add(std::span<const PublishValueVariant> value, const VersionID version) noexcept = 0;
   virtual void do_reset() noexcept = 0;
 }; // DiscardOldVersionTagBufferBase
 
@@ -163,7 +171,7 @@ private:
     return &value_;
   }
 
-  void do_add(gsl::span<PublishValueVariant> value, const VersionID version) noexcept override
+  void do_add(std::span<PublishValueVariant> value, const VersionID version) noexcept override
   {
     if (version > this->stored_version_ || this->stored_version_ == tag_no_data) {
       this->stored_version_ = version;
@@ -171,7 +179,7 @@ private:
     }
   }
 
-  void do_add(gsl::span<const PublishValueVariant> value, const VersionID version) noexcept override
+  void do_add(std::span<const PublishValueVariant> value, const VersionID version) noexcept override
   {
     if (version > this->stored_version_ || this->stored_version_ == tag_no_data) {
       this->stored_version_ = version;
@@ -229,7 +237,7 @@ public:
    *
    * \pre value matches the expected types for the derived class
    */
-  void add(gsl::span<const PublishValueVariant> value, const VersionID version) noexcept
+  void add(std::span<const PublishValueVariant> value, const VersionID version) noexcept
   {
     assert(detail::span_is_valid<Ts...>(value, std::index_sequence_for<Ts...>{}));
     if (version > last_stored_version_ || last_stored_version_ == tag_no_data) {

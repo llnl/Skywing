@@ -27,9 +27,6 @@ option(SKYWING_WARNINGS_AS_ERRORS
   ${SKYWING_DEVELOPER_BUILD})
 
 option(SKYWING_EXTERNAL_CATCH2 "Search for and use an external Catch2" OFF)
-option(SKYWING_EXTERNAL_GSL
-  "Search for and use an external Guidelines Support Library (GSL)"
-  OFF)
 option(SKYWING_EXTERNAL_SPDLOG "Search for and use an external spdlog" OFF)
 
 set(SKYWING_LOG_LEVEL "off"
@@ -44,11 +41,11 @@ if (NOT SKYWING_LOG_LEVEL_UC IN_LIST _VALID_LOG_LEVELS)
     "Valid choices: \"${_VALID_LOG_LEVELS}\"")
 endif ()
 
-# C++: Require at least C++17, and disallow compiler extensions.
+# C++: Require at least C++20, and disallow compiler extensions.
 if (NOT CMAKE_CXX_STANDARD
     OR CMAKE_CXX_STANDARD EQUAL 98
-    OR CMAKE_CXX_STANDARD LESS 17)
-  set(CMAKE_CXX_STANDARD 17
+    OR CMAKE_CXX_STANDARD LESS 20)
+  set(CMAKE_CXX_STANDARD 20
     CACHE STRING "C++ Standard to use."
     FORCE)
 endif ()
@@ -119,14 +116,6 @@ else ()
   add_subdirectory(subprojects/spdlog)
 endif ()
 
-# "Guidelines Support Library" (not GNU Scientific Library, as it has
-# been for like 20 years, but who's counting).
-if (SKYWING_EXTERNAL_GSL)
-  find_package(gsl MODULE REQUIRED)
-else ()
-  add_subdirectory(subprojects/gsl)
-endif ()
-
 # External dependencies
 find_package(Threads REQUIRED)
 find_package(CapnProto 1.0 REQUIRED CONFIG)
@@ -143,12 +132,11 @@ target_link_libraries(skywing_core
   Threads::Threads
   CapnProto::capnp
   spdlog::spdlog
-  ${gsl_LIBS}
 )
 target_include_directories(skywing_core
   PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/skywing>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/subprojects/gsl/include>)
+)
 target_compile_definitions(skywing_core
   PUBLIC
   SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${SKYWING_LOG_LEVEL_UC}
@@ -174,13 +162,13 @@ target_link_libraries(skywing_mid
   INTERFACE
   skywing_core)
 
-# Setup the C++ standard. Should be at least C++17.
+# Setup the C++ standard. Should be at least C++20.
 if (CMAKE_CXX_STANDARD)
   target_compile_features(skywing_core INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
   target_compile_features(skywing_mid INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
 else ()
-  target_compile_features(skywing_core INTERFACE cxx_std_17)
-  target_compile_features(skywing_mid INTERFACE cxx_std_17)
+  target_compile_features(skywing_core INTERFACE cxx_std_20)
+  target_compile_features(skywing_mid INTERFACE cxx_std_20)
 endif ()
 
 # Add sources

@@ -62,9 +62,16 @@ namespace skywing
     NeighborDataHandler<BaseDataType, SubDataType>
     get_sub_handler(std::function<SubDataType(const DataType&)> sub_transformer) const
     {
-      return NeighborDataHandler<BaseDataType, SubDataType>
-        ([=](const BaseDataType& v){return sub_transformer(transformer_(v));},
-         tags_, neighbor_values_, updated_tags_);
+      return NeighborDataHandler<BaseDataType, SubDataType>(
+#if __cpluspus >= 202002L
+        [=, this]
+#else
+        [=, *this]
+#endif
+        (const BaseDataType& v) { return sub_transformer(transformer_(v)); },
+        tags_,
+        neighbor_values_,
+        updated_tags_);
     }
 
     // template<std::size_t index>
