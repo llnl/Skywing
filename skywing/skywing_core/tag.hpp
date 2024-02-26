@@ -9,6 +9,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <span>
 
 namespace skywing::skywing_core {
 
@@ -31,7 +32,6 @@ concept HasToInt = requires(T t) {
  * @tparam Ts Set of data types that will be sent with each
  * publication in the publication stream.
  */
-
 class Tag {
 public:
   Tag() = default;
@@ -42,8 +42,8 @@ public:
   /** @brief Get the string TagID for this Tag. */
   const std::string get_id() const { return id_; }
 
-  /** @brief Get a vector representing the one or more data types associated with this Subscription's Tag. */
-  const std::vector<DataTypeRef>& get_expected_types() const { return expected_types_; }
+  /** @brief Get a view of a vector representing the one or more data types associated with this Subscription's Tag. */
+  auto get_expected_types() const -> std::span<DataTypeRef const> { return expected_types_; }
 
 private:
   std::string id_{};
@@ -106,6 +106,12 @@ public:
 private:
   std::tuple<Types...> expected_types_;
 };
+
+template<Publishable... Types>
+Tag make_tag(std::string id)
+{
+  return Tag(id, PublishDataTypes<Types...>());
+}
 
 } // namespace skywing::skywing_core
 #endif // TAG_HPP
