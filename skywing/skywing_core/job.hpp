@@ -77,32 +77,28 @@ public:
         Manager& manager,
         std::function<void(Job&, ManagerHandle)> to_run) noexcept;
 
-    /** \brief Declare intent to publish on tags, this must be done before
-     * publishing on a tag
-     */
-    template <typename... Ts>
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    void declare_publication_intent(const Ts&... tags) noexcept
-    {
-        const std::array<const internal::PublishTagBase*, sizeof...(Ts)>
-            tag_ptrs{&tags...};
-        declare_publication_intent_impl(
-            std::span<const internal::PublishTagBase* const>{tag_ptrs.data(),
-                                                             tag_ptrs.size()});
-    }
+  /** \brief Declare intent to publish on tags, this must be done before publishing
+   * on a tag
+   */
+  template<typename... Ts>
+  void declare_publication_intent(const Ts&... tags) noexcept
+  {
+    const std::array<const skywing_core::Tag*, sizeof...(Ts)> tag_ptrs{&tags...};
+    declare_publication_intent_impl(std::span<const skywing_core::Tag* const>{tag_ptrs.data(), tag_ptrs.size()});
+  }
 
-    /** \brief Declare publication intent for a range
-     */
-    template <typename Range>
-    void declare_publication_intent_range(const Range& tags_in) noexcept
-    // requires std::ranges::contiguous_range<Range>
-    {
-        std::vector<internal::PublishTagBase const*> tags;
-        tags.reserve(tags_in.size());
-        for (auto const& t : tags_in)
-            tags.push_back(&t);
-        declare_publication_intent_impl(tags);
-    }
+  /** \brief Declare publication intent for a range
+   */
+  template<typename Range>
+  void declare_publication_intent_range(const Range& tags_in) noexcept
+  // requires std::ranges::contiguous_range<Range>
+  {
+    std::vector<skywing_core::Tag const*> tags;
+    tags.reserve(tags_in.size());
+    for (auto const& t : tags_in)
+      tags.push_back(&t);
+    declare_publication_intent_impl(tags);
+  }
 
   /** \brief Retrieves the specified version for the tag, or latest if no version
    * is specified
@@ -389,31 +385,24 @@ private:
      */
     void mark_tag_as_dead(const TagID& tag_id) noexcept;
 
-    void publish_impl(const internal::PublishTagBase& tag,
-                      std::span<PublishValueVariant> to_send) noexcept;
+  void publish_impl(const skywing_core::Tag& tag, std::span<PublishValueVariant> to_send) noexcept;
 
-    void init_or_update_subscribe(
-        std::span<const internal::PublishTagBase> tags,
-        std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>
-            ptr) noexcept;
+  void init_or_update_subscribe(
+    std::span<const skywing_core::Tag> tags,
+    std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-    Waiter<void> get_subscribe_future(
-        std::span<const internal::PublishTagBase> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<const skywing_core::Tag> tags) noexcept;
 
-    Waiter<bool> get_ip_subscribe_future(
-        const std::string& address,
-        const std::span<const internal::PublishTagBase> tags) noexcept;
+  Waiter<bool>
+    get_ip_subscribe_future(const std::string& address, const std::span<const skywing_core::Tag> tags) noexcept;
 
-    void declare_publication_intent_impl(
-        std::span<const internal::PublishTagBase> tags) noexcept;
-    void declare_publication_intent_impl(
-        std::span<const internal::PublishTagBase* const> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const skywing_core::Tag> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const skywing_core::Tag* const> tags) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
-    bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
-    bool tags_have_subscriptions_impl(
-        std::span<const internal::PublishTagBase> tags) const noexcept;
+  bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
+  bool tags_have_subscriptions_impl(std::span<const skywing_core::Tag> tags) const noexcept;
 
     // The id of the job
     JobID id_;
