@@ -12,9 +12,7 @@
 
 using namespace skywing;
 
-using I32ValueTag = skywing::ReduceValueTag<std::int32_t>;
-using I32GroupTag = skywing::ReduceGroupTag<std::int32_t>;
-
+using pubtag_t = PublishTag<int>;
 
 struct MachineConfig
 {
@@ -96,49 +94,31 @@ void runJob(
     std::cout << "Machine " << config.name << " finished connecting." << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds{4});
 
-    std::vector<I32ValueTag> reduce_group_tags;
+    std::vector<pubtag_t> tags;
     for (unsigned i = 0; i < num_total_agents; i++)
-      reduce_group_tags.push_back(I32ValueTag{"tag" + std::to_string(i)});
+      tags.push_back(pubtag_t{"tag" + std::to_string(i)});
 
-    std::cout << "Agenet " << config.name << " about to create reduce group." << std::endl;
-    auto reduce_group_waiter = job.create_reduce_group(
-      I32GroupTag{"random number reduce"},
-      reduce_group_tags[agent_id],
-      reduce_group_tags);
-    auto& reduce_group = reduce_group_waiter.get();
-    std::cout << "Agenet " << config.name << " finished creating reduce group." << std::endl;
-    std::uniform_int_distribution<std::int32_t> random_dist{50, 150};
-    std::ranlux48 prng{std::random_device{}()};
-    const auto min_value = static_cast<int>(random_dist.min() * num_total_agents);
-    const auto max_value = static_cast<int>(random_dist.max() * num_total_agents);
-    for (unsigned i = 0; i < 100; i++) {
-      const auto random_value = random_dist(prng);
-      auto waiter = reduce_group.allreduce(std::plus<>{}, random_value);
-      const auto result_opt = waiter.get();
-      if (!result_opt) {
-        const auto cur_time = std::time(nullptr);
-        std::cout << std::put_time(std::localtime(&cur_time), "[%F %T]") << " Reduce operation failed; exiting...\n";
-        return;
-      }
-      else {
-        const auto cur_time = std::time(nullptr);
-        // The result should never fall outside of the specified range, but do axo sanity
-        // check just in case
-        const auto result = *result_opt;
-        if (result >= min_value && result <= max_value) {
-          std::cout << std::put_time(std::localtime(&cur_time), "[%F %T]") << " Allreduce summation: " << result
-                    << '\n';
+    // Each agent declares that it intends to publish a stream under a given tag.
+    job.declare_publication_intent(tags[agent_id]);
+
+    for (size_t i = agent_id; i < tags.size(); i++)
+      job.subscribe(tags[i]).wait();
+
+    // Repeatedly submit and receive values.
+    int pub_val = 100 * agent_id;
+    for (size_t i = 0; i < 10; i++) {
+      // Publish a value.
+      job.publish(tags[agent_id], pub_val);
+      for (size_t i = agent_id; i < tags.size(); i++) {
+	// Request and wait for a new value under the subscription specified by `tags[i]`.
+        if (std::optional<int> nbr_val = job.get_waiter(tags[i]).get()) {
+          std::cout << config.name << " received value " << *nbr_val;
+          std::cout<< " from Agent " << i << std::endl;
         }
-        else {
-          // If this message is ever seen and the code has otherwise been unchanged,
-          // there's some kind of bug!
-          std::cerr << std::put_time(std::localtime(&cur_time), "[%F %T]") << " !!! Out of range value " << result
-                    << " !!!\n";
-          std::exit(1);
-        }
-        // Sleep so there aren't tons of lines of output
-        std::this_thread::sleep_for(std::chrono::seconds(1));
       }
+      // Increase the value published by this agent and wait a second.
+      pub_val++;
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   });
   manager.run();

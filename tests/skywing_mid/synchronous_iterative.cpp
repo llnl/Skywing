@@ -53,7 +53,7 @@ void machine_task(const NetworkInfo* const info, const int index)
     using IterMethod = SynchronousIterative<TestAsyncProcessor, StopAfterTime, TrivialResiliencePolicy>;
     IterMethod iter_method = WaiterBuilder<IterMethod>(manager, job_handle, tag_ids[index], tag_ids)
       .set_processor(index, num_machines)
-      .set_stop_policy(std::chrono::seconds(5))
+      .set_stop_policy(std::chrono::seconds(10))
       .set_resilience_policy()
       .build_waiter().get();
     iter_method.run();

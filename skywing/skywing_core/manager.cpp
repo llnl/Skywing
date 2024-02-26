@@ -287,31 +287,6 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
       Manager::ExternalManagerAccessor::handle_get_publishers(*manager_, msg, *this);
       return true;
     },
-    [&](const JoinReduceGroup& msg) {
-      SKYNET_TRACE_LOG(
-        "\"{}\" received join reduce group from \"{}\" for group \"{}\", producing tag \"{}\"",
-        manager_->id(),
-        id_,
-        msg.reduce_tag(),
-        msg.tag_produced());
-      if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.tag_produced())) { return false; }
-      return Manager::ExternalManagerAccessor::handle_join_reduce_group(*manager_, msg, *this);
-    },
-    [&](const SubmitReduceValue& msg) {
-      SKYNET_TRACE_LOG(
-        "\"{}\" received submit reduce value from \"{}\" for group \"{}\", tag \"{}\", version {}",
-        manager_->id(),
-        id_,
-        msg.reduce_tag(),
-        msg.data().tag_id(),
-        msg.data().version());
-      if (!tag_name_okay(msg.reduce_tag()) || !tag_name_okay(msg.data().tag_id())) { return false; }
-      return Manager::ExternalManagerAccessor::handle_submit_reduce_value(*manager_, msg, *this);
-    },
-    [&](const ReportReduceDisconnection& msg) {
-      if (!tag_name_okay(msg.reduce_tag())) { return false; }
-      return Manager::ExternalManagerAccessor::handle_report_reduce_disconnection(*manager_, msg, *this);
-    },
     [&](const PublishData& msg) {
       if (!tag_name_okay(msg.tag_id())) { return false; }
       return Manager::ExternalManagerAccessor::handle_publish_data(*manager_, msg, *this);
@@ -532,10 +507,8 @@ void Manager::run() noexcept
       }
       //std::cout << "Agent " << id() << " about to announce notifications. " << std::endl;
       using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
-      std::array<cv_ref_pair, 3> cv_array{
-        cv_ref_pair{notify_subscriptions_, subscription_cv_},
-        cv_ref_pair{notify_reduce_group_, reduce_group_cv_},
-        cv_ref_pair{notify_connection_, connection_cv_}};
+      std::array<cv_ref_pair, 2> cv_array{
+        cv_ref_pair{notify_subscriptions_, subscription_cv_}, cv_ref_pair{notify_connection_, connection_cv_}};
       for (auto& [notify, cv] : cv_array) {
         if (notify) {
           cv.notify_all();
@@ -615,25 +588,6 @@ void Manager::remove_dead_neighbors() noexcept
       notify_subscriptions_ = true;
       SKYNET_TRACE_LOG("\"{}\" removing dead neighbor \"{}\"", id_, it->first);
       send_to_neighbors(internal::make_remove_neighbor(it->first));
-      // Find any reduce groups that this machine is a part of and
-      // notify them of the disconnection
-      // TODO: Probably want to cache this at some point so everything
-      // doesn't have to be scanned over anytime something disconnects?
-      for (auto& [tag, info] : reduce_tag_data_) {
-        (void)tag;
-        // Pointers to prevent copies
-        auto scan_lists = {&info.parent_machines, &info.child_machines[0], &info.child_machines[1]};
-        for (auto& list_ptr : scan_lists) {
-          auto& list = *list_ptr;
-          // Also remove the connection
-          const auto iter = std::find(list.cbegin(), list.cend(), it->first);
-          if (iter != list.cend()) {
-            list.erase(iter);
-            SKYNET_TRACE_LOG("\"{}\" reporting disconnection in reduce group \"{}\"", id_, tag);
-            internal::ReduceGroupBase::Accessor::report_disconnection(*info.group);
-          }
-        }
-      }
       // Remove corresponding address
       const auto erase_addr = [&](auto& erase_from, const auto& on_erase) {
         const auto addr_matches = [&](const auto& pair) { return pair.second == std::addressof(it->second); };
@@ -965,264 +919,6 @@ void Manager::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
   notify_subscriptions_ = true;
 }
 
-Waiter<internal::ReduceGroupBase&> Manager::create_reduce_group(std::unique_ptr<internal::ReduceGroupBase> group_ptr) noexcept
-{
-  const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(*group_ptr);
-  const auto& group_id = internal::ReduceGroupBase::Accessor::group_id(*group_ptr);
-  // Create an entry for the group
-  const auto [tag_iter, tag_inserted] = self_sub_count_.emplace(tag_produced, 0);
-  (void)tag_iter;
-  if (!tag_inserted) {
-    std::cerr << "The tag " << std::quoted(tag_produced)
-              << " was attempted to be produced for more than one reduce group!\n";
-    std::exit(1);
-  }
-  const auto [iter, inserted] = reduce_tag_data_.try_emplace(group_id, std::move(group_ptr));
-  // Allow creating the same group twice as tags can be reused
-  // There's probably an additional check that should be done, but I'm not sure what
-  // if (!inserted)
-  // {
-  //   std::cerr
-  //     << "The reduce group " << std::quoted(group_id) << " was attempted to be created twice!\n";
-  //   std::terminate();
-  // }
-  const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*iter->second.group).parent();
-  if (!parent_tag.empty()) {
-    pending_tags_.push_back(parent_tag);
-    for (auto& neighbor : neighbors_) {
-      neighbor.second.reset_backoff_counter();
-      neighbor.second.find_publishers_for_tags({parent_tag}, std::vector<std::uint8_t>{1});
-    }
-  }
-  // Notify reduce groups for when new tags are produced
-  notify_reduce_group_ = true;
-  return make_waiter<internal::ReduceGroupBase&>(
-    job_mut_,
-    reduce_group_cv_,
-    internal::ManagerReduceGroupIsCreated{*this, group_id},
-    internal::ManagerGetReduceGroup{*this, group_id});
-}
-
-Waiter<void> Manager::rebuild_reduce_group(const TagID& group_id) noexcept
-{
-  SKYNET_TRACE_LOG("\"{}\" rebuilding reduce group \"{}\"", id_, group_id);
-  const auto iter = reduce_tag_data_.find(group_id);
-  assert(iter != reduce_tag_data_.cend());
-  const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*iter->second.group).parent();
-  if (!parent_tag.empty()) {
-    // Don't bother searching for machines that already have connections
-    if (iter->second.parent_machines.empty()) {
-      pending_tags_.push_back(parent_tag);
-      for (auto& neighbor : neighbors_) {
-        neighbor.second.reset_backoff_counter();
-        neighbor.second.find_publishers_for_tags({parent_tag}, std::vector<std::uint8_t>{1});
-      }
-    }
-  }
-  return make_waiter(job_mut_, reduce_group_cv_, internal::ManagerReduceGroupIsCreated{*this, group_id});
-}
-
-bool Manager::reduce_group_is_created(const TagID& group_id) noexcept
-{
-  // See if the parent has a connection
-  const auto group_iter = reduce_tag_data_.find(group_id);
-  assert(group_iter != reduce_tag_data_.cend());
-  const auto& reduce_data = group_iter->second;
-  const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
-  if (!parent_tag.empty() && reduce_data.parent_machines.empty()) {
-    if (self_sub_count_.find(parent_tag) == self_sub_count_.cend()) {
-      SKYNET_TRACE_LOG(
-        "\"{}\" - reduce group \"{}\" is not yet created as there is no parent connection", id_, group_id);
-      return false;
-    }
-  }
-  // Check that the children have joined the group
-  for (std::size_t i = 0; i < reduce_data.child_machines.size(); ++i) {
-    // Ignore empty tags
-    const auto& neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group);
-    if (!neighbors.tags[i + 1].empty() && reduce_data.child_machines[i].empty()) {
-      if (self_sub_count_.find(neighbors.tags[i + 1]) == self_sub_count_.cend()) {
-        SKYNET_TRACE_LOG(
-          "\"{}\" - reduce group \"{}\" is not yet created as the {} child has no connections",
-          id_,
-          group_id,
-          i == 0 ? "left" : "right");
-        return false;
-      }
-    }
-  }
-  SKYNET_TRACE_LOG("\"{}\" - reduce group \"{}\" is ready", id_, group_id);
-  return true;
-}
-
-bool Manager::handle_join_reduce_group(
-  const internal::JoinReduceGroup& msg, const internal::ExternalManager& from) noexcept
-{
-  // Check if the reduce group exists
-  const auto reduce_group_loc = reduce_tag_data_.find(msg.reduce_tag());
-  if (reduce_group_loc == reduce_tag_data_.cend()) { return false; }
-  // Now check against the children tags, and add to them if they match,
-  // making sure it doesn't already exist
-  auto& reduce_group = reduce_group_loc->second;
-  auto& child_machines = reduce_group.child_machines;
-  for (std::size_t i = 0; i < child_machines.size(); ++i) {
-    // See if the tag matches
-    const auto& tag_neighbors = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_group.group);
-    if (msg.tag_produced() == tag_neighbors.tags[i + 1]) {
-      // Add it, unless it's already in there; that's an error
-      auto& existing_conns = child_machines[i];
-      const auto tag_loc = std::find(existing_conns.cbegin(), existing_conns.cend(), msg.tag_produced());
-      if (tag_loc != existing_conns.cend()) {
-        SKYNET_WARN_LOG(
-          "\"{}\" received join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but it already existed in "
-          "the group.",
-          id_,
-          from.id(),
-          msg.tag_produced(),
-          msg.reduce_tag());
-        // Remove it from the container as the connection will be killed
-        existing_conns.erase(tag_loc);
-        return false;
-      }
-      else {
-        // otherwise just add it and mark this as a success
-        existing_conns.push_back(from.id());
-        notify_reduce_group_ = true;
-        return true;
-      }
-    }
-  }
-  SKYNET_WARN_LOG(
-    "\"{}\" received join group from \"{}\" for tag \"{}\" for reduce group \"{}\", but such a group does not exist.",
-    id_,
-    from.id(),
-    msg.tag_produced(),
-    msg.reduce_tag());
-  return false;
-}
-
-internal::ReduceGroupBase& Manager::get_reduce_group(const TagID& group_id) noexcept
-{
-  const auto loc = reduce_tag_data_.find(group_id);
-  assert(loc != reduce_tag_data_.cend());
-  return *loc->second.group;
-}
-
-void Manager::reduce_send_data_and_remove_missing(
-  std::vector<MachineID>& machines, const std::vector<std::byte>& message) noexcept
-{
-  for (auto iter = machines.begin(); iter != machines.end();) {
-    const auto parent_loc = neighbors_.find(*iter);
-    if (parent_loc == neighbors_.cend()) { iter = machines.erase(iter); }
-    else {
-      parent_loc->second.send_message(message);
-      ++iter;
-    }
-  }
-}
-
-void Manager::send_reduce_data_to_parent(
-  const TagID& group_id,
-  const VersionID version,
-  const TagID& reduce_tag,
-  gsl::span<const PublishValueVariant> value) noexcept
-{
-  const auto loc = reduce_tag_data_.find(group_id);
-  assert(loc != reduce_tag_data_.cend());
-  auto& parent_machines = loc->second.parent_machines;
-  const auto reduce_message = internal::make_submit_reduce_value(group_id, version, reduce_tag, value);
-  reduce_send_data_and_remove_missing(parent_machines, reduce_message);
-  // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
-}
-
-void Manager::send_reduce_data_to_children(
-  const TagID& group_id,
-  const VersionID version,
-  const TagID& reduce_tag,
-  gsl::span<const PublishValueVariant> value) noexcept
-{
-  const auto loc = reduce_tag_data_.find(group_id);
-  assert(loc != reduce_tag_data_.cend());
-  auto& child_machines = loc->second.child_machines;
-  const auto reduce_message = internal::make_submit_reduce_value(group_id, version, reduce_tag, value);
-  for (auto& children : child_machines) {
-    reduce_send_data_and_remove_missing(children, reduce_message);
-  }
-  // internal::ReduceGroupBase::Accessor::add_data(*loc->second.group, reduce_tag, value, version);
-}
-
-void Manager::send_report_disconnection(
-  const TagID& group_id, const MachineID& initiating_machine, const ReductionDisconnectID disconnect_id) noexcept
-{
-  const auto loc = reduce_tag_data_.find(group_id);
-  assert(loc != reduce_tag_data_.cend());
-  const auto msg = internal::make_report_reduce_disconnection(group_id, initiating_machine, disconnect_id);
-  reduce_send_data_and_remove_missing(loc->second.parent_machines, msg);
-  for (auto& children : loc->second.child_machines) {
-    reduce_send_data_and_remove_missing(children, msg);
-  }
-}
-
-bool Manager::handle_submit_reduce_value(
-  const internal::SubmitReduceValue& msg, const internal::ExternalManager& from) noexcept
-{
-  return handle_reduce_value(msg.reduce_tag(), msg.data(), from);
-}
-
-bool Manager::handle_reduce_value(
-  const TagID& reduce_group_id, const internal::PublishData& value, const internal::ExternalManager& from) noexcept
-{
-  // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
-  (void)from;
-  // Make sure the group exists
-  const auto group_loc = reduce_tag_data_.find(reduce_group_id);
-  if (group_loc == reduce_tag_data_.cend()) {
-    SKYNET_WARN_LOG(
-      "\"{}\" rejected reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the reduce group does not "
-      "exist",
-      id_,
-      from.id(),
-      reduce_group_id,
-      value.tag_id());
-    return false;
-  }
-  auto var_opt = value.value();
-  if (!var_opt) {
-    SKYNET_WARN_LOG(
-      "\"{}\" rejected reduce value from \"{}\" for reduce group \"{}\" for tag \"{}\" as the value could not be "
-      "extracted",
-      id_,
-      from.id(),
-      reduce_group_id,
-      value.tag_id());
-    return false;
-  }
-  return internal::ReduceGroupBase::Accessor::add_data(
-    *group_loc->second.group, value.tag_id(), *var_opt, value.version());
-}
-
-bool Manager::handle_report_reduce_disconnection(
-  const internal::ReportReduceDisconnection& msg, const internal::ExternalManager& from) noexcept
-{
-  // Cast to void to avoid unused parameter warnings when the warn level isn't enabled.
-  (void)from;
-  // Make sure the group exists
-  const auto group_loc = reduce_tag_data_.find(msg.reduce_tag());
-  if (group_loc == reduce_tag_data_.cend()) {
-    SKYNET_WARN_LOG(
-      "\"{}\" rejected reduce disconnection from \"{}\", initiated by \"{}\", "
-      "for reduce group \"{}\" as the reduce group does not exist",
-      id_,
-      from.id(),
-      msg.initiating_machine(),
-      msg.reduce_tag());
-    return false;
-  }
-  internal::ReduceGroupBase::Accessor::propagate_disconnection(
-    *group_loc->second.group, msg.initiating_machine(), msg.id());
-  return true;
-}
-
 void Manager::init_connections_for_pending_tags() noexcept
 {
   if (!pending_tags_.empty()) { SKYNET_TRACE_LOG("\"{}\" is initiating connections for tags {}", id_, pending_tags_);}
@@ -1279,13 +975,6 @@ void Manager::init_connections_for_pending_tags() noexcept
         }
         else {
           if (tag[0] == internal::publish_tag_marker) { finalize_subscription(tag, *neighbor_iter->second); }
-          else {
-            // Reduce group
-            const auto tags_str_view = internal::split(tag, '\0');
-            for (const auto& str_view : tags_str_view) {
-              finalize_reduce_group(neighbor_iter->second->id(), group_from_parent_tag(TagID{str_view}).first);
-            }
-          }
           tag_iter = pending_tags_.erase(tag_iter);
         }
       }
@@ -1319,11 +1008,7 @@ void Manager::init_connections_for_pending_tags() noexcept
                          id_, addr, AddrPortPair{addr.substr(0, addr.find(':')), port}, tag);
         const auto [iter, inserted] = pending_conns_.try_emplace(
           AddrPortPair{addrstr, port},
-          PendingInfo{
-            std::move(conn),
-            ConnStatus::waiting_for_conn,
-            tag[0] == internal::publish_tag_marker ? ConnType::subscription : ConnType::reduce_group,
-            tag});
+          PendingInfo{std::move(conn), ConnStatus::waiting_for_conn, ConnType::subscription, tag});
         (void)iter;
         if (inserted)
         {
@@ -1358,8 +1043,6 @@ const char* Manager::to_c_str(ConnType type) noexcept
     return "by_accept";
   case ConnType::subscription:
     return "subscription";
-  case ConnType::reduce_group:
-    return "reduce_group";
   case ConnType::specific_ip:
     return "specific_ip";
   }
@@ -1406,16 +1089,6 @@ void Manager::process_pending_conns() noexcept
       }
     } break;
 
-    case ConnType::reduce_group: {
-      const auto tag_str_view = internal::split(info.tag, '\0');
-      for (const auto& tag_view : tag_str_view) {
-        const TagID tag{tag_view};
-        auto& [group_id, reduce_data] = group_from_parent_tag(tag);
-        (void)group_id;
-        const auto& parent_tag = internal::ReduceGroupBase::Accessor::tag_neighbors(*reduce_data.group).parent();
-        handle_tag(parent_tag, tag);
-      }
-    } break;
     }
   };
   for (auto iter = pending_conns_.begin(); iter != pending_conns_.end();) {
@@ -1500,13 +1173,6 @@ void Manager::process_pending_conns() noexcept
               case ConnType::user_requested:
                 break;
 
-              case ConnType::reduce_group: {
-                const auto tag_str_view = internal::split(info.tag, '\0');
-                for (const auto& tag : tag_str_view) {
-                  finalize_reduce_group(new_neighbor_iter->first, group_from_parent_tag(TagID{tag}).first);
-                }
-              } break;
-
               case ConnType::subscription:
                 finalize_subscription(info.tag, new_neighbor_iter->second);
                 break;
@@ -1567,19 +1233,6 @@ void Manager::process_pending_conns() noexcept
 std::vector<std::byte> Manager::make_handshake() const noexcept
 {
   return internal::make_greeting(id_, make_neighbor_vector(), port_);
-}
-
-void Manager::finalize_reduce_group(const MachineID& parent_machine_id, const TagID& group_tag) noexcept
-{
-  const auto iter = reduce_tag_data_.find(group_tag);
-  assert(iter != reduce_tag_data_.cend());
-  auto& group = *iter->second.group;
-  const auto& tag_produced = internal::ReduceGroupBase::Accessor::produced_tag(group);
-  const auto& parent_id = iter->second.parent_machines.emplace_back(parent_machine_id);
-  const auto neighbor_iter = neighbors_.find(parent_id);
-  assert(neighbor_iter != neighbors_.cend());
-  neighbor_iter->second.send_message(internal::make_join_reduce_group(group_tag, tag_produced));
-  notify_reduce_group_ = true;
 }
 
 bool Manager::subscription_tags_are_produced(const internal::SubscriptionNotice& msg) const noexcept

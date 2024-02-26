@@ -57,8 +57,6 @@ ValueOrTuple<Ts...> make_value(gsl::span<const PublishValueVariant> value, std::
 enum class TagType : char
 {
   publish_tag = publish_tag_marker,
-  reduce_value = reduce_value_marker,
-  reduce_group = reduce_group_marker
 };
 
 // The implementation for all tags would be the same,
@@ -106,8 +104,6 @@ inline static constexpr std::array<std::uint8_t, sizeof...(Ts)> expected_type_fo
 
 // Convenience aliases
 using PublishTagBase = internal::TagBase<TagType::publish_tag>;
-using ReduceValueTagBase = internal::TagBase<TagType::reduce_value>;
-using ReduceGroupTagBase = internal::TagBase<TagType::reduce_group>;
 
 // Empty class for determining if something is a private tag at compile-time
 class PrivateTagBase {};

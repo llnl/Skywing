@@ -53,7 +53,7 @@ def generate_config_file(num_agents, node_names_list, filename, port_start):
     port_start - (int) The port to begin counting at for each node.
     """
     f = open(filename, 'w')
-    num_agents_per_node = num_agents / len(node_names_list)
+    num_agents_per_node = int(num_agents / len(node_names_list))
     port_num = port_start
     for i, name in enumerate(node_names_list):
         for j in range(num_agents_per_node):

@@ -177,34 +177,6 @@ bool GetPublishers::ignore_cache() const noexcept { return r.getIgnoreCache(); }
 GetPublishers::GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept : r{std::move(reader)} {}
 
 /////////////////////////////////////////////////////
-// JoinReduceGroup
-/////////////////////////////////////////////////////
-
-TagID JoinReduceGroup::reduce_tag() const noexcept { return r.getReduceTag(); }
-TagID JoinReduceGroup::tag_produced() const noexcept { return r.getTagProduced(); }
-JoinReduceGroup::JoinReduceGroup(cpnpro::JoinReduceGroup::Reader reader) noexcept : r{std::move(reader)} {}
-
-/////////////////////////////////////////////////////
-// SubmitReduceValue
-/////////////////////////////////////////////////////
-
-TagID SubmitReduceValue::reduce_tag() const noexcept { return r.getReduceTag(); }
-PublishData SubmitReduceValue::data() const noexcept { return PublishData{r.getData()}; }
-SubmitReduceValue::SubmitReduceValue(cpnpro::SubmitReduceValue::Reader reader) noexcept : r{std::move(reader)} {}
-
-/////////////////////////////////////////////////////
-// ReportReduceDisconnection
-/////////////////////////////////////////////////////
-
-TagID ReportReduceDisconnection::reduce_tag() const noexcept { return r.getReduceTag(); }
-MachineID ReportReduceDisconnection::initiating_machine() const noexcept { return r.getInitiatingMachine(); }
-ReductionDisconnectID ReportReduceDisconnection::id() const noexcept { return r.getId(); }
-
-ReportReduceDisconnection::ReportReduceDisconnection(cpnpro::ReportReduceDisconnection::Reader reader) noexcept
-  : r{std::move(reader)}
-{}
-
-/////////////////////////////////////////////////////
 // SubscriptionNotice
 /////////////////////////////////////////////////////
 
@@ -263,12 +235,6 @@ auto MessageHandler::extract_message() const noexcept -> std::optional<MessageVa
       return ReportPublishers{impl_->root.getReportPublishers()};
     case vals::GET_PUBLISHERS:
       return GetPublishers{impl_->root.getGetPublishers()};
-    case vals::JOIN_REDUCE_GROUP:
-      return JoinReduceGroup{impl_->root.getJoinReduceGroup()};
-    case vals::SUBMIT_REDUCE_VALUE:
-      return SubmitReduceValue{impl_->root.getSubmitReduceValue()};
-    case vals::REPORT_REDUCE_DISCONNECTION:
-      return ReportReduceDisconnection{impl_->root.getReportReduceDisconnection()};
     case vals::PUBLISH_DATA:
       return PublishData{impl_->root.getPublishData()};
     case vals::SUBSCRIPTION_NOTICE:

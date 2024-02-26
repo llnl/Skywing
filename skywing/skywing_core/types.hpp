@@ -28,9 +28,6 @@ using TagID = std::string;
 /// The type used for communicating message sizes over the network
 using NetworkSizeType = std::uint32_t;
 
-/// The type used for disconnection notifications in reduce groups
-using ReductionDisconnectID = std::uint64_t;
-
 /// A typelist of all the types that can be published
 using PublishValueTypeList = internal::TypeList<
   float,
@@ -81,55 +78,6 @@ struct ValueOrTupleImpl<T> {
 template<typename... Ts>
 using ValueOrTuple = typename internal::detail::ValueOrTupleImpl<Ts...>::Type;
 
-/// A type indicating that a reduce did not produce a result intentionally
-/// (i.e., that it is not the root of the reduce tree)
-struct ReduceNoValue {};
-
-/// A type indicating that a reduce failed due to a disconnection
-struct ReduceDisconnection {};
-
-/** \brief The return result for a normal reduce operation.
- *
- * As a reduce operation can either not produce a value because it isn't
- * the root or not produce a value because of a connection error, can't
- * just return an optional.
- */
-template<typename T>
-class ReduceResult {
-public:
-  constexpr ReduceResult(ReduceNoValue) noexcept : var_{ReduceNoValue{}} {}
-  constexpr ReduceResult(ReduceDisconnection) noexcept : var_{ReduceDisconnection{}} {}
-  constexpr ReduceResult(T value) noexcept : var_{std::move(value)} {}
-
-  /** \brief Returns true if an error occurred
-   */
-  constexpr bool error_occurred() const noexcept { return std::holds_alternative<ReduceDisconnection>(var_); }
-
-  /** \brief Returns true if the variant holds a value
-   */
-  constexpr bool has_value() const noexcept { return std::holds_alternative<T>(var_); }
-
-  /** \brief Returns the value held
-   *
-   * \pre obj.has_value() == true
-   */
-  constexpr const T& value() const& noexcept
-  {
-    assert(has_value());
-    return *std::get_if<T>(&var_);
-  }
-  constexpr T value() && noexcept
-  {
-    assert(has_value());
-    return *std::get_if<T>(&var_);
-  }
-  constexpr const T& operator*() const& noexcept { return value(); }
-  constexpr T operator*() && noexcept { return value(); }
-
-private:
-  std::variant<ReduceNoValue, ReduceDisconnection, T> var_;
-};
-
 /// Address/port pair
 using AddrPortPair = std::pair<std::string, std::uint16_t>;
 
@@ -161,28 +109,8 @@ auto wrap_void_func(Callable&& c, Args&&... args) noexcept
   }
 }
 
-/// Structure for reporting reduce group building
-struct ReduceGroupNeighbors {
-  // Having everything as an array is nice sometimes, but so is having named
-  // members
-  std::array<TagID, 3> tags;
-
-  const TagID& parent() const noexcept { return tags[0]; }
-  TagID& parent() noexcept { return tags[0]; }
-  const TagID& left_child() const noexcept { return tags[1]; }
-  TagID& left_child() noexcept { return tags[1]; }
-  const TagID& right_child() const noexcept { return tags[2]; }
-  TagID& right_child() noexcept { return tags[2]; }
-};
-
 // Marker prepended to mark tags as publish tags
 inline constexpr char publish_tag_marker = 'p';
-
-// Marker prepended to mark tags as begin for reduce groups
-inline constexpr char reduce_value_marker = 'r';
-
-// Marker prepended to mark tags as reduce group tags
-inline constexpr char reduce_group_marker = 'g';
 
 // Marker prepended to mark tags as private tags
 inline constexpr char private_tag_marker = 'x';
@@ -206,8 +134,7 @@ struct any_of {
 // Checks if a tag name is bad
 inline bool tag_name_okay(const std::string& tag) noexcept
 {
-  return !tag.empty()
-      && (tag[0] == any_of<char, publish_tag_marker, reduce_value_marker, reduce_group_marker, private_tag_marker>{});
+  return !tag.empty() && (tag[0] == any_of<char, publish_tag_marker, private_tag_marker>{});
 }
 } // namespace internal
 } // namespace skywing

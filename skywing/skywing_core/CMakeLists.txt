@@ -18,7 +18,6 @@ target_sources(skywing_core
   internal/devices/socket_communicator.cpp
   internal/manager_waiter_callables.cpp
   internal/message_creators.cpp
-  internal/reduce_group.cpp
   internal/utility/network_conv.cpp
   job.cpp
   manager.cpp
@@ -44,7 +43,6 @@ target_sources(skywing_core
   "${_endian_header}"
   internal/manager_waiter_callables.hpp
   internal/message_creators.hpp
-  internal/reduce_group.hpp
   internal/tag_buffer.hpp
   internal/utility/algorithms.hpp
   internal/utility/logging.hpp

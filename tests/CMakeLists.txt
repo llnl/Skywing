@@ -30,17 +30,14 @@ set(TEST_HDRS
 set(TEST_SRCS
   skywing_core/assorted.cpp
   skywing_core/broadcast.cpp
-  skywing_core/broken_reduce.cpp
   # skywing_core/broken_subscribes.cpp # Commented out in meson.build
   skywing_core/disconnect.cpp
   skywing_core/heartbeat.cpp
   skywing_core/ip_subscribe.cpp
   skywing_core/publish_data_wrapper.cpp
   skywing_core/publish_multiple_values.cpp
-  skywing_core/reduce_tag_bug.cpp
   skywing_core/repeat_connection.cpp
   skywing_core/self_subscribe.cpp
-  skywing_core/simple_reduce.cpp
   skywing_core/devices/socket_communicator.cpp
 
   skywing_mid/associative_vector.cpp

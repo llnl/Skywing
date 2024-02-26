@@ -52,24 +52,6 @@ std::vector<std::byte> make_report_publishers(
 std::vector<std::byte> make_get_publishers(
   const std::vector<TagID>& tags, const std::vector<std::uint8_t>& publishers_needed, bool ignore_cache) noexcept;
 
-/** \brief Create a message to join a reduce group
- */
-std::vector<std::byte> make_join_reduce_group(const TagID& reduce_tag, const TagID& tag_produced) noexcept;
-
-/** \brief Create a message to submit a value for reduction, these are sent
- * to the parents
- */
-std::vector<std::byte> make_submit_reduce_value(
-  const TagID& reduce_tag,
-  const VersionID version,
-  const TagID& tag_id,
-  gsl::span<const PublishValueVariant> value) noexcept;
-
-/** \brief Create a message for sending a disconnection notification
- */
-std::vector<std::byte> make_report_reduce_disconnection(
-  const TagID& reduce_tag, const MachineID& initiating_machine, ReductionDisconnectID disconnection_id) noexcept;
-
 /** \brief Create a message for subscribing/unsubscribing
  */
 std::vector<std::byte> make_subscription_notice(const std::vector<TagID>& tags, bool is_unsubscribe) noexcept;

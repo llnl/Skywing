@@ -71,22 +71,6 @@ struct GetPublishers {
   ignoreCache      @2 : Bool;
 }
 
-struct JoinReduceGroup {
-  reduceTag   @0 : Text;
-  tagProduced @1 : Text;
-}
-
-struct SubmitReduceValue {
-  reduceTag  @0 : Text;
-  data       @1 : PublishData;
-}
-
-struct ReportReduceDisconnection {
-  reduceTag         @0 : Text;
-  initiatingMachine @1 : Text;
-  id                @2 : UInt64;
-}
-
 struct SubscriptionNotice {
   tags          @0 : List(Text);
   isUnsubscribe @1 : Bool;
@@ -101,10 +85,7 @@ struct StatusMessage {
     heartbeat                 @4  : Void;
     reportPublishers          @5  : ReportPublishers;
     getPublishers             @6  : GetPublishers;
-    joinReduceGroup           @7  : JoinReduceGroup;
-    submitReduceValue         @8  : SubmitReduceValue;
-    reportReduceDisconnection @9  : ReportReduceDisconnection;
-    publishData               @10 : PublishData;
-    subscriptionNotice        @11 : SubscriptionNotice;
+    publishData               @7 : PublishData;
+    subscriptionNotice        @8 : SubscriptionNotice;
   }
 }

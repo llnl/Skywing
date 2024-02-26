@@ -1,4 +1,3 @@
-add_subdirectory(admm)
 add_subdirectory(async_jacobi)
 add_subdirectory(asynchronous_iterative)
 add_subdirectory(bigfloat)

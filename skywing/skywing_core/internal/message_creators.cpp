@@ -166,40 +166,6 @@ std::vector<std::byte> make_get_publishers(
   return finalize_message(builder);
 }
 
-std::vector<std::byte> make_join_reduce_group(const TagID& reduce_tag, const TagID& tag_produced) noexcept
-{
-  capnp::MallocMessageBuilder builder;
-  auto message = builder.initRoot<cpnpro::StatusMessage>().initJoinReduceGroup();
-  message.setReduceTag(reduce_tag);
-  message.setTagProduced(tag_produced);
-  return finalize_message(builder);
-}
-
-std::vector<std::byte> make_submit_reduce_value(
-  const TagID& reduce_tag,
-  const VersionID version,
-  const TagID& tag_id,
-  gsl::span<const PublishValueVariant> value) noexcept
-{
-  capnp::MallocMessageBuilder builder;
-  auto message = builder.initRoot<cpnpro::StatusMessage>().initSubmitReduceValue();
-  message.setReduceTag(reduce_tag);
-  auto publish_data = message.initData();
-  set_publish_data(publish_data, version, tag_id, value);
-  return finalize_message(builder);
-}
-
-std::vector<std::byte> make_report_reduce_disconnection(
-  const TagID& reduce_tag, const MachineID& initiating_machine, ReductionDisconnectID disconnection_id) noexcept
-{
-  capnp::MallocMessageBuilder builder;
-  auto message = builder.initRoot<cpnpro::StatusMessage>().initReportReduceDisconnection();
-  message.setReduceTag(reduce_tag);
-  message.setInitiatingMachine(initiating_machine);
-  message.setId(disconnection_id);
-  return finalize_message(builder);
-}
-
 std::vector<std::byte> make_subscription_notice(const std::vector<TagID>& tags, bool is_unsubscribe) noexcept
 {
   capnp::MallocMessageBuilder builder;
