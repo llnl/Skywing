@@ -3,16 +3,15 @@
 
 #include "skywing_core/types.hpp"
 
-#include "gsl/span"
-
 #include <cstddef>
+#include <span>
 #include <vector>
 
 namespace skywing::internal {
 /** \brief Create data for a publish
  */
 std::vector<std::byte>
-  make_publish(const VersionID version, const TagID& tag_id, gsl::span<const PublishValueVariant> value) noexcept;
+  make_publish(const VersionID version, const TagID& tag_id, std::span<const PublishValueVariant> value) noexcept;
 
 /** \brief Create data for a greeting
  */

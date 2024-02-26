@@ -33,7 +33,6 @@ need to acquire yourself beforehand.
    * requires version 2.9.0 or newer
  * spdlog
    * requires version 1.0 or newer
- * Guidelines Support Library (GSL)
 
 ## Build instructions
 

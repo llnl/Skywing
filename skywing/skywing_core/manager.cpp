@@ -550,7 +550,7 @@ void Manager::handle_neighbor_messages() noexcept
   }
 }
 
-void Manager::publish(const VersionID version, const TagID& tag_id, gsl::span<PublishValueVariant> value) noexcept
+void Manager::publish(const VersionID version, const TagID& tag_id, std::span<PublishValueVariant> value) noexcept
 {
   const auto msg = internal::make_publish(version, tag_id, value);
   (void)msg;
@@ -926,13 +926,13 @@ void Manager::init_connections_for_pending_tags() noexcept
   // first so that multiple connections to the same machine aren't started
   std::unordered_map<std::string, std::string> to_conn;
   std::vector<decltype(pending_tags_)::iterator> to_delete;
-  
+
   SKYNET_TRACE_LOG("\"{}\" in init_connections_for_pending_tags for pendings_tags list of size {}", id_, pending_tags_.size());
   // for (const auto& [tag, publishers] : publishers_for_tag_)
   // {
   //   SKYNET_TRACE_LOG("\"{}\" knows {} publishers for tag {}", id_, publishers.size(), tag);
   // }
-  
+
   for (auto tag_iter = pending_tags_.begin(); tag_iter != pending_tags_.end();) {
     const auto& tag = *tag_iter;
     const auto iter = publishers_for_tag_.find(tag);
@@ -950,7 +950,7 @@ void Manager::init_connections_for_pending_tags() noexcept
       ++tag_iter;
       continue;
     }
-    
+
     auto& publishers = iter->second; // a unordered_set<PublisherInfo>
     if (publishers.empty()) {
       SKYNET_TRACE_LOG("\"{}\" knows no publishers for tag \"{}\"", id_, tag);
@@ -1123,7 +1123,7 @@ void Manager::process_pending_conns() noexcept
         else
           SKYNET_WARN_LOG(
                           "\"{}\" errored trying to connect to {}, type {}", id_, iter->first, to_c_str(info.type));
-          
+
         handle_error(info);
         notify_connection_ = true;
         iter = pending_conns_.erase(iter);

@@ -29,18 +29,18 @@ Job::Job(
 
 bool Job::is_finished() const noexcept { return to_run_ == nullptr; }
 
-const std::unordered_map<TagID, gsl::span<const std::uint8_t>>& Job::tags_produced() const noexcept
+const std::unordered_map<TagID, std::span<const std::uint8_t>>& Job::tags_produced() const noexcept
 {
   return tags_produced_;
 }
 
-bool Job::process_data(const TagID& tag_id, gsl::span<const PublishValueVariant> data, const VersionID version) noexcept
+bool Job::process_data(const TagID& tag_id, std::span<const PublishValueVariant> data, const VersionID version) noexcept
 {
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   const auto loc = buffers.find(tag_id);
   // Not subscribed; don't do anything, but not an error
-  if (loc == buffers.cend()) {
+  if (loc == cend(buffers)) {
     SKYNET_TRACE_LOG(
       "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to not being subscribed",
       manager_->id(),
@@ -53,7 +53,7 @@ bool Job::process_data(const TagID& tag_id, gsl::span<const PublishValueVariant>
   // If the types are wrong then something went wrong
   const auto comparer = [](std::uint8_t lhs, const PublishValueVariant& rhs) { return lhs == rhs.index(); };
   const auto& expected_types = loc->second.expected_types;
-  if (!std::equal(expected_types.cbegin(), expected_types.cend(), data.cbegin(), data.cend(), comparer)) {
+  if (!std::equal(cbegin(expected_types), cend(expected_types), cbegin(data), cend(data), comparer)) {
     SKYNET_WARN_LOG(
       "\"{}\", job \"{}\" discarded tag \"{}\", version {}, data {}, due to it having the wrong type index",
       manager_->id(),
@@ -78,16 +78,16 @@ bool Job::tag_has_subscription(const internal::PublishTagBase& tag) const noexce
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   const auto iter = buffers.find(tag.id());
-  return iter != buffers.cend() && iter->second.error_occurred == TagInfo::Error::no_error;
+  return iter != cend(buffers) && iter->second.error_occurred == TagInfo::Error::no_error;
 }
 
-bool Job::tags_have_subscriptions_impl(gsl::span<const internal::PublishTagBase> tags) const noexcept
+bool Job::tags_have_subscriptions_impl(std::span<const internal::PublishTagBase> tags) const noexcept
 {
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   for (const auto& tag : tags) {
     const auto iter = buffers.find(tag.id());
-    if (iter == buffers.cend() || iter->second.error_occurred != TagInfo::Error::no_error) { return false; }
+    if (iter == cend(buffers) || iter->second.error_occurred != TagInfo::Error::no_error) { return false; }
   }
   return true;
 }
@@ -103,7 +103,7 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   const auto tag_loc = buffers.find(tag_id);
-  if (tag_loc == buffers.cend()) { return; }
+  if (tag_loc == cend(buffers)) { return; }
   auto& tag_info = tag_loc->second;
   tag_info.error_occurred = TagInfo::Error::disconnected;
   ++tag_info.connection_id;
@@ -113,10 +113,10 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
   data_buffer_modified_cv_.notify_all();
 }
 
-void Job::publish_impl(const internal::PublishTagBase& tag, const gsl::span<PublishValueVariant> to_send) noexcept
+void Job::publish_impl(const internal::PublishTagBase& tag, const std::span<PublishValueVariant> to_send) noexcept
 {
   assert(
-    tags_produced_.find(tag.id()) != tags_produced_.cend()
+    tags_produced_.find(tag.id()) != cend(tags_produced_)
     && "Attempted to publish on a tag that was not declared for publishing!");
   // assert(tags_produced_.find(tag.id())->second == to_send.index()
   //   && "Attempted to publish the wrong type on a tag!");
@@ -137,15 +137,15 @@ bool Job::has_data_no_lock(const internal::PublishTagBase& tag) noexcept
 {
   auto& buffers = bufs_.unsafe_get();
   const auto loc = buffers.find(tag.id());
-  if (loc == buffers.cend()) { return false; }
+  if (loc == cend(buffers)) { return false; }
   return loc->second.buffer->has_data();
 }
 
 const JobID& Job::id() const noexcept { return id_; }
 
 void Job::init_or_update_subscribe(
-  const gsl::span<const internal::PublishTagBase> tags,
-  gsl::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
+  const std::span<const internal::PublishTagBase> tags,
+  std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
 {
   assert(tags.size() == ptrs.size());
   auto [buffers, lock] = bufs_.get();
@@ -153,7 +153,7 @@ void Job::init_or_update_subscribe(
   // Always subscribe ahead of time, since the gap between the
   // Job::subscribe calls can cause messages to get discarded once the
   // connection is made but before it's marked as subscribed
-  for (int i = 0; i < tags.size(); ++i) {
+  for (size_t i = 0; i < tags.size(); ++i) {
     const auto& tag = tags[i];
     auto& ptr = ptrs[i];
     // Then add the expected type; marking the tag as watched
@@ -174,18 +174,18 @@ void Job::init_or_update_subscribe(
   }
 }
 
-Waiter<void> Job::get_subscribe_future(const gsl::span<const internal::PublishTagBase> tags) noexcept
+Waiter<void> Job::get_subscribe_future(const std::span<const internal::PublishTagBase> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
+  std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
 Waiter<bool> Job::get_ip_subscribe_future(
-  const std::string& address, const gsl::span<const internal::PublishTagBase> tags) noexcept
+  const std::string& address, const std::span<const internal::PublishTagBase> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(tags.cbegin(), tags.cend(), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
+  std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [](const internal::PublishTagBase& t) { return t.id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(
@@ -195,7 +195,7 @@ Waiter<bool> Job::get_ip_subscribe_future(
   return Manager::JobAccessor::ip_subscribe(*manager_, addr_pair, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(gsl::span<const internal::PublishTagBase> tags) noexcept
+void Job::declare_publication_intent_impl(std::span<const internal::PublishTagBase> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -204,13 +204,13 @@ void Job::declare_publication_intent_impl(gsl::span<const internal::PublishTagBa
     }
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
-      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase& t) { return t.id(); });
+      cbegin(tags), cend(tags), tag_ids.begin(), [&](const internal::PublishTagBase& t) { return t.id(); });
     return tag_ids;
   }();
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(const gsl::span<const internal::PublishTagBase* const> tags) noexcept
+void Job::declare_publication_intent_impl(const std::span<const internal::PublishTagBase* const> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -219,7 +219,7 @@ void Job::declare_publication_intent_impl(const gsl::span<const internal::Publis
     }
     std::vector<TagID> tag_ids(tags.size());
     std::transform(
-      tags.cbegin(), tags.cend(), tag_ids.begin(), [&](const internal::PublishTagBase* t) { return t->id(); });
+      cbegin(tags), cend(tags), tag_ids.begin(), [&](const internal::PublishTagBase* t) { return t->id(); });
     return tag_ids;
   }();
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
@@ -238,7 +238,7 @@ bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   const auto iter = buffers.find(tag_id);
-  if (iter == buffers.cend()) { return false; }
+  if (iter == cend(buffers)) { return false; }
   return iter->second.error_occurred == TagInfo::Error::no_error;
 }
 } // namespace skywing

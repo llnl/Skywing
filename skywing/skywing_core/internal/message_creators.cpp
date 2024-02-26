@@ -48,12 +48,12 @@ void set_publish_data(
   cpnpro::PublishData::Builder to_set,
   const VersionID version,
   const TagID& tag_id,
-  gsl::span<const PublishValueVariant> value) noexcept
+  std::span<const PublishValueVariant> value) noexcept
 {
   to_set.setVersion(version);
   to_set.setTagID(tag_id);
   auto publish_value = to_set.initValue(value.size());
-  for (int i = 0; i < value.size(); ++i) {
+  for (size_t i = 0; i < value.size(); ++i) {
     std::visit(
       [&](const auto& data) {
         using ValueType = std::remove_cv_t<std::remove_reference_t<decltype(data)>>;
@@ -76,7 +76,7 @@ void set_vector(const InitFunc& init_func, MessageType msg, const std::vector<Ve
 } // namespace
 
 std::vector<std::byte>
-  make_publish(const VersionID version, const TagID& tag_id, gsl::span<const PublishValueVariant> value) noexcept
+  make_publish(const VersionID version, const TagID& tag_id, std::span<const PublishValueVariant> value) noexcept
 {
   capnp::MallocMessageBuilder builder;
   auto message = builder.initRoot<cpnpro::StatusMessage>().initPublishData();
