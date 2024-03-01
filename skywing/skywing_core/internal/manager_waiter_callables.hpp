@@ -1,70 +1,88 @@
 #ifndef SKYNET_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
 #define SKYNET_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
 
-// This header exists so that the Manager types returned from the header can be used
-// by Job
-
-#include "skywing_core/types.hpp"
+// This header exists so that the Manager types returned from the header can be
+// used by Job
 
 #include <vector>
 
-namespace skywing {
+#include "skywing_core/types.hpp"
+
+namespace skywing
+{
 class Manager;
 
-namespace internal {
+namespace internal
+{
 
-class ManagerSubscribeIsDone {
+class ManagerSubscribeIsDone
+{
 public:
-  ManagerSubscribeIsDone(Manager& manager, const std::vector<TagID>& tags) noexcept;
-  bool operator()() const noexcept;
+    ManagerSubscribeIsDone(Manager& manager,
+                           const std::vector<TagID>& tags) noexcept;
+    bool operator()() const noexcept;
 
 private:
-  Manager* manager_;
-  std::vector<TagID> tags_;
+    Manager* manager_;
+    std::vector<TagID> tags_;
 }; // class ManagerSubscribeIsDone
 
-class ManagerConnectionIsComplete {
+class ManagerConnectionIsComplete
+{
 public:
-  ManagerConnectionIsComplete(Manager& manager, const std::string& address, std::uint16_t port) noexcept;
-  bool operator()() const noexcept;
+    ManagerConnectionIsComplete(Manager& manager,
+                                const std::string& address,
+                                std::uint16_t port) noexcept;
+    bool operator()() const noexcept;
 
 private:
-  Manager* manager_;
-  AddrPortPair address_;
+    Manager* manager_;
+    AddrPortPair address_;
 }; // class ManagerConnectionIsComplete
 
-class ManagerGetConnectionSuccess {
+class ManagerGetConnectionSuccess
+{
 public:
-  ManagerGetConnectionSuccess(Manager& manager, const std::string& address, std::uint16_t port) noexcept;
-  bool operator()() const noexcept;
+    ManagerGetConnectionSuccess(Manager& manager,
+                                const std::string& address,
+                                std::uint16_t port) noexcept;
+    bool operator()() const noexcept;
 
 private:
-  Manager* manager_;
-  AddrPortPair address_;
+    Manager* manager_;
+    AddrPortPair address_;
 }; // class ManagerGetConnectionSuccess
 
-class ManagerIPSubscribeComplete {
+class ManagerIPSubscribeComplete
+{
 public:
-  ManagerIPSubscribeComplete(Manager& manager, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept;
-  bool operator()() const noexcept;
+    ManagerIPSubscribeComplete(Manager& manager,
+                               const AddrPortPair& address,
+                               const std::vector<TagID>& tags,
+                               bool is_self_sub) noexcept;
+    bool operator()() const noexcept;
 
 private:
-  Manager* manager_;
-  AddrPortPair address_;
-  std::vector<TagID> tags_;
-  bool is_self_sub_;
+    Manager* manager_;
+    AddrPortPair address_;
+    std::vector<TagID> tags_;
+    bool is_self_sub_;
 };
 
-class ManagerIPSubscribeSuccess {
+class ManagerIPSubscribeSuccess
+{
 public:
-  ManagerIPSubscribeSuccess(Manager& manager, const AddrPortPair& address, const std::vector<TagID>& tags, bool is_self_sub) noexcept;
-  bool operator()() const noexcept;
+    ManagerIPSubscribeSuccess(Manager& manager,
+                              const AddrPortPair& address,
+                              const std::vector<TagID>& tags,
+                              bool is_self_sub) noexcept;
+    bool operator()() const noexcept;
 
 private:
-  Manager* manager_;
-  AddrPortPair address_;
-  std::vector<TagID> tags_;
-  bool is_self_sub_;
+    Manager* manager_;
+    AddrPortPair address_;
+    std::vector<TagID> tags_;
+    bool is_self_sub_;
 };
 } // namespace internal
 } // namespace skywing

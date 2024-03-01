@@ -1,19 +1,20 @@
 #ifndef QUACC_PROCESSOR_HPP
 #define QUACC_PROCESSOR_HPP
 
-#include "skywing_mid/idempotent_processor.hpp"
-#include "skywing_mid/push_sum_processor.hpp"
-#include "skywing_mid/push_flow_processor.hpp"
-#include "skywing_mid/big_float.hpp"
 #include <chrono>
-#include <random>
 #include <cmath>
 #include <iostream>
+#include <random>
+
+#include "skywing_mid/big_float.hpp"
+#include "skywing_mid/idempotent_processor.hpp"
+#include "skywing_mid/push_flow_processor.hpp"
+#include "skywing_mid/push_sum_processor.hpp"
 
 namespace skywing
 {
-  using std::exp;
-  using std::log;
+using std::exp;
+using std::log;
 
 /** @brief QUasi-Arithmetic Collective Counter
  *
@@ -53,92 +54,101 @@ namespace skywing
  * @tparam MinProc The processor for gossip minima.
  * @tparam MeanProc The processor for gossip means.
  */
-template<typename real_t = BigFloat,
-         typename MinProc = MinProcessor<real_t>,
-         typename MeanProc = PushFlowProcessor<real_t>>
+template <typename real_t = BigFloat,
+          typename MinProc = MinProcessor<real_t>,
+          typename MeanProc = PushFlowProcessor<real_t>>
 class QUACCProcessor
 {
 public:
-  using ValueType = std::tuple<typename MinProc::ValueType, typename MeanProc::ValueType>;
+    using ValueType =
+        std::tuple<typename MinProc::ValueType, typename MeanProc::ValueType>;
 
-  /** @param number_of_neighbors The neighbor count for this agent;
-   *  this parameter is a quirk of the Push Sum mean algorithm and is
-   *  likely not necessary for something else like Push Flow.
-   *  @param lambda Parameter for the exponential distribution.
-   */
-  template<typename... Args>
-  QUACCProcessor(Args&&... args)
-    : my_val_(get_exponential_dist_value()),
-      min_processor_(my_val_),
-      mean_processor_(exp(-my_val_), std::forward<Args>(args)...)
-  { }
-  
-  ValueType get_init_publish_values()
-  {
-    return ValueType(min_processor_.get_init_publish_values(),
-                     mean_processor_.get_init_publish_values());
-  }
+    /** @param number_of_neighbors The neighbor count for this agent;
+     *  this parameter is a quirk of the Push Sum mean algorithm and is
+     *  likely not necessary for something else like Push Flow.
+     *  @param lambda Parameter for the exponential distribution.
+     */
+    template <typename... Args>
+    QUACCProcessor(Args&&... args)
+        : my_val_(get_exponential_dist_value()),
+          min_processor_(my_val_),
+          mean_processor_(exp(-my_val_), std::forward<Args>(args)...)
+    {}
 
-  template<typename NbrDataHandler, typename IterMethod>
-  void process_update(const NbrDataHandler& nbr_data_handler, const IterMethod& iter_method)
-  {
-    auto min_data_handler = nbr_data_handler.template get_sub_handler<typename MinProc::ValueType>([](const ValueType& v){return std::get<0>(v);});
-    min_processor_.process_update(min_data_handler, iter_method);
+    ValueType get_init_publish_values()
+    {
+        return ValueType(min_processor_.get_init_publish_values(),
+                         mean_processor_.get_init_publish_values());
+    }
 
-    auto mean_data_handler = nbr_data_handler.template get_sub_handler<typename MeanProc::ValueType>([](const ValueType& v){return std::get<1>(v);});
-    mean_processor_.process_update(mean_data_handler, iter_method);
-  }
+    template <typename NbrDataHandler, typename IterMethod>
+    void process_update(const NbrDataHandler& nbr_data_handler,
+                        const IterMethod& iter_method)
+    {
+        auto min_data_handler =
+            nbr_data_handler
+                .template get_sub_handler<typename MinProc::ValueType>(
+                    [](const ValueType& v) { return std::get<0>(v); });
+        min_processor_.process_update(min_data_handler, iter_method);
 
-  ValueType prepare_for_publication(ValueType v)
-  {
-    return ValueType(min_processor_.prepare_for_publication(std::get<0>(v)),
-                     mean_processor_.prepare_for_publication(std::get<1>(v)));
-  }
+        auto mean_data_handler =
+            nbr_data_handler
+                .template get_sub_handler<typename MeanProc::ValueType>(
+                    [](const ValueType& v) { return std::get<1>(v); });
+        mean_processor_.process_update(mean_data_handler, iter_method);
+    }
 
-  real_t get_raw_count() const
-  {
-    return exp(-(log(mean_processor_.get_value())
-                 + min_processor_.get_value()));
-  }
-  size_t get_count() const
-  {
-    size_t count = static_cast<size_t>(round(static_cast<double>(get_raw_count())));
-    return count == 0 ? 1 : count;
-  }
+    ValueType prepare_for_publication(ValueType v)
+    {
+        return ValueType(
+            min_processor_.prepare_for_publication(std::get<0>(v)),
+            mean_processor_.prepare_for_publication(std::get<1>(v)));
+    }
 
-  real_t get_min() const {return min_processor_.get_value();}
-  real_t get_mean() const
-  {
-    return mean_processor_.get_value();
-    // real_t x_val = mean_processor_.get_x();
-    // real_t y_val = mean_processor_.get_y();
-    // return x_val / y_val;
-  }
+    real_t get_raw_count() const
+    {
+        return exp(
+            -(log(mean_processor_.get_value()) + min_processor_.get_value()));
+    }
+    size_t get_count() const
+    {
+        size_t count =
+            static_cast<size_t>(round(static_cast<double>(get_raw_count())));
+        return count == 0 ? 1 : count;
+    }
+
+    real_t get_min() const { return min_processor_.get_value(); }
+    real_t get_mean() const
+    {
+        return mean_processor_.get_value();
+        // real_t x_val = mean_processor_.get_x();
+        // real_t y_val = mean_processor_.get_y();
+        // return x_val / y_val;
+    }
 
 private:
+    // Draw a value at random from the exponential distribution with
+    // parameter lambda
+    real_t get_exponential_dist_value()
+    {
+        unsigned seed =
+            std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator(seed);
+        std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
-  // Draw a value at random from the exponential distribution with
-  // parameter lambda
-  real_t get_exponential_dist_value()
-  {
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine generator(seed);
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        real_t p = distribution(generator);
+        // should actually be 1-p but the distribution of p and
+        // distribution of 1-p are the same so it's fine.
+        return -log(p) / LAMBDA;
+    }
 
-    real_t p = distribution(generator);
-    // should actually be 1-p but the distribution of p and
-    // distribution of 1-p are the same so it's fine.
-    return -log(p) / LAMBDA;
-  }
+    const real_t LAMBDA = 1e-10;
+    real_t my_val_;
+    MinProc min_processor_;
+    MeanProc mean_processor_;
 
-  const real_t LAMBDA = 1e-10;
-  real_t my_val_;
-  MinProc min_processor_;
-  MeanProc mean_processor_;
-
-  
 }; // class QUACCProcessor
 
-} // namespace skyne
+} // namespace skywing
 
 #endif // QUACC_PROCESSOR_HPP

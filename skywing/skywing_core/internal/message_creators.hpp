@@ -1,22 +1,26 @@
 #ifndef SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
 #define SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
 
-#include "skywing_core/types.hpp"
-
 #include <cstddef>
 #include <span>
 #include <vector>
 
-namespace skywing::internal {
+#include "skywing_core/types.hpp"
+
+namespace skywing::internal
+{
 /** \brief Create data for a publish
  */
 std::vector<std::byte>
-  make_publish(const VersionID version, const TagID& tag_id, std::span<const PublishValueVariant> value) noexcept;
+make_publish(const VersionID version,
+             const TagID& tag_id,
+             std::span<const PublishValueVariant> value) noexcept;
 
 /** \brief Create data for a greeting
  */
-std::vector<std::byte>
-  make_greeting(const MachineID& from, const std::vector<MachineID>& neighbors, std::uint16_t port) noexcept;
+std::vector<std::byte> make_greeting(const MachineID& from,
+                                     const std::vector<MachineID>& neighbors,
+                                     std::uint16_t port) noexcept;
 
 /** \brief Create data for a goodbyte
  */
@@ -41,19 +45,22 @@ std::vector<std::byte> make_heartbeat() noexcept;
  * not horribly ugly though, so put it off for now.
  */
 std::vector<std::byte> make_report_publishers(
-  const std::vector<TagID>& tags,
-  const std::vector<std::vector<std::string>>& addresses,
-  const std::vector<std::vector<MachineID>>& machines,
-  const std::vector<TagID>& locally_produced_tags) noexcept;
+    const std::vector<TagID>& tags,
+    const std::vector<std::vector<std::string>>& addresses,
+    const std::vector<std::vector<MachineID>>& machines,
+    const std::vector<TagID>& locally_produced_tags) noexcept;
 
 /** \brief Create data for a request for producers of a tag
  */
-std::vector<std::byte> make_get_publishers(
-  const std::vector<TagID>& tags, const std::vector<std::uint8_t>& publishers_needed, bool ignore_cache) noexcept;
+std::vector<std::byte>
+make_get_publishers(const std::vector<TagID>& tags,
+                    const std::vector<std::uint8_t>& publishers_needed,
+                    bool ignore_cache) noexcept;
 
 /** \brief Create a message for subscribing/unsubscribing
  */
-std::vector<std::byte> make_subscription_notice(const std::vector<TagID>& tags, bool is_unsubscribe) noexcept;
+std::vector<std::byte> make_subscription_notice(const std::vector<TagID>& tags,
+                                                bool is_unsubscribe) noexcept;
 } // namespace skywing::internal
 
 #endif // SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
