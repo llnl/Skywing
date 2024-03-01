@@ -1,13 +1,14 @@
 #ifndef STOPPING_CRITERION_HPP
 #define STOPPING_CRITERION_HPP
 
+#include <chrono>
+
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
-#include <chrono>
 
 namespace skywing
 {
-  
+
 /* This file contains a number of common iterative methods StopPolicy
    (stopping criteria) options.
  */
@@ -18,23 +19,20 @@ namespace skywing
 class StopAfterTime
 {
 public:
+    template <typename Duration>
+    StopAfterTime(Duration d) : max_run_time_(d)
+    {}
 
-  template<typename Duration>
-  StopAfterTime(Duration d)
-    : max_run_time_(d)
-  {}
-
-  template<typename CallerT>
-  bool operator()(const CallerT& caller)
-  {
-    return caller.run_time() > max_run_time_;
-  }
+    template <typename CallerT>
+    bool operator()(const CallerT& caller)
+    {
+        return caller.run_time() > max_run_time_;
+    }
 
 private:
-  std::chrono::milliseconds max_run_time_;
-  
-}; // class StopAfterTime
+    std::chrono::milliseconds max_run_time_;
 
+}; // class StopAfterTime
 
 // template<typename LocalStopPolicy>
 // class SynchronousConsensusStop
@@ -58,7 +56,7 @@ private:
 //                       const IterMethod& caller)
 //   {
 //     locally_ready_to_stop_ = local_stop_policy_(caller);
-    
+
 //     bool is_all_ready = locally_ready_to_stop_ &&
 //       nbr_data_handler.f_accumulate<bool>([](const bool& b) {return b;},
 //                                           std::logical_and<bool>);

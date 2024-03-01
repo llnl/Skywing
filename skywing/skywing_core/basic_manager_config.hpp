@@ -1,13 +1,14 @@
 #error This header is not yet supported
 
 #ifndef SKYNET_BASIC_MANAGER_CONFIG_HPP
-  #define SKYNET_BASIC_MANAGER_CONFIG_HPP
+#define SKYNET_BASIC_MANAGER_CONFIG_HPP
 
-  #include <iosfwd>
-  #include <optional>
-  #include <vector>
+#include <iosfwd>
+#include <optional>
+#include <vector>
 
-namespace skywing {
+namespace skywing
+{
 class Manager;
 struct BuildManagerInfo;
 
@@ -34,19 +35,22 @@ std::optional<BuildManagerInfo> read_manager_config(std::istream& in) noexcept;
  * can fail, but an optional can't be returned due to a Manager not being
  * move-able.
  */
-struct BuildManagerInfo {
-  std::string name;
-  std::vector<std::string> to_connect_to;
-  std::uint32_t heartbeat_interval_in_ms;
-  std::uint16_t port;
+struct BuildManagerInfo
+{
+    std::string name;
+    std::vector<std::string> to_connect_to;
+    std::uint32_t heartbeat_interval_in_ms;
+    std::uint16_t port;
 
-  // Declared as an inline friend so it can only be found via ADL.
-  // Simple calls the below function
-  friend std::istream& operator>>(std::istream& in, BuildManagerInfo& info)
-  {
-    if (auto new_info = read_manager_config(in)) { info = std::move(*new_info); }
-    return in;
-  }
+    // Declared as an inline friend so it can only be found via ADL.
+    // Simple calls the below function
+    friend std::istream& operator>>(std::istream& in, BuildManagerInfo& info)
+    {
+        if (auto new_info = read_manager_config(in)) {
+            info = std::move(*new_info);
+        }
+        return in;
+    }
 };
 } // namespace skywing
 
