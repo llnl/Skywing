@@ -14,8 +14,8 @@ namespace
 {
 constexpr int num_machines = 2;
 
-using ValueTag = PublishTag<int, double>;
-using NotifyTag = PublishTag<>;
+using ValueTag = Tag<int, double>;
+using NotifyTag = Tag<>;
 
 constexpr std::tuple<int, double> publish_value{10, 3.14159};
 const ValueTag tag0{"tag 0"};

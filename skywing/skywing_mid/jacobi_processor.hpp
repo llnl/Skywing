@@ -32,9 +32,9 @@ template <typename E = double>
 class JacobiProcessor
 {
 public:
-    using element_t = E;
-    using ValueType = std::vector<element_t>;
-    using ValueTag = skywing::PublishTag<ValueType>;
+  using element_t = E;
+  using ValueType = std::vector<element_t>;
+  using ValueTag = skywing::Tag<ValueType>;
 
     /**
      * @param A_partition A matrix row partition.

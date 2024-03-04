@@ -12,7 +12,7 @@
 
 using namespace skywing;
 
-using pubtag_t = PublishTag<int>;
+using pubtag_t = Tag<int>;
 
 struct MachineConfig
 {

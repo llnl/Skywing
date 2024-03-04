@@ -16,7 +16,7 @@ std::vector<size_t> ports{20000, 20001, 20002};
 // streams, are statically types with the data being sent through the
 // publication stream. In this case, we will be sending ints through
 // the publication streams.
-using pubtag_t = skywing::PublishTag<int>;
+using pubtag_t = skywing::Tag<int>;
 
 // The tags associated with each publication stream. Agent 0 (using
 // Port 20000) will publish under tag "tag0", Agent 1 (using Port
