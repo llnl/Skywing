@@ -416,7 +416,7 @@ private:
   Waiter<bool> connect_to_server(const char* const address, const std::uint16_t port) noexcept;
   Waiter<bool> connect_to_server(std::string_view address) noexcept;
   size_t number_of_neighbors() const noexcept;
-  size_t number_of_subscribers(const skywing_core::Tag<>& tag) const noexcept;
+  size_t number_of_subscribers(const skywing_core::AbstractTag& tag) const noexcept;
   std::uint16_t port() const noexcept;
 
     Waiter<void> waiter_on_subscription_change(
@@ -715,7 +715,7 @@ public:
 
   /** \brief Returns the number of subscribers that a tag has
    */
-  int number_of_subscribers(const skywing_core::Tag& tag) const noexcept
+  int number_of_subscribers(const skywing_core::AbstractTag& tag) const noexcept
   {
     return handle_->number_of_subscribers(tag);
   }

@@ -7,51 +7,24 @@
 #include <compare>
 #include <concepts>
 #include <functional>
+#include <span>
 #include <string>
 #include <vector>
-#include <span>
 
 namespace skywing::skywing_core {
 
-using DataTypeRef = std::uint8_t;
-
-template<typename T>
-concept HasToInt = requires(T t) {
-  {
-    t.to_int()
-  } -> std::same_as<std::vector<DataTypeRef>>;
-};
-
-/** @brief A collective-global unique identifier for a publication stream.
- *
- * A Tag consists of (a) one or more data types that will be
- * published by this publication stream, each of which must be a
- * valid type in the PublishValueTypeList in skywing_core/types.hpp,
- * and (b) an id (ie a string) identifier.
- *
- * @tparam Ts Set of data types that will be sent with each
- * publication in the publication stream.
+/**
+ * @brief Base class for concrete Tag class so the Tag class template can be stored in std::vector.
  */
-class Tag {
+class AbstractTag {
 public:
-  Tag() = default;
-  Tag(std::string id) : id_{std::move('p' + id)} {}
-  Tag(std::string id, HasToInt auto expected_types) : Tag(id) { expected_types_ = expected_types.to_int(); }
-  auto operator<=>(const Tag&) const = default;
-
-  /** @brief Get the string TagID for this Tag. */
-  const std::string get_id() const { return id_; }
-
-  /** @brief Get a view of a vector representing the one or more data types associated with this Subscription's Tag. */
-  auto get_expected_types() const -> std::span<DataTypeRef const> { return expected_types_; }
-
+  using DataTypeRef = std::uint8_t;
+  virtual ~AbstractTag() = default;
+  virtual const std::string get_id() const = 0;
+  virtual auto get_expected_types() const -> std::span<DataTypeRef const> = 0;
+  std::unique_ptr<AbstractTag> clone() const { return std::unique_ptr<AbstractTag>(this->do_clone()); }
 private:
-  std::string id_{};
-  std::vector<DataTypeRef> expected_types_{};
-};
-
-struct hash {
-  std::size_t operator()(const Tag& tag) const { return std::hash<std::string>{}(tag.get_id()); }
+  virtual AbstractTag* do_clone() const = 0;
 };
 
 template<typename T, typename... U>
@@ -86,32 +59,45 @@ concept Publishable = IsAnyOf<
   bool,
   std::vector<bool>>;
 
+/** @brief A collective-global unique identifier for a publication stream.
+ *
+ * A Tag consists of (a) one or more data types that will be
+ * published by this publication stream, each of which must be a
+ * valid type in the PublishValueTypeList in skywing_core/types.hpp,
+ * and (b) an id (ie a string) identifier.
+ *
+ * @tparam Types Set of data types that will be sent with each
+ * publication in the publication stream.
+ */
 template<Publishable... Types>
-class PublishDataTypes {
+class Tag : public AbstractTag {
 public:
-  PublishDataTypes() = default;
+  using DataTypeRef = std::uint8_t;
 
-  template<Publishable... Ts>
-  std::vector<DataTypeRef> to_int()
+  Tag(std::string id) : id_{std::move('p' + id)}
   {
-    std::vector<DataTypeRef> tmp{};
-    std::apply(
-      [&tmp]() {
-        ((tmp.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Ts, PublishValueTypeList>))), ...);
-      },
-      expected_types_);
-    return tmp;
+    (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
+     ...);
   }
 
+  auto operator<=>(const Tag&) const = default;
+
+  /** @brief Get the string TagID for this Tag. */
+  const std::string get_id() const { return id_; }
+
+  /** @brief Get a view of a vector representing the one or more data types associated with this Subscription's Tag. */
+  auto get_expected_types() const -> std::span<DataTypeRef const> { return expected_types_; }
+
 private:
-  std::tuple<Types...> expected_types_;
+  virtual Tag<Types...>* do_clone() const override { return new Tag<Types...>(*this); }
+  std::string id_;
+  std::vector<DataTypeRef> expected_types_;
 };
 
 template<Publishable... Types>
-Tag make_tag(std::string id)
-{
-  return Tag(id, PublishDataTypes<Types...>());
-}
+struct hash {
+  std::size_t operator()(const Tag<Types...>& tag) const { return std::hash<std::string>{}(tag.get_id()); }
+};
 
 } // namespace skywing::skywing_core
 #endif // TAG_HPP
