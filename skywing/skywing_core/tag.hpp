@@ -70,7 +70,7 @@ concept Publishable = IsAnyOf<
  * publication in the publication stream.
  */
 template<Publishable... Types>
-class Tag : public AbstractTag {
+class Tag final : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
 
@@ -83,10 +83,10 @@ public:
   auto operator<=>(const Tag&) const = default;
 
   /** @brief Get the string TagID for this Tag. */
-  const std::string get_id() const { return id_; }
+  const std::string get_id() const override { return id_; }
 
   /** @brief Get a view of a vector representing the one or more data types associated with this Subscription's Tag. */
-  auto get_expected_types() const -> std::span<DataTypeRef const> { return expected_types_; }
+  auto get_expected_types() const -> std::span<DataTypeRef const> override { return expected_types_; }
 
 private:
   virtual Tag<Types...>* do_clone() const override { return new Tag<Types...>(*this); }
