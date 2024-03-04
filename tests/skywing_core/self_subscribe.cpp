@@ -4,10 +4,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 using namespace skywing;
-namespace
-{
-using PubTag = PublishTag<std::int32_t>;
-using PrivatePubTag = PrivateTag<std::int32_t>;
+namespace {
+using PubTag = Tag<std::int32_t>;
+using PrivatePubTag = Tag<std::int32_t>;
 // using GroupTag = ReduceGroupTag<std::int32_t>;
 // using ValueTag = ReduceValueTag<std::int32_t>;
 

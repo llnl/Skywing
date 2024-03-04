@@ -8,9 +8,8 @@
 
 using namespace skywing;
 
-namespace
-{
-using ValueTag = PrivateTag<std::int32_t>;
+namespace {
+using ValueTag = Tag<std::int32_t>;
 const ValueTag tag{"Test IP Tag"};
 const std::int32_t tag_value = 10;
 std::atomic<bool> ready_for_subscription = false;

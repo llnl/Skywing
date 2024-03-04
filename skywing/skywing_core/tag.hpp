@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace skywing::skywing_core {
+namespace skywing {
 
 /**
  * @brief Base class for concrete Tag class so the Tag class template can be stored in std::vector.
@@ -74,7 +74,7 @@ class Tag : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
 
-  Tag(std::string id) : id_{std::move('p' + id)}
+  Tag(std::string id) : id_{'p' + id}
   {
     (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
      ...);
@@ -99,5 +99,5 @@ struct hash {
   std::size_t operator()(const Tag<Types...>& tag) const { return std::hash<std::string>{}(tag.get_id()); }
 };
 
-} // namespace skywing::skywing_core
+} // namespace skywing
 #endif // TAG_HPP

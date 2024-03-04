@@ -6,6 +6,7 @@
 #include "manager.hpp"
 #include "types.hpp"
 #include "waiter.hpp"
+#include "tag.hpp"
 
 #include "enable_logging.hpp"
 

@@ -440,6 +440,6 @@ private:
     // Condition variable when data is added to buffers or an error occurs
     std::condition_variable data_buffer_modified_cv_;
 }; // Class Job
-} // namespace skywing::skywing_core
+} // namespace skywing
 
 #endif // SKYWING_JOB_HPP
