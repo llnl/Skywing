@@ -200,14 +200,17 @@ void Job::init_or_update_subscribe(
 Waiter<void> Job::get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
+  std::transform(
+    cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
-Waiter<bool> Job::get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
+Waiter<bool>
+  Job::get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
-  std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
+  std::transform(
+    cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(
@@ -231,7 +234,7 @@ void Job::declare_publication_intent_impl(std::span<const AbstractTag> tags) noe
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(const std::span<const AbstractTag* const> tags) noexcept
+void Job::declare_publication_intent_impl(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -239,7 +242,9 @@ void Job::declare_publication_intent_impl(const std::span<const AbstractTag* con
       tags_produced_.try_emplace(tag->get_id(), tag->get_expected_types());
     }
     std::vector<TagID> tag_ids(tags.size());
-    std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](const AbstractTag* t) { return t->get_id(); });
+    std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](const std::unique_ptr<const AbstractTag>& t) {
+      return t->get_id();
+    });
     return tag_ids;
   }();
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);

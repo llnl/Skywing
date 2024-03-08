@@ -82,8 +82,9 @@ public:
   template<typename... Ts>
   void declare_publication_intent(const Ts&... tags) noexcept
   {
-    const std::array<const AbstractTag*, sizeof...(Ts)> tag_ptrs{&tags...};
-    declare_publication_intent_impl(std::span<const AbstractTag* const>{tag_ptrs.data(), tag_ptrs.size()});
+    using TagPtr = std::unique_ptr<const AbstractTag>;
+    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
+    declare_publication_intent_impl(std::span<TagPtr>{tag_ptrs});
   }
 
   /** \brief Declare publication intent for a range
@@ -388,7 +389,7 @@ private:
 
   void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
-  void declare_publication_intent_impl(std::span<const AbstractTag* const> tags) noexcept;
+  void declare_publication_intent_impl(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
