@@ -312,7 +312,7 @@ public:
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          tags.push_back(tag_pair.second.tag().clone());
+          tags.emplace_back(tag_pair.first.substr(1));
           ;
         }
       }
