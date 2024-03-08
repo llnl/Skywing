@@ -176,8 +176,9 @@ public:
     assert("Tag attempted to be subscribed to twice!" && tag_is_not_subscribed(tag));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     BufferPtr buffer = std::make_unique<typename Tag<Ts...>::BufferType>();
-    init_or_update_subscribe(std::span<std::unique_ptr<const AbstractTag>,1>{tag.clone()}, std::span<BufferPtr>{buffer});
-    return get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>,1>{tag.clone()});
+    init_or_update_subscribe(
+      std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1}, std::span<BufferPtr>{buffer});
+    return get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -381,7 +382,8 @@ private:
 
   Waiter<void> get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
-  Waiter<bool> get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
+  Waiter<bool>
+    get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
   void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
