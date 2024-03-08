@@ -288,7 +288,9 @@ public:
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
     std::span<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [](const AbstractTag& t) { return t.clone(); });
+    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [&](const std::unique_ptr<const AbstractTag>& t) {
+      return t->clone();
+    });
     init_or_update_subscribe(tag_span, std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
     return get_subscribe_future(tag_span);
   }
