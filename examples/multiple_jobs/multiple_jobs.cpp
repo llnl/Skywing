@@ -19,7 +19,7 @@
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
-using ValueTag = skywing::PublishTag<std::vector<double>>;
+using ValueTag = skywing::PublishTag<double>;
 
 // Get names of the agents in the collective.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_system)
@@ -80,7 +80,7 @@ void machine_task(int machine_number,
 
     ValueTag summation_result_tag{"summation_result"};
     ValueTag contribution_update_tag{"contribution_update"
-				     + std::to_string{machine_number}};
+				     + std::to_string(machine_number)};
 
     auto summation_job = [&](Job& job, ManagerHandle manager_handle)
     {
@@ -133,17 +133,17 @@ void machine_task(int machine_number,
       IterMethod summation_iteration = iter_waiter.get();
 
       // set up lambda function to publish result and update contribution
-      auto update_fun = [&](const decltype(summation_iteration)& p)
+      auto update_fun = [&](decltype(summation_iteration)& p)
       {
-	double current_value = p.get_processor.get_value();
+	double current_value = p.get_processor().get_value();
 	std::cout << p.run_time().count() << "ms: Agent "
-		  << machine_number << " producing value" <<
+		  << machine_number << " producing value"
 		  << current_value << std::endl;
 	job.publish(summation_result_tag, current_value);
 
 	double contrib_value = *job.get_waiter(contribution_update_tag).get();
 	std::cout << p.run_time().count() << "ms: Agent "
-		  << machine_number << " receiving contribution" <<
+		  << machine_number << " receiving contribution"
 		  << contrib_value << std::endl;
 	p.get_processor().set_value(contrib_value);
       };
@@ -161,15 +161,15 @@ void machine_task(int machine_number,
       
       job.subscribe(summation_result_tag);
 
-      for (size_t = 0; i < 5; i++)
+      for (size_t i = 0; i < 5; i++)
       {
-	for (size_t = 0; j < 4; j++)
+	for (size_t j = 0; j < 4; j++)
 	{
 	  double curr_sum_result = *job.get_waiter(summation_result_tag).get();
-	  std::cout << p.run_time().count() << "ms: Agent "
-		    << machine_number << " seeing summation result " <<
+	  std::cout << "Agent "
+		    << machine_number << " seeing summation result "
 		    << curr_sum_result << std::endl;
-	  std::this_thread::sleep_for(std::chrono__seconds(3));
+	  std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 	contrib_value = contrib_value * 10;
 	job.publish(contribution_update_tag, contrib_value);
