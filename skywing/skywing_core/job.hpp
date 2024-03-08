@@ -93,10 +93,10 @@ public:
   void declare_publication_intent_range(const Range& tags_in) noexcept
   // requires std::ranges::contiguous_range<Range>
   {
-    std::vector<AbstractTag const*> tags;
+    std::vector<std::unique_ptr<const AbstractTag>> tags;
     tags.reserve(tags_in.size());
     for (auto const& t : tags_in)
-      tags.push_back(&t);
+      tags.push_back(t.clone());
     declare_publication_intent_impl(tags);
   }
 
