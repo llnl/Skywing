@@ -177,7 +177,8 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     BufferPtr buffer = std::make_unique<typename Tag<Ts...>::BufferType>();
     init_or_update_subscribe(
-      std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1}, std::span<BufferPtr>{buffer});
+      std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1},
+      std::span<BufferPtr, 1>{std::addressof(buffer), 1});
     return get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1});
   }
 
