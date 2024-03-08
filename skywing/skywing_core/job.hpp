@@ -156,13 +156,13 @@ public:
    */
   bool has_data(const AbstractTag& tag) noexcept;
 
-  /** \brief Subscribe to all tags passed into the vector.
+  /** \brief Request a subscription to publication stream denoted by the given tag.
    *
-   * \pre The tags are not currently subscribed to
-   * \return A future for when the tags have been subscribed to
+   * \pre The tag is not currently subscribed to
+   * \return A future for when the tag has been subscribed to
    */
   template<typename... Ts>
-  Waiter<void> subscribe(const Ts&... tags) noexcept
+  Waiter<void> subscribe(const Tag<Ts...>& tag) noexcept
   //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
   {
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
@@ -173,12 +173,11 @@ public:
     (void)tag_is_not_subscribed; // avoid compiler warning in release buiild
 
     // TODO: Make this std::terminate or something instead?
-    assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
+    assert("Tag attempted to be subscribed to twice!" && tag_is_not_subscribed(tag));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    const std::array<AbstractTag, sizeof...(Ts)> tag_array{tags...};
-    init_or_update_subscribe(std::span<const AbstractTag>{tag_array}, std::span<BufferPtr>{ptrs});
-    return get_subscribe_future(std::span<const AbstractTag>{tag_array});
+    BufferPtr buffer = std::make_unique<typename Tag<Ts...>::BufferType>();
+    init_or_update_subscribe(std::span<std::unique_ptr<const AbstractTag>,1>{tag.clone()}, std::span<BufferPtr>{buffer});
+    return get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>,1>{tag.clone()});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -192,12 +191,8 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     std::vector<BufferPtr> ptrs(tags.size());
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<typename TagType::BufferType>(); });
-    // FIXME (trb 2024/01/17): This is absolutely awful but currently
-    // the only subclass of PublishTagBase is PublishTag, which
-    // doesn't add data fields. So this works, despite being terrible.
-    const auto tag_span
-
-      = std::span<const AbstractTag>{(const AbstractTag*)tags.data(), tags.size()};
+    std::span<std::unique_ptr<const AbstractTag>> tag_span;
+    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [](const AbstractTag& t) { return t.clone(); });
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
     return get_subscribe_future(tag_span);
   }
@@ -209,10 +204,11 @@ public:
   // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+    using TagPtr = std::unique_ptr<const AbstractTag>;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    const std::array<AbstractTag, sizeof...(Ts)> tag_array{tags...};
-    init_or_update_subscribe(std::span<const AbstractTag>{tag_array}, std::span<BufferPtr>{ptrs});
-    return get_ip_subscribe_future(address, std::span<const AbstractTag>{tag_array});
+    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
+    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs}, std::span<BufferPtr>{ptrs});
+    return get_ip_subscribe_future(address, std::span<TagPtr>{tag_ptrs});
   }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
@@ -288,11 +284,9 @@ public:
   Waiter<void> rebuild_tags(const Range& tags)
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
-    const auto tag_span
-      = std::span<const AbstractTag>{(const AbstractTag*)tags.data(), tags.size()};
-    init_or_update_subscribe(
-      tag_span,
-      std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
+    std::span<std::unique_ptr<const AbstractTag>> tag_span;
+    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [](const AbstractTag& t) { return t.clone(); });
+    init_or_update_subscribe(tag_span, std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
     return get_subscribe_future(tag_span);
   }
 
@@ -313,7 +307,8 @@ public:
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          tags.push_back(tag_pair.second.tag().clone());;
+          tags.push_back(tag_pair.second.tag().clone());
+          ;
         }
       }
       return tags;
@@ -381,13 +376,12 @@ private:
   void publish_impl(const AbstractTag& tag, std::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    std::span<const AbstractTag> tags,
+    std::span<std::unique_ptr<const AbstractTag>> tags,
     std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  Waiter<void> get_subscribe_future(std::span<const AbstractTag> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
-  Waiter<bool>
-    get_ip_subscribe_future(const std::string& address, const std::span<const AbstractTag> tags) noexcept;
+  Waiter<bool> get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
   void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
