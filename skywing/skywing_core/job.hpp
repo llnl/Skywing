@@ -312,7 +312,8 @@ public:
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          tags.emplace_back(tag_pair.first.substr(1));
+          std::unique_ptr<const AbstractTag> tag_ptr = std::make_unique<const Tag<std::uint8_t>>(tag_pair.first.substr(1));
+          tags.push_back(std::move(tag_ptr));
           ;
         }
       }

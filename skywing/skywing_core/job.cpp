@@ -201,7 +201,7 @@ Waiter<void> Job::get_subscribe_future(std::span<std::unique_ptr<const AbstractT
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
@@ -210,7 +210,7 @@ Waiter<bool>
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [](const std::unique_ptr<AbstractTag>& t) { return t->get_id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(
