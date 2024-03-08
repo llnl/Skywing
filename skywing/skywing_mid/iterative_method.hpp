@@ -101,16 +101,16 @@ public:
         return job_->rebuild_tags(search_tags);
     }
 
-    /** @brief Rebuilds the specified dead tags
-     */
-    template <typename... Tags>
-    Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    {
-        const std::array<internal::PublishTagBase, sizeof...(Tags)> tag_array{
-            static_cast<internal::PublishTagBase>(tags)...};
-        return rebuild_dead_tags_range(tag_array);
-    }
+  /** @brief Rebuilds the specified dead tags
+   */
+  template<typename... Tags>
+  Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
+  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+  {
+    const std::array<AbstractTag, sizeof...(Tags)> tag_array{
+      static_cast<AbstractTag>(tags)...};
+    return rebuild_dead_tags_range(tag_array);
+  }
 
     /** @brief Drops tracking for dead tags
      */
@@ -135,15 +135,15 @@ public:
         }
     }
 
-    /** @brief Drops the specified dead tags
-     */
-    template <typename... Tags>
-    void drop_dead_tags(const Tags&... tags) noexcept
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    {
-        const std::array<internal::PublishTagBase, sizeof...(Tags)> tag_array{
-            static_cast<internal::PublishTagBase>(tags)...};
-    }
+  /** @brief Drops the specified dead tags
+   */
+  template<typename... Tags>
+  void drop_dead_tags(const Tags&... tags) noexcept
+  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+  {
+    const std::array<AbstractTag, sizeof...(Tags)> tag_array{
+      static_cast<AbstractTag>(tags)...};
+  }
 
     /** @brief Gather any data that has been published by neighbors.
      *
