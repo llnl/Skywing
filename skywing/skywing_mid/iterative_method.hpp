@@ -24,13 +24,11 @@ template <typename ResiliencePolicy, typename DataType>
 class IterativeMethod
 {
 public:
-    using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
-    using TagValueType =
-        typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
-    using TagType =
-        UnwrapAndApply_t<TagValueType, PublishTag>; // PublishTag<stuff...>;
-    using DataT = DataType;
-    using ValueType = DataType;
+  using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
+  using TagValueType = typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
+  using TagType = UnwrapAndApply_t<TagValueType, Tag>; // Tag<stuff...>;
+  using DataT = DataType;
+  using ValueType = DataType;
 
     /** @param job The job running this iterative method.
      *  @param produced_tag The tag this agent will publish during iteration.
