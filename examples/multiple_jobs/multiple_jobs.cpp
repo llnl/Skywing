@@ -87,7 +87,7 @@ void summation_job_fun(Job& job, ManagerHandle manager_handle,
   std::vector<std::string> tagIDs_for_sub
     { tagIDs[wrap_ind(i - 1)], tagIDs[i], tagIDs[wrap_ind(i + 1)] };
 
-  // // set up publishing of summation results
+  // set up publishing of summation results
   job.declare_publication_intent(summation_result_tag);
 
   // set up subscribing to individual update from other job on this agent
