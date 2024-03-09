@@ -40,6 +40,11 @@ public:
         assert(!id.empty());
     }
 
+    explicit PublishTag() noexcept
+      : PublishTag("")
+    { }
+    
+
     using ValueType = ValueOrTuple<Ts...>;
     using BufferType = internal::DiscardOldVersionTagBuffer<Ts...>;
 
@@ -192,6 +197,23 @@ public:
                     return std::nullopt;
                 }
             });
+    }
+
+  /** \brief Get a value from a subscription, if there is data to get.
+
+      \return std::optional<Ts...> An optional that, if there is data,
+      holds the data.
+   */
+    template<typename... Ts>
+    std::optional<ValueOrTuple<Ts...>>
+    get_data_if_present(const PublishTag<Ts...>& tag)
+    {
+      using OptT = std::optional<ValueOrTuple<Ts...>>;
+      Waiter<OptT> waiter = get_waiter(tag);
+      if (waiter.is_ready())
+	return waiter.get();
+      else
+	return std::nullopt;
     }
 
     /** \brief Checks if a tag buffer has data or not

@@ -21,165 +21,160 @@
 using namespace skywing;
 using ValueTag = skywing::PublishTag<double>;
 
-// Get names of the agents in the collective.
-std::vector<std::string> obtain_machine_names(std::uint16_t size_of_system)
+using CountProcessor = QUACCProcessor<BigFloat,
+				      MinProcessor<BigFloat>,
+				      PushFlowProcessor<BigFloat>>;
+using SumMethod =
+  SumProcessor<double, PushFlowProcessor<double>, CountProcessor>;
+using IterMethod = AsynchronousIterative<SumMethod,
+					 AlwaysPublish,
+					 StopAfterTime,
+					 TrivialResiliencePolicy>;
+
+struct ParamStruct
 {
-    std::vector<std::string> machine_names;
-    machine_names.resize(size_of_system);
-    for (int i = 0; i < size_of_system; i++) {
-        machine_names[i] = "node" + std::to_string(i + 1);
-    }
-    return machine_names;
-}
+  int agent_number;
+  int size_of_system;
+  std::vector<std::uint16_t> ports;
+  std::vector<std::string> agent_names;
+  std::string pubTagID;
+  std::vector<std::string> tagIDs;
+  ValueTag summation_result_tag;
+  ValueTag contribution_update_tag;
+};
 
-// Get the ports for each agent in the collective.
-std::vector<std::uint16_t> set_port(std::uint16_t starting_port_number,
-                                    std::uint16_t size_of_system)
+/* \brief The job that executives a collective summation.
+
+ * This job continually executives a collective summation. It
+ * contributes a single value to the collective summation.
+
+ * It subscribes to a tag that, when it has data, represents an update
+ * to the value this agent is contribution to the summation. It
+ * continually checks that tag; when the tag has new data, this job
+ * immediately updates its contribution to the summation.
+ *
+ * This job also publishes a value that represents its current
+ * estimation of the collective summation result. This value is
+ * continually updated, and it is continually publishing its current
+ * estimate.
+ */
+void summation_job_fun(Job& job, ManagerHandle manager_handle,
+		       ParamStruct& param_struct)
 {
-    std::vector<std::uint16_t> ports;
-
-    for (std::uint16_t i = 0; i < size_of_system; i++) {
-        ports.push_back(starting_port_number + (i * 1));
-    }
-    return ports;
-}
-
-// Get each agent's tag ID for the summation job.
-std::vector<std::string> obtain_tag_ids(int size_of_system)
-{
-    std::vector<std::string> tags;
-    for (int i = 0; i < size_of_system; i++) {
-        std::string hold = "summation_tag" + std::to_string(i);
-        tags.push_back(hold);
-    }
-    return tags;
-}
-
-// // For this example, the exact average can be computed by inputting the system
-// // size.
-// double obtain_exact_average(int size_of_system)
-// {
-//     double average = 0.0;
-//     for (int i = 0; i < size_of_system; i++) {
-//         average += 1.0 * i + 1.0;
-//     }
-//     average /= size_of_system;
-//     return average;
-// }
-
-void machine_task(int machine_number,
-                  int size_of_system,
-                  int number_of_neighbors,
-                  std::vector<std::uint16_t> ports,
-                  std::vector<std::string> machine_names,
-                  std::string pubTagID,
-                  std::vector<std::string> tagIDs)
-{
-    skywing::Manager manager{ports[machine_number],
-                             machine_names[machine_number]};
-
-    ValueTag summation_result_tag{"summation_result"};
-    ValueTag contribution_update_tag{"contribution_update"
-				     + std::to_string(machine_number)};
-
-    auto summation_job = [&](Job& job, ManagerHandle manager_handle)
-    {
-      if (machine_number != static_cast<int>((ports.size()) - 1)) {
-	// Connecting to the server is an asynchronous operation and can
-	// fail. Wait for the result each time and keep attempting to
-	// connect until it does
-	while (!manager_handle.connect_to_server
-	       ("127.0.0.1", ports[machine_number + 1]).get())
-	  { }
-      }
+  int agent_number = param_struct.agent_number;
+  int size_of_system = param_struct.size_of_system;
+  std::vector<std::uint16_t> ports = param_struct.ports;
+  std::vector<std::string> agent_names = param_struct.agent_names;
+  std::string pubTagID = param_struct.pubTagID;
+  std::vector<std::string> tagIDs = param_struct.tagIDs;
+  ValueTag summation_result_tag = param_struct.summation_result_tag;
+  ValueTag contribution_update_tag = param_struct.contribution_update_tag;
+  
+  if (agent_number != static_cast<int>((ports.size()) - 1)) {
+    // Connecting to the server is an asynchronous operation and can
+    // fail. Wait for the result each time and keep attempting to
+    // connect until it does
+    while (!manager_handle.connect_to_server
+	   ("127.0.0.1", ports[agent_number + 1]).get())
+      { }
+  }
       
-      // make gossip connections in a circle
-      int i = machine_number;
-      size_t number_of_neighbors = 2;
+  // make gossip connections in a circle.
+  int i = agent_number;
+  auto wrap_ind = [&](int ind) {
+		    return (ind % size_of_system + size_of_system) % size_of_system;
+		  };
+  std::vector<std::string> tagIDs_for_sub
+    { tagIDs[wrap_ind(i - 1)], tagIDs[i], tagIDs[wrap_ind(i + 1)] };
 
-      auto wrap_ind = [&](int ind) {
-			return (ind % size_of_system + size_of_system) % size_of_system;
-		      };
-      std::vector<std::string> tagIDs_for_sub
-	{ tagIDs[wrap_ind(i - 1)], tagIDs[i], tagIDs[wrap_ind(i + 1)] };
+  // // set up publishing of summation results
+  job.declare_publication_intent(summation_result_tag);
 
-      // set up publishing of summation results
-      job.declare_publication_intent(summation_result_tag);
+  // set up subscribing to individual update from other job on this agent
+  job.subscribe(contribution_update_tag).wait();
+  double starting_value = *job.get_waiter(contribution_update_tag).get();
+    
+  Waiter<IterMethod> iter_waiter =
+    WaiterBuilder<IterMethod>(
+			      manager_handle, job, pubTagID, tagIDs_for_sub)
+    .set_processor(starting_value)
+    .set_publish_policy()
+    .set_stop_policy(std::chrono::seconds(60))
+    .set_resilience_policy()
+    .build_waiter();
+    
+  IterMethod summation_iteration = iter_waiter.get();
 
-      // set up subscribing to individual update from other job on this agent
-      job.subscribe(contribution_update_tag).wait();
-      double starting_value = *job.get_waiter(contribution_update_tag).get();
+  // Set up lambda function to publish result and update
+  // contribution. This function is called by the iterative method on
+  // every iteration.
+  auto update_fun = [&](IterMethod& p)
+  {
+    double current_value = p.get_processor().get_value();
+    std::cout << p.run_time().count() << "ms: Agent "
+	      << agent_number << " producing value "
+	      << current_value << std::endl;
+    job.publish(summation_result_tag, current_value);
 
-      // set up summation iteration
-      (void) number_of_neighbors;
-      using CountProcessor = QUACCProcessor<BigFloat,
-					    MinProcessor<BigFloat>,
-					    PushFlowProcessor<BigFloat>>;
-      using SumMethod =
-	SumProcessor<double, PushFlowProcessor<double>, CountProcessor>;
-      using IterMethod = AsynchronousIterative<SumMethod,
-					       AlwaysPublish,
-					       StopAfterTime,
-					       TrivialResiliencePolicy>;
-      Waiter<IterMethod> iter_waiter =
-	WaiterBuilder<IterMethod>(
-				  manager_handle, job, pubTagID, tagIDs_for_sub)
-	.set_processor(starting_value)
-	.set_publish_policy()
-	.set_stop_policy(std::chrono::seconds(60))
-	.set_resilience_policy()
-	.build_waiter();
-
-      IterMethod summation_iteration = iter_waiter.get();
-
-      // set up lambda function to publish result and update contribution
-      auto update_fun = [&](decltype(summation_iteration)& p)
+    std::optional<double> contrib_value
+      = job.get_data_if_present(contribution_update_tag);
+    if (contrib_value)
       {
-	double current_value = p.get_processor().get_value();
 	std::cout << p.run_time().count() << "ms: Agent "
-		  << machine_number << " producing value"
-		  << current_value << std::endl;
-	job.publish(summation_result_tag, current_value);
+		  << agent_number << " receiving contribution"
+		  << *contrib_value << std::endl;
+	p.get_processor().set_value(*contrib_value);
+      }
+  };
+   
+  summation_iteration.run(update_fun);  
+}
 
-	double contrib_value = *job.get_waiter(contribution_update_tag).get();
-	std::cout << p.run_time().count() << "ms: Agent "
-		  << machine_number << " receiving contribution"
-		  << contrib_value << std::endl;
-	p.get_processor().set_value(contrib_value);
-      };
+/* \brief The job that updates this agent's contribution to the
+   summation and uses the summation result.
+
+ * This job provides an initial value to the above summation job
+ * through a publication. Then it does two things:
+ * 1) Every 3 seconds, through a subscription, it checks for the
+ * current summation estimate from the summation job on this agent.
+ * 2) Every 12 seconds, it updates the value this agent contributes to
+ * the summation.
+ */
+void use_result_job_fun(Job& job, ManagerHandle manager_handle,
+			ParamStruct& param_struct)
+{
+  int agent_number = param_struct.agent_number;
+  ValueTag summation_result_tag = param_struct.summation_result_tag;
+  ValueTag contribution_update_tag = param_struct.contribution_update_tag;
+
+  double contrib_value = agent_number + 1;
+  job.declare_publication_intent(contribution_update_tag);
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+  job.publish(contribution_update_tag, contrib_value);
+  std::this_thread::sleep_for(std::chrono::seconds(5));
       
-      summation_iteration.run(update_fun);
-    };
+  job.subscribe(summation_result_tag);
 
-    auto use_result_job = [&](Job& job, ManagerHandle manager_handle)
+  for (size_t i = 0; i < 5; i++)
     {
-      double contrib_value = machine_number + 1;
-      job.declare_publication_intent(contribution_update_tag);
+      for (size_t j = 0; j < 4; j++)
+    	{
+	  std::optional<double> curr_sum_result
+	    = job.get_waiter(summation_result_tag).get();
+	  if (curr_sum_result)
+	    {
+	      std::cout << "Agent "
+			<< agent_number << " seeing summation result "
+			<< *curr_sum_result << std::endl;
+	      std::this_thread::sleep_for(std::chrono::seconds(3));
+	    }
+    	}
+      contrib_value = contrib_value * 10;
+      std::cout << "Agent "
+		<< agent_number << " increasing contrib to "
+		<< contrib_value << std::endl;
       job.publish(contribution_update_tag, contrib_value);
-
-      std::this_thread::sleep_for(std::chrono::seconds(5));
-      
-      job.subscribe(summation_result_tag);
-
-      for (size_t i = 0; i < 5; i++)
-      {
-	for (size_t j = 0; j < 4; j++)
-	{
-	  double curr_sum_result = *job.get_waiter(summation_result_tag).get();
-	  std::cout << "Agent "
-		    << machine_number << " seeing summation result "
-		    << curr_sum_result << std::endl;
-	  std::this_thread::sleep_for(std::chrono::seconds(3));
-	}
-	contrib_value = contrib_value * 10;
-	job.publish(contribution_update_tag, contrib_value);
-      }
-    };
-
-    manager.submit_job("summation_job", summation_job);
-    manager.submit_job("use_result_job", use_result_job);
-
-    manager.run();
+    }
 }
 
 int main(int argc, char* argv[])
@@ -191,46 +186,47 @@ int main(int argc, char* argv[])
     }
     // Parse the machine number, starting_port_number, and size_of_system that
     // was passed in
-    int machine_number = std::stoi(argv[1]);
+    int agent_number = std::stoi(argv[1]);
     std::uint16_t starting_port_number = std::stoi(argv[2]);
     int size_of_system = std::stoi(argv[3]);
-    if (machine_number > size_of_system - 1 || machine_number < 0) {
-        std::cerr << "Invalid machine_number of " << std::quoted(argv[1])
-                  << ".\n"
-                  << "Must be an integer between 0 and " << size_of_system - 1
-                  << '\n';
-        return -1;
+
+    std::vector<std::uint16_t> ports;
+    std::vector<std::string> agent_names;
+    std::vector<std::string> subTagIDs;
+    for (std::size_t i = 0; i < size_of_system; i++)
+    {
+      ports.push_back(starting_port_number + i);
+      agent_names.push_back("agent" + std::to_string(i+1));
+      subTagIDs.push_back("summation_tag" + std::to_string(i));
     }
-    if (size_of_system <= 0) {
-        std::cerr << "Invalid size_of_system of " << std::quoted(argv[1])
-                  << ".\n"
-                  << "Must be an integer greater than 0 and  match the number "
-                     "of threads created. \n";
-        return -1;
-    }
+    std::string pubTagID = subTagIDs[agent_number];
 
-    // Skywing setup
-    std::vector<std::uint16_t> ports =
-        set_port(starting_port_number, size_of_system);
-    std::vector<std::string> machine_names =
-        obtain_machine_names(size_of_system);
-    std::vector<std::string> subTagIDs = obtain_tag_ids(size_of_system);
+    ParamStruct param_struct;
+    param_struct.agent_number = agent_number;
+    param_struct.size_of_system = size_of_system;
+    param_struct.ports = ports;
+    param_struct.agent_names = agent_names;
+    param_struct.pubTagID = pubTagID;
+    param_struct.tagIDs = subTagIDs;
+    param_struct.summation_result_tag = ValueTag("summation_result");
+    param_struct.contribution_update_tag
+      = ValueTag("contribution_update" + std::to_string(agent_number));
 
-    // This pubTag is exists in subTags[machine_number] which is needed for
-    // initialization, but its declared separately here mainly to highlight how
-    // the creator works for the push_sum class.
-    std::string pubTagID("push_sum_tag" + std::to_string(machine_number));
-    // Push sum variables -> initialized by user
+    auto summation_job = [&param_struct](Job& job, ManagerHandle manager_handle)
+    {
+      summation_job_fun(job, manager_handle, param_struct);
+    };
 
-    int number_of_neighbors = size_of_system - 1;
+    auto use_result_job = [&param_struct](Job& job, ManagerHandle manager_handle)
+    {
+      use_result_job_fun(job, manager_handle, param_struct);
+    };
 
-    // Skywing job
-    machine_task(machine_number,
-                 size_of_system,
-                 number_of_neighbors,
-                 ports,
-                 machine_names,
-                 pubTagID,
-                 subTagIDs);
+    skywing::Manager manager{ports[agent_number],
+                             agent_names[agent_number]};
+    manager.submit_job("summation_job", summation_job);
+    manager.submit_job("use_result_job", use_result_job);
+    manager.run();
+
     return 0;
 }
