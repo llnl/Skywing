@@ -84,14 +84,14 @@ public:
   {
     using TagPtr = std::unique_ptr<const AbstractTag>;
     const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    declare_publication_intent_impl(std::span<TagPtr>{tag_ptrs});
+    declare_publication_intent_impl(std::span<const TagPtr>{tag_ptrs});
   }
 
   /** \brief Declare publication intent for a range
    */
   template<typename Range>
   void declare_publication_intent_range(const Range& tags_in) noexcept
-  // requires std::ranges::contiguous_range<Range>
+    requires std::ranges::contiguous_range<Range>
   {
     std::vector<std::unique_ptr<const AbstractTag>> tags;
     tags.reserve(tags_in.size());
@@ -169,7 +169,7 @@ public:
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
       const auto [buffers, lock] = bufs_.get();
       (void)lock;
-      return buffers.find(tag.id()) == buffers.cend();
+      return buffers.find(tag.get_id()) == buffers.cend();
     };
     (void)tag_is_not_subscribed; // avoid compiler warning in release buiild
 
@@ -187,7 +187,7 @@ public:
    */
   template<typename Range>
   Waiter<void> subscribe_range(const Range& tags) noexcept
-  // requires std::ranges::contiguous_range<Range>
+    requires std::ranges::contiguous_range<Range>
   {
     using IterType = std::decay_t<decltype(tags.begin())>;
     using TagType = typename std::iterator_traits<IterType>::value_type;
@@ -204,7 +204,7 @@ public:
    */
   template<typename... Ts>
   Waiter<bool> ip_subscribe(const std::string& address, const Ts&... tags) noexcept
-  // requires (... && std::is_base_of_v<internal::PrivateTagBase, Ts>)
+    requires IsTag<Ts...>
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using TagPtr = std::unique_ptr<const AbstractTag>;
@@ -312,7 +312,8 @@ public:
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          std::unique_ptr<const AbstractTag> tag_ptr = std::make_unique<const Tag<std::uint8_t>>(tag_pair.first.substr(1));
+          std::unique_ptr<const AbstractTag> tag_ptr
+            = std::make_unique<const Tag<std::uint8_t>>(tag_pair.first.substr(1));
           tags.push_back(std::move(tag_ptr));
           ;
         }
@@ -392,7 +393,7 @@ private:
 
   void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
-  void declare_publication_intent_impl(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 

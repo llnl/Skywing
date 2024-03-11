@@ -9,23 +9,15 @@
 #include <functional>
 #include <span>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace skywing {
 
-/**
- * @brief Base class for concrete Tag class so the Tag class template can be stored in std::vector.
- */
-class AbstractTag {
-public:
-  using DataTypeRef = std::uint8_t;
-  virtual ~AbstractTag() = default;
-  virtual const std::string get_id() const = 0;
-  virtual auto get_expected_types() const -> std::span<DataTypeRef const> = 0;
-  std::unique_ptr<AbstractTag> clone() const { return std::unique_ptr<AbstractTag>(this->do_clone()); }
-private:
-  virtual AbstractTag* do_clone() const = 0;
-};
+class AbstractTag;
+
+template<typename... Ts>
+concept IsTag = (std::is_base_of<AbstractTag, Ts>::value && ...);
 
 template<typename T, typename... U>
 concept IsAnyOf = (std::same_as<T, U> || ...);
@@ -59,6 +51,22 @@ concept Publishable = IsAnyOf<
   bool,
   std::vector<bool>>;
 
+/**
+ * @brief Base class for concrete Tag class so the Tag class template can be stored in std::vector.
+ */
+class AbstractTag {
+public:
+  using DataTypeRef = std::uint8_t;
+  virtual ~AbstractTag() = default;
+  [[nodiscard]] auto operator<=>(const AbstractTag&) const = default;
+  virtual const std::string get_id() const = 0;
+  virtual auto get_expected_types() const -> std::span<DataTypeRef const> = 0;
+  std::unique_ptr<AbstractTag> clone() const { return std::unique_ptr<AbstractTag>(this->do_clone()); }
+
+private:
+  virtual AbstractTag* do_clone() const = 0;
+};
+
 /** @brief A collective-global unique identifier for a publication stream.
  *
  * A Tag consists of (a) one or more data types that will be
@@ -73,14 +81,15 @@ template<Publishable... Types>
 class Tag final : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
+  using ValueType = ValueOrTuple<Types...>; // could this just be tuple or a TypeList?
 
-  Tag(std::string id) : id_{'p' + id}
+  explicit Tag(std::string id) : id_{'p' + id}
   {
     (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
      ...);
   }
 
-  auto operator<=>(const Tag&) const = default;
+  [[nodiscard]] auto operator<=>(const Tag&) const = default;
 
   /** @brief Get the string TagID for this Tag. */
   const std::string get_id() const override { return id_; }

@@ -234,7 +234,7 @@ void Job::declare_publication_intent_impl(std::span<const AbstractTag> tags) noe
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
+void Job::declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
