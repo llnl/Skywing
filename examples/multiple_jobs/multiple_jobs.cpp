@@ -71,7 +71,7 @@ void summation_job_fun(Job& job,
     ValueTag summation_result_tag = param_struct.summation_result_tag;
     ValueTag contribution_update_tag = param_struct.contribution_update_tag;
 
-    if (agent_number != static_cast<int>((ports.size()) - 1)) {
+    if (agent_number != static_cast<size_t>((ports.size()) - 1)) {
         // Connecting to the server is an asynchronous operation and can
         // fail. Wait for the result each time and keep attempting to
         // connect until it does
