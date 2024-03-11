@@ -142,7 +142,7 @@ void use_result_job_fun(Job& job,
                         ManagerHandle manager_handle,
                         ParamStruct& param_struct)
 {
-  (void) manager_handle; // required but not needed parameter
+    (void) manager_handle; // required but not needed parameter
     size_t agent_number = param_struct.agent_number;
     ValueTag summation_result_tag = param_struct.summation_result_tag;
     ValueTag contribution_update_tag = param_struct.contribution_update_tag;
