@@ -20,6 +20,7 @@
 #include "skywing_core/types.hpp"
 #include "skywing_core/waiter.hpp"
 #include "tag.hpp"
+#include "skywing_mid/internal/iterative_helpers.hpp"
 
 namespace skywing
 {
@@ -192,8 +193,10 @@ public:
     using IterType = std::decay_t<decltype(tags.begin())>;
     using TagType = typename std::iterator_traits<IterType>::value_type;
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+    using ValueType = typename TagType::ValueType;
+    using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
     std::vector<BufferPtr> ptrs(tags.size());
-    std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<typename TagType::BufferType>(); });
+    std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
     std::span<std::unique_ptr<const AbstractTag>> tag_span;
     std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [](const AbstractTag& t) { return t.clone(); });
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
