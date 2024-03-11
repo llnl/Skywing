@@ -33,8 +33,8 @@ using IterMethod = AsynchronousIterative<SumMethod,
 
 struct ParamStruct
 {
-    int agent_number;
-    int size_of_system;
+    size_t agent_number;
+    size_t size_of_system;
     std::vector<std::uint16_t> ports;
     std::vector<std::string> agent_names;
     std::string pubTagID;
@@ -62,8 +62,8 @@ void summation_job_fun(Job& job,
                        ManagerHandle manager_handle,
                        ParamStruct& param_struct)
 {
-    int agent_number = param_struct.agent_number;
-    int size_of_system = param_struct.size_of_system;
+    size_t agent_number = param_struct.agent_number;
+    size_t size_of_system = param_struct.size_of_system;
     std::vector<std::uint16_t> ports = param_struct.ports;
     std::vector<std::string> agent_names = param_struct.agent_names;
     std::string pubTagID = param_struct.pubTagID;
@@ -82,8 +82,8 @@ void summation_job_fun(Job& job,
     }
 
     // make gossip connections in a circle.
-    int i = agent_number;
-    auto wrap_ind = [&](int ind) {
+    size_t i = agent_number;
+    auto wrap_ind = [&](size_t ind) {
         return (ind % size_of_system + size_of_system) % size_of_system;
     };
     std::vector<std::string> tagIDs_for_sub{
@@ -142,7 +142,8 @@ void use_result_job_fun(Job& job,
                         ManagerHandle manager_handle,
                         ParamStruct& param_struct)
 {
-    int agent_number = param_struct.agent_number;
+  (void) manager_handle; // required but not needed parameter
+    size_t agent_number = param_struct.agent_number;
     ValueTag summation_result_tag = param_struct.summation_result_tag;
     ValueTag contribution_update_tag = param_struct.contribution_update_tag;
 
@@ -181,14 +182,14 @@ int main(int argc, char* argv[])
     }
     // Parse the machine number, starting_port_number, and size_of_system that
     // was passed in
-    int agent_number = std::stoi(argv[1]);
+    size_t agent_number = std::stoul(argv[1]);
     std::uint16_t starting_port_number = std::stoi(argv[2]);
-    int size_of_system = std::stoi(argv[3]);
+    size_t size_of_system = std::stoul(argv[3]);
 
     std::vector<std::uint16_t> ports;
     std::vector<std::string> agent_names;
     std::vector<std::string> subTagIDs;
-    for (std::size_t i = 0; i < size_of_system; i++) {
+    for (size_t i = 0; i < size_of_system; i++) {
         ports.push_back(starting_port_number + i);
         agent_names.push_back("agent" + std::to_string(i + 1));
         subTagIDs.push_back("summation_tag" + std::to_string(i));
