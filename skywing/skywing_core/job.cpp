@@ -168,7 +168,7 @@ const JobID& Job::id() const noexcept
 }
 
 void Job::init_or_update_subscribe(
-  std::span<std::unique_ptr<const AbstractTag>> tags,
+  std::span<const std::unique_ptr<const AbstractTag>> tags,
   std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
 {
   assert(tags.size() == ptrs.size());
@@ -197,11 +197,11 @@ void Job::init_or_update_subscribe(
   }
 }
 
-Waiter<void> Job::get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
+Waiter<void> Job::get_subscribe_future(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](const std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 

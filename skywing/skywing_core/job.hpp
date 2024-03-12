@@ -180,8 +180,8 @@ public:
     using TagPtr = std::unique_ptr<const AbstractTag>;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
     const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs},std::span<BufferPtr>{ptrs});
-    return get_subscribe_future(std::span<TagPtr>{tag_ptrs});
+    init_or_update_subscribe(std::span<const TagPtr>{tag_ptrs},std::span<BufferPtr>{ptrs});
+    return get_subscribe_future(std::span<const TagPtr>{tag_ptrs});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -197,8 +197,8 @@ public:
     using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
     std::vector<BufferPtr> ptrs(tags.size());
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
-    std::span<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [](const AbstractTag& t) { return t.clone(); });
+    std::span<const std::unique_ptr<const AbstractTag>> tag_span;
+    std::transform(tags.cbegin(), tags.cend(), cbegin(tag_span), [&](const AbstractTag& t) { return t.clone(); });
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
     return get_subscribe_future(tag_span);
   }
@@ -291,7 +291,7 @@ public:
   {
     std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
     std::span<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), tag_span.begin(), [&](const std::unique_ptr<const AbstractTag>& t) {
+    std::transform(tags.cbegin(), tags.cend(), cbegin(tag_span), [&](const std::unique_ptr<const AbstractTag>& t) {
       return t->clone();
     });
     init_or_update_subscribe(tag_span, std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
@@ -386,10 +386,10 @@ private:
   void publish_impl(const AbstractTag& tag, std::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    std::span<std::unique_ptr<const AbstractTag>> tags,
+    std::span<const std::unique_ptr<const AbstractTag>> tags,
     std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  Waiter<void> get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
 
   Waiter<bool>
     get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
