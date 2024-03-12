@@ -138,7 +138,7 @@ void summation_job_fun(Job& job,
  * 2) Every 12 seconds, it updates the value this agent contributes to
  * the summation.
  */
-void use_result_job_fun(Job& job,
+void input_output_job_fun(Job& job,
                         ManagerHandle manager_handle,
                         ParamStruct& param_struct)
 {
@@ -212,14 +212,14 @@ int main(int argc, char* argv[])
         summation_job_fun(job, manager_handle, param_struct);
     };
 
-    auto use_result_job = [&param_struct](Job& job,
-                                          ManagerHandle manager_handle) {
-        use_result_job_fun(job, manager_handle, param_struct);
+    auto input_output_job = [&param_struct](Job& job,
+					    ManagerHandle manager_handle) {
+        input_output_job_fun(job, manager_handle, param_struct);
     };
 
     skywing::Manager manager{ports[agent_number], agent_names[agent_number]};
     manager.submit_job("summation_job", summation_job);
-    manager.submit_job("use_result_job", use_result_job);
+    manager.submit_job("use_result_job", input_output_job);
     manager.run();
 
     return 0;
