@@ -39,6 +39,7 @@ set(TEST_SRCS
   skywing_core/repeat_connection.cpp
   skywing_core/self_subscribe.cpp
   skywing_core/devices/socket_communicator.cpp
+  skywing_core/multiple_jobs_test.cpp
 
   skywing_mid/associative_vector.cpp
   skywing_mid/asynchronous_iterative.cpp
