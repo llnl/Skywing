@@ -41,6 +41,8 @@ void job_fun(Job& job,
     job.subscribe(tags[other_job_index]).get();
     job.subscribe(tags[other_agent_index]).get();
 
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
     int my_val = my_index;
     job.publish(tags[my_index], my_val);
 
@@ -50,8 +52,9 @@ void job_fun(Job& job,
         job.get_waiter(tags[other_job_index]).get();
     std::optional<int> other_agent_val =
         job.get_waiter(tags[other_agent_index]).get();
-    REQUIRE(other_job_val);
-    REQUIRE(other_agent_val);
+
+    REQUIRE(other_job_val.has_value());
+    REQUIRE(other_agent_val.has_value());
     REQUIRE(*other_job_val == other_job_index);
     REQUIRE(*other_agent_val == other_agent_index);
 }
