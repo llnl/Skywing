@@ -82,6 +82,7 @@ class Tag final : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
   using ValueType = ValueOrTuple<Types...>; // could this just be tuple or a TypeList?
+  using BufferType = internal::DiscardOldVersionTagBuffer<Types...>;
 
   explicit Tag(std::string id) : id_{'p' + id}
   {

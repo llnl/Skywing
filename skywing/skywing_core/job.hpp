@@ -164,7 +164,7 @@ public:
    * \return A future for when the tag has been subscribed to
    */
   template<typename... Ts>
-  Waiter<void> subscribe(const Tag<Ts...>& tag) noexcept
+  Waiter<void> subscribe(const Ts&... tags) noexcept
   //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
   {
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
@@ -175,13 +175,13 @@ public:
     (void)tag_is_not_subscribed; // avoid compiler warning in release buiild
 
     // TODO: Make this std::terminate or something instead?
-    assert("Tag attempted to be subscribed to twice!" && tag_is_not_subscribed(tag));
+    assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    BufferPtr buffer = std::make_unique<typename Tag<Ts...>::BufferType>();
-    init_or_update_subscribe(
-      std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1},
-      std::span<BufferPtr, 1>{std::addressof(buffer), 1});
-    return get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>, 1>{std::addressof(tag.clone()), 1});
+    using TagPtr = std::unique_ptr<const AbstractTag>;
+    std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
+    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
+    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs},std::span<BufferPtr>{ptrs});
+    return get_subscribe_future(std::span<TagPtr>{tag_ptrs});
   }
 
   /** \brief Subscribes to a range of tags.
