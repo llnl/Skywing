@@ -12,26 +12,32 @@ using namespace skywing;
 
 namespace
 {
-  constexpr int num_machines = 2;
-  using ValueTag = PublishTag<int>;
+constexpr int num_machines = 2;
+using ValueTag = PublishTag<int>;
 
-  std::vector<ValueTag> tags = {ValueTag{"tag 00"}, ValueTag{"tag 01"},
-				 ValueTag{"tag 10"}, ValueTag{"tag 11"}};
+std::vector<ValueTag> tags = {ValueTag{"tag 00"},
+                              ValueTag{"tag 01"},
+                              ValueTag{"tag 10"},
+                              ValueTag{"tag 11"}};
 
-  void job_fun(Job& job, ManagerHandle manager_handle, const NetworkInfo* const info, const int agent_index, const int job_index)
-  {
-    connect_network(*info, manager_handle, agent_index,
-		    [](ManagerHandle& m, const int i)
-		    {
-		      return m.connect_to_server("127.0.0.1", get_starting_port() + i).get();
-		    });
+void job_fun(Job& job,
+             ManagerHandle manager_handle,
+             const NetworkInfo* const info,
+             const int agent_index,
+             const int job_index)
+{
+    connect_network(
+        *info, manager_handle, agent_index, [](ManagerHandle& m, const int i) {
+            return m.connect_to_server("127.0.0.1", get_starting_port() + i)
+                .get();
+        });
     int job_offset = 2 * job_index;
     int my_index = job_offset + agent_index;
     int other_job_index = job_offset + (1 - agent_index);
     int other_agent_index = (2 - job_offset) + agent_index;
-    
+
     job.declare_publication_intent(tags[my_index]);
-    
+
     job.subscribe(tags[other_job_index]).get();
     job.subscribe(tags[other_agent_index]).get();
 
@@ -40,32 +46,32 @@ namespace
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    std::optional<int> other_job_val = job.get_waiter(tags[other_job_index]).get();
-    std::optional<int> other_agent_val = job.get_waiter(tags[other_agent_index]).get();
+    std::optional<int> other_job_val =
+        job.get_waiter(tags[other_job_index]).get();
+    std::optional<int> other_agent_val =
+        job.get_waiter(tags[other_agent_index]).get();
     REQUIRE(other_job_val);
     REQUIRE(other_agent_val);
     REQUIRE(*other_job_val == other_job_index);
     REQUIRE(*other_agent_val == other_agent_index);
-  }
+}
 
-  void agent_task(const NetworkInfo* const info, const int index)
-  {
+void agent_task(const NetworkInfo* const info, const int index)
+{
     Manager manager{static_cast<std::uint16_t>(get_starting_port() + index),
-			 std::to_string(index)};
+                    std::to_string(index)};
 
-    auto job0 = [&](Job& job, ManagerHandle manager_handle)
-		{
-		  job_fun(job, manager_handle, info, index, 0);
-		};
-    auto job1 = [&](Job& job, ManagerHandle manager_handle)
-		{
-		  job_fun(job, manager_handle, info, index, 1);
-		};
+    auto job0 = [&](Job& job, ManagerHandle manager_handle) {
+        job_fun(job, manager_handle, info, index, 0);
+    };
+    auto job1 = [&](Job& job, ManagerHandle manager_handle) {
+        job_fun(job, manager_handle, info, index, 1);
+    };
 
     manager.submit_job("job0", job0);
     manager.submit_job("job1", job1);
     manager.run();
-  }
+}
 
 } // namespace
 
