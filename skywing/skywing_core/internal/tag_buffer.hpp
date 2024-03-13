@@ -97,11 +97,6 @@ public:
 
     /** \brief Adds data if the version is newer
      */
-    void add(std::span<PublishValueVariant> value,
-             const VersionID version) noexcept
-    {
-        return do_add(value, version);
-    }
     void add(std::span<const PublishValueVariant> value,
              const VersionID version) noexcept
     {
@@ -117,8 +112,6 @@ public:
 private:
     virtual bool do_has_data() const noexcept = 0;
     virtual void* do_get() noexcept = 0;
-    virtual void do_add(std::span<PublishValueVariant> value,
-                        const VersionID version) noexcept = 0;
     virtual void do_add(std::span<const PublishValueVariant> value,
                         const VersionID version) noexcept = 0;
     virtual void do_reset() noexcept = 0;
@@ -141,17 +134,6 @@ private:
         return &value_;
     }
 
-    void do_add(std::span<PublishValueVariant> value,
-                const VersionID version) noexcept override
-    {
-        if (version > this->stored_version_
-            || this->stored_version_ == tag_no_data)
-        {
-            this->stored_version_ = version;
-            value_ = detail::make_value<Ts...>(
-                value, std::index_sequence_for<Ts...>{});
-        }
-    }
 
     void do_add(std::span<const PublishValueVariant> value,
                 const VersionID version) noexcept override

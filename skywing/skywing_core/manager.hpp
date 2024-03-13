@@ -368,7 +368,7 @@ public:
 
         static bool
         handle_publish_data(Manager& m,
-                            const internal::PublishData& msg,
+                            const internal::PublishData msg,
                             const internal::ExternalManager& from) noexcept
         {
             return m.handle_publish_data(msg, from);
@@ -566,7 +566,7 @@ private:
 
     /** \brief Handles published information
      */
-    bool handle_publish_data(const internal::PublishData& msg,
+    bool handle_publish_data(const internal::PublishData msg,
                              const internal::ExternalManager& from) noexcept;
 
     /** \brief Finalizes a subscription connection.

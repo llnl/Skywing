@@ -42,7 +42,7 @@ public:
 
         static bool process_data(Job& j,
                                  const TagID& tag,
-                                 std::span<const PublishValueVariant> data,
+                                 std::span<PublishValueVariant> data,
                                  const VersionID version) noexcept
         {
             return j.process_data(tag, data, version);
@@ -179,9 +179,9 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using TagPtr = std::unique_ptr<const AbstractTag>;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    init_or_update_subscribe(std::span<const TagPtr>{tag_ptrs},std::span<BufferPtr>{ptrs});
-    return get_subscribe_future(std::span<const TagPtr>{tag_ptrs});
+    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
+    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs}, std::span<BufferPtr>{ptrs});
+    return get_subscribe_future(std::span<TagPtr>{tag_ptrs});
   }
 
   /** \brief Subscribes to a range of tags.
@@ -197,7 +197,7 @@ public:
     using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
     std::vector<BufferPtr> ptrs(tags.size());
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
-    std::span<const std::unique_ptr<const AbstractTag>> tag_span;
+    std::span<std::unique_ptr<const AbstractTag>> tag_span;
     std::transform(tags.cbegin(), tags.cend(), cbegin(tag_span), [&](const AbstractTag& t) { return t.clone(); });
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
     return get_subscribe_future(tag_span);
@@ -212,7 +212,7 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using TagPtr = std::unique_ptr<const AbstractTag>;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
+    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
     init_or_update_subscribe(std::span<TagPtr>{tag_ptrs}, std::span<BufferPtr>{ptrs});
     return get_ip_subscribe_future(address, std::span<TagPtr>{tag_ptrs});
   }
@@ -246,7 +246,7 @@ public:
       "Argument values can not be converted to tag types!");
     std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
       static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
-    publish_impl(tag, std::span<PublishValueVariant>{variants});
+    publish_impl(tag, std::vector<PublishValueVariant>(variants.begin(), variants.end()));
   }
 
   template<typename... PublishTagTypes, typename... TupleTypes>
@@ -333,7 +333,7 @@ public:
   template<typename Range>
   bool tags_have_subscriptions(const Range& tags) const noexcept
   {
-    return tags_have_subscriptions_impl(std::span<const AbstractTag>{begin(tags), end(tags)});
+    return tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>>{begin(tags), end(tags)});
   }
 
   /** \brief Returns the number of subscriptions that a tag has
@@ -374,7 +374,7 @@ private:
      * \return True if processing went fine, false if there was an error
      */
     bool process_data(const TagID& tag_id,
-                      std::span<const PublishValueVariant> data,
+                      std::span<PublishValueVariant> data,
                       VersionID version) noexcept;
 
     /** \brief Marks a tag as dead due to connection issues
@@ -383,18 +383,18 @@ private:
      */
     void mark_tag_as_dead(const TagID& tag_id) noexcept;
 
-  void publish_impl(const AbstractTag& tag, std::span<PublishValueVariant> to_send) noexcept;
+  void publish_impl(const AbstractTag& tag, std::vector<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    std::span<const std::unique_ptr<const AbstractTag>> tags,
+    std::span<std::unique_ptr<const AbstractTag>> tags,
     std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  Waiter<void> get_subscribe_future(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
   Waiter<bool>
     get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
 
-  void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
+  // void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
   void declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
 
@@ -402,7 +402,7 @@ private:
 
   bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
 
-  bool tags_have_subscriptions_impl(std::span<const AbstractTag> tags) const noexcept;
+  bool tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) const noexcept;
 
     // The id of the job
     JobID id_;

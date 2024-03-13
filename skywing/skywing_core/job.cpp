@@ -39,7 +39,7 @@ Job::tags_produced() const noexcept
 }
 
 bool Job::process_data(const TagID& tag_id,
-                       std::span<const PublishValueVariant> data,
+                       std::span<PublishValueVariant> data,
                        const VersionID version) noexcept
 {
     auto [buffers, lock] = bufs_.get();
@@ -100,12 +100,12 @@ bool Job::tag_has_subscription(const AbstractTag& tag) const noexcept
   return iter != cend(buffers) && iter->second.error_occurred == TagInfo::Error::no_error;
 }
 
-bool Job::tags_have_subscriptions_impl(std::span<const AbstractTag> tags) const noexcept
+bool Job::tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) const noexcept
 {
   auto [buffers, lock] = bufs_.get();
   (void)lock;
   for (const auto& tag : tags) {
-    const auto iter = buffers.find(tag.get_id());
+    const auto iter = buffers.find(tag->get_id());
     if (iter == cend(buffers) || iter->second.error_occurred != TagInfo::Error::no_error) { return false; }
   }
   return true;
@@ -134,7 +134,7 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
     data_buffer_modified_cv_.notify_all();
 }
 
-void Job::publish_impl(const AbstractTag& tag, const std::span<PublishValueVariant> to_send) noexcept
+void Job::publish_impl(const AbstractTag& tag, const std::vector<PublishValueVariant> to_send) noexcept
 {
   assert(
     tags_produced_.find(tag.id()) != cend(tags_produced_)
@@ -168,7 +168,7 @@ const JobID& Job::id() const noexcept
 }
 
 void Job::init_or_update_subscribe(
-  std::span<const std::unique_ptr<const AbstractTag>> tags,
+  std::span<std::unique_ptr<const AbstractTag>> tags,
   std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
 {
   assert(tags.size() == ptrs.size());
@@ -197,11 +197,11 @@ void Job::init_or_update_subscribe(
   }
 }
 
-Waiter<void> Job::get_subscribe_future(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept
+Waiter<void> Job::get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [&](const std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->get_id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
@@ -220,19 +220,19 @@ Waiter<bool>
   return Manager::JobAccessor::ip_subscribe(*manager_, addr_pair, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept
-{
-  const std::vector<TagID> tag_ids = [&]() {
-    std::lock_guard g{bufs_.mutex()};
-    for (const auto& tag : tags) {
-      tags_produced_.try_emplace(tag.get_id(), tag.get_expected_types());
-    }
-    std::vector<TagID> tag_ids(tags.size());
-    std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](const AbstractTag& t) { return t.get_id(); });
-    return tag_ids;
-  }();
-  Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
-}
+// void Job::declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept
+// {
+//   const std::vector<TagID> tag_ids = [&]() {
+//     std::lock_guard g{bufs_.mutex()};
+//     for (const auto& tag : tags) {
+//       tags_produced_.try_emplace(tag.get_id(), tag.get_expected_types());
+//     }
+//     std::vector<TagID> tag_ids(tags.size());
+//     std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](const AbstractTag& t) { return t.get_id(); });
+//     return tag_ids;
+//   }();
+//   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
+// }
 
 void Job::declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept
 {
