@@ -195,11 +195,18 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using ValueType = typename TagType::ValueType;
     using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
+    std::cout << "A" << std::endl;
     std::vector<BufferPtr> ptrs(tags.size());
+    std::cout << "B" << std::endl;
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
-    std::span<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), cbegin(tag_span), [&](const AbstractTag& t) { return t.clone(); });
+    std::cout << "C" << std::endl;
+    //    std::span<std::unique_ptr<const AbstractTag>> tag_span;
+    std::vector<std::unique_ptr<const AbstractTag>> tag_span;
+    std::cout << "D" << std::endl;
+    std::transform(tags.cbegin(), tags.cend(), std::back_inserter(tag_span), [&](const AbstractTag& t) { return t.clone(); });
+    std::cout << "E" << std::endl;
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
+    std::cout << "F" << std::endl;
     return get_subscribe_future(tag_span);
   }
 
