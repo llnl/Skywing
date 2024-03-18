@@ -19,7 +19,7 @@
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
-using ValueTag = skywing::PublishTag<double>;
+using ValueTag = PublishTag<double>;
 
 using CountProcessor = QUACCProcessor<BigFloat,
                                       MinProcessor<BigFloat>,
@@ -49,7 +49,7 @@ struct ParamStruct
  * contributes a single value to the collective summation.
 
  * It subscribes to a tag that, when it has data, represents an update
- * to the value this agent is contribution to the summation. It
+ * to the value this agent is contributing to the summation. It
  * continually checks that tag; when the tag has new data, this job
  * immediately updates its contribution to the summation.
  *
@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
     param_struct.contribution_update_tag =
         ValueTag("contribution_update" + std::to_string(agent_number));
 
-    auto summation_job = [&param_struct](Job& job,
+    auto summation_job = [param_struct](Job& job,
                                          ManagerHandle manager_handle) {
         summation_job_fun(job, manager_handle, param_struct);
     };

@@ -32,7 +32,7 @@ A better approach is to have each agent continually doing _both_ tasks. In this 
    agent contributes a value to the summation; this job subscribes to
    a data stream through which it receives this agent's contribution.
 
--*Input/Output Job:* Supply inputs to, and use outputs from, the
+- *Input/Output Job:* Supply inputs to, and use outputs from, the
   collective summation. This job publishes a data stream representing
   updated contribution values to the summation. It also subscribes to
   a data stream representing the output values from the summation.
