@@ -195,18 +195,11 @@ public:
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using ValueType = typename TagType::ValueType;
     using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
-    std::cout << "A" << std::endl;
     std::vector<BufferPtr> ptrs(tags.size());
-    std::cout << "B" << std::endl;
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
-    std::cout << "C" << std::endl;
-    //    std::span<std::unique_ptr<const AbstractTag>> tag_span;
     std::vector<std::unique_ptr<const AbstractTag>> tag_span;
-    std::cout << "D" << std::endl;
     std::transform(tags.cbegin(), tags.cend(), std::back_inserter(tag_span), [&](const AbstractTag& t) { return t.clone(); });
-    std::cout << "E" << std::endl;
     init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
-    std::cout << "F" << std::endl;
     return get_subscribe_future(tag_span);
   }
 
@@ -253,7 +246,7 @@ public:
       "Argument values can not be converted to tag types!");
     std::array<PublishValueVariant, sizeof...(ArgTypes)> variants{
       static_cast<PublishTagTypes>(std::forward<ArgTypes>(values))...};
-    publish_impl(tag, std::vector<PublishValueVariant>(variants.begin(), variants.end()));
+    publish_impl(tag, variants);
   }
 
   template<typename... PublishTagTypes, typename... TupleTypes>
@@ -390,7 +383,7 @@ private:
      */
     void mark_tag_as_dead(const TagID& tag_id) noexcept;
 
-  void publish_impl(const AbstractTag& tag, std::vector<PublishValueVariant> to_send) noexcept;
+  void publish_impl(const AbstractTag& tag, std::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
     std::span<std::unique_ptr<const AbstractTag>> tags,

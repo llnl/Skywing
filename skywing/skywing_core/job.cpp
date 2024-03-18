@@ -134,7 +134,7 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
     data_buffer_modified_cv_.notify_all();
 }
 
-void Job::publish_impl(const AbstractTag& tag, const std::vector<PublishValueVariant> to_send) noexcept
+void Job::publish_impl(const AbstractTag& tag, const std::span<PublishValueVariant> to_send) noexcept
 {
   assert(
     tags_produced_.find(tag.id()) != cend(tags_produced_)
