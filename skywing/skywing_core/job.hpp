@@ -165,7 +165,7 @@ public:
    */
   template<typename... Ts>
   Waiter<void> subscribe(const Ts&... tags) noexcept
-  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+    requires IsTag<Ts...>
   {
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
       const auto [buffers, lock] = bufs_.get();

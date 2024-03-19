@@ -3,6 +3,7 @@
 
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/types.hpp"
+#include "skywing_mid/internal/iterative_helpers.hpp"
 
 #include <compare>
 #include <concepts>
@@ -11,6 +12,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <memory>
 
 namespace skywing {
 
@@ -82,7 +84,8 @@ class Tag final : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
   using ValueType = ValueOrTuple<Types...>; // could this just be tuple or a TypeList?
-  using BufferType = internal::DiscardOldVersionTagBuffer<Types...>;
+  // using BufferType = internal::DiscardOldVersionTagBuffer<Types...>;
+  using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
 
   explicit Tag(std::string id) : id_{'p' + id}
   {

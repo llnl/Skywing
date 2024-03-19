@@ -137,7 +137,7 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
 void Job::publish_impl(const AbstractTag& tag, const std::span<PublishValueVariant> to_send) noexcept
 {
   assert(
-    tags_produced_.find(tag.id()) != cend(tags_produced_)
+    tags_produced_.find(tag.get_id()) != cend(tags_produced_)
     && "Attempted to publish on a tag that was not declared for publishing!");
   // assert(tags_produced_.find(tag.id())->second == to_send.index()
   //   && "Attempted to publish the wrong type on a tag!");
