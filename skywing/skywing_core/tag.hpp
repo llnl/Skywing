@@ -98,13 +98,20 @@ public:
    * 
    * @param id a unique string id associated with stream of data to be published.
   */
-  explicit Tag(std::string id) : id_{'p' + id}
+  Tag(std::string id) : id_{'p' + id}
   {
     (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
      ...);
   }
 
-  [[nodiscard]] auto operator<=>(const Tag&) const = default;
+  /** @brief Compiler generated comparison operators.
+   *
+   * @param rhs right-hand side Tag object to be compared.
+   * 
+   * @return Compiler deduces std::weak_ordering, std::strong_ordering,
+   * or std::partial_ordering depending on the member variables of the class.
+  */
+  [[nodiscard]] auto operator<=>(const Tag& rhs) const = default;
 
   /** @brief Get the string TagID for this Tag.
   */
@@ -119,11 +126,6 @@ private:
   Tag<Types...>* do_clone() const override { return new Tag<Types...>(*this); }
   std::string id_;
   std::vector<DataTypeRef> expected_types_;
-};
-
-template<Publishable... Types>
-struct hash {
-  std::size_t operator()(const Tag<Types...>& tag) const { return std::hash<std::string>{}(tag.id()); }
 };
 
 } // namespace skywing
