@@ -3,6 +3,8 @@
 
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
+#include "skywing_core/tag.hpp"
+#include "skywing_mid/pubsub_converter.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
 #include "skywing_mid/neighbor_data_handler.hpp"
 #include "skywing_mid/pubsub_converter.hpp"
@@ -103,7 +105,7 @@ public:
    */
   template<typename... Tags>
   Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+  requires IsTag<Tags...>
   {
     const std::array<AbstractTag, sizeof...(Tags)> tag_array{
       static_cast<AbstractTag>(tags)...};
@@ -137,7 +139,7 @@ public:
    */
   template<typename... Tags>
   void drop_dead_tags(const Tags&... tags) noexcept
-  //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
+  requires IsTag<Tags...>
   {
     const std::array<AbstractTag, sizeof...(Tags)> tag_array{
       static_cast<AbstractTag>(tags)...};

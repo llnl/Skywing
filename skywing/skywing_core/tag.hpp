@@ -54,39 +54,50 @@ concept Publishable = IsAnyOf<
   std::vector<bool>>;
 
 /**
- * @brief Base class for concrete Tag class so the Tag class template can be stored in std::vector.
+ * @brief Base class for concrete Tag class.
+ * 
+ * @details
+ * This abstract class defines an interface for the Tag class.
+ * It is not to be extended for different Tag types but just
+ * so the Tag class template can be stored as a single type in std::vector.
  */
 class AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
   virtual ~AbstractTag() = default;
   [[nodiscard]] auto operator<=>(const AbstractTag&) const = default;
-  virtual const std::string get_id() const = 0;
-  virtual auto get_expected_types() const -> std::vector<DataTypeRef> = 0;
+  virtual const std::string id() const = 0;
+  virtual std::vector<DataTypeRef> get_expected_types() const = 0;
   std::unique_ptr<const AbstractTag> clone() const { return std::unique_ptr<const AbstractTag>(this->do_clone()); }
 
 private:
   virtual AbstractTag* do_clone() const = 0;
 };
 
-/** @brief A collective-global unique identifier for a publication stream.
- *
+/** 
+ * @brief A collective-global unique identifier for a publication stream.
+ * @tparam Types Set of data types that will be sent with each
+ * publication in the publication stream.
+ * 
+ * @details
  * A Tag consists of (a) one or more data types that will be
  * published by this publication stream, each of which must be a
  * valid type in the PublishValueTypeList in skywing_core/types.hpp,
  * and (b) an id (ie a string) identifier.
  *
- * @tparam Types Set of data types that will be sent with each
- * publication in the publication stream.
  */
 template<Publishable... Types>
 class Tag final : public AbstractTag {
 public:
   using DataTypeRef = std::uint8_t;
-  using ValueType = ValueOrTuple<Types...>; // could this just be tuple or a TypeList?
-  // using BufferType = internal::DiscardOldVersionTagBuffer<Types...>;
+  using ValueType = ValueOrTuple<Types...>;
   using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
 
+  /**
+   * Constructor to create a Tag.
+   * 
+   * @param id a unique string id associated with stream of data to be published.
+  */
   explicit Tag(std::string id) : id_{'p' + id}
   {
     (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
@@ -95,11 +106,14 @@ public:
 
   [[nodiscard]] auto operator<=>(const Tag&) const = default;
 
-  /** @brief Get the string TagID for this Tag. */
-  const std::string get_id() const override { return id_; }
+  /** @brief Get the string TagID for this Tag.
+  */
+  const std::string id() const override { return id_; }
 
-  /** @brief Get a view of a vector representing the one or more data types associated with this Subscription's Tag. */
-  auto get_expected_types() const -> std::vector<DataTypeRef> override { return expected_types_; }
+  /** @brief Get a vector representing the one or more data types
+   * associated with this Tag.
+  */
+  std::vector<DataTypeRef> get_expected_types() const override { return expected_types_; }
 
 private:
   Tag<Types...>* do_clone() const override { return new Tag<Types...>(*this); }
@@ -109,7 +123,7 @@ private:
 
 template<Publishable... Types>
 struct hash {
-  std::size_t operator()(const Tag<Types...>& tag) const { return std::hash<std::string>{}(tag.get_id()); }
+  std::size_t operator()(const Tag<Types...>& tag) const { return std::hash<std::string>{}(tag.id()); }
 };
 
 } // namespace skywing

@@ -680,11 +680,11 @@ const std::string& Manager::id() const noexcept
 size_t Manager::number_of_subscribers(const AbstractTag& tag) const noexcept
 {
   std::lock_guard<std::mutex> lock{job_mut_};
-  const auto self_iter = self_sub_count_.find(tag.get_id());
+  const auto self_iter = self_sub_count_.find(tag.id());
   const auto self_subs = self_iter == self_sub_count_.cend() ? 0 : self_iter->second;
   return std::accumulate(
     neighbors_.cbegin(), neighbors_.cend(), self_subs, [&](const size_t sum, const auto& neighbor_pair) noexcept {
-      return sum + neighbor_pair.second.is_subscribed_to(tag.get_id());
+      return sum + neighbor_pair.second.is_subscribed_to(tag.id());
     });
 }
 

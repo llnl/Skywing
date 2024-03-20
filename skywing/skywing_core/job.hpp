@@ -116,7 +116,7 @@ public:
     // due to being in an unordered_map
     auto [buffers, lock] = bufs_.get();
     (void)lock;
-    const auto tag_iter = buffers.find(tag.get_id());
+    const auto tag_iter = buffers.find(tag.id());
     assert(tag_iter != buffers.cend());
     auto& tag_info = tag_iter->second;
     const auto tag_conn_id = tag_info.connection_id;
@@ -170,7 +170,7 @@ public:
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
       const auto [buffers, lock] = bufs_.get();
       (void)lock;
-      return buffers.find(tag.get_id()) == buffers.cend();
+      return buffers.find(tag.id()) == buffers.cend();
     };
     (void)tag_is_not_subscribed; // avoid compiler warning in release buiild
 
@@ -393,8 +393,6 @@ private:
 
   Waiter<bool>
     get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
-
-  // void declare_publication_intent_impl(std::span<const AbstractTag> tags) noexcept;
 
   void declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
 
