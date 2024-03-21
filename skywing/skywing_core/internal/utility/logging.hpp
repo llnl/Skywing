@@ -36,16 +36,16 @@ struct fmt::formatter<std::span<T>>
     template <typename FormatContext>
     auto format(const std::span<T>& data, FormatContext& ctx) noexcept
     {
-        format_to(ctx.out(), "[");
+        fmt::format_to(ctx.out(), "[");
         bool add_comma = false;
         for (const auto& value : data) {
             if (add_comma) {
-                format_to(ctx.out(), ", ");
+                fmt::format_to(ctx.out(), ", ");
             }
-            format_to(ctx.out(), "{}", value);
+            fmt::format_to(ctx.out(), "{}", value);
             add_comma = true;
         }
-        return format_to(ctx.out(), "]");
+        return fmt::format_to(ctx.out(), "]");
     }
 };
 
@@ -100,7 +100,7 @@ struct fmt::formatter<std::pair<V1, V2>>
     template <typename FormatContext>
     auto format(const std::pair<V1, V2>& data, FormatContext& ctx) noexcept
     {
-        return format_to(ctx.out(), "{}, {}", data.first, data.second);
+        return fmt::format_to(ctx.out(), "{}, {}", data.first, data.second);
     }
 };
 
@@ -143,13 +143,13 @@ struct fmt::formatter<skywing::PublishValueVariant>
                 using Type = std::decay_t<decltype(value)>;
                 if constexpr (std::is_same_v<Type, std::vector<bool>>) {
                     // dumb std::vector<bool> workaround
-                    return format_to(ctx.out(),
-                                     "{}",
-                                     std::vector<std::uint8_t>{value.cbegin(),
-                                                               value.cend()});
+                    return fmt::format_to(ctx.out(),
+                                          "{}",
+                                          std::vector<std::uint8_t>{
+                                              value.cbegin(), value.cend()});
                 }
                 else {
-                    return format_to(ctx.out(), "{}", value);
+                    return fmt::format_to(ctx.out(), "{}", value);
                 }
             },
             data);
@@ -172,7 +172,7 @@ struct fmt::formatter<skywing::AddrPortPair>
     template <typename FormatContext>
     auto format(const skywing::AddrPortPair& data, FormatContext& ctx) noexcept
     {
-        return format_to(ctx.out(), "{}:{}", data.first, data.second);
+        return fmt::format_to(ctx.out(), "{}:{}", data.first, data.second);
     }
 };
 
