@@ -419,7 +419,7 @@ private:
         // The buffer
         std::unique_ptr<internal::DiscardOldVersionTagBufferBase> buffer;
         // The expected type
-        std::span<const std::uint8_t> expected_types;
+        std::vector<std::uint8_t> expected_types;
         // ID for the connection so if a subscription is broken then reformed
         // they can be differentiated
         std::uint16_t connection_id;
