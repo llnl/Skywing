@@ -60,7 +60,7 @@ struct ParamStruct
  */
 void summation_job_fun(Job& job,
                        ManagerHandle manager_handle,
-                       ParamStruct& param_struct)
+                       ParamStruct const& param_struct)
 {
     size_t agent_number = param_struct.agent_number;
     size_t size_of_system = param_struct.size_of_system;
@@ -140,7 +140,7 @@ void summation_job_fun(Job& job,
  */
 void input_output_job_fun(Job& job,
                           ManagerHandle manager_handle,
-                          ParamStruct& param_struct)
+                          ParamStruct const& param_struct)
 {
     (void) manager_handle; // required but not needed parameter
     size_t agent_number = param_struct.agent_number;
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
         summation_job_fun(job, manager_handle, param_struct);
     };
 
-    auto input_output_job = [&param_struct](Job& job,
+    auto input_output_job = [param_struct](Job& job,
                                             ManagerHandle manager_handle) {
         input_output_job_fun(job, manager_handle, param_struct);
     };
