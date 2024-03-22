@@ -119,7 +119,7 @@ void summation_job_fun(Job& job,
             job.get_data_if_present(contribution_update_tag);
         if (contrib_value) {
             std::cout << p.run_time().count() << "ms: Agent " << agent_number
-                      << " receiving contribution" << *contrib_value
+                      << " receiving contribution " << *contrib_value
                       << std::endl;
             p.get_processor().set_value(*contrib_value);
         }
