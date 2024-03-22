@@ -208,12 +208,12 @@ int main(int argc, char* argv[])
         ValueTag("contribution_update" + std::to_string(agent_number));
 
     auto summation_job = [param_struct](Job& job,
-                                         ManagerHandle manager_handle) {
+                                        ManagerHandle manager_handle) {
         summation_job_fun(job, manager_handle, param_struct);
     };
 
     auto input_output_job = [param_struct](Job& job,
-                                            ManagerHandle manager_handle) {
+                                           ManagerHandle manager_handle) {
         input_output_job_fun(job, manager_handle, param_struct);
     };
 

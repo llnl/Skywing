@@ -1,11 +1,11 @@
 ```
-           _|                                        _|
-   _|_|_|  _|  _|    _|    _|  _|_|_|      _|_|    _|_|_|_|
- _|_|      _|_|      _|    _|  _|    _|  _|_|_|_|    _|
-     _|_|  _|  _|    _|    _|  _|    _|  _|          _|
- _|_|_|    _|    _|    _|_|_|  _|    _|    _|_|_|      _|_|
-                           _|
-                       _|_|
+           _|                                  _|
+   _|_|_|  _|  _|    _|    _|  _|          _|      _|_|_|      _|_|
+ _|_|      _|_|      _|    _|  _|    _|    _|  _|  _|    _|  _|    _|
+     _|_|  _|  _|    _|    _|  _|  _|  _|  _|  _|  _|    _|  _|    _|
+ _|_|_|    _|    _|    _|_|_|    _|      _|    _|  _|    _|    _|_|_|
+                           _|                                      _|
+                       _|_|                                    _|_|
 ```
 
 # Multiple Jobs
@@ -50,8 +50,31 @@ output tag simply has ID "summation_result", a tag that is not
 specific to this agent.
 
 What this means is that _every agent publishes the summation output
-under the same tag_. This is not a problem, and is often of
-benefit. When a job subscribes to a data stream, the agent will seek
-_some_ agent that publishes under the tag; it can be itself or it can
-be another agent. The fact that many options exist provides resilience
-benefits.
+under the same tag_ (See Tutorial 02 for discussion of this). This is
+not a problem, and is often of benefit. When a job subscribes to a
+data stream, the agent will seek _some_ agent that publishes under the
+tag; it can be itself or it can be another agent. The fact that many
+options exist provides resilience benefits.
+
+## Running the example.
+
+To run the example, source the run script with a starting port:
+```
+source run.sh [start_port]
+```
+For example,
+```
+source run.sh 20000
+```
+
+## What to see in the output.
+
+The output will take a couple seconds to really start. Then, a
+continual stream of updates from the summation jobs will be
+produced. Every 3 seconds, the input/output jobs will read off the
+summation value from their subscriptions and print it.
+
+Every 12 seconds, the input/output jobs will update the contribution
+value publication, increasing it by a factor of 10. As a result, the
+summation job will react, noisily adjusting to the new values before
+converging to the new sum.
