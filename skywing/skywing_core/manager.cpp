@@ -1625,7 +1625,7 @@ bool Manager::subscription_tags_are_produced(
     return true;
 }
 
-bool Manager::handle_publish_data(const internal::PublishData msg, const internal::ExternalManager& from) noexcept
+bool Manager::handle_publish_data(const internal::PublishData& msg, const internal::ExternalManager& from) noexcept
 {
     (void) from;
     if (const auto value = msg.value()) {

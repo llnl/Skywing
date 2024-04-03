@@ -163,9 +163,8 @@ public:
    * \pre The tag is not currently subscribed to
    * \return A future for when the tag has been subscribed to
    */
-  template<typename... Ts>
+  template<IsTag... Ts>
   Waiter<void> subscribe(const Ts&... tags) noexcept
-    requires IsTag<Ts...>
   {
     const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
       const auto [buffers, lock] = bufs_.get();
@@ -205,9 +204,8 @@ public:
 
   /** \brief Subscribe to a set of tags from a specific IP
    */
-  template<typename... Ts>
+  template<IsTag... Ts>
   Waiter<bool> ip_subscribe(const std::string& address, const Ts&... tags) noexcept
-    requires IsTag<Ts...>
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
     using TagPtr = std::unique_ptr<const AbstractTag>;

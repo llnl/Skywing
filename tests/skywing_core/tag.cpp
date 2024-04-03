@@ -32,6 +32,6 @@ TEST_CASE("Tag creation", "[core]")
 {
     skywing::Tag<float,double,bool> tag{"id"};
     std::vector<std::uint8_t> expected_types {0,2,23};
-    REQUIRE(tag.id() == "pid");
+    REQUIRE(tag.id() == "id");
     REQUIRE(tag.get_expected_types() == expected_types);
 }

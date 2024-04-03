@@ -103,9 +103,8 @@ public:
 
   /** @brief Rebuilds the specified dead tags
    */
-  template<typename... Tags>
+  template<IsTag... Tags>
   Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-  requires IsTag<Tags...>
   {
     const std::array<AbstractTag, sizeof...(Tags)> tag_array{
       static_cast<AbstractTag>(tags)...};
@@ -137,9 +136,8 @@ public:
 
   /** @brief Drops the specified dead tags
    */
-  template<typename... Tags>
+  template<IsTag... Tags>
   void drop_dead_tags(const Tags&... tags) noexcept
-  requires IsTag<Tags...>
   {
     const std::array<AbstractTag, sizeof...(Tags)> tag_array{
       static_cast<AbstractTag>(tags)...};

@@ -1,5 +1,5 @@
-#ifndef TAG_HPP
-#define TAG_HPP
+#ifndef SKYWING_SKYWING_CORE_TAG_HPP
+#define SKYWING_SKYWING_CORE_TAG_HPP
 
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/types.hpp"
@@ -66,7 +66,7 @@ public:
   using DataTypeRef = std::uint8_t;
   virtual ~AbstractTag() = default;
   [[nodiscard]] auto operator<=>(const AbstractTag&) const = default;
-  virtual const std::string id() const = 0;
+  virtual std::string id() const = 0;
   virtual std::vector<DataTypeRef> get_expected_types() const = 0;
   std::unique_ptr<const AbstractTag> clone() const { return std::unique_ptr<const AbstractTag>(this->do_clone()); }
 
@@ -98,7 +98,7 @@ public:
    * 
    * @param id a unique string id associated with stream of data to be published.
   */
-  Tag(std::string id) : id_{'p' + id}
+  Tag(std::string id) : id_{std::move(id)}
   {
     (expected_types_.push_back(static_cast<DataTypeRef>(skywing::internal::index_of<Types, PublishValueTypeList>)),
      ...);
@@ -115,7 +115,7 @@ public:
 
   /** @brief Get the string TagID for this Tag.
   */
-  const std::string id() const override { return id_; }
+  std::string id() const override { return id_; }
 
   /** @brief Get a vector representing the one or more data types
    * associated with this Tag.
@@ -129,4 +129,4 @@ private:
 };
 
 } // namespace skywing
-#endif // TAG_HPP
+#endif // SKYWING_SKYWING_CORE_TAG_HPP
