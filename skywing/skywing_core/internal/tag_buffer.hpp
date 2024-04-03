@@ -62,10 +62,6 @@ ValueOrTuple<Ts...> make_value(std::span<const PublishValueVariant> value,
 }
 } // namespace detail
 
-enum class TagType : char
-{
-    publish_tag = publish_tag_marker,
-};
 
 template <typename TagT>
 struct hash

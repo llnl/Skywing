@@ -120,12 +120,6 @@ auto wrap_void_func(Callable&& c, Args&&... args) noexcept
     }
 }
 
-// Marker prepended to mark tags as publish tags
-inline constexpr char publish_tag_marker = 'p';
-
-// Marker prepended to mark tags as private tags
-inline constexpr char private_tag_marker = 'x';
-
 /// Structure for testing if a value is any of the supplied values
 template <typename T, T... Values>
 struct any_of
@@ -143,13 +137,6 @@ struct any_of
     }
 };
 
-// Checks if a tag name is bad
-inline bool tag_name_okay(const std::string& tag) noexcept
-{
-    return !tag.empty()
-           && (tag[0]
-               == any_of<char, publish_tag_marker, private_tag_marker>{});
-}
 } // namespace internal
 } // namespace skywing
 

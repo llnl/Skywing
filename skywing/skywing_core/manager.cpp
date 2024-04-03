@@ -322,26 +322,12 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
         },
         [&](const ReportPublishers& msg) {
             SKYWING_TRACE_LOG("\"{}\" received report publishers from \"{}\" "
-                              "with remote tags \"{}\" and local tags \"{}\"",
-                              manager_->id(),
-                              id_,
-                              msg.tags(),
-                              msg.locally_produced_tags());
-            // Make sure all of the tag names are okay
-            for (const auto& tag_list :
-                 {msg.tags(), msg.locally_produced_tags()}) {
-                for (const auto& tag : tag_list) {
-                    if (!tag_name_okay(tag)) {
-                        SKYWING_WARN_LOG(
-                            "\"{}\" dropping connection with \"{}\" due to bad "
-                            "tag \"{}\" in report publishers.",
-                            manager_->id(),
-                            id_,
-                            tag);
-                        return false;
-                    }
-                }
-            }
+                             "with remote tags \"{}\" and local tags \"{}\"",
+                             manager_->id(),
+                             id_,
+                             msg.tags(),
+                             msg.locally_produced_tags());
+
             Manager::ExternalManagerAccessor::add_publishers_and_propagate(
                 *manager_, msg, *this);
             // Mark there as not being a request out there and update the time
@@ -356,24 +342,12 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                 manager_->id(),
                 id_,
                 msg.tags());
-            for (const auto& tag : msg.tags()) {
-                if (!tag_name_okay(tag)) {
-                    SKYWING_WARN_LOG("\"{}\" discarded connection with \"{}\" "
-                                     "due to bad tag name \"{}\"",
-                                     manager_->id(),
-                                     id_,
-                                     tag);
-                    return false;
-                }
-            }
+
             Manager::ExternalManagerAccessor::handle_get_publishers(
                 *manager_, msg, *this);
             return true;
         },
         [&](const PublishData& msg) {
-            if (!tag_name_okay(msg.tag_id())) {
-                return false;
-            }
             return Manager::ExternalManagerAccessor::handle_publish_data(
                 *manager_, msg, *this);
         },
@@ -393,11 +367,6 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                         why);
                 };
             for (const auto& tag : msg.tags()) {
-                if (!tag_name_okay(tag)) {
-                    reject_notice(
-                        fmt::format("invalid tag name \"{}\" given", tag));
-                    return false;
-                }
                 const auto [iter, inserted] =
                     remote_subscriptions_.emplace(tag);
                 (void) iter;
@@ -853,10 +822,6 @@ Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
             {
                 return false;
             }
-            // Ignore private tags
-            if (to_find[0] == internal::private_tag_marker) {
-                return false;
-            }
             return true;
         });
     if (!pending_tags_.empty()) {
@@ -1260,9 +1225,7 @@ void Manager::init_connections_for_pending_tags() noexcept
                     ++tag_iter;
                 }
                 else {
-                    if (tag[0] == internal::publish_tag_marker) {
-                        finalize_subscription(tag, *neighbor_iter->second);
-                    }
+                    finalize_subscription(tag, *neighbor_iter->second);
                     tag_iter = pending_tags_.erase(tag_iter);
                 }
             }
