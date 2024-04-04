@@ -1,5 +1,5 @@
-#ifndef SKYNET_MANAGER_HPP
-#define SKYNET_MANAGER_HPP
+#ifndef SKYWING_MANAGER_HPP
+#define SKYWING_MANAGER_HPP
 
 #include "skywing_core/internal/capn_proto_wrapper.hpp"
 #include "skywing_core/internal/devices/socket_communicator.hpp"
@@ -753,4 +753,4 @@ private:
 }; // class ManagerHandle
 } // namespace skywing
 
-#endif // SKYNET_MANAGER_HPP
+#endif // SKYWING_MANAGER_HPP

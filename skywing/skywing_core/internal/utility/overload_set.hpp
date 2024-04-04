@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
-#define SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
+#ifndef SKYWING_INTERNAL_UTILITY_OVERLOAD_SET_HPP
+#define SKYWING_INTERNAL_UTILITY_OVERLOAD_SET_HPP
 
 #include <utility>
 
@@ -27,4 +27,4 @@ OverloadSet<Ts...> make_overload_set(Ts&&... callables) noexcept
 }
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_UTILITY_OVERLOAD_SET_HPP
+#endif // SKYWING_INTERNAL_UTILITY_OVERLOAD_SET_HPP

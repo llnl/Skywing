@@ -1,5 +1,5 @@
-#ifndef SKYNET_WAITER_HPP
-#define SKYNET_WAITER_HPP
+#ifndef SKYWING_WAITER_HPP
+#define SKYWING_WAITER_HPP
 
 #include <chrono>
 #include <condition_variable>
@@ -400,4 +400,4 @@ WaiterVec<T> make_waitervec(std::vector<Waiter<T>> waiters) noexcept
 
 } // namespace skywing
 
-#endif // SKYNET_WAITER_HPP
+#endif // SKYWING_WAITER_HPP

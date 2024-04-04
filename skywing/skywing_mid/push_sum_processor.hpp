@@ -1,5 +1,5 @@
-#ifndef SKYNET_UPPER_PUSH_SUM_HPP
-#define SKYNET_UPPER_PUSH_SUM_HPP
+#ifndef SKYWING_UPPER_PUSH_SUM_HPP
+#define SKYWING_UPPER_PUSH_SUM_HPP
 
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"

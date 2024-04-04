@@ -1,5 +1,5 @@
-#ifndef SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
-#define SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
+#ifndef SKYWING_MID_INTERNAL_ITERATIVE_BASE_HPP
+#define SKYWING_MID_INTERNAL_ITERATIVE_BASE_HPP
 
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
@@ -352,4 +352,4 @@ private:
 
 } // namespace skywing
 
-#endif // SKYNET_MID_INTERNAL_ITERATIVE_BASE_HPP
+#endif // SKYWING_MID_INTERNAL_ITERATIVE_BASE_HPP

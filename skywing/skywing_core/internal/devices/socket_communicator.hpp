@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
-#define SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#ifndef SKYWING_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#define SKYWING_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
 
 #include <cstddef>
 #include <cstdint>
@@ -151,4 +151,4 @@ std::string to_ip_port(const AddrPortPair& addr) noexcept;
 AddrPortPair to_canonical(const AddrPortPair& addr) noexcept;
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP
+#endif // SKYWING_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

@@ -1,5 +1,5 @@
-#ifndef SKYNETHELPER_HPP
-#define SKYNETHELPER_HPP
+#ifndef SKYWINGHELPER_HPP
+#define SKYWINGHELPER_HPP
 
 #include <chrono>
 

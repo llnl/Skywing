@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_UTILITY_ALGORITHMS
-#define SKYNET_INTERNAL_UTILITY_ALGORITHMS
+#ifndef SKYWING_INTERNAL_UTILITY_ALGORITHMS
+#define SKYWING_INTERNAL_UTILITY_ALGORITHMS
 
 #include <iterator>
 #include <string>
@@ -194,4 +194,4 @@ auto zip_iter_equal_len(Iters... iters) noexcept
 }
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_UTILITY_ALGORITHMS
+#endif // SKYWING_INTERNAL_UTILITY_ALGORITHMS

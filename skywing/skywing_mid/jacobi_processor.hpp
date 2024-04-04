@@ -1,5 +1,5 @@
-#ifndef SKYNET_UPPER_ASYNCHRONOUS_JACOBI_HPP
-#define SKYNET_UPPER_ASYNCHRONOUS_JACOBI_HPP
+#ifndef SKYWING_UPPER_ASYNCHRONOUS_JACOBI_HPP
+#define SKYWING_UPPER_ASYNCHRONOUS_JACOBI_HPP
 
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"

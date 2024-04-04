@@ -62,7 +62,7 @@ int init_connection(const int sockfd,
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
     if (inet_pton(AF_INET, address, &serv_addr.sin_addr) <= 0) {
-        SKYNET_ERROR_LOG("Invalid address {}", address);
+        SKYWING_ERROR_LOG("Invalid address {}", address);
         std::exit(4);
     }
     return connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
@@ -119,7 +119,7 @@ std::optional<SocketCommunicator> SocketCommunicator::accept() noexcept
         // This should never happen and is a programming bug if it's reached
         // Not 100% sure how to handle it, but forcefully quitting with a
         // message seems to be fine for now
-        SKYNET_DEBUG_LOG(
+        SKYWING_DEBUG_LOG(
             "accept had handle_ {}, raw_handle {}, threw error: {}",
             handle_,
             raw_handle,
@@ -244,8 +244,8 @@ ConnectionError
 SocketCommunicator::send_message(const std::byte* const message,
                                  const std::size_t size) noexcept
 {
-    if (send(handle_, message, size, SKYNET_NO_SIGPIPE) < 0) {
-        SKYNET_DEBUG_LOG("send_message threw error: {}", strerror(errno));
+    if (send(handle_, message, size, SKYWING_NO_SIGPIPE) < 0) {
+        SKYWING_DEBUG_LOG("send_message threw error: {}", strerror(errno));
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return ConnectionError::would_block;
         }
@@ -267,7 +267,7 @@ SocketCommunicator::read_message(std::byte* const buffer,
             return ConnectionError::would_block;
         }
 
-        SKYNET_DEBUG_LOG("read_message threw error: {}", strerror(errno));
+        SKYWING_DEBUG_LOG("read_message threw error: {}", strerror(errno));
         return ConnectionError::unrecoverable;
     }
     return read_bytes == 0 ? ConnectionError::closed
@@ -280,8 +280,8 @@ AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
     socklen_t len = sizeof(client_address);
     int err = getpeername(handle_, (struct sockaddr*) &client_address, &len);
     if (err != 0)
-        SKYNET_DEBUG_LOG("ip_address_and_port threw error: {}",
-                         strerror(errno));
+        SKYWING_DEBUG_LOG("ip_address_and_port threw error: {}",
+                          strerror(errno));
 
     return {inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port)};
 }

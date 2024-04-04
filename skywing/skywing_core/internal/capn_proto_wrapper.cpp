@@ -241,7 +241,7 @@ MessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
     capnp::readMessageCopy(in_s, to_ret.impl_->message);
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
     if (suppressor.failed()) {
-        SKYNET_WARN_LOG(
+        SKYWING_WARN_LOG(
             "Failed to decode message in MessageHandler::try_to_create.");
         return {};
     }
@@ -280,7 +280,7 @@ auto MessageHandler::extract_message() const noexcept
         return {};
     }();
     if (suppressor.failed()) {
-        SKYNET_WARN_LOG(
+        SKYWING_WARN_LOG(
             "Failed to decode message in MessageHandler::extract_message.");
         return {};
     }

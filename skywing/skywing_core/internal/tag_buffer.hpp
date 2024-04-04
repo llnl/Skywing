@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_TAG_BUFFER_HPP
-#define SKYNET_INTERNAL_TAG_BUFFER_HPP
+#ifndef SKYWING_INTERNAL_TAG_BUFFER_HPP
+#define SKYWING_INTERNAL_TAG_BUFFER_HPP
 
 #include <cassert>
 #include <cstring>
@@ -312,4 +312,4 @@ public:
 }; // class FifoTagBuffer
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_TAG_BUFFER_HPP
+#endif // SKYWING_INTERNAL_TAG_BUFFER_HPP

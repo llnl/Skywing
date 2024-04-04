@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
-#define SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
+#ifndef SKYWING_INTERNAL_MESSAGE_CREATORS_HPP
+#define SKYWING_INTERNAL_MESSAGE_CREATORS_HPP
 
 #include <cstddef>
 #include <span>
@@ -63,4 +63,4 @@ std::vector<std::byte> make_subscription_notice(const std::vector<TagID>& tags,
                                                 bool is_unsubscribe) noexcept;
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_MESSAGE_CREATORS_HPP
+#endif // SKYWING_INTERNAL_MESSAGE_CREATORS_HPP

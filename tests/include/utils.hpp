@@ -1,5 +1,5 @@
-#ifndef SKYNET_TEST_UTILS_HPP
-#define SKYNET_TEST_UTILS_HPP
+#ifndef SKYWING_TEST_UTILS_HPP
+#define SKYWING_TEST_UTILS_HPP
 
 #include <algorithm>
 #include <cassert>
@@ -182,7 +182,7 @@ void connect_network(const NetworkInfo& info,
 } // namespace skywing
 
 // Macro to synchronize all machines
-#define SKYNET_SYNCHRONIZE_MACHINES(machine_count)                             \
+#define SKYWING_SYNCHRONIZE_MACHINES(machine_count)                            \
     []() noexcept {                                                            \
         static std::size_t sync{0};                                            \
         static std::mutex m;                                                   \
@@ -199,4 +199,4 @@ void connect_network(const NetworkInfo& info,
         }                                                                      \
     }()
 
-#endif // SKYNET_TEST_UTILS_HPP
+#endif // SKYWING_TEST_UTILS_HPP
