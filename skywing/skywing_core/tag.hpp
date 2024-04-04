@@ -68,7 +68,7 @@ public:
   [[nodiscard]] auto operator<=>(const AbstractTag&) const = default;
   virtual std::string id() const = 0;
   virtual std::vector<DataTypeRef> get_expected_types() const = 0;
-  std::unique_ptr<const AbstractTag> clone() const { return std::unique_ptr<const AbstractTag>(this->do_clone()); }
+  std::unique_ptr<AbstractTag> clone() const { return std::unique_ptr<AbstractTag>{this->do_clone()}; }
 
 private:
   virtual AbstractTag* do_clone() const = 0;
@@ -115,15 +115,15 @@ public:
 
   /** @brief Get the string TagID for this Tag.
   */
-  std::string id() const override { return id_; }
+  std::string id() const final { return id_; }
 
   /** @brief Get a vector representing the one or more data types
    * associated with this Tag.
   */
-  std::vector<DataTypeRef> get_expected_types() const override { return expected_types_; }
+  std::vector<DataTypeRef> get_expected_types() const final { return expected_types_; }
 
 private:
-  Tag<Types...>* do_clone() const override { return new Tag<Types...>(*this); }
+  Tag<Types...>* do_clone() const final { return new Tag<Types...>(*this); }
   std::string id_;
   std::vector<DataTypeRef> expected_types_;
 };

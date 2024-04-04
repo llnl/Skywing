@@ -80,24 +80,24 @@ public:
   /** \brief Declare intent to publish on tags, this must be done before publishing
    * on a tag
    */
-  template<typename... Ts>
+  template<IsTag... Ts>
   void declare_publication_intent(const Ts&... tags) noexcept
   {
-    using TagPtr = std::unique_ptr<const AbstractTag>;
-    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    declare_publication_intent_impl(std::span<const TagPtr>{tag_ptrs});
+    using TagPtr = const AbstractTag*;
+    const std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
+    declare_publication_intent_impl(tag_ptrs);
   }
 
   /** \brief Declare publication intent for a range
    */
-  template<typename Range>
-  void declare_publication_intent_range(const Range& tags_in) noexcept
-    requires std::ranges::contiguous_range<Range>
+  template<typename TagContainer>
+  requires IsTag<typename TagContainer::value_type>
+  void declare_publication_intent_range(const TagContainer& tags_in) noexcept
   {
-    std::vector<std::unique_ptr<const AbstractTag>> tags;
+    std::vector<const AbstractTag*> tags;
     tags.reserve(tags_in.size());
     for (auto const& t : tags_in)
-      tags.push_back(t.clone());
+      tags.push_back(&t);
     declare_publication_intent_impl(tags);
   }
 
@@ -176,18 +176,18 @@ public:
     // TODO: Make this std::terminate or something instead?
     assert("Tag attempted to be subscribed to twice!" && (... && tag_is_not_subscribed(tags)));
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    using TagPtr = std::unique_ptr<const AbstractTag>;
+    using TagPtr = const AbstractTag*;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs}, std::span<BufferPtr>{ptrs});
-    return get_subscribe_future(std::span<TagPtr>{tag_ptrs});
+    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
+    init_or_update_subscribe(tag_ptrs, ptrs);
+    return get_subscribe_future(tag_ptrs);
   }
 
   /** \brief Subscribes to a range of tags.
    */
-  template<typename Range>
-  Waiter<void> subscribe_range(const Range& tags) noexcept
-    requires std::ranges::contiguous_range<Range>
+  template<typename TagContainer>
+  requires IsTag<typename TagContainer::value_type>
+  Waiter<void> subscribe_range(const TagContainer& tags) noexcept
   {
     using IterType = std::decay_t<decltype(tags.begin())>;
     using TagType = typename std::iterator_traits<IterType>::value_type;
@@ -196,9 +196,12 @@ public:
     using BufferType = UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
     std::vector<BufferPtr> ptrs(tags.size());
     std::generate(ptrs.begin(), ptrs.end(), []() noexcept { return std::make_unique<BufferType>(); });
-    std::vector<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), std::back_inserter(tag_span), [&](const AbstractTag& t) { return t.clone(); });
-    init_or_update_subscribe(tag_span, std::span<BufferPtr>{ptrs});
+    std::vector<const AbstractTag*> tag_span;
+    tag_span.reserve(tags.size());
+    for (auto const& t: tags) {
+      tag_span.push_back(&t);
+    }
+    init_or_update_subscribe(tag_span, ptrs);
     return get_subscribe_future(tag_span);
   }
 
@@ -208,11 +211,11 @@ public:
   Waiter<bool> ip_subscribe(const std::string& address, const Ts&... tags) noexcept
   {
     using BufferPtr = std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-    using TagPtr = std::unique_ptr<const AbstractTag>;
+    using TagPtr = const AbstractTag*;
     std::array<BufferPtr, sizeof...(Ts)> ptrs{std::make_unique<typename Ts::BufferType>()...};
-    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{tags.clone()...};
-    init_or_update_subscribe(std::span<TagPtr>{tag_ptrs}, std::span<BufferPtr>{ptrs});
-    return get_ip_subscribe_future(address, std::span<TagPtr>{tag_ptrs});
+    std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
+    init_or_update_subscribe(tag_ptrs, ptrs);
+    return get_ip_subscribe_future(address, tag_ptrs);
   }
 
     // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
@@ -284,16 +287,16 @@ public:
 
   /** \brief Rebuilds connections for the specified tags
    */
-  template<typename Range>
-  Waiter<void> rebuild_tags(const Range& tags)
+  template<typename TagPtrContainer>
+  Waiter<void> rebuild_tags(const TagPtrContainer& tags)
   {
-    std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs{tags.size()};
-    std::span<std::unique_ptr<const AbstractTag>> tag_span;
-    std::transform(tags.cbegin(), tags.cend(), cbegin(tag_span), [&](const std::unique_ptr<const AbstractTag>& t) {
-      return t->clone();
-    });
-    init_or_update_subscribe(tag_span, std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>{ptrs});
-    return get_subscribe_future(tag_span);
+    std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> buf_ptrs{tags.size()};
+    std::vector<const AbstractTag*> tag_ptrs;
+    for (auto const& t : tags) {
+      tag_ptrs.push_back(std::to_address(t));
+    }
+    init_or_update_subscribe(tag_ptrs, buf_ptrs);
+    return get_subscribe_future(tag_ptrs);
   }
 
   /** \brief Rebuilds connections for any missing tags
@@ -302,37 +305,23 @@ public:
    */
   Waiter<void> rebuild_missing_tag_connections() noexcept
   {
-    // init_or_update_subscribe obtains a lock, so might as well just
-    // init this in a lambda (since it can then be const)
-    const std::vector<std::unique_ptr<const AbstractTag>> tags = [&]() {
-      const auto [buffers, lock] = bufs_.get();
-      (void)lock;
-      std::vector<std::unique_ptr<const AbstractTag>> tags;
+    [[maybe_unused]] const auto [buffers, lock] = bufs_.get();
+    std::vector<std::unique_ptr<const AbstractTag>> tags;
       for (const auto& tag_pair : buffers) {
         if (tag_pair.second.error_occurred != TagInfo::Error::no_error) {
           // The expected type here doesn't matter
           // Also have to remove the first letter as it identifies the type of
           // tag, but it will just get added again later
-          std::unique_ptr<const AbstractTag> tag_ptr
-            = std::make_unique<const Tag<std::uint8_t>>(tag_pair.first.substr(1));
-          tags.push_back(std::move(tag_ptr));
+          tags.emplace_back(std::make_unique<Tag<std::uint8_t>>(tag_pair.first.substr(1)));
           ;
         }
       }
-      return tags;
-    }();
     return rebuild_tags(tags);
   }
 
   /** \brief Check if a tag's subscription is valid or not
    */
   bool tag_has_subscription(const AbstractTag& tag) const noexcept;
-
-  template<typename Range>
-  bool tags_have_subscriptions(const Range& tags) const noexcept
-  {
-    return tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>>{begin(tags), end(tags)});
-  }
 
   /** \brief Returns the number of subscriptions that a tag has
    *
@@ -384,21 +373,19 @@ private:
   void publish_impl(const AbstractTag& tag, std::span<PublishValueVariant> to_send) noexcept;
 
   void init_or_update_subscribe(
-    std::span<std::unique_ptr<const AbstractTag>> tags,
+    std::span<const AbstractTag* const> tags,
     std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptr) noexcept;
 
-  Waiter<void> get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
+  Waiter<void> get_subscribe_future(std::span<const AbstractTag* const> tags) noexcept;
 
   Waiter<bool>
-    get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept;
+    get_ip_subscribe_future(const std::string& address, std::span<const AbstractTag* const> tags) noexcept;
 
-  void declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept;
+  void declare_publication_intent_impl(std::span<const AbstractTag* const> tags) noexcept;
 
     // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
   bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
-
-  bool tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) const noexcept;
 
     // The id of the job
     JobID id_;

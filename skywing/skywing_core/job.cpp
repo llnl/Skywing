@@ -100,17 +100,6 @@ bool Job::tag_has_subscription(const AbstractTag& tag) const noexcept
   return iter != cend(buffers) && iter->second.error_occurred == TagInfo::Error::no_error;
 }
 
-bool Job::tags_have_subscriptions_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) const noexcept
-{
-  auto [buffers, lock] = bufs_.get();
-  (void)lock;
-  for (const auto& tag : tags) {
-    const auto iter = buffers.find(tag->id());
-    if (iter == cend(buffers) || iter->second.error_occurred != TagInfo::Error::no_error) { return false; }
-  }
-  return true;
-}
-
 size_t Job::number_of_subscribers(const AbstractTag& tag) const noexcept
 {
     return ManagerHandle{*manager_}.number_of_subscribers(tag);
@@ -168,7 +157,7 @@ const JobID& Job::id() const noexcept
 }
 
 void Job::init_or_update_subscribe(
-  std::span<std::unique_ptr<const AbstractTag>> tags,
+  std::span<const AbstractTag* const> tags,
   std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>> ptrs) noexcept
 {
   assert(tags.size() == ptrs.size());
@@ -197,20 +186,20 @@ void Job::init_or_update_subscribe(
   }
 }
 
-Waiter<void> Job::get_subscribe_future(std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
+Waiter<void> Job::get_subscribe_future(std::span<const AbstractTag* const> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](auto const& t) { return t->id(); });
   return Manager::JobAccessor::subscribe(*manager_, tag_ids);
 }
 
 Waiter<bool>
-  Job::get_ip_subscribe_future(const std::string& address, std::span<std::unique_ptr<const AbstractTag>> tags) noexcept
+  Job::get_ip_subscribe_future(const std::string& address, std::span<const AbstractTag* const> tags) noexcept
 {
   std::vector<TagID> tag_ids(tags.size());
   std::transform(
-    cbegin(tags), cend(tags), tag_ids.begin(), [&](std::unique_ptr<const AbstractTag>& t) { return t->id(); });
+    cbegin(tags), cend(tags), tag_ids.begin(), [&](auto const& t) { return t->id(); });
   const auto addr_pair = internal::split_address(address);
   if (addr_pair.first.empty()) {
     std::cerr << fmt::format(
@@ -220,7 +209,7 @@ Waiter<bool>
   return Manager::JobAccessor::ip_subscribe(*manager_, addr_pair, tag_ids);
 }
 
-void Job::declare_publication_intent_impl(std::span<const std::unique_ptr<const AbstractTag>> tags) noexcept
+void Job::declare_publication_intent_impl(std::span<const AbstractTag* const> tags) noexcept
 {
   const std::vector<TagID> tag_ids = [&]() {
     std::lock_guard g{bufs_.mutex()};
@@ -228,9 +217,7 @@ void Job::declare_publication_intent_impl(std::span<const std::unique_ptr<const 
       tags_produced_.try_emplace(tag->id(), tag->get_expected_types());
     }
     std::vector<TagID> tag_ids(tags.size());
-    std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](const std::unique_ptr<const AbstractTag>& t) {
-      return t->id();
-    });
+    std::transform(cbegin(tags), cend(tags), tag_ids.begin(), [&](auto const& t) { return t->id(); });
     return tag_ids;
   }();
   Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
