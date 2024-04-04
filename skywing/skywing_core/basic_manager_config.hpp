@@ -1,7 +1,7 @@
 #error This header is not yet supported
 
-#ifndef SKYNET_BASIC_MANAGER_CONFIG_HPP
-#define SKYNET_BASIC_MANAGER_CONFIG_HPP
+#ifndef SKYWING_BASIC_MANAGER_CONFIG_HPP
+#define SKYWING_BASIC_MANAGER_CONFIG_HPP
 
 #include <iosfwd>
 #include <optional>
@@ -54,4 +54,4 @@ struct BuildManagerInfo
 };
 } // namespace skywing
 
-#endif // SKYNET_BASIC_MANAGER_CONFIG_HPP
+#endif // SKYWING_BASIC_MANAGER_CONFIG_HPP

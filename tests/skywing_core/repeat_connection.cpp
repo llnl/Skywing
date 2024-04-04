@@ -49,7 +49,7 @@ void machine_task(const int index)
             }
             REQUIRE(try_conn(manager, conn_index));
         }
-        SKYNET_SYNCHRONIZE_MACHINES(num_machines);
+        SKYWING_SYNCHRONIZE_MACHINES(num_machines);
     });
     base_manager.run();
 }

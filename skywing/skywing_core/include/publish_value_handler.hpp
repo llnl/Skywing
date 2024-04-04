@@ -1,5 +1,5 @@
-#ifndef SKYNET_SRC_PUBLISH_VALUE_HANDLER_HPP
-#define SKYNET_SRC_PUBLISH_VALUE_HANDLER_HPP
+#ifndef SKYWING_SRC_PUBLISH_VALUE_HANDLER_HPP
+#define SKYWING_SRC_PUBLISH_VALUE_HANDLER_HPP
 
 #include <cstddef>
 #include <cstdint>
@@ -44,7 +44,7 @@ template <typename T>
 struct PublishValueHandler;
 
 // Create a mapping for a type and a vector of that type
-#define SKYNET_MAKE_PUBLISH_VALUE_HANDLER(cpp_type, capn_suffix)               \
+#define SKYWING_MAKE_PUBLISH_VALUE_HANDLER(cpp_type, capn_suffix)              \
     template <>                                                                \
     struct PublishValueHandler<cpp_type>                                       \
     {                                                                          \
@@ -83,19 +83,19 @@ struct PublishValueHandler;
         }                                                                      \
     }
 
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(double, D);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(float, F);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int8_t, I8);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int16_t, I16);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int32_t, I32);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::int64_t, I64);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint8_t, U8);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint16_t, U16);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint32_t, U32);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(std::uint64_t, U64);
-SKYNET_MAKE_PUBLISH_VALUE_HANDLER(bool, Bool);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(double, D);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(float, F);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::int8_t, I8);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::int16_t, I16);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::int32_t, I32);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::int64_t, I64);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::uint8_t, U8);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::uint16_t, U16);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::uint32_t, U32);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(std::uint64_t, U64);
+SKYWING_MAKE_PUBLISH_VALUE_HANDLER(bool, Bool);
 
-#undef SKYNET_MAKE_PUBLISH_VALUE_HANDLER
+#undef SKYWING_MAKE_PUBLISH_VALUE_HANDLER
 
 // String is a little bit different
 template <>
@@ -163,4 +163,4 @@ struct PublishValueHandler<std::vector<std::byte>>
 };
 } // namespace skywing::internal::detail
 
-#endif // SKYNET_SRC_PUBLISH_VALUE_HANDLER_HPP
+#endif // SKYWING_SRC_PUBLISH_VALUE_HANDLER_HPP

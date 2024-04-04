@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_ENDIAN_POSIX_HPP
-#define SKYNET_INTERNAL_ENDIAN_POSIX_HPP
+#ifndef SKYWING_INTERNAL_ENDIAN_POSIX_HPP
+#define SKYWING_INTERNAL_ENDIAN_POSIX_HPP
 
 #include <cstdint>
 
@@ -33,4 +33,4 @@ inline std::int64_t byte_swap(std::int64_t val) noexcept
 }
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_ENDIAN_POSIX_HPP
+#endif // SKYWING_INTERNAL_ENDIAN_POSIX_HPP

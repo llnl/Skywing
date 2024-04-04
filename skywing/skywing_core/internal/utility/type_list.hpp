@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP
-#define SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP
+#ifndef SKYWING_INTERNAL_UTILITY_TYPE_LIST_HPP
+#define SKYWING_INTERNAL_UTILITY_TYPE_LIST_HPP
 
 namespace skywing::internal
 {
@@ -147,4 +147,4 @@ using ExtractTemplateTypeArgs =
     typename detail::ExtractTemplateTypeArgsImpl<Template>::Type;
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_UTILITY_TYPE_LIST_HPP
+#endif // SKYWING_INTERNAL_UTILITY_TYPE_LIST_HPP

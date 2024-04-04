@@ -8,8 +8,8 @@ target_sources(skywing_mid
   asynchronous_iterative.hpp
   big_float.hpp
   data_input.hpp
-  helpers/skynet_config.hpp
-  helpers/skynet_helper.hpp
+  helpers/skywing_config.hpp
+  helpers/skywing_helper.hpp
   idempotent_processor.hpp
   internal/iterative_helpers.hpp
   internal/pubsub_converter_helpers.hpp

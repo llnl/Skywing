@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
-#define SKYNET_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
+#ifndef SKYWING_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
+#define SKYWING_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
 
 // This header exists so that the Manager types returned from the header can be
 // used by Job
@@ -87,4 +87,4 @@ private:
 } // namespace internal
 } // namespace skywing
 
-#endif // SKYNET_INTERNAL_MANAGER_WAITER_CALLABLES_HPP
+#endif // SKYWING_INTERNAL_MANAGER_WAITER_CALLABLES_HPP

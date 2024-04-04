@@ -1,5 +1,5 @@
-#ifndef SKYNET_JOB_HPP
-#define SKYNET_JOB_HPP
+#ifndef SKYWING_JOB_HPP
+#define SKYWING_JOB_HPP
 
 #include <cassert>
 #include <chrono>
@@ -553,4 +553,4 @@ struct std::hash<skywing::PrivateTag<Ts...>>
     }
 };
 
-#endif // SKYNET_JOB_HPP
+#endif // SKYWING_JOB_HPP

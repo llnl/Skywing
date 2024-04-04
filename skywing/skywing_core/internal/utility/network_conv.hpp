@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_UTILITY_NETWORK_CONV_HPP
-#define SKYNET_INTERNAL_UTILITY_NETWORK_CONV_HPP
+#ifndef SKYWING_INTERNAL_UTILITY_NETWORK_CONV_HPP
+#define SKYWING_INTERNAL_UTILITY_NETWORK_CONV_HPP
 
 #include <array>
 #include <cstddef>
@@ -17,4 +17,4 @@ std::array<std::byte, sizeof(NetworkSizeType)>
 to_network_bytes(const NetworkSizeType value) noexcept;
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_UTILITY_NETWORK_CONV_HPP
+#endif // SKYWING_INTERNAL_UTILITY_NETWORK_CONV_HPP

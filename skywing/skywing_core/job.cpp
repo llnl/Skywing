@@ -47,13 +47,14 @@ bool Job::process_data(const TagID& tag_id,
     const auto loc = buffers.find(tag_id);
     // Not subscribed; don't do anything, but not an error
     if (loc == cend(buffers)) {
-        SKYNET_TRACE_LOG("\"{}\", job \"{}\" discarded tag \"{}\", version {}, "
-                         "data {}, due to not being subscribed",
-                         manager_->id(),
-                         id_,
-                         tag_id,
-                         version,
-                         data);
+        SKYWING_TRACE_LOG(
+            "\"{}\", job \"{}\" discarded tag \"{}\", version {}, "
+            "data {}, due to not being subscribed",
+            manager_->id(),
+            id_,
+            tag_id,
+            version,
+            data);
         return true;
     }
     // If the types are wrong then something went wrong
@@ -67,18 +68,18 @@ bool Job::process_data(const TagID& tag_id,
                     cend(data),
                     comparer))
     {
-        SKYNET_WARN_LOG("\"{}\", job \"{}\" discarded tag \"{}\", version {}, "
-                        "data {}, due to it having the wrong type index",
-                        manager_->id(),
-                        id_,
-                        tag_id,
-                        version,
-                        data);
+        SKYWING_WARN_LOG("\"{}\", job \"{}\" discarded tag \"{}\", version {}, "
+                         "data {}, due to it having the wrong type index",
+                         manager_->id(),
+                         id_,
+                         tag_id,
+                         version,
+                         data);
         loc->second.error_occurred = TagInfo::Error::incorrect_type;
         data_buffer_modified_cv_.notify_all();
         return false;
     }
-    SKYNET_TRACE_LOG(
+    SKYWING_TRACE_LOG(
         "\"{}\", job \"{}\" accepted tag \"{}\", version {}, data {}",
         manager_->id(),
         id_,
@@ -125,7 +126,7 @@ Job::number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
 
 void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
 {
-    SKYNET_TRACE_LOG("\"{}\" tag \"{}\" marked as dead.", id_, tag_id);
+    SKYWING_TRACE_LOG("\"{}\" tag \"{}\" marked as dead.", id_, tag_id);
     auto [buffers, lock] = bufs_.get();
     (void) lock;
     const auto tag_loc = buffers.find(tag_id);

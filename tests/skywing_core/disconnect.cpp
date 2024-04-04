@@ -64,7 +64,7 @@ void machine_task(
                 }
             }
         }
-        SKYNET_SYNCHRONIZE_MACHINES(num_machines);
+        SKYWING_SYNCHRONIZE_MACHINES(num_machines);
         static std::atomic<int> ready_count{0};
         if (ready_count.fetch_add(1) != static_cast<int>(num_machines - 1)) {
             while (ready_count != static_cast<int>(num_machines)) {

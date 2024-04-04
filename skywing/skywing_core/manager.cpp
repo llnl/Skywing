@@ -147,13 +147,13 @@ void ExternalManager::find_publishers_for_tags(
     const std::vector<TagID>& tags,
     const std::vector<std::uint8_t>& publishers_needed) noexcept
 {
-    SKYNET_TRACE_LOG("\"{}\" asking \"{}\" for tags {}{}",
-                     manager_->id(),
-                     id_,
-                     tags,
-                     pending_tag_request_
-                         ? ", but ignored due to already pending request"
-                         : "");
+    SKYWING_TRACE_LOG("\"{}\" asking \"{}\" for tags {}{}",
+                      manager_->id(),
+                      id_,
+                      tags,
+                      pending_tag_request_
+                          ? ", but ignored due to already pending request"
+                          : "");
     if (!pending_tag_request_) {
         send_message(make_get_publishers(
             tags, publishers_needed, ignore_cache_on_next_request_));
@@ -190,7 +190,7 @@ AddrPortPair ExternalManager::address_pair() const noexcept
 //   case ConnectionError::closed:
 //     // [[fallthrough]];
 //   case ConnectionError::unrecoverable:
-//     SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error
+//     SKYWING_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error
 //     upon message read", manager_->id(), id_); dead_ = true; return false;
 //   }
 //   return true;
@@ -222,9 +222,9 @@ ExternalManager::try_to_get_message(SocketCommunicator& socket_comm) noexcept
         }
         else {
             // Couldn't read the size bytes - bad message
-            SKYNET_TRACE_LOG("\"{}\" setting {} to dead due to bad message",
-                             manager_->id(),
-                             id_);
+            SKYWING_TRACE_LOG("\"{}\" setting {} to dead due to bad message",
+                              manager_->id(),
+                              id_);
             dead_ = true;
             return {};
         }
@@ -232,14 +232,14 @@ ExternalManager::try_to_get_message(SocketCommunicator& socket_comm) noexcept
     else {
         const auto err = *std::get_if<ConnectionError>(&bytes_to_read_or_error);
         if (err == ConnectionError::closed) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" setting {} to dead because connection has closed",
                 manager_->id(),
                 id_);
             dead_ = true;
         }
         else if (err != ConnectionError::would_block) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" setting {} to dead because connection has some unknwon "
                 "error, perhaps received an RST packer",
                 manager_->id(),
@@ -262,14 +262,14 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
     const auto okay = handle.do_callback(
         [&](const Greeting&) {
             // shouldn't be seeing a greeting here
-            SKYNET_WARN_LOG(
+            SKYWING_WARN_LOG(
                 "\"{}\" received an unexpected greeting from \"{}\"",
                 manager_->id(),
                 id_);
             return false;
         },
         [&](const Goodbye&) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" received goodbye from \"{}\"", manager_->id(), id_);
             dead_ = true;
             return true;
@@ -280,7 +280,7 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
             // send a NewNeighbor message with a repeated ID
             const auto loc = std::lower_bound(
                 neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id());
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" received new neighbor from \"{}\" with id \"{}\"",
                 manager_->id(),
                 id_,
@@ -292,7 +292,7 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
             return true;
         },
         [&](const RemoveNeighbor& msg) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" received remove neighbor from \"{}\" with id \"{}\"",
                 manager_->id(),
                 id_,
@@ -316,23 +316,23 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
             (void) this;
             // Nothing to do; this is just to acknowledge it exists
             // (Last heard time was already updated)
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" received heartbeat from \"{}\"", manager_->id(), id_);
             return true;
         },
         [&](const ReportPublishers& msg) {
-            SKYNET_TRACE_LOG("\"{}\" received report publishers from \"{}\" "
-                             "with remote tags \"{}\" and local tags \"{}\"",
-                             manager_->id(),
-                             id_,
-                             msg.tags(),
-                             msg.locally_produced_tags());
+            SKYWING_TRACE_LOG("\"{}\" received report publishers from \"{}\" "
+                              "with remote tags \"{}\" and local tags \"{}\"",
+                              manager_->id(),
+                              id_,
+                              msg.tags(),
+                              msg.locally_produced_tags());
             // Make sure all of the tag names are okay
             for (const auto& tag_list :
                  {msg.tags(), msg.locally_produced_tags()}) {
                 for (const auto& tag : tag_list) {
                     if (!tag_name_okay(tag)) {
-                        SKYNET_WARN_LOG(
+                        SKYWING_WARN_LOG(
                             "\"{}\" dropping connection with \"{}\" due to bad "
                             "tag \"{}\" in report publishers.",
                             manager_->id(),
@@ -351,18 +351,18 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
             return true;
         },
         [&](const GetPublishers& msg) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" received get publishers from \"{}\" requesting tags {}",
                 manager_->id(),
                 id_,
                 msg.tags());
             for (const auto& tag : msg.tags()) {
                 if (!tag_name_okay(tag)) {
-                    SKYNET_WARN_LOG("\"{}\" discarded connection with \"{}\" "
-                                    "due to bad tag name \"{}\"",
-                                    manager_->id(),
-                                    id_,
-                                    tag);
+                    SKYWING_WARN_LOG("\"{}\" discarded connection with \"{}\" "
+                                     "due to bad tag name \"{}\"",
+                                     manager_->id(),
+                                     id_,
+                                     tag);
                     return false;
                 }
             }
@@ -378,15 +378,15 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                 *manager_, msg, *this);
         },
         [&](const SubscriptionNotice& msg) {
-            SKYNET_TRACE_LOG("\"{}\" received subscription notice from \"{}\" "
-                             "for tags {}, is unsubscribe: {}",
-                             manager_->id(),
-                             id_,
-                             msg.tags(),
-                             msg.is_unsubscribe());
+            SKYWING_TRACE_LOG("\"{}\" received subscription notice from \"{}\" "
+                              "for tags {}, is unsubscribe: {}",
+                              manager_->id(),
+                              id_,
+                              msg.tags(),
+                              msg.is_unsubscribe());
             const auto reject_notice =
                 [&]([[maybe_unused]] const std::string& why) {
-                    SKYNET_TRACE_LOG(
+                    SKYWING_TRACE_LOG(
                         "\"{}\" rejected subscription notice from \"{}\" as {}",
                         manager_->id(),
                         id_,
@@ -418,9 +418,9 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                 return false;
             }
             Manager::ExternalManagerAccessor::notify_subscriptions(*manager_);
-            SKYNET_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"",
-                             manager_->id(),
-                             id_);
+            SKYWING_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"",
+                              manager_->id(),
+                              id_);
             return true;
         },
         [](...) {
@@ -432,10 +432,10 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
         });
     // Something incorrect happened
     if (!okay) {
-        SKYNET_TRACE_LOG("\"{}\" setting {} to dead because something "
-                         "incorrect happened upon message handle",
-                         manager_->id(),
-                         id_);
+        SKYWING_TRACE_LOG("\"{}\" setting {} to dead because something "
+                          "incorrect happened upon message handle",
+                          manager_->id(),
+                          id_);
         dead_ = true;
     }
 }
@@ -527,10 +527,10 @@ Waiter<bool> Manager::connect_to_server(const char* const address,
                 canonical.first.c_str(), canonical.second);
             // Ignore status - if this initially fails it will be handled later
             (void) status;
-            SKYNET_TRACE_LOG("\"{}\" making connection from {} to {}",
-                             id_,
-                             iter->second.conn.host_ip_address_and_port(),
-                             iter->second.conn.ip_address_and_port());
+            SKYWING_TRACE_LOG("\"{}\" making connection from {} to {}",
+                              id_,
+                              iter->second.conn.host_ip_address_and_port(),
+                              iter->second.conn.ip_address_and_port());
         }
     }
     return make_waiter<bool>(job_mut_,
@@ -557,7 +557,7 @@ void Manager::accept_pending_connections() noexcept
                                 ConnStatus::waiting_for_conn,
                                 ConnType::user_requested,
                                 ""};
-        SKYNET_DEBUG_LOG(
+        SKYWING_DEBUG_LOG(
             "\"{}\" accepted connection from {}:{}", id_, address, port);
         // Accept seems to re-use ports, and the actual address doesn't matter,
         // so keep shuffling until it manages to get in
@@ -568,10 +568,10 @@ void Manager::accept_pending_connections() noexcept
             (void) iter;
             ++inc_port;
             if (inserted) {
-                SKYNET_DEBUG_LOG("\"{}\" inserted accepted connection from {} "
-                                 "into pending_conns_",
-                                 id_,
-                                 iter->second.conn.ip_address_and_port());
+                SKYWING_DEBUG_LOG("\"{}\" inserted accepted connection from {} "
+                                  "into pending_conns_",
+                                  id_,
+                                  iter->second.conn.ip_address_and_port());
                 break;
             }
         }
@@ -713,11 +713,12 @@ void Manager::publish(const VersionID version,
 {
     const auto msg = internal::make_publish(version, tag_id, value);
     (void) msg;
-    SKYNET_TRACE_LOG("\"{}\" publishing on tag \"{}\", version \"{}\", data {}",
-                     id_,
-                     tag_id,
-                     version,
-                     value);
+    SKYWING_TRACE_LOG(
+        "\"{}\" publishing on tag \"{}\", version \"{}\", data {}",
+        id_,
+        tag_id,
+        version,
+        value);
     for (auto& [name, job] : jobs_) {
         (void) name;
         Job::Accessor::process_data(job, tag_id, value, version);
@@ -760,7 +761,7 @@ void Manager::remove_dead_neighbors() noexcept
             // This could affect subscriptions, so notify anything waiting on
             // them
             notify_subscriptions_ = true;
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" removing dead neighbor \"{}\"", id_, it->first);
             send_to_neighbors(internal::make_remove_neighbor(it->first));
             // Remove corresponding address
@@ -800,7 +801,7 @@ void Manager::remove_dead_neighbors() noexcept
     // Do this after removing the neighbors so that the dead neighbors won't be
     // considered
     if (new_tags) {
-        SKYNET_TRACE_LOG(
+        SKYWING_TRACE_LOG(
             "\"{}\" finding publishers for new tag after neighbor removal",
             id_);
         find_publishers_for_pending_tags(true);
@@ -835,14 +836,14 @@ bool Manager::subscribe_is_done(
             return false;
         }
     }
-    SKYNET_DEBUG_LOG(
+    SKYWING_DEBUG_LOG(
         "\"{}\" subscription for tags {} finished.", id_, required_tags);
     return true;
 }
 
 Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
 {
-    SKYNET_DEBUG_LOG(
+    SKYWING_DEBUG_LOG(
         "\"{}\" initializing subscription for tags {}", id_, tag_ids);
     std::copy_if(
         tag_ids.cbegin(),
@@ -940,11 +941,11 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
     const auto [remaining_tags, num_left] =
         remove_tags_with_enough_publishers(msg);
     if (remaining_tags.empty()) {
-        SKYNET_TRACE_LOG("\"{}\" sending \"{}\" publisher information for {}, "
-                         "all tags have been fulfilled",
-                         id_,
-                         from.id(),
-                         msg.tags());
+        SKYWING_TRACE_LOG("\"{}\" sending \"{}\" publisher information for {}, "
+                          "all tags have been fulfilled",
+                          id_,
+                          from.id(),
+                          msg.tags());
         // Send the information back now
         from.send_message(make_known_tag_publisher_message());
     }
@@ -963,20 +964,20 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
         // If there are no other neighbors, just answer right away so
         // it doesn't stall
         if (neighbors_.size() == 1) {
-            SKYNET_TRACE_LOG("\"{}\" sending \"{}\" publisher information for "
-                             "{}, no neighbors to ask",
-                             id_,
-                             from.id(),
-                             [&]() {
-                                 std::vector<TagID> known_tags;
-                                 for (const auto& [tag, publishers] :
-                                      publishers_for_tag_) {
-                                     if (!publishers.empty()) {
-                                         known_tags.push_back(tag);
-                                     }
-                                 }
-                                 return known_tags;
-                             }());
+            SKYWING_TRACE_LOG("\"{}\" sending \"{}\" publisher information for "
+                              "{}, no neighbors to ask",
+                              id_,
+                              from.id(),
+                              [&]() {
+                                  std::vector<TagID> known_tags;
+                                  for (const auto& [tag, publishers] :
+                                       publishers_for_tag_) {
+                                      if (!publishers.empty()) {
+                                          known_tags.push_back(tag);
+                                      }
+                                  }
+                                  return known_tags;
+                              }());
             from.send_message(make_known_tag_publisher_message());
             return;
         }
@@ -990,18 +991,18 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
         // If there's already a pending request another one can't be sent, so
         // just return now
         if (from.has_pending_tag_request()) {
-            SKYNET_TRACE_LOG("\"{}\" returning early for request for tags {} "
-                             "from \"{}\" to avoid potential deadlock",
-                             id_,
-                             msg.tags(),
-                             from.id());
+            SKYWING_TRACE_LOG("\"{}\" returning early for request for tags {} "
+                              "from \"{}\" to avoid potential deadlock",
+                              id_,
+                              msg.tags(),
+                              from.id());
             from.send_message(make_known_tag_publisher_message());
             // No longer need to propagate information to this neighbor, as it
             // is being sent now
             send_publisher_information_to_.erase(from.id());
         }
         else {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" asking neighbors {} for tags {} for \"{}\"",
                 id_,
                 make_neighbor_vector(),
@@ -1073,7 +1074,7 @@ void Manager::add_publishers_and_propagate(
     {
         // TODO: Propagate this information back and disconnect from the
         // neighbor
-        SKYNET_WARN_LOG(
+        SKYWING_WARN_LOG(
             "\"{}\" received tag/publisher list size mismatch from \"{}\"",
             id_,
             from.id());
@@ -1133,7 +1134,7 @@ void Manager::add_publishers_and_propagate(
         for (const auto& send_to : machines_to_send_to) {
             const auto loc = neighbors_.find(send_to);
             if (loc != neighbors_.end()) {
-                SKYNET_TRACE_LOG(
+                SKYWING_TRACE_LOG(
                     "\"{}\" propagating back to \"{}\" with local tags {}",
                     id_,
                     send_to,
@@ -1172,7 +1173,7 @@ Manager::make_known_tag_publisher_message() const noexcept
 
 void Manager::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
 {
-    SKYNET_TRACE_LOG("\"{}\" adding tags produced: {}", id_, tags);
+    SKYWING_TRACE_LOG("\"{}\" adding tags produced: {}", id_, tags);
     // Mark the tags produced by this job
     for (const auto& tag : tags) {
         const auto [iter, inserted] = self_sub_count_.emplace(tag, 0);
@@ -1192,7 +1193,7 @@ void Manager::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
 void Manager::init_connections_for_pending_tags() noexcept
 {
     if (!pending_tags_.empty()) {
-        SKYNET_TRACE_LOG(
+        SKYWING_TRACE_LOG(
             "\"{}\" is initiating connections for tags {}", id_, pending_tags_);
     }
     // A single connection can supply multiple tags, so look through all the
@@ -1201,13 +1202,13 @@ void Manager::init_connections_for_pending_tags() noexcept
     std::unordered_map<std::string, std::string> to_conn;
     std::vector<decltype(pending_tags_)::iterator> to_delete;
 
-    SKYNET_TRACE_LOG("\"{}\" in init_connections_for_pending_tags for "
-                     "pendings_tags list of size {}",
-                     id_,
-                     pending_tags_.size());
+    SKYWING_TRACE_LOG("\"{}\" in init_connections_for_pending_tags for "
+                      "pendings_tags list of size {}",
+                      id_,
+                      pending_tags_.size());
     // for (const auto& [tag, publishers] : publishers_for_tag_)
     // {
-    //   SKYNET_TRACE_LOG("\"{}\" knows {} publishers for tag {}", id_,
+    //   SKYWING_TRACE_LOG("\"{}\" knows {} publishers for tag {}", id_,
     //   publishers.size(), tag);
     // }
 
@@ -1221,7 +1222,7 @@ void Manager::init_connections_for_pending_tags() noexcept
             self_iter != self_sub_count_.cend())
         {
             ++self_iter->second;
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" produces tag \"{}\", not creating connection",
                 id_,
                 tag);
@@ -1231,7 +1232,7 @@ void Manager::init_connections_for_pending_tags() noexcept
             continue;
         }
         if (iter == publishers_for_tag_.cend()) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" knows no publishers for tag \"{}\"", id_, tag);
             ++tag_iter;
             continue;
@@ -1239,7 +1240,7 @@ void Manager::init_connections_for_pending_tags() noexcept
 
         auto& publishers = iter->second; // a unordered_set<PublisherInfo>
         if (publishers.empty()) {
-            SKYNET_TRACE_LOG(
+            SKYWING_TRACE_LOG(
                 "\"{}\" knows no publishers for tag \"{}\"", id_, tag);
             ++tag_iter;
         }
@@ -1250,17 +1251,17 @@ void Manager::init_connections_for_pending_tags() noexcept
             const auto neighbor_iter =
                 addr_to_machine_.find(internal::split_address(addr));
             if (neighbor_iter != addr_to_machine_.cend()) {
-                SKYNET_TRACE_LOG(
+                SKYWING_TRACE_LOG(
                     "\"{}\" already has connection for tag \"{}\"", id_, tag);
                 assert(neighbor_iter->second);
                 // Make sure the address matches the id
                 if (neighbor_iter->second->id() != connect_to_id) {
-                    SKYNET_WARN_LOG("\"{}\" was told id for address \"{}\" is "
-                                    "\"{}\", locally id is \"{}\"",
-                                    id_,
-                                    addr,
-                                    connect_to_id,
-                                    neighbor_iter->second->id());
+                    SKYWING_WARN_LOG("\"{}\" was told id for address \"{}\" is "
+                                     "\"{}\", locally id is \"{}\"",
+                                     id_,
+                                     addr,
+                                     connect_to_id,
+                                     neighbor_iter->second->id());
                     ++tag_iter;
                 }
                 else {
@@ -1271,12 +1272,12 @@ void Manager::init_connections_for_pending_tags() noexcept
                 }
             }
             else {
-                SKYNET_TRACE_LOG(
+                SKYWING_TRACE_LOG(
                     "\"{}\" will try to connect to {} \"{}\"", id_, addr, tag);
                 auto [conn_iter, inserted] = to_conn.try_emplace(addr, tag);
                 // Append tag to "list" if already there
                 if (!inserted) {
-                    SKYNET_TRACE_LOG(
+                    SKYWING_TRACE_LOG(
                         "\"{}\" didn't insert {} because already in to_conn",
                         id_,
                         addr);
@@ -1296,7 +1297,7 @@ void Manager::init_connections_for_pending_tags() noexcept
     }
     for (const auto& [addr, tag] : to_conn) {
         internal::SocketCommunicator conn{};
-        SKYNET_DEBUG_LOG(
+        SKYWING_DEBUG_LOG(
             "\"{}\" about to connect to \"{}\" for tag \"{}\"", id_, addr, tag);
         const auto err = conn.connect_non_blocking(addr);
         if (err == internal::ConnectionError::connection_in_progress
@@ -1307,7 +1308,7 @@ void Manager::init_connections_for_pending_tags() noexcept
             // connection is complete
             auto [addrstr, port] = internal::split_address(addr);
             while (true) {
-                SKYNET_DEBUG_LOG(
+                SKYWING_DEBUG_LOG(
                     "\"{}\" trying connecting to \"{}\" with key {} for tag "
                     "\"{}\"",
                     id_,
@@ -1322,7 +1323,7 @@ void Manager::init_connections_for_pending_tags() noexcept
                                 tag});
                 (void) iter;
                 if (inserted) {
-                    SKYNET_DEBUG_LOG(
+                    SKYWING_DEBUG_LOG(
                         "\"{}\" connecting to \"{}\" for tag \"{}\"",
                         id_,
                         iter->first,
@@ -1378,19 +1379,20 @@ void Manager::process_pending_conns() noexcept
             auto& publishers = pub_iter->second;
             // Set to ignore cache if there are no more publishers
             if (publishers.empty()) {
-                SKYNET_TRACE_LOG("\"{}\" ran out of publishers for tag \"{}\", "
-                                 "look for new ones.",
-                                 id_,
-                                 info.tag);
+                SKYWING_TRACE_LOG(
+                    "\"{}\" ran out of publishers for tag \"{}\", "
+                    "look for new ones.",
+                    id_,
+                    info.tag);
                 for (auto&& neighbor : neighbors_) {
                     neighbor.second.ignore_cache_on_next_request();
                 }
             }
             else {
-                SKYNET_TRACE_LOG("\"{}\" still has publishers for tag \"{}\", "
-                                 "going to next one",
-                                 id_,
-                                 info.tag);
+                SKYWING_TRACE_LOG("\"{}\" still has publishers for tag \"{}\", "
+                                  "going to next one",
+                                  id_,
+                                  info.tag);
             }
             // Just replace the tag to re-init the connection
             pending_tags_.emplace_back(std::string{base_tag});
@@ -1423,7 +1425,7 @@ void Manager::process_pending_conns() noexcept
 
             case internal::ConnectionError::no_error:
             {
-                SKYNET_TRACE_LOG(
+                SKYWING_TRACE_LOG(
                     "\"{}\" sending greeting from {} to {} for tag \"{}\"",
                     id_,
                     info.conn.host_ip_address_and_port(),
@@ -1444,14 +1446,14 @@ void Manager::process_pending_conns() noexcept
             // Anything else is an error
             default:
                 if (iter->second.type == Manager::ConnType::subscription)
-                    SKYNET_WARN_LOG("\"{}\" errored trying to connect to {}, "
-                                    "type {}, tag {}",
-                                    id_,
-                                    iter->first,
-                                    to_c_str(info.type),
-                                    info.tag);
+                    SKYWING_WARN_LOG("\"{}\" errored trying to connect to {}, "
+                                     "type {}, tag {}",
+                                     id_,
+                                     iter->first,
+                                     to_c_str(info.type),
+                                     info.tag);
                 else
-                    SKYNET_WARN_LOG(
+                    SKYWING_WARN_LOG(
                         "\"{}\" errored trying to connect to {}, type {}",
                         id_,
                         iter->first,
@@ -1502,7 +1504,7 @@ void Manager::process_pending_conns() noexcept
                                                            greeting.port());
                                 new_neighbor_iter = neighbor_iter;
                                 if (!inserted) {
-                                    SKYNET_TRACE_LOG(
+                                    SKYWING_TRACE_LOG(
                                         "\"{}\" already has a connection from "
                                         "\"{}\" so will simply add to "
                                         "communicators.",
@@ -1515,14 +1517,14 @@ void Manager::process_pending_conns() noexcept
                                 addr_to_machine_.try_emplace(
                                     new_neighbor_iter->second.address_pair(),
                                     &neighbor_iter->second);
-                                SKYNET_TRACE_LOG(
+                                SKYWING_TRACE_LOG(
                                     "\"{}\" received greeting from \"{}\"",
                                     id_,
                                     neighbor_iter->first);
                                 return true;
                             },
                             [&](...) {
-                                SKYNET_WARN_LOG(
+                                SKYWING_WARN_LOG(
                                     "\"{}\" received unexpected message from "
                                     "\"{}\", expected greeting",
                                     id_,
@@ -1530,11 +1532,11 @@ void Manager::process_pending_conns() noexcept
                                 return false;
                             });
                         if (okay) {
-                            SKYNET_TRACE_LOG("\"{}\" finalizing connection to "
-                                             "\"{}\" for tag \"{}\"",
-                                             id_,
-                                             iter->first,
-                                             info.tag);
+                            SKYWING_TRACE_LOG("\"{}\" finalizing connection to "
+                                              "\"{}\" for tag \"{}\"",
+                                              id_,
+                                              iter->first,
+                                              info.tag);
                             switch (info.type) {
                             case ConnType::by_accept:
                             case ConnType::user_requested: break;
@@ -1562,7 +1564,7 @@ void Manager::process_pending_conns() noexcept
                                 const auto expected_ip = ip_and_tag[0];
                                 const auto tags = ip_and_tag[1];
                                 if (new_neighbor.address() != expected_ip) {
-                                    SKYNET_ERROR_LOG(
+                                    SKYWING_ERROR_LOG(
                                         "Neighbor IP \"{}\" didn't match with "
                                         "expected IP \"{}\"!",
                                         new_neighbor.address(),
@@ -1590,10 +1592,11 @@ void Manager::process_pending_conns() noexcept
                 }
             }
             if (!okay) {
-                SKYNET_WARN_LOG("\"{}\" failed connecting to {} for tag \"{}\"",
-                                id_,
-                                info.conn.ip_address_and_port(),
-                                info.tag);
+                SKYWING_WARN_LOG(
+                    "\"{}\" failed connecting to {} for tag \"{}\"",
+                    id_,
+                    info.conn.ip_address_and_port(),
+                    info.tag);
                 notify_connection_ = true;
                 handle_error(info);
                 iter = pending_conns_.erase(iter);
@@ -1633,13 +1636,13 @@ bool Manager::handle_publish_data(
 {
     (void) from;
     if (const auto value = msg.value()) {
-        SKYNET_TRACE_LOG("\"{}\" received data on tag \"{}\" from \"{}\", "
-                         "version {}, data: {}",
-                         id_,
-                         msg.tag_id(),
-                         from.id(),
-                         msg.version(),
-                         *value);
+        SKYWING_TRACE_LOG("\"{}\" received data on tag \"{}\" from \"{}\", "
+                          "version {}, data: {}",
+                          id_,
+                          msg.tag_id(),
+                          from.id(),
+                          msg.version(),
+                          *value);
         bool okay = true;
         for (auto& [job_id, job] : jobs_) {
             (void) job_id;
@@ -1657,7 +1660,7 @@ void Manager::finalize_subscription(const std::string& tags,
                                     internal::ExternalManager& source) noexcept
 {
     const auto tags_str_view = internal::split(tags, '\0');
-    SKYNET_TRACE_LOG(
+    SKYWING_TRACE_LOG(
         "\"{}\" finalizing subscription for tags {} with machine {}",
         id_,
         tags_str_view,
@@ -1678,7 +1681,8 @@ void Manager::finalize_subscription(const std::string& tags,
 void Manager::find_publishers_for_pending_tags(const bool force_ask) noexcept
 {
     if (force_ask) {
-        SKYNET_TRACE_LOG("\"{}\" forcefully asking for {}", id_, pending_tags_);
+        SKYWING_TRACE_LOG(
+            "\"{}\" forcefully asking for {}", id_, pending_tags_);
         for (auto& neighbor : neighbors_) {
             neighbor.second.reset_backoff_counter();
             neighbor.second.find_publishers_for_tags(

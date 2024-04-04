@@ -1,5 +1,5 @@
-#ifndef SKYNET_SRC_SOCKET_WRAPPERS_HPP
-#define SKYNET_SRC_SOCKET_WRAPPERS_HPP
+#ifndef SKYWING_SRC_SOCKET_WRAPPERS_HPP
+#define SKYWING_SRC_SOCKET_WRAPPERS_HPP
 
 // OSX has to go through a few more steps to init non-blocking sockets, so
 // these wrappers are to help with that
@@ -25,4 +25,4 @@ int accept_make_non_blocking(const int sockfd,
                              socklen_t* addrlen) noexcept;
 } // namespace skywing::internal
 
-#endif // SKYNET_SRC_SOCKET_WRAPPERS_HPP
+#endif // SKYWING_SRC_SOCKET_WRAPPERS_HPP

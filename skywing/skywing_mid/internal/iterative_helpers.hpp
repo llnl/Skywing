@@ -1,5 +1,5 @@
-#ifndef SKYNET_ITERATIVE_HELPERS_HPP
-#define SKYNET_ITERATIVE_HELPERS_HPP
+#ifndef SKYWING_ITERATIVE_HELPERS_HPP
+#define SKYWING_ITERATIVE_HELPERS_HPP
 
 #include <tuple>
 #include <type_traits>
@@ -186,4 +186,4 @@ template <class T>
 inline constexpr bool has_ValueType_v = has_ValueType<T>::value;
 } // namespace skywing
 
-#endif // SKYNET_ITERATIVE_HELPERS_HPP
+#endif // SKYWING_ITERATIVE_HELPERS_HPP

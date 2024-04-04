@@ -158,7 +158,7 @@ void asynchronous_iterative(
 int main(const int argc, const char* const argv[])
 {
     // Explicitly disable logging as the output is too noisy otherwise
-    SKYNET_SET_LOG_LEVEL_TO_WARN();
+    SKYWING_SET_LOG_LEVEL_TO_WARN();
     if (argc != 3) {
         std::cerr << "Usage:\n" << argv[0] << " config_file machine_name\n";
         return 1;

@@ -1,5 +1,5 @@
-#ifndef SKYNET_NEIGHBOR_DATA_HANDLER_HPP
-#define SKYNET_NEIGHBOR_DATA_HANDLER_HPP
+#ifndef SKYWING_NEIGHBOR_DATA_HANDLER_HPP
+#define SKYWING_NEIGHBOR_DATA_HANDLER_HPP
 
 #include "skywing_core/job.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
@@ -351,4 +351,4 @@ private:
 
 } // namespace skywing
 
-#endif // SKYNET_NEIGHBOR_DATA_HANDLER_HPP
+#endif // SKYWING_NEIGHBOR_DATA_HANDLER_HPP

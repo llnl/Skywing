@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_UTILITY_LOGGING
-#define SKYNET_INTERNAL_UTILITY_LOGGING
+#ifndef SKYWING_INTERNAL_UTILITY_LOGGING
+#define SKYWING_INTERNAL_UTILITY_LOGGING
 
 #include <cstdint>
 #include <span>
@@ -16,12 +16,12 @@
 
 // Macro to wrap logging since I don't know if we're doing runtime or what and
 // this can easily be searched for or changed later on
-#define SKYNET_TRACE_LOG(...) SPDLOG_TRACE(__VA_ARGS__)
-#define SKYNET_DEBUG_LOG(...) SPDLOG_DEBUG(__VA_ARGS__)
-#define SKYNET_INFO_LOG(...) SPDLOG_INFO(__VA_ARGS__)
-#define SKYNET_WARN_LOG(...) SPDLOG_WARN(__VA_ARGS__)
-#define SKYNET_ERROR_LOG(...) SPDLOG_ERROR(__VA_ARGS__)
-#define SKYNET_CRITICAL_LOG(...) SPDLOG_CRITICAL(__VA_ARGS__)
+#define SKYWING_TRACE_LOG(...) SPDLOG_TRACE(__VA_ARGS__)
+#define SKYWING_DEBUG_LOG(...) SPDLOG_DEBUG(__VA_ARGS__)
+#define SKYWING_INFO_LOG(...) SPDLOG_INFO(__VA_ARGS__)
+#define SKYWING_WARN_LOG(...) SPDLOG_WARN(__VA_ARGS__)
+#define SKYWING_ERROR_LOG(...) SPDLOG_ERROR(__VA_ARGS__)
+#define SKYWING_CRITICAL_LOG(...) SPDLOG_CRITICAL(__VA_ARGS__)
 
 // Support for logging of std::span
 template <typename T>
@@ -176,4 +176,4 @@ struct fmt::formatter<skywing::AddrPortPair>
     }
 };
 
-#endif // SKYNET_INTERNAL_UTILITY_LOGGING
+#endif // SKYWING_INTERNAL_UTILITY_LOGGING

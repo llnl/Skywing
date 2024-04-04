@@ -1,5 +1,5 @@
-#ifndef SKYNET_INTERNAL_CAPN_PROTO_WRAPPER_HPP
-#define SKYNET_INTERNAL_CAPN_PROTO_WRAPPER_HPP
+#ifndef SKYWING_INTERNAL_CAPN_PROTO_WRAPPER_HPP
+#define SKYWING_INTERNAL_CAPN_PROTO_WRAPPER_HPP
 
 // This header exists to allow more convienent and (within the codebase)
 // conventional access to the Cap'n Proto messages
@@ -205,4 +205,4 @@ private:
 };
 } // namespace skywing::internal
 
-#endif // SKYNET_INTERNAL_CAPN_PROTO_WRAPPER_HPP
+#endif // SKYWING_INTERNAL_CAPN_PROTO_WRAPPER_HPP

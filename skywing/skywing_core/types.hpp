@@ -1,5 +1,5 @@
-#ifndef SKYNET_TYPES_HPP
-#define SKYNET_TYPES_HPP
+#ifndef SKYWING_TYPES_HPP
+#define SKYWING_TYPES_HPP
 
 #include <array>
 #include <cstddef>
@@ -164,4 +164,4 @@ struct std::hash<skywing::AddrPortPair>
     }
 };
 
-#endif // SKYNET_TYPES_HPP
+#endif // SKYWING_TYPES_HPP
