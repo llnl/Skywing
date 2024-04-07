@@ -13,7 +13,7 @@ using namespace skywing;
 namespace
 {
 constexpr int num_machines = 2;
-using ValueTag = PublishTag<int>;
+using ValueTag = Tag<int>;
 
 std::vector<ValueTag> tags = {ValueTag{"tag 00"},
                               ValueTag{"tag 01"},

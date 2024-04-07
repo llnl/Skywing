@@ -144,7 +144,7 @@ public:
    */
     template<typename... Ts>
     std::optional<ValueOrTuple<Ts...>>
-    get_data_if_present(const PublishTag<Ts...>& tag)
+    get_data_if_present(const Tag<Ts...>& tag)
     {
       using OptT = std::optional<ValueOrTuple<Ts...>>;
       Waiter<OptT> waiter = get_waiter(tag);

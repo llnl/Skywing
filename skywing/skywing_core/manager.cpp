@@ -1591,7 +1591,7 @@ bool Manager::subscription_tags_are_produced(
 bool Manager::handle_publish_data(const internal::PublishData& msg, const internal::ExternalManager& from) noexcept
 {
     (void) from;
-    if (const auto value = msg.value()) {
+    if (auto value = msg.value()) {
         SKYWING_TRACE_LOG("\"{}\" received data on tag \"{}\" from \"{}\", "
                           "version {}, data: {}",
                           id_,
