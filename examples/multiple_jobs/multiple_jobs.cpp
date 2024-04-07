@@ -19,7 +19,7 @@
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
-using ValueTag = PublishTag<double>;
+using ValueTag = Tag<double>;
 
 using CountProcessor = QUACCProcessor<BigFloat,
                                       MinProcessor<BigFloat>,
