@@ -4,7 +4,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 using namespace skywing;
-namespace {
+namespace
+{
 using PubTag = Tag<std::int32_t>;
 // using GroupTag = ReduceGroupTag<std::int32_t>;
 // using ValueTag = ReduceValueTag<std::int32_t>;
@@ -31,14 +32,17 @@ TEST_CASE("Self-subscription works", "[core]")
         REQUIRE(pub_fut.wait_for(wait_time));
         REQUIRE(pub_fut.get() == 10);
 
-    // IP Publish/Subscribe
-    const PubTag private_pub_tag{"private_integer"};
-    job.declare_publication_intent(private_pub_tag);
-    REQUIRE(job.ip_subscribe("localhost:" + std::to_string(get_starting_port()), private_pub_tag).wait_for(wait_time));
-    job.publish(private_pub_tag, 30);
-    auto private_pub_fut = job.get_waiter(private_pub_tag);
-    REQUIRE(private_pub_fut.wait_for(wait_time));
-    REQUIRE(private_pub_fut.get() == 30);
+        // IP Publish/Subscribe
+        const PubTag private_pub_tag{"private_integer"};
+        job.declare_publication_intent(private_pub_tag);
+        REQUIRE(
+            job.ip_subscribe("localhost:" + std::to_string(get_starting_port()),
+                             private_pub_tag)
+                .wait_for(wait_time));
+        job.publish(private_pub_tag, 30);
+        auto private_pub_fut = job.get_waiter(private_pub_tag);
+        REQUIRE(private_pub_fut.wait_for(wait_time));
+        REQUIRE(private_pub_fut.get() == 30);
 
         // Reduce operation
         // This is not yet supported - need to discuss if this is wanted as this

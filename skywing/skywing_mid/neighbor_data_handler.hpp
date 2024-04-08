@@ -32,7 +32,8 @@ template <typename BaseDataType, typename DataType>
 class NeighborDataHandler
 {
     using TagValueType = typename PubSubConverter<BaseDataType>::pubsub_type;
-  public:
+
+public:
     using TagType = UnwrapAndApply_t<TagValueType, Tag>;
 
     /** @param transformer A function that converts a \c BaseDataType

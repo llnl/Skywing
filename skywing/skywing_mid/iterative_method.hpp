@@ -4,7 +4,6 @@
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
 #include "skywing_core/tag.hpp"
-#include "skywing_mid/pubsub_converter.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
 #include "skywing_mid/neighbor_data_handler.hpp"
 #include "skywing_mid/pubsub_converter.hpp"
@@ -26,11 +25,12 @@ template <typename ResiliencePolicy, typename DataType>
 class IterativeMethod
 {
 public:
-  using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
-  using TagValueType = typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
-  using TagType = UnwrapAndApply_t<TagValueType, Tag>; // Tag<stuff...>;
-  using DataT = DataType;
-  using ValueType = DataType;
+    using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
+    using TagValueType =
+        typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
+    using TagType = UnwrapAndApply_t<TagValueType, Tag>; // Tag<stuff...>;
+    using DataT = DataType;
+    using ValueType = DataType;
 
     /** @param job The job running this iterative method.
      *  @param produced_tag The tag this agent will publish during iteration.
@@ -101,15 +101,15 @@ public:
         return job_->rebuild_tags(search_tags);
     }
 
-  /** @brief Rebuilds the specified dead tags
-   */
-  template<IsTag... Tags>
-  Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-  {
-    const std::array<AbstractTag, sizeof...(Tags)> tag_array{
-      static_cast<AbstractTag>(tags)...};
-    return rebuild_dead_tags_range(tag_array);
-  }
+    /** @brief Rebuilds the specified dead tags
+     */
+    template <IsTag... Tags>
+    Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
+    {
+        const std::array<AbstractTag, sizeof...(Tags)> tag_array{
+            static_cast<AbstractTag>(tags)...};
+        return rebuild_dead_tags_range(tag_array);
+    }
 
     /** @brief Drops tracking for dead tags
      */
@@ -134,14 +134,14 @@ public:
         }
     }
 
-  /** @brief Drops the specified dead tags
-   */
-  template<IsTag... Tags>
-  void drop_dead_tags(const Tags&... tags) noexcept
-  {
-    const std::array<AbstractTag, sizeof...(Tags)> tag_array{
-      static_cast<AbstractTag>(tags)...};
-  }
+    /** @brief Drops the specified dead tags
+     */
+    template <IsTag... Tags>
+    void drop_dead_tags(const Tags&... tags) noexcept
+    {
+        const std::array<AbstractTag, sizeof...(Tags)> tag_array{
+            static_cast<AbstractTag>(tags)...};
+    }
 
     /** @brief Gather any data that has been published by neighbors.
      *

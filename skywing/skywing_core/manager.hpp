@@ -6,8 +6,6 @@
 #include "skywing_core/internal/manager_waiter_callables.hpp"
 #include "skywing_core/internal/message_creators.hpp"
 // #include "skywing_core/basic_manager_config.hpp"
-#include "skywing_core/job.hpp"
-#include "skywing_core/types.hpp"
 #include "tag.hpp"
 
 #include <algorithm>
@@ -25,7 +23,8 @@
 #include <unordered_set>
 #include <vector>
 
-
+#include "skywing_core/job.hpp"
+#include "skywing_core/types.hpp"
 
 // This has to be separate due to requiring hashing support for the structure
 namespace skywing::internal
@@ -413,11 +412,12 @@ private:
     // Interface for ManagerHandle
     ///////////////////////////////////////
 
-  Waiter<bool> connect_to_server(const char* const address, const std::uint16_t port) noexcept;
-  Waiter<bool> connect_to_server(std::string_view address) noexcept;
-  size_t number_of_neighbors() const noexcept;
-  size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
-  std::uint16_t port() const noexcept;
+    Waiter<bool> connect_to_server(const char* const address,
+                                   const std::uint16_t port) noexcept;
+    Waiter<bool> connect_to_server(std::string_view address) noexcept;
+    size_t number_of_neighbors() const noexcept;
+    size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
+    std::uint16_t port() const noexcept;
 
     Waiter<void> waiter_on_subscription_change(
         std::function<bool()> is_ready_callable) noexcept
@@ -713,12 +713,12 @@ public:
      */
     const std::string& id() const noexcept { return handle_->id(); }
 
-  /** \brief Returns the number of subscribers that a tag has
-   */
-  int number_of_subscribers(const AbstractTag& tag) const noexcept
-  {
-    return handle_->number_of_subscribers(tag);
-  }
+    /** \brief Returns the number of subscribers that a tag has
+     */
+    int number_of_subscribers(const AbstractTag& tag) const noexcept
+    {
+        return handle_->number_of_subscribers(tag);
+    }
 
     /** \brief Creates a waiter that has a done condition that is run anytime
      * anything with subscriptions happens

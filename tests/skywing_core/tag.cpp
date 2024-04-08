@@ -1,8 +1,9 @@
-#include <catch2/catch_test_macros.hpp>
-#include <vector>
-#include <iostream>
 #include "skywing_core/tag.hpp"
 
+#include <iostream>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Tags can be compared", "[core]")
 {
@@ -30,8 +31,8 @@ TEST_CASE("Tags can be compared", "[core]")
 
 TEST_CASE("Tag creation", "[core]")
 {
-    skywing::Tag<float,double,bool> tag{"id"};
-    std::vector<std::uint8_t> expected_types {0,2,23};
+    skywing::Tag<float, double, bool> tag{"id"};
+    std::vector<std::uint8_t> expected_types{0, 2, 23};
     REQUIRE(tag.id() == "id");
     REQUIRE(tag.get_expected_types() == expected_types);
 }

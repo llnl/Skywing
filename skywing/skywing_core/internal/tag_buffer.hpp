@@ -62,7 +62,6 @@ ValueOrTuple<Ts...> make_value(std::span<const PublishValueVariant> value,
 }
 } // namespace detail
 
-
 template <typename TagT>
 struct hash
 {
@@ -91,12 +90,13 @@ public:
      */
     void* get() noexcept { return do_get(); }
 
-  /** \brief Adds data if the version is newer
-   */
-  void add(std::span<const PublishValueVariant> value, const VersionID version) noexcept
-  {
-    return do_add(value, version);
-  }
+    /** \brief Adds data if the version is newer
+     */
+    void add(std::span<const PublishValueVariant> value,
+             const VersionID version) noexcept
+    {
+        return do_add(value, version);
+    }
 
     /** \brief Resets the tag buffer to the default state
      */
@@ -105,10 +105,11 @@ public:
     virtual ~DiscardOldVersionTagBufferBase() = default;
 
 private:
-  virtual bool do_has_data() const noexcept = 0;
-  virtual void* do_get() noexcept = 0;
-  virtual void do_add(std::span<const PublishValueVariant> value, const VersionID version) noexcept = 0;
-  virtual void do_reset() noexcept = 0;
+    virtual bool do_has_data() const noexcept = 0;
+    virtual void* do_get() noexcept = 0;
+    virtual void do_add(std::span<const PublishValueVariant> value,
+                        const VersionID version) noexcept = 0;
+    virtual void do_reset() noexcept = 0;
 }; // DiscardOldVersionTagBufferBase
 
 template <typename... Ts>
@@ -127,7 +128,6 @@ private:
         this->last_fetched_version_ = this->stored_version_;
         return &value_;
     }
-
 
     void do_add(std::span<const PublishValueVariant> value,
                 const VersionID version) noexcept override

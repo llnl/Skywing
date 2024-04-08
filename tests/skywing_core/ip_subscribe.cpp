@@ -8,7 +8,8 @@
 
 using namespace skywing;
 
-namespace {
+namespace
+{
 using ValueTag = Tag<std::int32_t>;
 const ValueTag tag{"Test IP Tag"};
 const std::int32_t tag_value = 10;

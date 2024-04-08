@@ -105,9 +105,8 @@ using WrapVoidValue = std::conditional_t<
 
 /// Wraps void returning functions into returning VoidWrapper instead
 template <typename Callable, typename... Args>
-auto wrap_void_func(Callable&& c, Args&&... args) noexcept
-    -> WrapVoidValue<
-        decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>
+auto wrap_void_func(Callable&& c, Args&&... args) noexcept -> WrapVoidValue<
+    decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>
 {
     using RetType = WrapVoidValue<decltype(::std::forward<Callable>(c)(
         ::std::forward<Args>(args)...))>;
