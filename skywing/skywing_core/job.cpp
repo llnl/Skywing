@@ -243,14 +243,6 @@ void Job::declare_publication_intent_impl(
     Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
 }
 
-// void Job::unsubscribe_impl(const TagID& tag_id) noexcept
-// {
-//   auto [buffers, lock] = bufs_.get();
-//   (void)lock;
-//   // Just remove any the expected types and data maps
-//   buffers.erase(tag_id);
-// }
-
 bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept
 {
     auto [buffers, lock] = bufs_.get();

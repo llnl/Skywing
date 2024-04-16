@@ -83,64 +83,12 @@ public:
         return to_ret;
     }
 
-    /** @brief Rebuilds the specified dead tags, ignoring any tags that aren't
-     * dead
-     */
-    template <typename Range>
-    Waiter<void> rebuild_dead_tags_range(const Range& r) noexcept
-    {
-        std::vector<TagType> search_tags;
-        for (const auto& tag : r) {
-            auto iter =
-                std::find(dead_tags_.begin(), dead_tags_.end(), tag.id());
-            if (iter != dead_tags_.end()) {
-                search_tags.push_back(std::move(*iter));
-                dead_tags_.erase(*iter);
-            }
-        }
-        return job_->rebuild_tags(search_tags);
-    }
-
-    /** @brief Rebuilds the specified dead tags
-     */
-    template <IsTag... Tags>
-    Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-    {
-        const std::array<AbstractTag, sizeof...(Tags)> tag_array{
-            static_cast<AbstractTag>(tags)...};
-        return rebuild_dead_tags_range(tag_array);
-    }
-
     /** @brief Drops tracking for dead tags
      */
     void drop_dead_tags() noexcept
     {
         // TODO: Actually unsubscribe when that's a thing that can happen
         dead_tags_.clear();
-    }
-
-    /** @brief Drops tracking for specific tags, does nothing if the tags aren't
-     * dead
-     */
-    template <typename Range>
-    void drop_dead_tags(const Range& r) noexcept
-    {
-        for (const auto& tag : r) {
-            const auto iter =
-                std::find(dead_tags_.begin(), dead_tags_.end(), tag.id());
-            if (iter != dead_tags_.end()) {
-                dead_tags_.erase(iter);
-            }
-        }
-    }
-
-    /** @brief Drops the specified dead tags
-     */
-    template <IsTag... Tags>
-    void drop_dead_tags(const Tags&... tags) noexcept
-    {
-        const std::array<AbstractTag, sizeof...(Tags)> tag_array{
-            static_cast<AbstractTag>(tags)...};
     }
 
     /** @brief Gather any data that has been published by neighbors.

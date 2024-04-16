@@ -236,23 +236,6 @@ public:
         return get_ip_subscribe_future(address, tag_ptrs);
     }
 
-    // /** \brief Unsubscribes to the passed tag, does nothing if the job is not
-    //  * subscribed to the tag
-    //  */
-    // template<typename Tag>
-    // void unsubscribe(const Tag& tag) noexcept
-    // {
-    //   unsubscribe_impl(tag.id());
-    // }
-
-    // /** \brief Unsubscribes from all of the passed tags
-    //  */
-    // template<typename... UnsubTags>
-    // void unsubscribe(const UnsubTags&... tags) noexcept
-    // {
-    //   (unsubscribe(tags), ...);
-    // }
-
     /** \brief Publish data on the passed tag
      *
      * Will abort in debug mode if the tag has not been declared for publication
@@ -415,8 +398,6 @@ private:
 
     void declare_publication_intent_impl(
         std::span<const AbstractTag* const> tags) noexcept;
-
-    // void unsubscribe_impl(const TagID& tag_id) noexcept;
 
     bool tag_has_active_publisher_impl(const TagID& tag_id) const noexcept;
 
