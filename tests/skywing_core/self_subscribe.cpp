@@ -6,8 +6,7 @@
 using namespace skywing;
 namespace
 {
-using PubTag = PublishTag<std::int32_t>;
-using PrivatePubTag = PrivateTag<std::int32_t>;
+using PubTag = Tag<std::int32_t>;
 // using GroupTag = ReduceGroupTag<std::int32_t>;
 // using ValueTag = ReduceValueTag<std::int32_t>;
 
@@ -34,7 +33,7 @@ TEST_CASE("Self-subscription works", "[core]")
         REQUIRE(pub_fut.get() == 10);
 
         // IP Publish/Subscribe
-        const PrivatePubTag private_pub_tag{"integer"};
+        const PubTag private_pub_tag{"private_integer"};
         job.declare_publication_intent(private_pub_tag);
         REQUIRE(
             job.ip_subscribe("localhost:" + std::to_string(get_starting_port()),

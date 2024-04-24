@@ -6,6 +6,8 @@
 #include "skywing_core/internal/manager_waiter_callables.hpp"
 #include "skywing_core/internal/message_creators.hpp"
 // #include "skywing_core/basic_manager_config.hpp"
+#include "tag.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -414,8 +416,7 @@ private:
                                    const std::uint16_t port) noexcept;
     Waiter<bool> connect_to_server(std::string_view address) noexcept;
     size_t number_of_neighbors() const noexcept;
-    size_t
-    number_of_subscribers(const internal::PublishTagBase& tag) const noexcept;
+    size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
     std::uint16_t port() const noexcept;
 
     Waiter<void> waiter_on_subscription_change(
@@ -714,8 +715,7 @@ public:
 
     /** \brief Returns the number of subscribers that a tag has
      */
-    int
-    number_of_subscribers(const internal::PublishTagBase& tag) const noexcept
+    int number_of_subscribers(const AbstractTag& tag) const noexcept
     {
         return handle_->number_of_subscribers(tag);
     }

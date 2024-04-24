@@ -11,7 +11,7 @@
 #include "skywing_core/enable_logging.hpp"
 #include "skywing_core/skywing.hpp"
 
-using DataTag = skywing::PublishTag<double>;
+using DataTag = skywing::Tag<double>;
 
 struct MachineConfig
 {

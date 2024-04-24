@@ -34,7 +34,7 @@ class NeighborDataHandler
     using TagValueType = typename PubSubConverter<BaseDataType>::pubsub_type;
 
 public:
-    using TagType = UnwrapAndApply_t<TagValueType, PublishTag>;
+    using TagType = UnwrapAndApply_t<TagValueType, Tag>;
 
     /** @param transformer A function that converts a \c BaseDataType
      *  object into something of type \c DataType. For example, could

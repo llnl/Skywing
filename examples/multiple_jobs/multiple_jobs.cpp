@@ -19,7 +19,7 @@
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
-using ValueTag = PublishTag<double>;
+using ValueTag = Tag<double>;
 
 using CountProcessor = QUACCProcessor<BigFloat,
                                       MinProcessor<BigFloat>,
@@ -39,8 +39,8 @@ struct ParamStruct
     std::vector<std::string> agent_names;
     std::string pubTagID;
     std::vector<std::string> tagIDs;
-    ValueTag summation_result_tag;
-    ValueTag contribution_update_tag;
+    ValueTag summation_result_tag{""};
+    ValueTag contribution_update_tag{""};
 };
 
 /* \brief The job that executives a collective summation.

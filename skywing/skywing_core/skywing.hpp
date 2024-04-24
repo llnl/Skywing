@@ -4,6 +4,7 @@
 // Just include all of the common files here
 #include "job.hpp"
 #include "manager.hpp"
+#include "tag.hpp"
 #include "types.hpp"
 #include "waiter.hpp"
 

@@ -17,7 +17,7 @@ namespace
 {
 constexpr int num_machines = 4;
 
-using Int32Tag = PublishTag<std::int32_t>;
+using Int32Tag = Tag<std::int32_t>;
 
 void setup_network(const int index, ManagerHandle manager)
 {

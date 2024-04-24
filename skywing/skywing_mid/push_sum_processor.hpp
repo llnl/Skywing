@@ -28,7 +28,7 @@ class PushSumProcessor
 public:
     using scalar_t = S;
     using ValueType = std::tuple<S, S, unsigned>;
-    using ValueTag = skywing::PublishTag<ValueType>;
+    using ValueTag = skywing::Tag<ValueType>;
 
     /**
      * @param number_of_neighbors Number of neighboring agents.

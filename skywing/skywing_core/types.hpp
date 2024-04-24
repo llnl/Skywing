@@ -105,9 +105,8 @@ using WrapVoidValue = std::conditional_t<
 
 /// Wraps void returning functions into returning VoidWrapper instead
 template <typename Callable, typename... Args>
-auto wrap_void_func(Callable&& c, Args&&... args) noexcept
-    -> WrapVoidValue<
-        decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>
+auto wrap_void_func(Callable&& c, Args&&... args) noexcept -> WrapVoidValue<
+    decltype(::std::forward<Callable>(c)(::std::forward<Args>(args)...))>
 {
     using RetType = WrapVoidValue<decltype(::std::forward<Callable>(c)(
         ::std::forward<Args>(args)...))>;
@@ -119,12 +118,6 @@ auto wrap_void_func(Callable&& c, Args&&... args) noexcept
         return ::std::forward<Callable>(c)(::std::forward<Args>(args)...);
     }
 }
-
-// Marker prepended to mark tags as publish tags
-inline constexpr char publish_tag_marker = 'p';
-
-// Marker prepended to mark tags as private tags
-inline constexpr char private_tag_marker = 'x';
 
 /// Structure for testing if a value is any of the supplied values
 template <typename T, T... Values>
@@ -143,13 +136,6 @@ struct any_of
     }
 };
 
-// Checks if a tag name is bad
-inline bool tag_name_okay(const std::string& tag) noexcept
-{
-    return !tag.empty()
-           && (tag[0]
-               == any_of<char, publish_tag_marker, private_tag_marker>{});
-}
 } // namespace internal
 } // namespace skywing
 

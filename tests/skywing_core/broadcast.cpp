@@ -42,7 +42,7 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
     std::array<int, 3>{1, 2, -1},
     std::array<int, 3>{1, 2, 3}};
 
-using Uint64Tag = PublishTag<std::uint64_t>;
+using Uint64Tag = Tag<std::uint64_t>;
 
 void setup_network(ManagerHandle manager,
                    std::vector<std::uint16_t> const& ports,

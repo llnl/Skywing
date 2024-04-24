@@ -18,7 +18,7 @@
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
-using ValueTag = skywing::PublishTag<std::vector<double>>;
+using ValueTag = skywing::Tag<std::vector<double>>;
 
 // First three functions are for the Skywing setup step.
 std::vector<std::string> obtain_machine_names(std::uint16_t size_of_system)

@@ -3,6 +3,7 @@
 
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
+#include "skywing_core/tag.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
 #include "skywing_mid/neighbor_data_handler.hpp"
 #include "skywing_mid/pubsub_converter.hpp"
@@ -27,8 +28,7 @@ public:
     using ThisT = IterativeMethod<ResiliencePolicy, DataType>;
     using TagValueType =
         typename PubSubConverter<DataType>::pubsub_type; // std::tuple<stuff...>
-    using TagType =
-        UnwrapAndApply_t<TagValueType, PublishTag>; // PublishTag<stuff...>;
+    using TagType = UnwrapAndApply_t<TagValueType, Tag>; // Tag<stuff...>;
     using DataT = DataType;
     using ValueType = DataType;
 
@@ -83,66 +83,12 @@ public:
         return to_ret;
     }
 
-    /** @brief Rebuilds the specified dead tags, ignoring any tags that aren't
-     * dead
-     */
-    template <typename Range>
-    Waiter<void> rebuild_dead_tags_range(const Range& r) noexcept
-    {
-        std::vector<TagType> search_tags;
-        for (const auto& tag : r) {
-            auto iter =
-                std::find(dead_tags_.begin(), dead_tags_.end(), tag.id());
-            if (iter != dead_tags_.end()) {
-                search_tags.push_back(std::move(*iter));
-                dead_tags_.erase(*iter);
-            }
-        }
-        return job_->rebuild_tags(search_tags);
-    }
-
-    /** @brief Rebuilds the specified dead tags
-     */
-    template <typename... Tags>
-    Waiter<void> rebuild_dead_tags(const Tags&... tags) noexcept
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    {
-        const std::array<internal::PublishTagBase, sizeof...(Tags)> tag_array{
-            static_cast<internal::PublishTagBase>(tags)...};
-        return rebuild_dead_tags_range(tag_array);
-    }
-
     /** @brief Drops tracking for dead tags
      */
     void drop_dead_tags() noexcept
     {
         // TODO: Actually unsubscribe when that's a thing that can happen
         dead_tags_.clear();
-    }
-
-    /** @brief Drops tracking for specific tags, does nothing if the tags aren't
-     * dead
-     */
-    template <typename Range>
-    void drop_dead_tags(const Range& r) noexcept
-    {
-        for (const auto& tag : r) {
-            const auto iter =
-                std::find(dead_tags_.begin(), dead_tags_.end(), tag.id());
-            if (iter != dead_tags_.end()) {
-                dead_tags_.erase(iter);
-            }
-        }
-    }
-
-    /** @brief Drops the specified dead tags
-     */
-    template <typename... Tags>
-    void drop_dead_tags(const Tags&... tags) noexcept
-    //  requires (... && std::is_base_of_v<internal::PublishTagBase, Ts>)
-    {
-        const std::array<internal::PublishTagBase, sizeof...(Tags)> tag_array{
-            static_cast<internal::PublishTagBase>(tags)...};
     }
 
     /** @brief Gather any data that has been published by neighbors.
