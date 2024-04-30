@@ -652,13 +652,13 @@ size_t Manager::number_of_subscribers(const AbstractTag& tag) const noexcept
     const auto self_iter = self_sub_count_.find(tag.id());
     const auto self_subs =
         self_iter == self_sub_count_.cend() ? 0 : self_iter->second;
-    return std::accumulate(
-        neighbors_.cbegin(),
-        neighbors_.cend(),
-        self_subs,
-        [&](const size_t sum, const auto& neighbor_pair) noexcept {
-            return sum + neighbor_pair.second.is_subscribed_to(tag.id());
-        });
+    return self_subs
+           + std::count_if(cbegin(neighbors_),
+                           cend(neighbors_),
+                           [&tag](const auto& neighbor_pair) noexcept {
+                               return neighbor_pair.second.is_subscribed_to(
+                                   tag.id());
+                           });
 }
 
 std::uint16_t Manager::port() const noexcept
@@ -1453,46 +1453,53 @@ void Manager::process_pending_conns() noexcept
                                 message_buffer))
                     {
                         decltype(neighbors_)::iterator new_neighbor_iter;
-                        okay &= msg->do_callback(
-                            [&](const internal::Greeting& greeting) {
-                                // add connection to active list / remove from
-                                // pending list
-                                auto [neighbor_iter, inserted] =
-                                    neighbors_.try_emplace(greeting.from(),
-                                                           std::move(info.conn),
-                                                           greeting.from(),
-                                                           greeting.neighbors(),
-                                                           *this,
-                                                           greeting.port());
-                                new_neighbor_iter = neighbor_iter;
-                                if (!inserted) {
+                        okay =
+                            msg->do_callback(
+                                [&](const internal::Greeting& greeting) {
+                                    // add connection to active list / remove
+                                    // from pending list
+                                    auto [neighbor_iter, inserted] =
+                                        neighbors_.try_emplace(
+                                            greeting.from(),
+                                            std::move(info.conn),
+                                            greeting.from(),
+                                            greeting.neighbors(),
+                                            *this,
+                                            greeting.port());
+                                    new_neighbor_iter = neighbor_iter;
+                                    if (!inserted) {
+                                        SKYWING_TRACE_LOG(
+                                            "\"{}\" already has a connection "
+                                            "from "
+                                            "\"{}\" so will simply add to "
+                                            "communicators.",
+                                            id_,
+                                            neighbor_iter->first);
+                                        new_neighbor_iter->second
+                                            .add_communicator(
+                                                std::move(info.conn));
+                                        return true;
+                                    }
+                                    addr_to_machine_.try_emplace(
+                                        new_neighbor_iter->second
+                                            .address_pair(),
+                                        &neighbor_iter->second);
                                     SKYWING_TRACE_LOG(
-                                        "\"{}\" already has a connection from "
-                                        "\"{}\" so will simply add to "
-                                        "communicators.",
+                                        "\"{}\" received greeting from \"{}\"",
                                         id_,
                                         neighbor_iter->first);
-                                    new_neighbor_iter->second.add_communicator(
-                                        std::move(info.conn));
                                     return true;
-                                }
-                                addr_to_machine_.try_emplace(
-                                    new_neighbor_iter->second.address_pair(),
-                                    &neighbor_iter->second);
-                                SKYWING_TRACE_LOG(
-                                    "\"{}\" received greeting from \"{}\"",
-                                    id_,
-                                    neighbor_iter->first);
-                                return true;
-                            },
-                            [&](...) {
-                                SKYWING_WARN_LOG(
-                                    "\"{}\" received unexpected message from "
-                                    "\"{}\", expected greeting",
-                                    id_,
-                                    iter->first);
-                                return false;
-                            });
+                                },
+                                [&](...) {
+                                    SKYWING_WARN_LOG(
+                                        "\"{}\" received unexpected message "
+                                        "from "
+                                        "\"{}\", expected greeting",
+                                        id_,
+                                        iter->first);
+                                    return false;
+                                })
+                            && okay;
                         if (okay) {
                             SKYWING_TRACE_LOG("\"{}\" finalizing connection to "
                                               "\"{}\" for tag \"{}\"",
@@ -1608,8 +1615,9 @@ bool Manager::handle_publish_data(
         bool okay = true;
         for (auto& [job_id, job] : jobs_) {
             (void) job_id;
-            okay &= Job::Accessor::process_data(
-                job, msg.tag_id(), *value, msg.version());
+            okay = Job::Accessor::process_data(
+                       job, msg.tag_id(), *value, msg.version())
+                   && okay;
         }
         return okay;
     }
