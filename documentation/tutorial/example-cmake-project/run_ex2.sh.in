@@ -1,0 +1,21 @@
+#!/bin/bash
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( ind=0 ;  ind < size_of_collective ; ind++ ))
+  do
+      var="erase${ind}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
+
+size_of_collective=3
+for (( agent_ind = 0; agent_ind < $size_of_collective ; agent_ind++ ))
+do
+    echo $<TARGET_FILE:ex2> $agent_ind
+    $<TARGET_FILE:ex2> $agent_ind &
+    declare "erase${agent_ind}=$!"
+done
+sleep 15
+kill_progs
+exit 0

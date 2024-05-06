@@ -19,7 +19,7 @@ Some dependencies are managed by Skywing's build process, and some you
 need to acquire yourself beforehand.
 
 ## Dependencies Not Automatically Managed
- * compiler that supports C++17 library
+ * compiler that supports C++20 library
    * tested: GCC/g++ (10.3.0) and LLVM/clang (14.0.6)
  * CMake (https://cmake.org/)
  * Cap'n Proto (https://capnproto.org/)
@@ -30,19 +30,19 @@ need to acquire yourself beforehand.
    You do not need to acquire these yourself.
 
  * Catch2
-   * requires version 2.9.0 or newer
+   * requires version 3.0 or newer
  * spdlog
    * requires version 1.0 or newer
 
 ## Build instructions
 
-   Follow these instructions to build a "barebones" version of Skywing
-   without any tests or examples. If any dependencies have been
-   installed to nonstandard locations, remember to add the appropriate
-   paths to `CMAKE_PREFIX_PATH` and/or `PKG_CONFIG_PATH`. E.g., for
-   CapnProto and a Bourne-like shell, `export
-   CMAKE_PREFIX_PATH=/path/to/capnproto/install:${CMAKE_PREFIX_PATH}`
-   (prepending ensures your version will be found before any system install).
+Follow these instructions to build a "barebones" version of Skywing
+without any tests or examples. If any dependencies have been
+installed to nonstandard locations, remember to add the appropriate
+paths to `CMAKE_PREFIX_PATH` and/or `PKG_CONFIG_PATH`. E.g., for
+CapnProto and a Bourne-like shell, `export
+CMAKE_PREFIX_PATH=/path/to/capnproto/install:${CMAKE_PREFIX_PATH}`
+(prepending ensures your version will be found before any system install).
 
  * Build non-managed dependencies separately
  * Get dependencies
@@ -53,11 +53,14 @@ need to acquire yourself beforehand.
    * `cmake --build build`
  * Run tests
    * `python3 scripts/tester_script.py build/tests/test_runner.txt`
- * Optionally install the project. Note that the default installation
-   prefix is `/usr/local` but it can be changed by passing any desired
-   prefix to CMake with `cmake ...
-   -DCMAKE_INSTALL_PREFIX=/path/to/prefix ...`
+ * Install the project. This is required for interacting with Skywing
+   downstream. Note that the default installation prefix is
+   `/usr/local` but it can be changed by passing any desired prefix to
+   CMake with `cmake ... -DCMAKE_INSTALL_PREFIX=/path/to/prefix ...`
    * `cmake --install build`
+
+To use Skywing as a library in a downstream application, it is
+recommended that it be installed to simplify the build process.
 
 ## Enabling Tests and Examples
 
@@ -96,6 +99,47 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
 
 Note that Skywing configurations that involve many connections between agents can run into a file descriptor limit.
 The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)
+
+# Building an application on Skywing
+
+As noted in [the build instructions](#build-instructions), the
+preferred way to interact with Skywing in downstream applications is
+by using the installed artifacts. By default, Skywing will be
+installed to `/usr/local`, but the prefix may be altered by passing a
+custom value for `CMAKE_INSTALL_PREFIX` during configuration. This has
+many benefits, such as unifying include paths and exposing a CMake
+export.
+
+## CMake integration
+
+Skywing ships a CMake export in its install artifacts. This can be
+used to detect and interact with Skywing in downstream CMake-based
+applications and is the preferred way for downstreams to detect
+Skywing. The CMake export will capture all the usage requirements for
+the available installation of Skywing more precisely than a user might
+be able to guess or even detect using another format (such as
+pkg-config, which Skywing does not export).
+
+Integration with an existing CMake project is trivial. For example:
+
+```cmake
+find_package(Skywing REQUIRED)
+target_link_libraries(MyApp PRIVATE skywing::skywing)
+```
+
+This should fully capture any dependencies for Skywing. Users should
+be aware that the CMake configuration of projects that use the Skywing
+export will need to be aware of any Skywing dependencies' locations on
+disk. For example, if CapnProto is installed to a nonstandard
+location, CMake must be told via any of the standard CMake mechanisms,
+such as `CMAKE_PREFIX_PATH=${capnp_prefix}:${CMAKE_PREFIX_PATH}`. See
+the [CMake `find_package()`
+documentation](https://cmake.org/cmake/help/git-stage/command/find_package.html#config-mode-search-procedure)
+for a detailed description of the way CMake searches for dependencies.
+
+An example `CMakeLists.txt` file for building one of the Tutorial
+executables is available at
+`documentation/tutorial/example-cmake-project`.
 
 # Contributing to Skywing
 
