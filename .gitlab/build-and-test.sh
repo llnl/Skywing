@@ -28,6 +28,7 @@ case "${CXX_COMPILER}" in
     clang++)
         export CC=$(command -v clang)
         export CXX=$(command -v clang++)
+        ASAN_FLAGS="-fno-omit-frame-pointer -fsanitize=address"
         ;;
     icpc)
         export CC=$(command -v icc)
@@ -44,6 +45,7 @@ case "${CXX_COMPILER}" in
     *)
         export CC=$(command -v gcc)
         export CXX=$(command -v g++)
+        ASAN_FLAGS="-fno-omit-frame-pointer -fsanitize=address"
         ;;
 esac
 
@@ -110,6 +112,7 @@ cmake -G Ninja \
       -D CMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
       \
       -D SKYWING_DEVELOPER_BUILD=ON \
+      -D BUILD_SHARED_LIBS=ON \
       \
       -D SKYWING_BUILD_EXAMPLES=ON \
       -D SKYWING_BUILD_LC_EXAMPLES=ON \
@@ -172,3 +175,56 @@ then
     echo "FAIL: install failure."
     exit ${install_status}
 fi
+
+echo "----------------------------------------------------------------------"
+echo "  Building tutorial examples"
+echo "----------------------------------------------------------------------"
+
+export CMAKE_PREFIX_PATH=${INSTALL_DIR}:${CMAKE_PREFIX_PATH}
+if [[ -z "${CXX_FLAGS:+x}" ]]
+then
+    export CXXFLAGS="${ASAN_FLAGS}"
+else
+    export CXXFLAGS="${CXXFLAGS} ${ASAN_FLAGS}"
+fi
+
+EX_BUILD_DIR=${SOURCE_DIR}/build-tutorial-examples
+cmake -GNinja \
+      -S ${SOURCE_DIR}/documentation/tutorial/example-cmake-project \
+      -B ${EX_BUILD_DIR} \
+      -D CMAKE_BUILD_TYPE=Release |& tee ${SOURCE_DIR}/tutorial-config-outerr.log
+
+config_status="${PIPESTATUS[0]}"
+if [[ "${config_status}" -ne 0 ]];
+then
+    echo "FAIL: tutorial example configure failure."
+    exit ${config_status}
+fi
+
+cmake --build ${EX_BUILD_DIR} |& tee ${SOURCE_DIR}/tutorial-build-outerr.log
+
+build_status="${PIPESTATUS[0]}"
+if [[ "${build_status}" -ne 0 ]];
+then
+    echo "FAIL: tutorial example build failure."
+    exit ${build_status}
+fi
+
+echo "----------------------------------------------------------------------"
+echo "  Running tutorial examples"
+echo "----------------------------------------------------------------------"
+
+for EXAMPLE in ex1 ex2 ex3
+do
+    echo "----------------------------------------------------------------------"
+    echo "    Running example ${EXAMPLE}"
+    echo "----------------------------------------------------------------------"
+
+    ${EX_BUILD_DIR}/run_${EXAMPLE}.sh |& tee ${SOURCE_DIR}/tutorial-${EXAMPLE}-outerr.log
+    run_status="${PIPESTATUS[0]}"
+    if [[ "${run_status}" -ne 0 ]];
+    then
+        echo "FAIL: tutorial ${EXAMPLE} run failure."
+        exit ${run_status}
+    fi
+done
