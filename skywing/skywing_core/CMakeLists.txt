@@ -56,6 +56,7 @@ target_sources(skywing_core
   types.hpp
   waiter.hpp
   tag.hpp
+  subscription.hpp
 )
 
 # "Private" headers, enumerated to help IDEs

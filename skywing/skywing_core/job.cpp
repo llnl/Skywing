@@ -12,7 +12,7 @@ std::thread Job::Accessor::run(Job& j) noexcept
     return std::thread{[&j]() {
         j.to_run_(j, ManagerHandle{*j.manager_});
         // Re-use the buffer mutex here
-        std::lock_guard lock{j.bufs_.mutex()};
+        std::lock_guard lock{j.subs_.mutex()};
         // Signify that the work is done
         j.to_run_ = nullptr;
     }};
@@ -42,11 +42,12 @@ bool Job::process_data(const TagID& tag_id,
                        std::span<PublishValueVariant> data,
                        const VersionID version) noexcept
 {
-    auto [buffers, lock] = bufs_.get();
+    auto [subscriptions, lock] = subs_.get();
     (void) lock;
-    const auto loc = buffers.find(tag_id);
+    const auto loc = subscriptions.find(tag_id);
+    auto& subscription = loc->second;
     // Not subscribed; don't do anything, but not an error
-    if (loc == cend(buffers)) {
+    if (loc == cend(subscriptions)) {
         SKYWING_TRACE_LOG(
             "\"{}\", job \"{}\" discarded tag \"{}\", version {}, "
             "data {}, due to not being subscribed",
@@ -61,7 +62,7 @@ bool Job::process_data(const TagID& tag_id,
     const auto comparer = [](std::uint8_t lhs, const PublishValueVariant& rhs) {
         return lhs == rhs.index();
     };
-    const auto& expected_types = loc->second.expected_types;
+    const auto& expected_types = subscription.get_tag().get_expected_types();
     if (!std::equal(cbegin(expected_types),
                     cend(expected_types),
                     cbegin(data),
@@ -75,7 +76,7 @@ bool Job::process_data(const TagID& tag_id,
                          tag_id,
                          version,
                          data);
-        loc->second.error_occurred = TagInfo::Error::incorrect_type;
+        subscription.discard_tag();
         data_buffer_modified_cv_.notify_all();
         return false;
     }
@@ -87,18 +88,17 @@ bool Job::process_data(const TagID& tag_id,
         version,
         data);
     // Otherwise just make it the current value
-    loc->second.buffer->add(data, version);
+    subscription.add_data(data, version);
     data_buffer_modified_cv_.notify_all();
     return true;
 }
 
 bool Job::tag_has_subscription(const AbstractTag& tag) const noexcept
 {
-    auto [buffers, lock] = bufs_.get();
+    auto [subscriptions, lock] = subs_.get();
     (void) lock;
-    const auto iter = buffers.find(tag.id());
-    return iter != cend(buffers)
-           && iter->second.error_occurred == TagInfo::Error::no_error;
+    const auto iter = subscriptions.find(tag.id());
+    return iter != cend(subscriptions) && !iter->second.has_error();
 }
 
 size_t Job::number_of_subscribers(const AbstractTag& tag) const noexcept
@@ -109,15 +109,14 @@ size_t Job::number_of_subscribers(const AbstractTag& tag) const noexcept
 void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
 {
     SKYWING_TRACE_LOG("\"{}\" tag \"{}\" marked as dead.", id_, tag_id);
-    auto [buffers, lock] = bufs_.get();
+    auto [subscriptions, lock] = subs_.get();
     (void) lock;
-    const auto tag_loc = buffers.find(tag_id);
-    if (tag_loc == cend(buffers)) {
+    const auto tag_loc = subscriptions.find(tag_id);
+    if (tag_loc == cend(subscriptions)) {
         return;
     }
-    auto& tag_info = tag_loc->second;
-    tag_info.error_occurred = TagInfo::Error::disconnected;
-    ++tag_info.connection_id;
+    auto& subscription = tag_loc->second;
+    subscription.mark_tag_as_dead();
     // TODO: Allow passing multiple tags so the cv is notified a bunch
     // of times if there are many tags?  Errors are expected to be rare
     // so maybe this isn't a problem
@@ -127,7 +126,7 @@ void Job::mark_tag_as_dead(const TagID& tag_id) noexcept
 void Job::publish_impl(const AbstractTag& tag,
                        const std::span<PublishValueVariant> to_send) noexcept
 {
-    assert(tags_produced_.find(tag.id()) != cend(tags_produced_)
+    assert(tags_produced_.contains(tag.id())
            && "Attempted to publish on a tag that was not declared for "
               "publishing!");
     // assert(tags_produced_.find(tag.id())->second == to_send.index()
@@ -143,55 +142,23 @@ void Job::publish_impl(const AbstractTag& tag,
 // Private implementation of public functions
 bool Job::has_data(const AbstractTag& tag) noexcept
 {
-    std::lock_guard<std::mutex> lock{bufs_.mutex()};
+    std::lock_guard<std::mutex> lock{subs_.mutex()};
     return has_data_no_lock(tag);
 }
 
 bool Job::has_data_no_lock(const AbstractTag& tag) noexcept
 {
-    auto& buffers = bufs_.unsafe_get();
-    const auto loc = buffers.find(tag.id());
-    if (loc == cend(buffers)) {
-        return false;
+    auto& subscriptions = subs_.unsafe_get();
+    if (subscriptions.contains(tag.id())) {
+        auto& subscription = subscriptions.at(tag.id());
+        return subscription.has_data();
     }
-    return loc->second.buffer->has_data();
+    return false;
 }
 
 const JobID& Job::id() const noexcept
 {
     return id_;
-}
-
-void Job::init_or_update_subscribe(
-    std::span<const AbstractTag* const> tags,
-    std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>
-        ptrs) noexcept
-{
-    assert(tags.size() == ptrs.size());
-    auto [buffers, lock] = bufs_.get();
-    (void) lock;
-    // Always subscribe ahead of time, since the gap between the
-    // Job::subscribe calls can cause messages to get discarded once the
-    // connection is made but before it's marked as subscribed
-    for (size_t i = 0; i < tags.size(); ++i) {
-        auto& ptr = ptrs[i];
-        // Then add the expected type; marking the tag as watched
-        const auto [iter, inserted] =
-            buffers.try_emplace(tags[i]->id(),
-                                TagInfo{// Just need a dummy value here
-                                        std::move(ptr),
-                                        tags[i]->get_expected_types(),
-                                        0,
-                                        TagInfo::Error::no_error});
-        // Already exists - update the connection id and reset the buffer /
-        // error
-        if (!inserted) {
-            ++iter->second.connection_id;
-            // Reset it to a default constructed buffer
-            iter->second.buffer->reset();
-            iter->second.error_occurred = TagInfo::Error::no_error;
-        }
-    }
 }
 
 Waiter<void>
@@ -229,7 +196,7 @@ void Job::declare_publication_intent_impl(
     std::span<const AbstractTag* const> tags) noexcept
 {
     const std::vector<TagID> tag_ids = [&]() {
-        std::lock_guard g{bufs_.mutex()};
+        std::lock_guard g{subs_.mutex()};
         for (const auto& tag : tags) {
             tags_produced_.try_emplace(tag->id(), tag->get_expected_types());
         }
@@ -245,12 +212,12 @@ void Job::declare_publication_intent_impl(
 
 bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept
 {
-    auto [buffers, lock] = bufs_.get();
+    auto [subscriptions, lock] = subs_.get();
     (void) lock;
-    const auto iter = buffers.find(tag_id);
-    if (iter == cend(buffers)) {
+    const auto iter = subscriptions.find(tag_id);
+    if (iter == cend(subscriptions)) {
         return false;
     }
-    return iter->second.error_occurred == TagInfo::Error::no_error;
+    return !iter->second.has_error();
 }
 } // namespace skywing
