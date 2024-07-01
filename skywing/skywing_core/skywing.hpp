@@ -7,6 +7,7 @@
 #include "tag.hpp"
 #include "types.hpp"
 #include "waiter.hpp"
+#include "subscription.hpp"
 
 #include "enable_logging.hpp"
 

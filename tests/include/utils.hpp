@@ -12,6 +12,8 @@
 #include <vector>
 
 #include "skywing_core/manager.hpp"
+#include "skywing_core/internal/tag_buffer.hpp"
+#include <catch2/catch_test_macros.hpp>
 
 namespace skywing
 {
@@ -179,6 +181,30 @@ void connect_network(const NetworkInfo& info,
         std::this_thread::sleep_for(1ms);
     }
 }
+
+template<typename... Ts>
+class SubscribeDataAssert
+{
+public:
+    SubscribeDataAssert() = delete;
+    SubscribeDataAssert(std::span<PublishValueVariant> data)
+        : data_{internal::detail::make_value<Ts...>(data, std::index_sequence_for<Ts...>{})}
+    {}
+
+    void isStoredUnderTag(const Tag<Ts...>& tag, Job& job)
+    {
+        auto waiter = job.get_waiter(tag);
+        waiter.wait_for(wait_time);
+        const auto stored_data = waiter.get();
+        CHECK(stored_data);
+        REQUIRE(data_ == stored_data);
+    }
+
+private:
+    ValueOrTuple<Ts...> data_;
+    std::chrono::milliseconds wait_time{1000};
+};
+
 } // namespace skywing
 
 // Macro to synchronize all machines

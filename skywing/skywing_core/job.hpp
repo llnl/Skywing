@@ -1,8 +1,6 @@
 #ifndef SKYWING_JOB_HPP
 #define SKYWING_JOB_HPP
 
-#include "tag.hpp"
-
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -19,6 +17,8 @@
 #include "skywing_core/internal/tag_buffer.hpp"
 #include "skywing_core/internal/utility/mutex_guarded.hpp"
 #include "skywing_core/internal/utility/type_list.hpp"
+#include "skywing_core/subscription.hpp"
+#include "skywing_core/tag.hpp"
 #include "skywing_core/types.hpp"
 #include "skywing_core/waiter.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
@@ -53,7 +53,7 @@ public:
 
         static std::mutex& get_mutex(Job& j) noexcept
         {
-            return j.bufs_.mutex();
+            return j.subs_.mutex();
         }
 
         static void report_dead_tag(Job& j, const TagID& tag) noexcept
@@ -116,26 +116,25 @@ public:
         // Can just capture the reference to the value as it
         // will never get invalidated except when the element is deleted
         // due to being in an unordered_map
-        auto [buffers, lock] = bufs_.get();
+        auto [subscriptions, lock] = subs_.get();
         (void) lock;
-        const auto tag_iter = buffers.find(tag.id());
-        assert(tag_iter != buffers.cend());
-        auto& tag_info = tag_iter->second;
-        const auto tag_conn_id = tag_info.connection_id;
+        const auto tag_iter = subscriptions.find(tag.id());
+        assert(tag_iter != subscriptions.cend());
+        auto& subscription = tag_iter->second;
+        const auto tag_conn_id = subscription.id();
         return make_waiter<std::optional<ValueType>>(
-            bufs_.mutex(),
+            subs_.mutex(),
             data_buffer_modified_cv_,
-            [&tag_info, tag_conn_id]() {
-                return tag_info.buffer->has_data()
-                       || tag_info.error_occurred != TagInfo::Error::no_error
-                       || tag_info.connection_id != tag_conn_id;
+            [&subscription, tag_conn_id]() {
+                return subscription.has_data() || subscription.has_error()
+                       || subscription.id() != tag_conn_id;
             },
-            [&tag_info]() mutable -> std::optional<ValueType> {
+            [&subscription]() mutable -> std::optional<ValueType> {
                 // Don't check error information because the connection could
                 // have errored between storing the value in the buffer and then
                 // retrieving it
-                if (tag_info.buffer->has_data()) {
-                    return *static_cast<ValueType*>(tag_info.buffer->get());
+                if (subscription.has_data()) {
+                    return *static_cast<ValueType*>(subscription.get_data());
                 }
                 else {
                     return std::nullopt;
@@ -174,23 +173,29 @@ public:
     Waiter<void> subscribe(const Ts&... tags) noexcept
     {
         const auto tag_is_not_subscribed = [&](const auto& tag) noexcept {
-            const auto [buffers, lock] = bufs_.get();
+            const auto [subscriptions, lock] = subs_.get();
             (void) lock;
-            return buffers.find(tag.id()) == buffers.cend();
+            return !subscriptions.contains(tag.id());
         };
-        (void)
-            tag_is_not_subscribed; // avoid compiler warning in release buiild
+        (void) tag_is_not_subscribed; // avoid compiler warning in release build
 
         // TODO: Make this std::terminate or something instead?
         assert("Tag attempted to be subscribed to twice!"
                && (... && tag_is_not_subscribed(tags)));
-        using BufferPtr =
-            std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+
+        [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+        for (const auto tag : {tags...}) {
+            if (subscriptions.contains(tag.id())) {
+                Subscription& sub = subscriptions.at(tag.id());
+                sub.reset();
+            }
+            else {
+                subscriptions.insert_or_assign(tag.id(), Subscription(tag));
+            }
+        }
+
         using TagPtr = const AbstractTag*;
-        std::array<BufferPtr, sizeof...(Ts)> ptrs{
-            std::make_unique<typename Ts::BufferType>()...};
         std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
-        init_or_update_subscribe(tag_ptrs, ptrs);
         return get_subscribe_future(tag_ptrs);
     }
 
@@ -200,23 +205,19 @@ public:
         requires IsTag<typename TagContainer::value_type>
     Waiter<void> subscribe_range(const TagContainer& tags) noexcept
     {
-        using IterType = std::decay_t<decltype(tags.begin())>;
-        using TagType = typename std::iterator_traits<IterType>::value_type;
-        using BufferPtr =
-            std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
-        using ValueType = typename TagType::ValueType;
-        using BufferType =
-            UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
-        std::vector<BufferPtr> ptrs(tags.size());
-        std::generate(ptrs.begin(), ptrs.end(), []() noexcept {
-            return std::make_unique<BufferType>();
-        });
         std::vector<const AbstractTag*> tag_span;
         tag_span.reserve(tags.size());
-        for (auto const& t : tags) {
-            tag_span.push_back(&t);
+        [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+        for (auto const& tag : tags) {
+            tag_span.push_back(&tag);
+            if (subscriptions.contains(tag.id())) {
+                Subscription& sub = subscriptions.at(tag.id());
+                sub.reset();
+            }
+            else {
+                subscriptions.insert_or_assign(tag.id(), Subscription(tag));
+            }
         }
-        init_or_update_subscribe(tag_span, ptrs);
         return get_subscribe_future(tag_span);
     }
 
@@ -226,13 +227,9 @@ public:
     Waiter<bool> ip_subscribe(const std::string& address,
                               const Ts&... tags) noexcept
     {
-        using BufferPtr =
-            std::unique_ptr<internal::DiscardOldVersionTagBufferBase>;
+        subscribe(tags...);
         using TagPtr = const AbstractTag*;
-        std::array<BufferPtr, sizeof...(Ts)> ptrs{
-            std::make_unique<typename Ts::BufferType>()...};
         std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
-        init_or_update_subscribe(tag_ptrs, ptrs);
         return get_ip_subscribe_future(address, tag_ptrs);
     }
 
@@ -299,13 +296,11 @@ public:
     template <typename TagPtrContainer>
     Waiter<void> rebuild_tags(const TagPtrContainer& tags)
     {
-        std::vector<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>
-            buf_ptrs{tags.size()};
+        subscribe_range(tags);
         std::vector<const AbstractTag*> tag_ptrs;
         for (auto const& t : tags) {
             tag_ptrs.push_back(std::to_address(t));
         }
-        init_or_update_subscribe(tag_ptrs, buf_ptrs);
         return get_subscribe_future(tag_ptrs);
     }
 
@@ -315,19 +310,16 @@ public:
      */
     Waiter<void> rebuild_missing_tag_connections() noexcept
     {
-        [[maybe_unused]] const auto [buffers, lock] = bufs_.get();
-        std::vector<std::unique_ptr<const AbstractTag>> tags;
-        for (const auto& tag_pair : buffers) {
-            if (tag_pair.second.error_occurred != TagInfo::Error::no_error) {
-                // The expected type here doesn't matter
-                // Also have to remove the first letter as it identifies the
-                // type of tag, but it will just get added again later
-                tags.emplace_back(std::make_unique<Tag<std::uint8_t>>(
-                    tag_pair.first.substr(1)));
-                ;
+        [[maybe_unused]] const auto [subscriptions, lock] = subs_.get();
+        std::vector<const AbstractTag*> missing_tags;
+        for (auto& [tag_id, subscription] : subscriptions) {
+            if (subscription.has_error()) {
+                subscription.reset();
+                const auto& missing_tag = subscription.get_tag();
+                missing_tags.emplace_back(&missing_tag);
             }
         }
-        return rebuild_tags(tags);
+        return get_subscribe_future(missing_tags);
     }
 
     /** \brief Check if a tag's subscription is valid or not
@@ -344,7 +336,7 @@ public:
 
     void wait_for_update()
     {
-        std::unique_lock<std::mutex> lock{bufs_.mutex()};
+        std::unique_lock<std::mutex> lock{subs_.mutex()};
         data_buffer_modified_cv_.wait(lock);
         lock.unlock();
     }
@@ -352,7 +344,7 @@ public:
     template <typename Duration>
     void wait_for_update(Duration duration)
     {
-        std::unique_lock<std::mutex> lock{bufs_.mutex()};
+        std::unique_lock<std::mutex> lock{subs_.mutex()};
         data_buffer_modified_cv_.wait_for(lock, duration);
         lock.unlock();
     }
@@ -384,11 +376,6 @@ private:
     void publish_impl(const AbstractTag& tag,
                       std::span<PublishValueVariant> to_send) noexcept;
 
-    void init_or_update_subscribe(
-        std::span<const AbstractTag* const> tags,
-        std::span<std::unique_ptr<internal::DiscardOldVersionTagBufferBase>>
-            ptr) noexcept;
-
     Waiter<void>
     get_subscribe_future(std::span<const AbstractTag* const> tags) noexcept;
 
@@ -404,28 +391,7 @@ private:
     // The id of the job
     JobID id_;
 
-    // Group all of the related data to a tag ID in a single structure
-    struct TagInfo
-    {
-        // For potential future use
-        // Currently just used as a "is broken" flag essentially
-        enum struct Error
-        {
-            no_error,
-            incorrect_type,
-            disconnected
-        };
-        // The buffer
-        std::unique_ptr<internal::DiscardOldVersionTagBufferBase> buffer;
-        // The expected type
-        std::vector<std::uint8_t> expected_types;
-        // ID for the connection so if a subscription is broken then reformed
-        // they can be differentiated
-        std::uint16_t connection_id;
-        // The error (if any)
-        Error error_occurred;
-    };
-    MutexGuarded<std::unordered_map<std::string, TagInfo>> bufs_;
+    MutexGuarded<std::unordered_map<std::string, Subscription>> subs_;
 
     // The last version published on each tag
     std::unordered_map<std::string, VersionID> last_published_version_;
