@@ -42,9 +42,9 @@ workflow:
       - capnproto-$CI_JOB_NAME_SLUG/
 
 # Extra compilers may be added if you care.
-gcc-12-1-1:
+gcc-10-3-1:
   variables:
-    MODULES: "gcc/12.1.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    MODULES: "gcc/10.3.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
     CXX_COMPILER: "g++"
   extends: .build-and-test
 
