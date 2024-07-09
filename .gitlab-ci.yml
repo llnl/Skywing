@@ -17,10 +17,10 @@ workflow:
 
   stage: build-and-test
 
-  tags: [quartz, batch]
+  tags: [dane, batch]
 
   variables:
-    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr -p pbatch"
+    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr --res=ci"
     GIT_SUBMODULE_STRATEGY: recursive
     GIT_DEPTH: 5
 
@@ -79,15 +79,20 @@ clang-14-0-6:
 
 .build-documentation:
   stage: documentation
-  tags:
-    - oslic
-    - shell
+
+  tags: [dane, shell]
+
+  variables:
+    GIT_DEPTH: 5
+
+  needs: []
+
   script:
-  - rm -rf public/
-  - cd documentation
-  - doxygen
-  - cd ..
-  - mv documentation/html/ public/
+    - rm -rf public/
+    - cd documentation
+    - doxygen
+    - cd ..
+    - mv documentation/html/ public/
 
 # This builds the documentation for commits that are not on the 'main'
 # branch. This is an important test that a given commit doesn't break
