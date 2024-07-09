@@ -20,7 +20,7 @@ workflow:
   tags: [dane, batch]
 
   variables:
-    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr -p pbatch"
+    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr --res=ci"
     GIT_SUBMODULE_STRATEGY: recursive
     GIT_DEPTH: 5
 
