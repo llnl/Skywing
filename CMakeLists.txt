@@ -101,8 +101,11 @@ endif (SKYWING_DEVELOPER_BUILD)
 # Possible submodule dependencies
 if (SKYWING_BUILD_TESTS AND SKYWING_EXTERNAL_CATCH2)
   find_package(Catch2 3.0.0 REQUIRED CONFIG)
+  message(STATUS "Using external Catch2: ${Catch2_DIR}")
+  message(STATUS "Using Catch2 Version: ${Catch2_VERSION}")
 elseif (SKYWING_BUILD_TESTS)
   add_subdirectory(subprojects/catch2/Catch2)
+  message(STATUS "Using Catch2 from submodule.")
 endif ()
 
 if (SKYWING_EXTERNAL_SPDLOG)

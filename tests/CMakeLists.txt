@@ -2,8 +2,8 @@
 if (NOT SKYWING_EXTERNAL_CATCH2)
   list(APPEND CMAKE_MODULE_PATH
     "${PROJECT_SOURCE_DIR}/subprojects/catch2/Catch2/contrib")
-  include(Catch)
 endif ()
+include(Catch)
 
 # NOTE (trb 2023/12/04) -- This should all move into a single catch
 # binary, but there are some technical hurdles to overcome.
