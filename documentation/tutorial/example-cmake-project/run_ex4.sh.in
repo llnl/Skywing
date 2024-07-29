@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [[ $# < 1 ]]; then
+  echo "usage: source $(basename ${BASH_SOURCE[0]}) starting_port=[int] size_of_collective=[int]"
+  return
+fi
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( agent_num=0 ; agent_num < size_of_collective ; agent_num++ ))
+  do
+      var="erase${agent_num}"
+      eval kill -9 \$$var > /dev/null 2> /dev/null
+  done
+}
+
+run_duration=60
+for arg in "$@"
+do
+    # Check if the argument is of the form size=[int]
+    if [[ $arg =~ ^size_of_collective=([0-9]+)$ ]]; then
+        size_of_collective=${BASH_REMATCH[1]}
+        echo "size_of_collective is set to $size_of_collective"
+    fi
+
+    if [[ $arg =~ ^run_duration=([0-9]+)$ ]]; then
+        run_duration=${BASH_REMATCH[1]}
+        echo "run_duration is set to $run_duration"
+    fi
+
+done
+
+for (( agent_num=0 ; agent_num < size_of_collective ; agent_num++ ))
+do
+    echo $<TARGET_FILE:ex4> agent_number=${agent_num} "$@"
+    $<TARGET_FILE:ex4> agent_number=${agent_num} "$@" &
+    declare "erase${agent_num}=$!"
+done
+
+sleep ${run_duration}
+kill_progs

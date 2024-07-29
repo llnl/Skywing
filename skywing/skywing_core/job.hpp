@@ -183,17 +183,19 @@ public:
         assert("Tag attempted to be subscribed to twice!"
                && (... && tag_is_not_subscribed(tags)));
 
-        [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
-        for (const auto tag : {tags...}) {
+	{
+	  [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+	  for (const auto tag : {tags...}) {
             if (subscriptions.contains(tag.id())) {
-                Subscription& sub = subscriptions.at(tag.id());
-                sub.reset();
+	      Subscription& sub = subscriptions.at(tag.id());
+	      sub.reset();
             }
             else {
-                subscriptions.insert_or_assign(tag.id(), Subscription(tag));
+	      subscriptions.insert_or_assign(tag.id(), Subscription(tag));
             }
-        }
-
+	  }
+	}
+	
         using TagPtr = const AbstractTag*;
         std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
         return get_subscribe_future(tag_ptrs);
