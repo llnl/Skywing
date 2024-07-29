@@ -20,7 +20,7 @@ need to acquire yourself beforehand.
 
 ## Dependencies Not Automatically Managed
  * compiler that supports C++20 library
-   * tested: GCC/g++ (10.3.0) and LLVM/clang (14.0.6)
+   * tested: GCC/g++ (12.1.1) and LLVM/clang (14.0.6)
  * CMake (https://cmake.org/)
  * Cap'n Proto (https://capnproto.org/)
    * requires version 1.0 or newer
@@ -82,7 +82,7 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
 ### Building Skywing
  * Load a more recent CMake and switch to more recent version of gcc
    * `ml cmake/3.26.3`
-   * `ml gcc/11.2.1-magic`
+   * `ml gcc/12.1.1-magic`
  * Add capnp prefix directory to `CMAKE_PREFIX_PATH`
    * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/capnp-prefix`
  * Follow build instructions as normal
