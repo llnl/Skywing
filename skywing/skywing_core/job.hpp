@@ -183,9 +183,8 @@ public:
         assert("Tag attempted to be subscribed to twice!"
                && (... && tag_is_not_subscribed(tags)));
 
-	{
-	  [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
-	  for (const auto tag : {tags...}) {
+        [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+        for (const auto& tag : {tags...}) {
             if (subscriptions.contains(tag.id())) {
 	      Subscription& sub = subscriptions.at(tag.id());
 	      sub.reset();
