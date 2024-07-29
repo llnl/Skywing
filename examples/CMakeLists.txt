@@ -6,7 +6,6 @@ add_subdirectory(hello_world)
 add_subdirectory(mean_or_sum)
 add_subdirectory(power_method)
 add_subdirectory(sync_jacobi)
-add_subdirectory(multiple_jobs)
 
 if (SKYWING_BUILD_LC_EXAMPLES)
   add_subdirectory(lc_hello_world)

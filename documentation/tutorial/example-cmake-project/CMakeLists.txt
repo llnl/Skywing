@@ -7,7 +7,7 @@ project(Skywing_CMake_Example
 # This handles all dependencies of Skywing, too.
 find_package(Skywing REQUIRED)
 
-set(example_names ex1 ex2 ex3)
+set(example_names ex1 ex2 ex3 ex4)
 foreach (name ${example_names})
   # Build the executable for this example
   add_executable(${name} ${name}.cpp)
@@ -19,3 +19,8 @@ foreach (name ${example_names})
     INPUT run_${name}.sh.in
     FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 endforeach()
+
+file(GENERATE
+  OUTPUT plot_results_ex4.py
+  INPUT plot_results_ex4.py
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
