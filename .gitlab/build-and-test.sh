@@ -181,7 +181,7 @@ echo "  Building tutorial examples"
 echo "----------------------------------------------------------------------"
 
 export CMAKE_PREFIX_PATH=${INSTALL_DIR}:${CMAKE_PREFIX_PATH}
-if [[ -z "${CXX_FLAGS:+x}" ]]
+if [[ -z "${CXXFLAGS:+x}" ]]
 then
     export CXXFLAGS="${ASAN_FLAGS}"
 else
