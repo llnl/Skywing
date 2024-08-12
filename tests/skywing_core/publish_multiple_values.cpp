@@ -26,12 +26,12 @@ void machine_task(const NetworkInfo* const info, const int index)
     Manager base_manager{
         static_cast<std::uint16_t>(get_starting_port() + index),
         std::to_string(index)};
+    configure_network(*info, base_manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1",
+                                             get_starting_port() + i);
+    });
     base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
-        connect_network(
-            *info, manager, index, [](ManagerHandle& m, const int i) {
-                return m.connect_to_server("127.0.0.1", get_starting_port() + i)
-                    .get();
-            });
+        check_network_configuration(*info, manager, index);
         if (index == 0) {
             job.subscribe(tag1).get();
             // Declare publication intent after subscribing so that the other

@@ -78,7 +78,7 @@ public:
   BatteryChargeSensor(size_t order, double decay_rate)
     : order_(order), decay_rate_(decay_rate),
       gen_(std::random_device{}()), dist_(0.0, 1.0)
-  {    
+  {
     for (size_t i = 1; i <= order; i++)
       decay_coefficients_.push_back
 	(-1 * binomialCoefficients(order, i) * pow(-decay_rate, i));
@@ -118,7 +118,7 @@ public:
       it_coef++;
       it_vals++;
     }
-    
+
     // if already have `order_` prior values, remove last one
     prior_values_.push_front(new_val);
     if (prior_values_.size() > order_)
@@ -136,7 +136,7 @@ private:
   std::mt19937 gen_;
   std::normal_distribution<double> dist_;
   std::mutex mut_;
-  
+
 }; // class BatteryChargeSensor
 
 /* @brief Skywing Job to gather sensor readings and communicate them
@@ -145,21 +145,11 @@ private:
 void gather_battery_charge_job(Job& job,
 			       ManagerHandle manager_handle,
 			       size_t agent_number,
-			       size_t agent_port,
 			       std::shared_ptr<BatteryChargeSensor> sensor,
 			       size_t run_duration)
 {
     (void) manager_handle; // required but not needed parameter
 
-    // Initial agent connection boilerplate. Only needed on one agent.
-    if (agent_number != 0)
-    {
-      while (!manager_handle.connect_to_server("127.0.0.1", agent_port - 1).get())
-        {
-	  std::cout << "Agent " << agent_number << " failed to connect. Trying again." << std::endl;
-	}
-    }
-    
     // set up battery sensor publication
     BatteryChargeTag sensor_reading_tag("sensor_reading" + std::to_string(agent_number));
     job.declare_publication_intent(sensor_reading_tag);
@@ -204,7 +194,7 @@ void calculate_total_charge_job(Job& job,
     BatteryChargeTag sensor_reading_tag("sensor_reading" + std::to_string(agent_number));
     auto waiter = job.subscribe(sensor_reading_tag);
     waiter.wait();
-    
+
     // set up iterative method:
     // 1. Establish pub/subs for iteration in a circle topology around the collective.
     size_t i = agent_number;
@@ -299,16 +289,16 @@ void decide_on_actions_job(Job& job,
 	  sensor->set_sensor_mean(0.0);
 	  print_message(agent_number, "Flow: " + std::to_string(0.0));
 	}
-	
+
 	std::this_thread::sleep_for(std::chrono::milliseconds(decision_frequency_ms));
-      }	
+      }
     }
 }
 
 int main(int argc, char* argv[])
 {
     start_time = std::chrono::steady_clock::now();
-  
+
     // Error checking for the number of arguments
     if (argc < 4) {
         std::cout << "Not Enough Arguments: " << argc << std::endl;
@@ -318,7 +308,7 @@ int main(int argc, char* argv[])
     // collect command line arguments
     ArgParser arg_parser({"agent_number", "starting_port", "size_of_collective",
 	"AR_order", "AR_constant", "run_duration"}, argc, argv);
-    
+
     size_t agent_number = arg_parser.get_arg<size_t>("agent_number");
     std::uint16_t starting_port_number = arg_parser.get_arg<std::uint16_t>("starting_port");
     size_t size_of_collective = arg_parser.get_arg<size_t>("size_of_collective");
@@ -336,10 +326,10 @@ int main(int argc, char* argv[])
     std::shared_ptr<BatteryChargeSensor> sensor = std::make_shared<BatteryChargeSensor>(AR_order, AR_constant);
 
     // define job to gather individual battery charge level
-    auto gather_battery_charge_lambda = [agent_number, ports, sensor, run_duration]
+    auto gather_battery_charge_lambda = [agent_number, sensor, run_duration]
       (Job& job, ManagerHandle manager_handle) {
       gather_battery_charge_job(job, manager_handle, agent_number,
-				ports[agent_number], sensor, run_duration);
+				sensor, run_duration);
     };
 
     // define job to calculate collective total charge level
@@ -356,6 +346,12 @@ int main(int argc, char* argv[])
     };
 
     skywing::Manager manager{ports[agent_number], "agent" + std::to_string(agent_number)};
+    // Initial agent connection boilerplate.
+    if (agent_number != 0)
+    {
+      manager.configure_initial_neighbors("127.0.0.1", ports[agent_number] - 1);
+    }
+
     manager.submit_job("gather_battery_charge_job", gather_battery_charge_lambda);
     manager.submit_job("calculate_total_charge_job", calculate_total_charge_lambda);
     manager.submit_job("decide_on_action_job", decide_on_actions_lambda);

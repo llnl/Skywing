@@ -58,45 +58,30 @@ void runJob(const MachineConfig& config,
     std::cout << "Agent " << config.name << " is listening on port "
               << config.port << std::endl;
     skywing::Manager manager(config.port, config.name);
+
+    // Configure initial handshake connections between neighboring
+    // agents (Note: the actual connections are made later).
+    std::vector<std::tuple<std::string, uint16_t>> neighbor_address_port_pairs;
+    for (const auto& serverMachineName : config.serverMachineNames) {
+        const auto serverMachineNameIter = machines.find(serverMachineName);
+        if (serverMachineNameIter == machines.cend()) {
+            std::cerr << "Could not find machine \"" << serverMachineName
+                      << "\" to initiate connection to.\n";
+        }
+        neighbor_address_port_pairs.emplace_back(
+            serverMachineNameIter->second.remoteAddress.c_str(),
+            serverMachineNameIter->second.port);
+    }
+    // Connecting to the server is an asynchronous operation and can
+    // fail. We want to wait for the result and keep attempting to connect
+    // until a timeout of 30 seconds.
+    manager.configure_initial_neighbors(neighbor_address_port_pairs,
+                                        std::chrono::seconds(30));
     manager.submit_job(
         "job", [&](skywing::Job& job, skywing::ManagerHandle managerHandle) {
             std::cout << "Agent " << agent_id << " beginning the job."
                       << std::endl;
-
-            // standard connectivity boilerplate, should get a convenience
-            // function
-            for (const auto& serverMachineName : config.serverMachineNames) {
-                const auto serverMachineNameIter =
-                    machines.find(serverMachineName);
-                if (serverMachineNameIter == machines.cend()) {
-                    std::cerr << "Could not find machine \""
-                              << serverMachineName << "\" to connect to.\n";
-                }
-                const auto timeLimit =
-                    std::chrono::steady_clock::now() + std::chrono::seconds{30};
-                while (
-                    !managerHandle
-                         .connect_to_server(serverMachineNameIter->second
-                                                .remoteAddress.c_str(),
-                                            serverMachineNameIter->second.port)
-                         .get())
-                {
-                    if (std::chrono::steady_clock::now() > timeLimit) {
-                        std::cerr << config.name
-                                  << ": Took too long to connect to "
-                                  << serverMachineNameIter->second.remoteAddress
-                                  << ":" << serverMachineNameIter->second.port
-                                  << '\n';
-                        return;
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds{10});
-                }
-            }
-
-            std::cout << "Machine " << config.name << " finished connecting."
-                      << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds{4});
-
+            (void) managerHandle;
             std::vector<pubtag_t> tags;
             for (unsigned i = 0; i < num_total_agents; i++)
                 tags.push_back(pubtag_t{"tag" + std::to_string(i)});

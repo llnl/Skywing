@@ -10,6 +10,10 @@ namespace skywing
 std::thread Job::Accessor::run(Job& j) noexcept
 {
     return std::thread{[&j]() {
+        // Make the initial neighbor connection here. This
+        // is done in this location of the code (as opposed to
+        // within the manager) because it must be done asynchronously.
+        j.manager_->make_neighbor_connection();
         j.to_run_(j, ManagerHandle{*j.manager_});
         // Re-use the buffer mutex here
         std::lock_guard lock{j.subs_.mutex()};

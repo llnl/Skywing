@@ -11,8 +11,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include "skywing_core/manager.hpp"
 #include "skywing_core/internal/tag_buffer.hpp"
+#include "skywing_core/manager.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 namespace skywing
@@ -161,34 +161,40 @@ inline NetworkInfo make_network(const int num_machines,
     return to_ret;
 }
 
-// Performs the required steps to create the network from a NetworkInfo
+// Performs the required steps to configure the network from a NetworkInfo
 // The connection argument should have the signature `void(ManagerHandle, int)`
 // with the int parameter corresponding to the index of the machine to
-// connect to, and blocking until connected
-// Connect should return a bool indicating if the connection was successful
+// connect to, and blocking until connected (or timeout)
 template <typename Callable>
-void connect_network(const NetworkInfo& info,
-                     ManagerHandle& manager,
-                     const int index,
-                     Callable connect)
+void configure_network(const NetworkInfo& info,
+                       Manager& manager,
+                       const int index,
+                       Callable connect)
+{
+    for (const auto connect_to : info.connect_to[index]) {
+        connect(manager, connect_to);
+    }
+}
+
+// This checks that the initial requested connections have been made.
+inline void check_network_configuration(const NetworkInfo& info,
+                                        ManagerHandle& manager,
+                                        const int index)
 {
     using namespace std::chrono_literals;
-    for (const auto connect_to : info.connect_to[index]) {
-        while (!connect(manager, connect_to)) { /* nothing */
-        }
-    }
     while (manager.number_of_neighbors() != info.num_connections[index]) {
         std::this_thread::sleep_for(1ms);
     }
 }
 
-template<typename... Ts>
+template <typename... Ts>
 class SubscribeDataAssert
 {
 public:
     SubscribeDataAssert() = delete;
     SubscribeDataAssert(std::span<PublishValueVariant> data)
-        : data_{internal::detail::make_value<Ts...>(data, std::index_sequence_for<Ts...>{})}
+        : data_{internal::detail::make_value<Ts...>(
+            data, std::index_sequence_for<Ts...>{})}
     {}
 
     void isStoredUnderTag(const Tag<Ts...>& tag, Job& job)

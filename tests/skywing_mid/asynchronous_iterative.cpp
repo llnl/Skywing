@@ -41,11 +41,11 @@ void machine_task(const NetworkInfo* const info, const int index)
     const std::vector<std::string> tag_ids{"tag0", "tag1", "tag2"};
 
     Manager base_manager{ports[index], std::to_string(index)};
+    configure_network(*info, base_manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1", ports[i]);
+    });
     base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
-        connect_network(
-            *info, manager, index, [&](ManagerHandle m, const int i) {
-                return m.connect_to_server("127.0.0.1", ports[i]).get();
-            });
+        check_network_configuration(*info, manager, index);
 
         using IterMethod = AsynchronousIterative<TestAsyncProcessor,
                                                  AlwaysPublish,

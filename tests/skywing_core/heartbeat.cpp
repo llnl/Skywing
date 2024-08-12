@@ -25,12 +25,12 @@ void machine_task(const NetworkInfo* const info, const int index)
         static_cast<std::uint16_t>(get_starting_port() + index),
         std::to_string(index),
         heartbeat_interval};
+    configure_network(*info, base_manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1",
+                                             get_starting_port() + i);
+    });
     base_manager.submit_job("dummy job", [&](Job&, ManagerHandle manager) {
-        connect_network(
-            *info, manager, index, [&](ManagerHandle m, const int i) {
-                return m.connect_to_server("127.0.0.1", get_starting_port() + i)
-                    .get();
-            });
+        check_network_configuration(*info, manager, index);
         std::this_thread::sleep_for(heartbeat_interval * 10);
     });
     base_manager.run();

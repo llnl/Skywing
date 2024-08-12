@@ -44,33 +44,24 @@ constexpr std::array<std::array<int, 3>, 5> to_connect{
 
 using Uint64Tag = Tag<std::uint64_t>;
 
-void setup_network(ManagerHandle manager,
-                   std::vector<std::uint16_t> const& ports,
-                   const std::size_t index)
-{
-    using namespace std::chrono_literals;
-    // Connect to the corresponding machines (if any)
-    for (const auto& machine : to_connect[index]) {
-        if (machine == -1) {
-            break;
-        }
-        while (!manager.connect_to_server("127.0.0.1", ports[machine]).get())
-        { /* nothing */
-        }
-    }
-    // Wait until all machines have connected
-    while (manager.number_of_neighbors() != machine_counts[index]) {
-        std::this_thread::sleep_for(10ms);
-    }
-}
-
 void machine_task(const std::size_t index,
                   std::vector<std::uint16_t> const& ports)
 {
     Manager base_manager{ports[index], machine_names[index]};
+    // Configure connection to the corresponding machines (if any)
+    for (const auto& machine : to_connect[index]) {
+        if (machine == -1) {
+            break;
+        }
+        base_manager.configure_initial_neighbors("127.0.0.1", ports[machine]);
+    }
     // Submit job and broadcast on the job using each machine
     base_manager.submit_job("job 0", [&](Job& the_job, ManagerHandle manager) {
-        setup_network(manager, ports, index);
+        using namespace std::chrono_literals;
+        // Wait until all machines have connected
+        while (manager.number_of_neighbors() != machine_counts[index]) {
+            std::this_thread::sleep_for(10ms);
+        }
         the_job.declare_publication_intent(Uint64Tag{tag_names[index]});
         // Subscribe to everything ahead of time
         // Things trying to subscribe to each other concurrently can cause the

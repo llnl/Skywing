@@ -68,26 +68,17 @@ void machine_task(const int machine_number,
 {
     skywing::Manager manager{ports[machine_number],
                              machine_names[machine_number]};
-
+    // Configure initial handshake connections between neighboring
+    // agents (Note: the actual connections are made later).
+    if (machine_number != (static_cast<int>(ports.size()) - 1)) {
+        // Connecting to the server is an asynchronous operation and can
+        // fail. We want to wait for the result each time and keep attempting to
+        // connect until a timeout of two minutes.
+        manager.configure_initial_neighbors(
+            "127.0.0.1", ports[machine_number + 1], std::chrono::seconds(120));
+    }
     manager.submit_job(
         "job", [&](skywing::Job& job, ManagerHandle manager_handle) {
-            std::cout << "Agent " << machine_number
-                      << " about to connect to neighbors." << std::endl;
-            if (machine_number != (static_cast<int>(ports.size()) - 1)) {
-                // Connecting to the server is an asynchronous operation and can
-                // fail. Wait for the result each time and keep attempting to
-                // connect until it does
-                while (!manager_handle
-                            .connect_to_server("127.0.0.1",
-                                               ports[machine_number + 1])
-                            .get())
-                {
-                    // Empty
-                }
-            }
-            std::cout << "Agent " << machine_number
-                      << " finished connecting to neighbors." << std::endl;
-
             using IterMethod = SynchronousIterative<JacobiProcessor<double>,
                                                     StopAfterTime,
                                                     TrivialResiliencePolicy>;

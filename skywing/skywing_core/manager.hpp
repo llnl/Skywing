@@ -281,6 +281,24 @@ public:
      */
     ~Manager();
 
+    /** \brief Configure the initial neighbor connections to be made
+     */
+    void configure_initial_neighbors(
+        const std::vector<std::tuple<std::string, uint16_t>>&
+            neighbor_address_port_pairs,
+        std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
+
+    /** \brief Configure the initial neighbor connections to be made
+     */
+    void configure_initial_neighbors(
+        const std::string address,
+        const std::uint16_t port,
+        std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
+
+    /** \brief Initiate the initial connections to neighbors
+     */
+    void make_neighbor_connection() noexcept;
+
     /** \brief Creates a job for the manager to execute that produces the
      * specified tags.
      *
@@ -414,7 +432,6 @@ private:
 
     Waiter<bool> connect_to_server(const char* const address,
                                    const std::uint16_t port) noexcept;
-    Waiter<bool> connect_to_server(std::string_view address) noexcept;
     size_t number_of_neighbors() const noexcept;
     size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
     std::uint16_t port() const noexcept;
@@ -678,6 +695,14 @@ private:
     // the CV's can use notifications while the mutex is released
     bool notify_subscriptions_ = false;
     bool notify_connection_ = false;
+
+    // Requested initial neighbor address and port pairs for connections
+    mutable std::vector<std::tuple<std::string, uint16_t>>
+        initial_neighbor_address_port_pairs_;
+
+    // Maximum time to wait for initial neighbor connection to be established
+    mutable std::chrono::seconds initial_neighbor_connection_timeout_;
+
 }; // class Manager
 
 class ManagerHandle
@@ -693,13 +718,6 @@ public:
                                    const std::uint16_t port) noexcept
     {
         return handle_->connect_to_server(address, port);
-    }
-
-    /** \brief Connects to another instance with the address:port format
-     */
-    Waiter<bool> connect_to_server(std::string_view address) noexcept
-    {
-        return handle_->connect_to_server(address);
     }
 
     /** \brief Returns the number of machines connected
