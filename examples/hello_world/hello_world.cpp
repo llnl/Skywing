@@ -45,27 +45,27 @@ int main(const int argc, const char* const argv[])
     // communication between agents.
     Manager manager(ports[agent_num], agent_name);
 
+    // Configure initial handshake connections between neighboring
+    // agents (Note: the actual connections are made later).
+    // Every agent does NOT need to be neighbors (or even
+    // aware of) all agents in the collective. The requirement is only
+    // that the set of connections, when viewed as edges in an
+    // undirected graph, forms a connected graph.
+    // In this call, Agent 2 will reach out to Agent 1, and Agent 1
+    // will reach out to Agent 0. Agent 0 will not directly reach out
+    // to any agent, but this is fine as the graph will still be
+    // connected. Note that in a true deployment, the need for
+    // resilience would demand additional connections so that the
+    // failure of a single Agent can't disconnect the graph.
+    if (agent_num > 0) {
+        manager.configure_initial_neighbors("localhost", ports[agent_num - 1]);
+    }
+
     // Create the function that will be passed to the Skywing manager as
     // a Job. Everything inside this lambda function will execute in its
     // own thread once we call `manager.run()`.
     auto pubsub_job = [&](Job& job, ManagerHandle manager_handle) {
-        // Create initial handshake connections between neighboring
-        // agents. Every agent does NOT need to be neighbors (or even
-        // aware of) all agents in the collective. The requirement is only
-        // that the set of connections, when viewed as edges in an
-        // undirected graph, forms a connected graph.
-        // In this call, Agent 2 will reach out to Agent 1, and Agent 1
-        // will reach out to Agent 0. Agent 0 will not directly reach out
-        // to any agent, but this is fine as the graph will still be
-        // connected. Note that in a true deployment, the need for
-        // resilience would demand additional connections so that the
-        // failure of a single Agent can't disconnect the graph.
-        if (agent_num > 0)
-            while (!manager_handle
-                        .connect_to_server("localhost", ports[agent_num - 1])
-                        .get())
-                ;
-
+        (void) manager_handle;
         // Each agent declares that it intends to publish a stream under a given
         // tag.
         job.declare_publication_intent(tags[agent_num]);

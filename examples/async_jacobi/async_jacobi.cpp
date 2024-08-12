@@ -70,23 +70,15 @@ void machine_task(int machine_number,
     skywing::Manager manager{ports[machine_number],
                              machine_names[machine_number]};
 
+    if (machine_number != static_cast<int>((ports.size()) - 1)) {
+        // Connecting to the server is an asynchronous operation and can
+        // fail. We use the default time of waiting 10 seconds to connect.
+        manager.configure_initial_neighbors("127.0.0.1",
+                                            ports[machine_number + 1]);
+    }
+
     manager.submit_job(
         "job", [&](skywing::Job& job, ManagerHandle manager_handle) {
-            if (machine_number != static_cast<int>((ports.size()) - 1)) {
-                // Connecting to the server is an asynchronous operation and can
-                // fail.
-                while (!manager_handle
-                            .connect_to_server("127.0.0.1",
-                                               ports[machine_number + 1])
-                            .get())
-                {
-                    std::cout << "Machine " << machine_number
-                              << " trying to connect to "
-                              << ports[machine_number + 1] << std::endl;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                }
-            }
-
             std::cout << "Machine " << machine_number
                       << " creating iteration object." << std::endl;
 

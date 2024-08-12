@@ -25,12 +25,6 @@ std::unordered_map<std::size_t, std::vector<int>> publish_values{
     {2, std::vector<int>{2, 30}},
     {3, std::vector<int>{3, 40}}};
 
-// const std::map<PrivateValueTag, std::vector<std::string>> nodes{
-//   {private_tags[0], {"localhost:" + std::to_string(ports[0]), "localhost:" +
-//   std::to_string(ports[1])}}, {private_tags[1], {"localhost:" +
-//   std::to_string(ports[2]), "localhost:" + std::to_string(ports[3])}}
-// };
-
 void machine_task(const NetworkInfo* const info, const int index)
 {
     auto const start_port = get_starting_port();
@@ -41,11 +35,12 @@ void machine_task(const NetworkInfo* const info, const int index)
         static_cast<std::uint16_t>(start_port + 3)};
 
     Manager base_manager{ports[index], std::to_string(index)};
+    configure_network(*info, base_manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1", ports[i]);
+    });
     base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
-        connect_network(
-            *info, manager, index, [&](ManagerHandle m, const int i) {
-                return m.connect_to_server("127.0.0.1", ports[i]).get();
-            });
+        check_network_configuration(*info, manager, index);
+
         ///////////////////////////////
         // Normal iterative method
         ///////////////////////////////

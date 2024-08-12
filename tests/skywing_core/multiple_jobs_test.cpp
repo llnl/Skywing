@@ -26,11 +26,7 @@ void job_fun(Job& job,
              const int agent_index,
              const int job_index)
 {
-    connect_network(
-        *info, manager_handle, agent_index, [](ManagerHandle& m, const int i) {
-            return m.connect_to_server("127.0.0.1", get_starting_port() + i)
-                .get();
-        });
+    check_network_configuration(*info, manager_handle, agent_index);
     int job_offset = 2 * job_index;
     int my_index = job_offset + agent_index;
     int other_job_index = job_offset + (1 - agent_index);
@@ -64,6 +60,10 @@ void agent_task(const NetworkInfo* const info, const int index)
     Manager manager{static_cast<std::uint16_t>(get_starting_port() + index),
                     std::to_string(index)};
 
+    configure_network(*info, manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1",
+                                             get_starting_port() + i);
+    });
     auto job0 = [&](Job& job, ManagerHandle manager_handle) {
         job_fun(job, manager_handle, info, index, 0);
     };

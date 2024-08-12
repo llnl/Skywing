@@ -19,19 +19,23 @@ constexpr int num_machines = 4;
 
 using Int32Tag = Tag<std::int32_t>;
 
-void setup_network(const int index, ManagerHandle manager)
+void configure_network(const int index, Manager& manager)
 {
-    using namespace std::chrono_literals;
-    // Give some time to allow all of the servers to start
-    std::this_thread::sleep_for(10ms);
     // Fully connect the network to ensure that at any point all machines can
     // have a broadcast reach every other machine
-    for (int i = 0; i < index; ++i) {
-        while (!manager.connect_to_server("127.0.0.1", get_starting_port() + i)
-                    .get())
-        { /* nothing */
-        }
-    }
+    std::vector<std::tuple<std::string, uint16_t>> address_port_pairs(index);
+    for (int i = 0; i < index; ++i)
+        address_port_pairs[i] =
+            std::make_tuple("127.0.0.1", get_starting_port() + i);
+    manager.configure_initial_neighbors(address_port_pairs);
+}
+
+void check_network(ManagerHandle manager)
+{
+    using namespace std::chrono_literals;
+
+    // Give some time to allow all of the servers to start
+    std::this_thread::sleep_for(10ms);
     while (manager.number_of_neighbors() != num_machines - 1) {
         std::this_thread::sleep_for(1ms);
     }
@@ -45,11 +49,12 @@ void machine_task(
     using namespace std::chrono_literals;
     Manager manager{static_cast<std::uint16_t>(get_starting_port() + index),
                     std::to_string(index)};
+    configure_network(index, manager);
     const auto publish_num =
         *std::find(disconnect_order.cbegin(), disconnect_order.cend(), index);
     const Int32Tag publish_tag{std::to_string(publish_num)};
     manager.submit_job("Job 0", [&](Job& my_job, ManagerHandle manager) {
-        setup_network(index, manager);
+        check_network(manager);
         my_job.declare_publication_intent(publish_tag);
         std::vector<std::string> subscribe_to;
         for (int i = 0; i < num_machines; ++i) {

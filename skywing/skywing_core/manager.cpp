@@ -438,41 +438,6 @@ Manager::Manager(const std::uint16_t port,
     }
 }
 
-// Manager::Manager(const BuildManagerInfo& info) noexcept
-//   : Manager{info.port, info.name,
-//   std::chrono::milliseconds{info.heartbeat_interval_in_ms}}
-// {
-//   // TODO: This blocks until it is ready.  I guess that's fine though?
-//   // Connect to the other machines now
-//   auto connections_left = info.to_connect_to;
-//   while (!connections_left.empty())
-//   {
-//     for (auto iter = connections_left.begin(); iter !=
-//     connections_left.end(); /* nothing */)
-//     {
-//       const bool already_has_connection = [&]() {
-//         for (const auto& neighbor : neighbors_)
-//         {
-//           if (neighbor.second.address() == *iter)
-//           {
-//             return true;
-//           }
-//         }
-//         return false;
-//       }();
-//       if (already_has_connection || connect_to_server(*iter))
-//       {
-//         iter = connections_left.erase(iter);
-//       }
-//       else
-//       {
-//         ++iter;
-//       }
-//     }
-//     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-//   }
-// }
-
 Manager::~Manager()
 {
     send_to_neighbors(internal::make_goodbye());
@@ -508,12 +473,6 @@ Waiter<bool> Manager::connect_to_server(const char* const address,
                                  *this, canonical.first, canonical.second},
                              internal::ManagerGetConnectionSuccess{
                                  *this, canonical.first, canonical.second});
-}
-
-Waiter<bool> Manager::connect_to_server(std::string_view address) noexcept
-{
-    const auto [addr, port] = internal::split_address(address);
-    return connect_to_server(addr.c_str(), port);
 }
 
 void Manager::accept_pending_connections() noexcept
@@ -554,6 +513,43 @@ size_t Manager::number_of_neighbors() const noexcept
     return neighbors_.size();
 }
 
+void Manager::configure_initial_neighbors(
+    const std::vector<std::tuple<std::string, uint16_t>>&
+        neighbor_address_port_pairs,
+    std::chrono::seconds timeout) noexcept
+{
+    for (const auto& neighbor : neighbor_address_port_pairs) {
+        initial_neighbor_address_port_pairs_.emplace_back(neighbor);
+    }
+    initial_neighbor_connection_timeout_ = timeout;
+}
+
+// NOTE: If calling multiple times, will overwrite the previously set timeout
+// values
+void Manager::configure_initial_neighbors(const std::string address,
+                                          const std::uint16_t port,
+                                          std::chrono::seconds timeout) noexcept
+{
+    initial_neighbor_address_port_pairs_.emplace_back(
+        std::make_tuple(address, port));
+    initial_neighbor_connection_timeout_ = timeout;
+}
+
+void Manager::make_neighbor_connection() noexcept
+{
+    for (const auto& [ip, port] : initial_neighbor_address_port_pairs_) {
+        const auto time_limit = std::chrono::steady_clock::now()
+                                + initial_neighbor_connection_timeout_;
+        while (!connect_to_server(ip.c_str(), port).get()) {
+            if (std::chrono::steady_clock::now() > time_limit) {
+                SKYWING_DEBUG_LOG(
+                    "WARNING: Took too long to connect to {} : {}", ip, port);
+                return;
+            }
+        }
+    }
+}
+
 bool Manager::submit_job(
     JobID name, std::function<void(Job&, ManagerHandle)> to_run) noexcept
 {
@@ -582,7 +578,7 @@ void Manager::run() noexcept
             // std::cout << "Agent " << id() << " at top of loop." << std::endl;
             std::lock_guard lock{job_mut_};
             // std::cout << "Agent " << id() << " acquired mutex." << std::endl;
-            //  Remove any finished jobs
+            //   Remove any finished jobs
             for (auto iter = jobs_.begin(); iter != jobs_.end();) {
                 std::unique_lock lock{Job::Accessor::get_mutex(iter->second),
                                       std::try_to_lock};

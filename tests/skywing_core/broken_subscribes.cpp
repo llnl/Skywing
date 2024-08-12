@@ -37,12 +37,10 @@ void publish_once(int publish_number, std::uint16_t publish_port)
     // disconnected so it won't discard this connection for re-using the id
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     Manager base_manager{publish_port, publisher_id};
+    base_manager.configure_initial_neighbors("127.0.0.1",
+                                             subscriber_start_port());
     base_manager.submit_job("job", [&](Job& job, ManagerHandle manager) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        while (!manager.connect_to_server("127.0.0.1", subscriber_start_port())
-                    .get())
-        { /* nothing */
-        }
         job.declare_publication_intent(value_tag);
         while (manager.number_of_subscribers(value_tag) == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));

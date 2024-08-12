@@ -70,22 +70,17 @@ void machine_task(int machine_number,
 {
     skywing::Manager manager{ports[machine_number],
                              machine_names[machine_number]};
-
+    // Configure initial handshake connections between neighboring
+    // agents (Note: the actual connections are made later).
+    if (machine_number != static_cast<int>((ports.size()) - 1)) {
+        // Connecting to the server is an asynchronous operation and can
+        // fail. We want to wait for the result and keep attempting to connect
+        // until a timeout of two minutes.
+        manager.configure_initial_neighbors(
+            "127.0.0.1", ports[machine_number + 1], std::chrono::seconds(120));
+    }
     manager.submit_job(
         "job", [&](skywing::Job& job, ManagerHandle manager_handle) {
-            if (machine_number != static_cast<int>((ports.size()) - 1)) {
-                // Connecting to the server is an asynchronous operation and can
-                // fail. Wait for the result each time and keep attempting to
-                // connect until it does
-                while (!manager_handle
-                            .connect_to_server("127.0.0.1",
-                                               ports[machine_number + 1])
-                            .get())
-                {
-                    // Empty
-                }
-            }
-
             // make gossip connections in a circle
             int i = machine_number;
             size_t number_of_neighbors = 2;

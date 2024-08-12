@@ -15,14 +15,12 @@ int main(const int argc, const char* const argv[])
     size_t machine_num = std::stoul(argv[1]);
     std::string machine_name = std::string("machine") + argv[1];
     Manager manager(ports[machine_num], machine_name);
-    auto pubsub_job = [&](Job& job, ManagerHandle manager_handle) {
-        // make initial connections
-        if (machine_num > 0)
-            while (!manager_handle
-                        .connect_to_server("localhost", ports[machine_num - 1])
-                        .get())
-            {};
+    // make initial connections
+    if (machine_num > 0)
+        manager.configure_initial_neighbors("localhost",
+                                            ports[machine_num - 1]);
 
+    auto pubsub_job = [&](Job& job, ManagerHandle manager_handle) {
         // declare publication, subscribe and wait for subscriptions
         job.declare_publication_intent(tags[machine_num]);
         for (size_t i = machine_num; i < tags.size(); i++)

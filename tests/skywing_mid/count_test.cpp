@@ -28,13 +28,14 @@ void machine_task(const NetworkInfo* const info, const int index)
     const std::vector<std::string> tag_ids{"tag0", "tag1", "tag2", "tag3"};
 
     Manager base_manager{ports[index], std::to_string(index)};
+    std::cout << "Machine " << index << " configuring connections."
+              << std::endl;
+    configure_network(*info, base_manager, index, [&](Manager& m, const int i) {
+        return m.configure_initial_neighbors("127.0.0.1", ports[i]);
+    });
     base_manager.submit_job("job", [&](Job& job_handle, ManagerHandle manager) {
-        std::cout << "Machine " << index << " about to make connections."
-                  << std::endl;
-        connect_network(
-            *info, manager, index, [&](ManagerHandle m, const int i) {
-                return m.connect_to_server("127.0.0.1", ports[i]).get();
-            });
+        check_network_configuration(*info, manager, index);
+
         std::cout << "Machine " << index << " about to build itermethod."
                   << std::endl;
         using IterMethod = AsynchronousIterative<QUACCProcessor<>,

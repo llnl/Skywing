@@ -64,32 +64,20 @@ void asynchronous_iterative(
         std::cerr << config.name << ": Must produce at least one tag\n";
         std::exit(1);
     }
+    // Set-up the requested initial neighbor connections
+    for (const auto& connect_to_name : config.machines_to_connect_to) {
+        const auto conn_to_iter = machines.find(connect_to_name);
+        if (conn_to_iter == machines.cend()) {
+            std::cerr << "Could not find machine \"" << connect_to_name
+                      << "\" to connect to.\n";
+        }
+        manager.configure_initial_neighbors("127.0.0.1",
+                                            conn_to_iter->second.port);
+    }
     manager.submit_job(
         "job", [&](skywing::Job& job, skywing::ManagerHandle manager_handle) {
-            for (const auto& connect_to_name : config.machines_to_connect_to) {
-                const auto conn_to_iter = machines.find(connect_to_name);
-                if (conn_to_iter == machines.cend()) {
-                    std::cerr << "Could not find machine \"" << connect_to_name
-                              << "\" to connect to.\n";
-                }
-                const auto time_limit =
-                    std::chrono::steady_clock::now() + std::chrono::seconds{10};
-                while (!manager_handle
-                            .connect_to_server("127.0.0.1",
-                                               conn_to_iter->second.port)
-                            .get())
-                {
-                    if (std::chrono::steady_clock::now() > time_limit) {
-                        std::cerr << config.name
-                                  << ": Took too long to connect to "
-                                  << conn_to_iter->second.remote_address << ":"
-                                  << conn_to_iter->second.port << '\n';
-                        return;
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds{10});
-                }
-            }
             job.declare_publication_intent_range(config.tags_produced);
+            (void) manager_handle;
             // Subscribe to all the relevant tags
             auto fut = job.subscribe_range(config.tags_to_subscribe_to);
             if (!fut.wait_for(std::chrono::seconds(10))) {
