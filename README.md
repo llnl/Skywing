@@ -90,6 +90,12 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
  * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
 
 ### Running Skywing
+
+**WARNING**: To comply with LC security policy, allocated jobs must
+enable IP isolation. For SLURM jobs, add `--ip-isolate=yes` to the
+`salloc` command. For LSF jobs, add `-alloc_flags ipisolate` to the
+`bsub` command.
+
  * If there are issues finding CapnProto libraries at runtime, please
    file a bug with the development team. In the meantime, adding the
    appropriate path to `LD_LIBRARY_PATH` can often get you moving:

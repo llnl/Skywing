@@ -4,6 +4,7 @@
 #SBATCH -t 00:05:00
 #SBATCH -p pbatch
 #SBATCH -o lc_hello_world_out.txt
+#SBATCH --ip-isolate=yes
 
 #### Shell commands
 python3 generate_config_info.py num_agents=8 node_list=$SLURM_NODELIST port_start=30000 config_filename=config.cfg
