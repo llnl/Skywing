@@ -8,6 +8,8 @@ namespace skywing
 {
 
 /**
+ * NOTE: This processor is depreciated, the currently supported Jacobi
+ * Processor is linear_system_processors/jacobi_processor.hpp
  * @brief A Processor used in an IterativeMethod for solving square linear
  * systems of equations Ax=b.
  *
@@ -29,7 +31,7 @@ namespace skywing
  * method.
  */
 template <typename E = double>
-class JacobiProcessor
+class OldJacobiProcessor
 {
 public:
     using element_t = E;
@@ -42,7 +44,7 @@ public:
      * @param row_indices indices which correspond to the row the partition
      * above with respect to the matrix A.
      */
-    JacobiProcessor(std::vector<std::vector<element_t>> A_partition,
+    OldJacobiProcessor(std::vector<std::vector<element_t>> A_partition,
                     std::vector<element_t> b_partition,
                     std::vector<size_t> row_indices)
         : A_partition_(A_partition),

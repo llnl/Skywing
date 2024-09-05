@@ -53,6 +53,7 @@ std::vector<std::string> obtain_tag_ids(std::uint16_t size_of_network)
     return tag_ids;
 }
 
+// NOTE: This Jacobi Processor is depreciated. 
 // All of the Skywing specific code is located in this function.
 void machine_task(int machine_number,
                   int number_of_overlapping_components,
@@ -82,7 +83,7 @@ void machine_task(int machine_number,
             std::cout << "Machine " << machine_number
                       << " creating iteration object." << std::endl;
 
-            using IterMethod = AsynchronousIterative<JacobiProcessor<double>,
+            using IterMethod = AsynchronousIterative<OldJacobiProcessor<double>,
                                                      PublishOnLinfShift<double>,
                                                      StopAfterTime,
                                                      TrivialResiliencePolicy>;

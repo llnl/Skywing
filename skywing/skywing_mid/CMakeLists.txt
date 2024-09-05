@@ -15,7 +15,6 @@ target_sources(skywing_mid
   internal/pubsub_converter_helpers.hpp
   iterative_method.hpp
   iterative_resilience_policies.hpp
-  jacobi_processor.hpp
   neighbor_data_handler.hpp
   power_method_processor.hpp
   publish_policies.hpp
@@ -26,4 +25,5 @@ target_sources(skywing_mid
   stop_policies.hpp
   sum_processor.hpp
   synchronous_iterative.hpp
+  linear_system_processors/jacobi_processors/jacobi_processor.hpp
 )

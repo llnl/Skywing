@@ -165,32 +165,50 @@ target_link_libraries(skywing_mid
   INTERFACE
   skywing_core)
 
+  add_library(skywing_math_interface INTERFACE)
+target_sources(skywing_math_interface
+  PUBLIC
+  FILE_SET math_api
+  TYPE HEADERS
+  BASE_DIRS skywing)
+target_link_libraries(skywing_math_interface
+  INTERFACE
+  skywing_mid)
+
 # Setup the C++ standard. Should be at least C++20.
 if (CMAKE_CXX_STANDARD)
   target_compile_features(skywing_core INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
   target_compile_features(skywing_mid INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
+  target_compile_features(skywing_math_interface INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
 else ()
   target_compile_features(skywing_core INTERFACE cxx_std_20)
   target_compile_features(skywing_mid INTERFACE cxx_std_20)
+  target_compile_features(skywing_math_interface INTERFACE cxx_std_20)
 endif ()
 
 # Add sources
 add_subdirectory(generated_files)
 add_subdirectory(skywing/skywing_core)
 add_subdirectory(skywing/skywing_mid)
+add_subdirectory(skywing/skywing_math_interface)
 
 # Helper targets for consistent view of linking
 add_library(skywing::core ALIAS skywing_core)
 add_library(skywing::mid ALIAS skywing_mid)
+add_library(skywing::math_interface ALIAS skywing_math_interface)
 
 add_library(skywing::skywing IMPORTED INTERFACE)
 target_link_libraries(skywing::skywing INTERFACE skywing::mid)
 target_link_libraries(skywing::skywing INTERFACE skywing::core)
+target_link_libraries(skywing::skywing INTERFACE skywing::math_interface)
 
 set_target_properties(skywing_core PROPERTIES
   EXPORT_NAME core)
 set_target_properties(skywing_mid PROPERTIES
   EXPORT_NAME mid)
+set_target_properties(skywing_math_interface PROPERTIES
+  EXPORT_NAME math_interface)
+
 
 # Examples
 if (SKYWING_BUILD_EXAMPLES OR SKYWING_BUILD_LC_EXAMPLES)
@@ -226,7 +244,8 @@ install(TARGETS skywing_core skywing_mid
   EXPORT SkywingTargets
   FILE_SET capnp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing"
   FILE_SET core_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing"
-  FILE_SET mid_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing")
+  FILE_SET mid_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing"
+  FILE_SET math_api DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/skywing")
 install(FILES
   "${PROJECT_BINARY_DIR}/SkywingConfig.install.cmake"
   RENAME "SkywingConfig.cmake"
