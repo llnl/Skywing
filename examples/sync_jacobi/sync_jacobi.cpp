@@ -79,7 +79,24 @@ void machine_task(const int machine_number,
     }
     manager.submit_job(
         "job", [&](skywing::Job& job, ManagerHandle manager_handle) {
-            using IterMethod = SynchronousIterative<JacobiProcessor<double>,
+            std::cout << "Agent " << machine_number
+                      << " about to connect to neighbors." << std::endl;
+            if (machine_number != (static_cast<int>(ports.size()) - 1)) {
+                // Connecting to the server is an asynchronous operation and can
+                // fail. Wait for the result each time and keep attempting to
+                // connect until it does
+                while (!manager_handle
+                            .connect_to_server("127.0.0.1",
+                                               ports[machine_number + 1])
+                            .get())
+                {
+                    // Empty
+                }
+            }
+            std::cout << "Agent " << machine_number
+                      << " finished connecting to neighbors." << std::endl;
+
+            using IterMethod = SynchronousIterative<OldJacobiProcessor<double>,
                                                     StopAfterTime,
                                                     TrivialResiliencePolicy>;
             // using IterMethod = AsynchronousIterative<JacobiProcessor<double>,
