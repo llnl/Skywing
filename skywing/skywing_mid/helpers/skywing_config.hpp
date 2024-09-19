@@ -45,10 +45,10 @@ namespace skywing::internal
 template <typename T>
 struct is_tag : std::integral_constant<
                     bool,
-                    std::is_base_of_v<PublishTagBase, T> ||
+                    std::is_base_of_v<AbstractTag, T> ||
                         //      std::is_base_of_v<ReduceValueTagBase, T> ||
                         //      std::is_base_of_v<ReduceGroupTagBase, T> ||
-                        std::is_base_of_v<PrivateTagBase, T>>
+                        std::is_base_of_v<AbstractTag, T>>
 {};
 
 template <class T>

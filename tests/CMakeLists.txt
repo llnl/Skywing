@@ -44,6 +44,7 @@ set(TEST_SRCS
   skywing_core/subscription.cpp
 
   skywing_mid/associative_vector.cpp
+  skywing_mid/idempotent_processor_test.cpp
   skywing_mid/asynchronous_iterative.cpp
   skywing_mid/count_test.cpp
   skywing_mid/max_test.cpp
