@@ -7,28 +7,28 @@
 
 namespace skywing
 {
-std::thread Job::Accessor::run(Job& j) noexcept
-{
-    return std::thread{[&j]() {
-        // Make the initial neighbor connection here. This
-        // is done in this location of the code (as opposed to
-        // within the manager) because it must be done asynchronously.
-        j.manager_->make_neighbor_connection();
-        j.to_run_(j, ManagerHandle{*j.manager_});
-        // Re-use the buffer mutex here
-        std::lock_guard lock{j.subs_.mutex()};
-        // Signify that the work is done
-        j.to_run_ = nullptr;
-    }};
-}
 
-Job::Job(Accessor::AllowConstruction,
-         const std::string& id,
+Job::Job(const std::string& id,
          Manager& manager,
          std::function<void(Job&, ManagerHandle)> to_run) noexcept
     : id_{id}, manager_{&manager}, to_run_{std::move(to_run)}
 {
     assert(!id.empty());
+}
+
+std::thread Job::run() noexcept
+{
+    return std::thread{[=, this]() {
+        // Make the initial neighbor connection here. This
+        // is done in this location of the code (as opposed to
+        // within the manager) because it must be done asynchronously.
+        manager_->make_neighbor_connection();
+        to_run_(*this, ManagerHandle{*manager_});
+        // Re-use the buffer mutex here
+        std::lock_guard lock{subs_.mutex()};
+        // Signify that the work is done
+        to_run_ = nullptr;
+    }};
 }
 
 bool Job::is_finished() const noexcept
@@ -140,7 +140,7 @@ void Job::publish_impl(const AbstractTag& tag,
         last_published_version_.try_emplace(tag.id(), internal::tag_no_data)
             .first->second;
     last_version = last_version + 1;
-    Manager::JobAccessor::publish(*manager_, last_version, tag.id(), to_send);
+    manager_->publish(last_version, tag.id(), to_send);
 }
 
 // Private implementation of public functions
@@ -173,7 +173,7 @@ Job::get_subscribe_future(std::span<const AbstractTag* const> tags) noexcept
                    cend(tags),
                    tag_ids.begin(),
                    [&](auto const& t) { return t->id(); });
-    return Manager::JobAccessor::subscribe(*manager_, tag_ids);
+    return manager_->subscribe(tag_ids);
 }
 
 Waiter<bool>
@@ -193,7 +193,7 @@ Job::get_ip_subscribe_future(const std::string& address,
             address);
         std::exit(1);
     }
-    return Manager::JobAccessor::ip_subscribe(*manager_, addr_pair, tag_ids);
+    return manager_->ip_subscribe(addr_pair, tag_ids);
 }
 
 void Job::declare_publication_intent_impl(
@@ -211,7 +211,7 @@ void Job::declare_publication_intent_impl(
                        [&](auto const& t) { return t->id(); });
         return tag_ids;
     }();
-    Manager::JobAccessor::report_new_publish_tags(*manager_, tag_ids);
+    manager_->report_new_publish_tags(tag_ids);
 }
 
 bool Job::tag_has_active_publisher_impl(const TagID& tag_id) const noexcept

@@ -328,8 +328,7 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                               msg.tags(),
                               msg.locally_produced_tags());
 
-            Manager::ExternalManagerAccessor::add_publishers_and_propagate(
-                *manager_, msg, *this);
+            manager_->add_publishers_and_propagate(msg, *this);
             // Mark there as not being a request out there and update the time
             // to send out
             pending_tag_request_ = false;
@@ -343,13 +342,11 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                 id_,
                 msg.tags());
 
-            Manager::ExternalManagerAccessor::handle_get_publishers(
-                *manager_, msg, *this);
+            manager_->handle_get_publishers(msg, *this);
             return true;
         },
         [&](const PublishData& msg) {
-            return Manager::ExternalManagerAccessor::handle_publish_data(
-                *manager_, msg, *this);
+            return manager_->handle_publish_data(msg, *this);
         },
         [&](const SubscriptionNotice& msg) {
             SKYWING_TRACE_LOG("\"{}\" received subscription notice from \"{}\" "
@@ -377,16 +374,14 @@ void ExternalManager::handle_message(MessageHandler& handle) noexcept
                     return false;
                 }
             }
-            if (!Manager::ExternalManagerAccessor::
-                    subscription_tags_are_produced(*manager_, msg))
-            {
+            if (!manager_->subscription_tags_are_produced(msg)) {
                 // TODO: Send a cancellation notice instead for the tags that
                 // aren't there when this happens
                 reject_notice(fmt::format(
                     "machine does not produce asked for tags {}", msg.tags()));
                 return false;
             }
-            Manager::ExternalManagerAccessor::notify_subscriptions(*manager_);
+            manager_->notify_subscriptions();
             SKYWING_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"",
                               manager_->id(),
                               id_);
@@ -554,7 +549,6 @@ bool Manager::submit_job(
     JobID name, std::function<void(Job&, ManagerHandle)> to_run) noexcept
 {
     const auto res = jobs_.try_emplace(name,
-                                       Job::Accessor::AllowConstruction{},
                                        name,
                                        *this,
                                        std::move(to_run));
@@ -568,7 +562,7 @@ void Manager::run() noexcept
     threads.reserve(jobs_.size());
     for (auto& [name, job] : jobs_) {
         (void) name;
-        threads.push_back(Job::Accessor::run(job));
+        threads.push_back(job.run());
     }
     // Do processing while there are still jobs
     while (!jobs_.empty()) {
@@ -580,7 +574,7 @@ void Manager::run() noexcept
             // std::cout << "Agent " << id() << " acquired mutex." << std::endl;
             //   Remove any finished jobs
             for (auto iter = jobs_.begin(); iter != jobs_.end();) {
-                std::unique_lock lock{Job::Accessor::get_mutex(iter->second),
+                std::unique_lock lock{iter->second.get_mutex(),
                                       std::try_to_lock};
                 if (lock.owns_lock() && iter->second.is_finished()) {
                     // Need to unlock before deallocation
@@ -675,6 +669,7 @@ void Manager::publish(const VersionID version,
                       const TagID& tag_id,
                       std::span<PublishValueVariant> value) noexcept
 {
+    std::lock_guard lock{job_mut_};
     const auto msg = internal::make_publish(version, tag_id, value);
     (void) msg;
     SKYWING_TRACE_LOG(
@@ -685,7 +680,7 @@ void Manager::publish(const VersionID version,
         value);
     for (auto& [name, job] : jobs_) {
         (void) name;
-        Job::Accessor::process_data(job, tag_id, value, version);
+        job.process_data(tag_id, value, version);
     }
     send_to_neighbors_if(msg, [&](const auto& neighbor) {
         return neighbor.is_subscribed_to(tag_id);
@@ -700,9 +695,7 @@ bool Manager::add_data_to_queue(const internal::PublishData& msg) noexcept
         if (!msg_var) {
             return false;
         }
-        if (!Job::Accessor::process_data(
-                job, msg.tag_id(), *msg_var, msg.version()))
-        {
+        if (!job.process_data(msg.tag_id(), *msg_var, msg.version())) {
             return false;
         }
     }
@@ -751,8 +744,7 @@ void Manager::remove_dead_neighbors() noexcept
             erase_addr(tag_to_machine_, [&](const auto& tag_pair) {
                 new_tags = true;
                 for (auto& job_pair : jobs_) {
-                    Job::Accessor::report_dead_tag(job_pair.second,
-                                                   tag_pair.first);
+                    job_pair.second.mark_tag_as_dead(tag_pair.first);
                 }
                 pending_tags_.emplace_back(tag_pair.first);
             });
@@ -807,6 +799,7 @@ bool Manager::subscribe_is_done(
 
 Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
 {
+    std::lock_guard lock{job_mut_};
     SKYWING_DEBUG_LOG(
         "\"{}\" initializing subscription for tags {}", id_, tag_ids);
     std::copy_if(
@@ -841,6 +834,7 @@ Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
 Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
                                    const std::vector<TagID>& tag_ids) noexcept
 {
+    std::lock_guard lock{job_mut_};
     const auto canonical_addr = internal::to_canonical(addr);
     const auto iter = addr_to_machine_.find(canonical_addr);
     // Handle self-subscription
@@ -1133,6 +1127,7 @@ Manager::make_known_tag_publisher_message() const noexcept
 
 void Manager::report_new_publish_tags(const std::vector<TagID>& tags) noexcept
 {
+    std::lock_guard lock{job_mut_};
     SKYWING_TRACE_LOG("\"{}\" adding tags produced: {}", id_, tags);
     // Mark the tags produced by this job
     for (const auto& tag : tags) {
@@ -1611,9 +1606,8 @@ bool Manager::handle_publish_data(
         bool okay = true;
         for (auto& [job_id, job] : jobs_) {
             (void) job_id;
-            okay = Job::Accessor::process_data(
-                       job, msg.tag_id(), *value, msg.version())
-                   && okay;
+            okay =
+                job.process_data(msg.tag_id(), *value, msg.version()) && okay;
         }
         return okay;
     }

@@ -11,7 +11,7 @@ ManagerSubscribeIsDone::ManagerSubscribeIsDone(
 
 bool ManagerSubscribeIsDone::operator()() const noexcept
 {
-    return Manager::WaiterAccessor::subscribe_is_done(*manager_, tags_);
+    return manager_->subscribe_is_done(tags_);
 }
 
 ManagerConnectionIsComplete::ManagerConnectionIsComplete(
@@ -21,7 +21,7 @@ ManagerConnectionIsComplete::ManagerConnectionIsComplete(
 
 bool ManagerConnectionIsComplete::operator()() const noexcept
 {
-    return Manager::WaiterAccessor::conn_is_complete(*manager_, address_);
+    return manager_->conn_is_complete(address_);
 }
 
 ManagerGetConnectionSuccess::ManagerGetConnectionSuccess(
@@ -31,7 +31,7 @@ ManagerGetConnectionSuccess::ManagerGetConnectionSuccess(
 
 bool ManagerGetConnectionSuccess::operator()() const noexcept
 {
-    return Manager::WaiterAccessor::conn_get_success(*manager_, address_);
+    return manager_->addr_is_connected(address_);
 }
 
 ManagerIPSubscribeComplete::ManagerIPSubscribeComplete(
@@ -51,7 +51,7 @@ bool ManagerIPSubscribeComplete::operator()() const noexcept
         return true;
     }
     // Wait first to see if the connection has finished processing
-    return Manager::WaiterAccessor::conn_is_complete(*manager_, address_);
+    return manager_->conn_is_complete(address_);
 }
 
 ManagerIPSubscribeSuccess::ManagerIPSubscribeSuccess(
@@ -68,8 +68,8 @@ ManagerIPSubscribeSuccess::ManagerIPSubscribeSuccess(
 bool ManagerIPSubscribeSuccess::operator()() const noexcept
 {
     return is_self_sub_
-           || (Manager::WaiterAccessor::conn_get_success(*manager_, address_)
-               && Manager::WaiterAccessor::subscribe_is_done(*manager_, tags_));
+           || (manager_->addr_is_connected(address_)
+               && manager_->subscribe_is_done(tags_));
 }
 
 } // namespace skywing::internal
