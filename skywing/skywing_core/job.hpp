@@ -34,49 +34,21 @@ class ManagerHandle;
 class Job
 {
 public:
-    // Allow the manager to call process data and run
-    struct Accessor
-    {
-    private:
-        friend class Manager;
-        friend class Job;
-
-        static bool process_data(Job& j,
-                                 const TagID& tag,
-                                 std::span<PublishValueVariant> data,
-                                 const VersionID version) noexcept
-        {
-            return j.process_data(tag, data, version);
-        }
-
-        static std::thread run(Job& j) noexcept;
-
-        static std::mutex& get_mutex(Job& j) noexcept
-        {
-            return j.subs_.mutex();
-        }
-
-        static void report_dead_tag(Job& j, const TagID& tag) noexcept
-        {
-            j.mark_tag_as_dead(tag);
-        }
-
-        // Work around to disallow construction of Jobs outside of the manager
-        // A public constructor is needed due to it being emplaced into a map
-        struct AllowConstruction
-        {
-            // Explicit constructor so that it has to be named, but the name is
-            // private
-            explicit AllowConstruction() = default;
-        };
-    };
 
     /** \brief Creates a job with the specified manager and work
      */
-    Job(Accessor::AllowConstruction,
-        const std::string& id,
+    Job(const std::string& id,
         Manager& manager,
         std::function<void(Job&, ManagerHandle)> to_run) noexcept;
+
+    /** \brief Creates a thread of execution for the job with a callable
+     * \return A thread for this job
+     */
+    std::thread run() noexcept;
+
+    /** \brief Returns a reference to the mutex that guards subscriptions
+     */
+    std::mutex& get_mutex() noexcept { return subs_.mutex(); }
 
     /** \brief Declare intent to publish on tags, this must be done before
      * publishing on a tag
@@ -352,11 +324,6 @@ public:
 
     void notify_of_update() { data_buffer_modified_cv_.notify_all(); }
 
-private:
-    /** \brief Checks if a buffer has data without locking
-     */
-    bool has_data_no_lock(const AbstractTag& tag) noexcept;
-
     /** \brief Processes the raw information sent from a job on another instance
      *
      * \param tag The id of the tag the data was sent with
@@ -373,6 +340,11 @@ private:
      * \param tag The id of the tag to mark as dead
      */
     void mark_tag_as_dead(const TagID& tag_id) noexcept;
+
+private:
+    /** \brief Checks if a buffer has data without locking
+     */
+    bool has_data_no_lock(const AbstractTag& tag) noexcept;
 
     void publish_impl(const AbstractTag& tag,
                       std::span<PublishValueVariant> to_send) noexcept;

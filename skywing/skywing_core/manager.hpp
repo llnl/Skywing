@@ -316,114 +316,73 @@ public:
      */
     const std::string& id() const noexcept;
 
-    // Access for the Job class
-    struct JobAccessor
-    {
-    private:
-        friend class Job;
+    /** \brief Subscribes to the passed tags only on a specific IP
+     */
+    Waiter<bool> ip_subscribe(const AddrPortPair& addr,
+                              const std::vector<TagID>& tag_ids) noexcept;
 
-        static void publish(Manager& m,
-                            const VersionID version,
-                            const TagID& tag_id,
-                            std::span<PublishValueVariant> value) noexcept
-        {
-            std::lock_guard lock{m.job_mut_};
-            m.publish(version, tag_id, value);
-        }
+    /** \brief Subscribes to the passed tags.
+     */
+    Waiter<void> subscribe(const std::vector<TagID>& tag_ids) noexcept;
 
-        static void
-        report_new_publish_tags(Manager& m,
-                                const std::vector<TagID>& tags) noexcept
-        {
-            std::lock_guard lock{m.job_mut_};
-            m.report_new_publish_tags(tags);
-        }
+    // Auxillary function to help with subscribe function
+    bool
+    subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept;
 
-        static auto subscribe(Manager& m,
-                              const std::vector<TagID>& tag_ids) noexcept
-        {
-            std::lock_guard lock{m.job_mut_};
-            return m.subscribe(tag_ids);
-        }
+    /** \brief Returns true if the connection to the specified address is
+     * complete
+     */
+    bool conn_is_complete(const AddrPortPair& address) noexcept;
 
-        static auto ip_subscribe(Manager& m,
-                                 const AddrPortPair& addr,
-                                 const std::vector<TagID>& tag_ids) noexcept
-        {
-            std::lock_guard lock{m.job_mut_};
-            return m.ip_subscribe(addr, tag_ids);
-        }
-    }; // struct JobAccessor
+    /** \brief Returns true if the connection was successful, false otherwise
+     *
+     * More accurately, checks if an address is currently connected, which may
+     * be useful to expose at some point?
+     */
+    bool addr_is_connected(const AddrPortPair& address) const noexcept;
 
-    // Accessor for the ExternalManager class
-    struct ExternalManagerAccessor
-    {
-    private:
-        friend class internal::ExternalManager;
+    /** \brief Handles the get_publishers message
+     */
+    void handle_get_publishers(const internal::GetPublishers& msg,
+                               internal::ExternalManager& from) noexcept;
 
-        static void
-        handle_get_publishers(Manager& m,
-                              const internal::GetPublishers& msg,
-                              internal::ExternalManager& from) noexcept
-        {
-            m.handle_get_publishers(msg, from);
-        }
+    /** \brief Adds the publishers and propagate the information is required
+     *
+     * Returns a bool indicating if the next request for publishers should
+     * ignore the cache
+     */
+    void add_publishers_and_propagate(
+        const internal::ReportPublishers& msg,
+        const internal::ExternalManager& from) noexcept;
 
-        static void add_publishers_and_propagate(
-            Manager& m,
-            const internal::ReportPublishers& msg,
-            const internal::ExternalManager& from) noexcept
-        {
-            m.add_publishers_and_propagate(msg, from);
-        }
+    /** \brief Returns true if the subscription tags are all produced
+     */
+    bool subscription_tags_are_produced(
+        const internal::SubscriptionNotice& msg) const noexcept;
 
-        static bool subscription_tags_are_produced(
-            Manager& m, const internal::SubscriptionNotice& msg) noexcept
-        {
-            return m.subscription_tags_are_produced(msg);
-        }
+    /** \brief Handles published information
+     */
+    bool handle_publish_data(const internal::PublishData& msg,
+                             const internal::ExternalManager& from) noexcept;
 
-        static bool
-        handle_publish_data(Manager& m,
-                            const internal::PublishData& msg,
-                            const internal::ExternalManager& from) noexcept
-        {
-            return m.handle_publish_data(msg, from);
-        }
+    /** Notifications raised so that condition variables can
+     * use notifications while the mutex is released.
+     */
+    void notify_subscriptions() noexcept { notify_subscriptions_ = true; }
 
-        static void notify_subscriptions(Manager& m) noexcept
-        {
-            m.notify_subscriptions_ = true;
-        }
-    }; // struct ExternalManagerAccessor
+    /** \brief Broadcast a message to the entire network
+     *
+     * \param version The message's version
+     * \param tag_id The id of the tag the message is for
+     * \param value The value to send
+     */
+    void publish(const VersionID version,
+                 const TagID& tag_id,
+                 std::span<PublishValueVariant> value) noexcept;
 
-    struct WaiterAccessor
-    {
-    private:
-        friend class internal::ManagerSubscribeIsDone;
-        friend class internal::ManagerConnectionIsComplete;
-        friend class internal::ManagerGetConnectionSuccess;
-        friend class internal::ManagerIPSubscribeComplete;
-        friend class internal::ManagerIPSubscribeSuccess;
-
-        static bool subscribe_is_done(Manager& m,
-                                      const std::vector<TagID>& tags) noexcept
-        {
-            return m.subscribe_is_done(tags);
-        }
-
-        static bool conn_is_complete(Manager& m,
-                                     const AddrPortPair& address) noexcept
-        {
-            return m.conn_is_complete(address);
-        }
-
-        static bool conn_get_success(Manager& m,
-                                     const AddrPortPair& address) noexcept
-        {
-            return m.addr_is_connected(address);
-        }
-    }; // struct WaiterAccessor
+    /** \brief Reports when new tags are being produced
+     */
+    void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
 
 private:
     ///////////////////////////////////////
@@ -467,16 +426,6 @@ private:
      */
     void handle_neighbor_messages() noexcept;
 
-    /** \brief Broadcast a message to the entire network
-     *
-     * \param version The message's version
-     * \param tag_id The id of the tag the message is for
-     * \param value The value to send
-     */
-    void publish(const VersionID version,
-                 const TagID& tag_id,
-                 std::span<PublishValueVariant> value) noexcept;
-
     // Adds data to the tag queue for a job from a message
     // Returns true if it was successful, false if something went wrong
     bool add_data_to_queue(const internal::PublishData& msg) noexcept;
@@ -510,24 +459,6 @@ private:
      */
     void send_to_neighbors(const std::vector<std::byte>& to_send) noexcept;
 
-    // Auxillary function to help with subscribe function
-    bool
-    subscribe_is_done(const std::vector<TagID>& required_tags) const noexcept;
-
-    /** \brief Subscribes to the passed tags.
-     */
-    Waiter<void> subscribe(const std::vector<TagID>& tag_ids) noexcept;
-
-    /** \brief Subscribes to the passed tags only on a specific IP
-     */
-    Waiter<bool> ip_subscribe(const AddrPortPair& addr,
-                              const std::vector<TagID>& tag_ids) noexcept;
-
-    /** \brief Handles the get_publishers message
-     */
-    void handle_get_publishers(const internal::GetPublishers& msg,
-                               internal::ExternalManager& from) noexcept;
-
     /** \brief Removes any tags that have enough publishers, returning the tags
      * that remain and the number of publishers that they need
      */
@@ -535,38 +466,13 @@ private:
         const internal::GetPublishers& msg) noexcept
         -> std::pair<std::vector<TagID>, std::vector<std::uint8_t>>;
 
-    /** \brief Adds the publishers and propagate the information is required
-     *
-     * Returns a bool indicating if the next request for publishers should
-     * ignore the cache
-     */
-    void add_publishers_and_propagate(
-        const internal::ReportPublishers& msg,
-        const internal::ExternalManager& from) noexcept;
-
     /** \brief Produce a message containing the known publishers and tags
      */
     std::vector<std::byte> make_known_tag_publisher_message() const noexcept;
 
-    /** \brief Reports when new tags are being produced
-     */
-    void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
-
     /** \brief Attempt to create connections for any pending tags.
      */
     void init_connections_for_pending_tags() noexcept;
-
-    /** \brief Returns true if the connection to the specified address is
-     * complete
-     */
-    bool conn_is_complete(const AddrPortPair& address) noexcept;
-
-    /** \brief Returns true if the connection was successful, false otherwise
-     *
-     * More accurately, checks if an address is currently connected, which may
-     * be useful to expose at some point?
-     */
-    bool addr_is_connected(const AddrPortPair& address) const noexcept;
 
     /** \brief Process pending user requested connections
      */
@@ -575,16 +481,6 @@ private:
     /** \brief Creates the message for the initial handshake
      */
     std::vector<std::byte> make_handshake() const noexcept;
-
-    /** \brief Returns true if the subscription tags are all produced
-     */
-    bool subscription_tags_are_produced(
-        const internal::SubscriptionNotice& msg) const noexcept;
-
-    /** \brief Handles published information
-     */
-    bool handle_publish_data(const internal::PublishData& msg,
-                             const internal::ExternalManager& from) noexcept;
 
     /** \brief Finalizes a subscription connection.
      *
