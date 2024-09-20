@@ -180,17 +180,19 @@ public:
     {
         std::vector<const AbstractTag*> tag_span;
         tag_span.reserve(tags.size());
-        [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
-        for (auto const& tag : tags) {
+	{
+	  [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+	  for (auto const& tag : tags) {
             tag_span.push_back(&tag);
             if (subscriptions.contains(tag.id())) {
-                Subscription& sub = subscriptions.at(tag.id());
-                sub.reset();
+	      Subscription& sub = subscriptions.at(tag.id());
+	      sub.reset();
             }
             else {
-                subscriptions.insert_or_assign(tag.id(), Subscription(tag));
+	      subscriptions.insert_or_assign(tag.id(), Subscription(tag));
             }
-        }
+	  }
+	}
         return get_subscribe_future(tag_span);
     }
 
