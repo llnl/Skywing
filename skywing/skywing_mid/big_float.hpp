@@ -4,22 +4,25 @@
 #include <cmath>
 #include <iostream>
 #include <tuple>
+#include <type_traits>
 
 #include "skywing_mid/pubsub_converter.hpp"
 
 namespace skywing
 {
 
+template <typename T>
+concept Arithmetic_t = std::is_arithmetic_v<T>;
+
 class BigFloat
 {
 public:
-    /** @brief Construct a BigFloat from another floating type.
+    /** @brief Construct a BigFloat from another arithmetic type.
      */
-    template <typename float_t>
-    BigFloat(float_t f)
+    BigFloat(Arithmetic_t auto num)
     {
         int exp;
-        fraction_ = std::frexp(f, &exp);
+        fraction_ = std::frexp(num, &exp);
         exp_ = static_cast<std::int64_t>(exp);
     }
 
