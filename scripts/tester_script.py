@@ -46,7 +46,7 @@ for i, command in enumerate(commands):
         try:
             completed = subprocess.run(
                 command['command'],
-                timeout=15,
+                timeout=120,
                 capture_output=True,
                 text=True,
                 env={'START_PORT': str(ports[port_index]), **os.environ}

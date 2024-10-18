@@ -47,6 +47,7 @@ set(TEST_SRCS
   skywing_mid/idempotent_processor_test.cpp
   skywing_mid/asynchronous_iterative.cpp
   skywing_mid/count_test.cpp
+  skywing_mid/ex4.cpp
   skywing_mid/max_test.cpp
   skywing_mid/pubsub.cpp
   skywing_mid/stoppolicy_send.cpp

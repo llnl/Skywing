@@ -214,6 +214,8 @@ echo "----------------------------------------------------------------------"
 echo "  Running tutorial examples"
 echo "----------------------------------------------------------------------"
 
+# A modified version of ex4 is tested in tests/skywing_mid/ex4.cpp
+# which mirrors documentation/tutorial/example-cmake-project/ex4.cpp
 for EXAMPLE in ex1 ex2 ex3
 do
     echo "----------------------------------------------------------------------"
