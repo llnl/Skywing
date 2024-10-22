@@ -33,7 +33,7 @@ public:
 private:
     cpnpro::PublishData::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     friend class Publish;
     explicit PublishData(cpnpro::PublishData::Reader reader) noexcept;
 };
@@ -50,7 +50,7 @@ public:
 private:
     cpnpro::Greeting::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit Greeting(cpnpro::Greeting::Reader reader) noexcept;
 };
 
@@ -71,7 +71,7 @@ public:
 private:
     cpnpro::NewNeighbor::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit NewNeighbor(cpnpro::NewNeighbor::Reader reader) noexcept;
 };
 
@@ -85,7 +85,7 @@ public:
 private:
     cpnpro::RemoveNeighbor::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit RemoveNeighbor(cpnpro::RemoveNeighbor::Reader reader) noexcept;
 };
 
@@ -109,7 +109,7 @@ public:
 private:
     cpnpro::ReportPublishers::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit ReportPublishers(cpnpro::ReportPublishers::Reader reader) noexcept;
 };
 
@@ -125,7 +125,7 @@ public:
 private:
     cpnpro::GetPublishers::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit GetPublishers(cpnpro::GetPublishers::Reader reader) noexcept;
 };
 
@@ -140,27 +140,27 @@ public:
 private:
     cpnpro::SubscriptionNotice::Reader r;
 
-    friend class MessageHandler;
+    friend class MessageDeserializer;
     explicit SubscriptionNotice(
         cpnpro::SubscriptionNotice::Reader reader) noexcept;
 };
 
 /** \brief Class for converting the raw bytes of a message into a useable format
  */
-class MessageHandler
+class MessageDeserializer
 {
 public:
     /** \brief Construct a message handler from a raw set of bytes
      */
-    static std::optional<MessageHandler>
+    static std::optional<MessageDeserializer>
     try_to_create(const std::vector<std::byte>& data) noexcept;
 
     // Moveable only
-    MessageHandler() noexcept;
-    MessageHandler(const MessageHandler&) = delete;
-    MessageHandler& operator=(const MessageHandler&) = delete;
-    MessageHandler(MessageHandler&&) noexcept;
-    MessageHandler& operator=(MessageHandler&&) noexcept;
+    MessageDeserializer() noexcept;
+    MessageDeserializer(const MessageDeserializer&) = delete;
+    MessageDeserializer& operator=(const MessageDeserializer&) = delete;
+    MessageDeserializer(MessageDeserializer&&) noexcept;
+    MessageDeserializer& operator=(MessageDeserializer&&) noexcept;
 
     /** \brief Perform a callback on the stored message
      *

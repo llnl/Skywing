@@ -19,6 +19,8 @@ target_sources(skywing_core
   internal/manager_waiter_callables.cpp
   internal/message_creators.cpp
   internal/utility/network_conv.cpp
+  neighbor_agent.cpp
+  message_handler.cpp
   job.cpp
   manager.cpp
 )
@@ -52,6 +54,8 @@ target_sources(skywing_core
   internal/utility/type_list.hpp
   job.hpp
   manager.hpp
+  neighbor_agent.hpp
+  message_handler.hpp
   skywing.hpp
   types.hpp
   waiter.hpp

@@ -218,21 +218,21 @@ SubscriptionNotice::SubscriptionNotice(
 {}
 
 /////////////////////////////////////////////////////
-// MessageHandler
+// MessageDeserializer
 /////////////////////////////////////////////////////
 
-MessageHandler::MessageHandler() noexcept : impl_{std::make_unique<Impl>()}
+MessageDeserializer::MessageDeserializer() noexcept : impl_{std::make_unique<Impl>()}
 {}
 
-MessageHandler::MessageHandler(MessageHandler&&) noexcept = default;
-MessageHandler& MessageHandler::operator=(MessageHandler&&) noexcept = default;
+MessageDeserializer::MessageDeserializer(MessageDeserializer&&) noexcept = default;
+MessageDeserializer& MessageDeserializer::operator=(MessageDeserializer&&) noexcept = default;
 
-std::optional<MessageHandler>
-MessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
+std::optional<MessageDeserializer>
+MessageDeserializer::try_to_create(const std::vector<std::byte>& data) noexcept
 {
     detail::ExceptionSuppressor suppressor;
     // Read the message from the passed bytes
-    MessageHandler to_ret;
+    MessageDeserializer to_ret;
     kj::Array<const kj::byte> buffer{
         reinterpret_cast<const kj::byte*>(data.data()),
         data.size(),
@@ -242,15 +242,15 @@ MessageHandler::try_to_create(const std::vector<std::byte>& data) noexcept
     to_ret.impl_->root = to_ret.impl_->message.getRoot<cpnpro::StatusMessage>();
     if (suppressor.failed()) {
         SKYWING_WARN_LOG(
-            "Failed to decode message in MessageHandler::try_to_create.");
+            "Failed to decode message in MessageDeserializer::try_to_create.");
         return {};
     }
     else {
-        return std::optional<MessageHandler>{std::move(to_ret)};
+        return std::optional<MessageDeserializer>{std::move(to_ret)};
     }
 }
 
-auto MessageHandler::extract_message() const noexcept
+auto MessageDeserializer::extract_message() const noexcept
     -> std::optional<MessageVariant>
 {
     using vals = cpnpro::StatusMessage::Which;
@@ -281,7 +281,7 @@ auto MessageHandler::extract_message() const noexcept
     }();
     if (suppressor.failed()) {
         SKYWING_WARN_LOG(
-            "Failed to decode message in MessageHandler::extract_message.");
+            "Failed to decode message in MessageDeserializer::extract_message.");
         return {};
     }
     else {

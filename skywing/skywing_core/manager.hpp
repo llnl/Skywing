@@ -4,8 +4,8 @@
 #include "skywing_core/internal/capn_proto_wrapper.hpp"
 #include "skywing_core/internal/devices/socket_communicator.hpp"
 #include "skywing_core/internal/manager_waiter_callables.hpp"
-#include "skywing_core/internal/message_creators.hpp"
 // #include "skywing_core/basic_manager_config.hpp"
+#include "skywing_core/neighbor_agent.hpp"
 #include "tag.hpp"
 
 #include <algorithm>
@@ -65,6 +65,8 @@ class Job;
 
 namespace internal
 {
+  class MessageHandler;
+  
 // The default hearbeat interval
 inline static constexpr std::chrono::milliseconds default_heartbeat_interval{
     5000};
@@ -81,160 +83,6 @@ struct ByAccept
 struct ByRequest
 {};
 
-/** \brief The handle used for external Skywing instances that are connected
- */
-class ExternalManager
-{
-public:
-    ExternalManager(SocketCommunicator comm,
-                    const MachineID& id,
-                    const std::vector<MachineID>& neighbors,
-                    Manager& manager,
-                    std::uint16_t port) noexcept;
-
-    /** \brief Handles any messages sent from the connection
-     */
-    void get_and_handle_messages() noexcept;
-
-    /** \brief Sends a raw message to the other manager
-     *
-     * Also marks the connection as dead if any errors occur.  Does nothing
-     * if the connection is marked as dead.
-     */
-    void send_message(const std::vector<std::byte>& c) noexcept;
-
-    /** \brief Returns the id of the computer this is connected to
-     */
-    MachineID id() const noexcept;
-
-    /** \brief Returns if the connection is dead or not
-     */
-    bool is_dead() const noexcept;
-
-    /** \brief Marks the connection as dead
-     */
-    void mark_as_dead() noexcept;
-
-    /** \brief Returns true if the given neighbor is present, false otherwise
-     */
-    bool has_neighbor(const MachineID& id) const noexcept;
-
-    /** \brief Sends a heartbeat if enough time has passed
-     */
-    void send_heartbeat_if_past_interval(
-        std::chrono::milliseconds interval) noexcept;
-
-    /** \brief Begins the search process for the specified tags
-     */
-    void find_publishers_for_tags(
-        const std::vector<TagID>& tags,
-        const std::vector<std::uint8_t>& publishers_needed) noexcept;
-
-    /** \brief The address for communication with the external manager
-     */
-    std::string address() const noexcept;
-
-    /** \brief Pair version of the address
-     */
-    AddrPortPair address_pair() const noexcept;
-
-    /** \brief Sets the external manager to ignore the cache on the next request
-     * for publishers
-     */
-    void ignore_cache_on_next_request() noexcept;
-
-    /** \brief Returns true if the external manager is subscribed to the tag,
-     * returns false if it is not.
-     */
-    bool is_subscribed_to(const TagID& tag) const noexcept;
-
-    /** \brief Returns true if tags should be asked for
-     */
-    bool should_ask_for_tags() const noexcept;
-
-    /** \brief Returns true if there are pending tags
-     */
-    bool has_pending_tag_request() const noexcept;
-
-    /** \brief Resets the backoff counter
-     */
-    void reset_backoff_counter() noexcept;
-
-    /** \brief Increments the backoff counter
-     */
-    void increase_backoff_counter() noexcept;
-
-    const std::vector<MachineID>& neighbors() { return neighbors_; }
-
-    void add_communicator(SocketCommunicator&& comm)
-    {
-        conns_.push_back(std::move(comm));
-    }
-
-private:
-    // // Read some bytes from the connection, returning false if the read
-    // failed bool read_from_conn(std::byte* buffer, std::size_t count)
-    // noexcept;
-
-    // // Read some bytes from the connection, returning an empty vector if
-    // // the number of bytes couldn't be read
-    // std::vector<std::byte> read_from_conn(std::size_t count) noexcept;
-
-    // Attempts to get a message
-    std::optional<MessageHandler>
-    try_to_get_message(SocketCommunicator& socket_comm) noexcept;
-
-    // Handle status messages
-    void handle_message(MessageHandler& handle) noexcept;
-
-    // Calculate the next time tags should be requested
-    std::chrono::steady_clock::time_point
-    calc_next_request_time() const noexcept;
-
-    // For talking with the external manager.
-    // See you'd think there would only be one SocketCommunicator for
-    // talking to another agent, so why the vector? It's because
-    // sometimes agents initiate connections with each other
-    // simulataneously, creating multiple socket connections between the
-    // same pair of agents. Deciding which one to drop would require an
-    // entire agreement protocol, which isn't worth it, so just hang on
-    // to both.
-    std::vector<SocketCommunicator> conns_;
-
-    // The id of the external manager
-    MachineID id_;
-
-    // The last time the machine was heard from
-    std::chrono::steady_clock::time_point last_heard_;
-
-    // The neighbors that the external machine has
-    std::vector<MachineID> neighbors_;
-
-    // The owning manager
-    Manager* manager_;
-
-    // The time that will be waited until requesting tags again
-    std::chrono::steady_clock::time_point request_tags_time_;
-
-    // Tags that the remote is subscribed for
-    // std::unordered_set for fast look-up
-    std::unordered_set<TagID> remote_subscriptions_;
-
-    // The port to use to connect to the remote machine
-    std::uint16_t port_;
-
-    // The number of times requests have been unfulfilled
-    std::uint8_t backoff_counter_ = 0;
-
-    // If the next request for tags should ignore the cache or not
-    bool ignore_cache_on_next_request_ = false;
-
-    // If the connection is dead or not
-    bool dead_ = false;
-
-    // If there is a request out for tags or not
-    bool pending_tag_request_ = false;
-}; // class ExternalManager
 } // namespace internal
 
 /** \brief The manager Skywing instance used for communication
@@ -344,7 +192,8 @@ public:
     /** \brief Handles the get_publishers message
      */
     void handle_get_publishers(const internal::GetPublishers& msg,
-                               internal::ExternalManager& from) noexcept;
+                               internal::NeighborAgent& from) noexcept;
+
 
     /** \brief Adds the publishers and propagate the information is required
      *
@@ -353,7 +202,7 @@ public:
      */
     void add_publishers_and_propagate(
         const internal::ReportPublishers& msg,
-        const internal::ExternalManager& from) noexcept;
+        const internal::NeighborAgent& from) noexcept;
 
     /** \brief Returns true if the subscription tags are all produced
      */
@@ -363,7 +212,7 @@ public:
     /** \brief Handles published information
      */
     bool handle_publish_data(const internal::PublishData& msg,
-                             const internal::ExternalManager& from) noexcept;
+                             const internal::NeighborAgent& from) noexcept;
 
     /** Notifications raised so that condition variables can
      * use notifications while the mutex is released.
@@ -446,14 +295,7 @@ private:
      */
     template <typename Callable>
     void send_to_neighbors_if(const std::vector<std::byte>& to_send,
-                              Callable condition) noexcept
-    {
-        for (auto&& neighbor : neighbors_) {
-            if (condition(neighbor.second)) {
-                neighbor.second.send_message(to_send);
-            }
-        }
-    }
+                              Callable condition) noexcept;
 
     /** \brief Broadcasts a message to all neighbors
      */
@@ -487,7 +329,7 @@ private:
      * \param tags '\0' seperated list of tags
      */
     void finalize_subscription(const std::string& tags,
-                               internal::ExternalManager& source) noexcept;
+                               internal::NeighborAgent& source) noexcept;
 
     /** \brief Asks neighbors for publishers for pending tags with no know
      * publishers
@@ -505,7 +347,7 @@ private:
     std::unordered_map<JobID, Job> jobs_;
 
     // List of neighboring connections
-    std::unordered_map<MachineID, internal::ExternalManager> neighbors_;
+    std::unordered_map<MachineID, internal::NeighborAgent> neighbors_;
 
     // List of publishers that are known for each tag
     std::unordered_map<TagID, std::unordered_set<internal::PublisherInfo>>
@@ -528,7 +370,7 @@ private:
 
     // List of machines that are waiting for information for producers of a
     // certain tag Uses MachineID's instead of pointers in case the remote
-    // machine disconnects and the ExternalManager is deleted between the time a
+    // machine disconnects and the NeighborAgent is deleted between the time a
     // request is started and a response is received
     // TODO: Maybe move to pointers and just make sure to remove them when the
     // neighbor is removed? Also potentially combine with tag_to_machine_ since
@@ -542,16 +384,16 @@ private:
     // The port used for communications
     std::uint16_t port_;
 
-    // Mapping from a machine address to a pointer to the external manager
+    // Mapping from a machine address to a pointer to the neighbor agent
     // This is also used for testing that a connection has completed
-    std::unordered_map<AddrPortPair, internal::ExternalManager*>
+    std::unordered_map<AddrPortPair, internal::NeighborAgent*>
         addr_to_machine_;
 
     // Mapping from a tag to the ID used for the subscription to the tag
     // Used to know when a subscription is done and for if multiple jobs
     // subscribe to the same tag
     // This is also use to mark when a pending connection is for a tag
-    std::unordered_map<TagID, internal::ExternalManager*> tag_to_machine_;
+    std::unordered_map<TagID, internal::NeighborAgent*> tag_to_machine_;
 
     /** \brief Connection status for pending connections
      */
@@ -598,6 +440,8 @@ private:
 
     // Maximum time to wait for initial neighbor connection to be established
     mutable std::chrono::seconds initial_neighbor_connection_timeout_;
+
+  std::unique_ptr<internal::MessageHandler> message_handler_;
 
 }; // class Manager
 
