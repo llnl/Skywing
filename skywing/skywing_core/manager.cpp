@@ -6,6 +6,9 @@
 
 #include "skywing_core/internal/utility/algorithms.hpp"
 #include "skywing_core/internal/utility/logging.hpp"
+#include "skywing_core/neighbor_agent.hpp"
+#include "skywing_core/message_handler.hpp"
+#include "skywing_core/internal/message_creators.hpp"
 
 namespace skywing
 {
@@ -19,404 +22,6 @@ make_need_one_pub(const std::vector<TagID>& tags) noexcept
 }
 } // namespace
 
-namespace internal
-{
-ExternalManager::ExternalManager(SocketCommunicator conn,
-                                 const MachineID& id,
-                                 const std::vector<MachineID>& neighbors,
-                                 Manager& manager,
-                                 const std::uint16_t port) noexcept
-    : id_{id},
-      last_heard_{std::chrono::steady_clock::now()},
-      neighbors_{neighbors},
-      manager_{&manager},
-      port_{port}
-{
-    conns_.push_back(std::move(conn));
-}
-
-void ExternalManager::get_and_handle_messages() noexcept
-{
-    //  std::cout << "Agent " << manager_->id() << " handling neighbor messages
-    //  from " << id() << " with dead status" << dead_ << std::endl;
-    if (dead_) {
-        return;
-    }
-    for (auto& socket_comm : conns_) {
-        //    std::cout << "Agent " << manager_->id() << " about to try to get a
-        //    message from " << id() << std::endl;
-        while (auto handler = try_to_get_message(socket_comm)) {
-            // Update the last time something was heard
-            last_heard_ = std::chrono::steady_clock::now();
-            // Handle the message
-            //      std::cout << "Agent " << manager_->id() << " got a message
-            //      from " << id() << ", about to handle it. " << std::endl;
-            handle_message(*handler);
-            //      std::cout << "Agent " << manager_->id() << " finished
-            //      handling message from " << id() << std::endl;
-        }
-    }
-    //  std::cout << "Agent " << manager_->id() << " done handling messages from
-    //  the live " << id() << std::endl;
-}
-
-void ExternalManager::send_message(const std::vector<std::byte>& c) noexcept
-{
-    if (dead_) {
-        return;
-    }
-    // TODO: Maybe don't just use the first socket communicator if there are
-    // multiple
-    // TODO: Pretty sure this will incorrectly set to dead upon
-    // ConnectionError::would_block
-    if (conns_[0].send_message(c.data(), c.size()) != ConnectionError::no_error)
-    {
-        dead_ = true;
-    }
-}
-
-MachineID ExternalManager::id() const noexcept
-{
-    return id_;
-}
-
-bool ExternalManager::is_dead() const noexcept
-{
-    return dead_;
-}
-
-void ExternalManager::mark_as_dead() noexcept
-{
-    dead_ = true;
-}
-
-void ExternalManager::ignore_cache_on_next_request() noexcept
-{
-    ignore_cache_on_next_request_ = true;
-}
-
-bool ExternalManager::is_subscribed_to(const TagID& tag) const noexcept
-{
-    return remote_subscriptions_.find(tag) != remote_subscriptions_.cend();
-}
-
-bool ExternalManager::should_ask_for_tags() const noexcept
-{
-    return !pending_tag_request_
-           && std::chrono::steady_clock::now() > request_tags_time_;
-}
-
-bool ExternalManager::has_pending_tag_request() const noexcept
-{
-    return pending_tag_request_;
-}
-
-void ExternalManager::reset_backoff_counter() noexcept
-{
-    backoff_counter_ = 0;
-    request_tags_time_ = calc_next_request_time();
-}
-
-void ExternalManager::increase_backoff_counter() noexcept
-{
-    ++backoff_counter_;
-    request_tags_time_ = calc_next_request_time();
-}
-
-bool ExternalManager::has_neighbor(const MachineID& id) const noexcept
-{
-    const auto loc =
-        std::lower_bound(neighbors_.cbegin(), neighbors_.cend(), id);
-    return loc != neighbors_.cend() && *loc == id;
-}
-
-void ExternalManager::send_heartbeat_if_past_interval(
-    std::chrono::milliseconds interval) noexcept
-{
-    using namespace std::chrono;
-    const auto time_expired = steady_clock::now() - last_heard_;
-    if (time_expired >= interval) {
-        // Try to send a message
-        send_message(make_heartbeat());
-        // This count as hearing from the device
-        last_heard_ = steady_clock::now();
-    }
-}
-
-void ExternalManager::find_publishers_for_tags(
-    const std::vector<TagID>& tags,
-    const std::vector<std::uint8_t>& publishers_needed) noexcept
-{
-    SKYWING_TRACE_LOG("\"{}\" asking \"{}\" for tags {}{}",
-                      manager_->id(),
-                      id_,
-                      tags,
-                      pending_tag_request_
-                          ? ", but ignored due to already pending request"
-                          : "");
-    if (!pending_tag_request_) {
-        send_message(make_get_publishers(
-            tags, publishers_needed, ignore_cache_on_next_request_));
-        ignore_cache_on_next_request_ = false;
-        pending_tag_request_ = true;
-    }
-}
-
-std::string ExternalManager::address() const noexcept
-{
-    const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
-    (void) dummy;
-    return ip_address + ':' + std::to_string(port_);
-}
-
-AddrPortPair ExternalManager::address_pair() const noexcept
-{
-    const auto [ip_address, dummy] = conns_[0].ip_address_and_port();
-    (void) dummy;
-    return {ip_address, port_};
-}
-
-// // Read some bytes from the connection, returning false if the read failed
-// bool ExternalManager::read_from_conn(std::byte* const buffer, const
-// std::size_t count) noexcept
-// {
-//   const auto err = conns_[0].read_message(buffer, count);
-//   switch (err) {
-//   case ConnectionError::no_error:
-//     break;
-//   case ConnectionError::would_block:
-//     return false;
-
-//   case ConnectionError::closed:
-//     // [[fallthrough]];
-//   case ConnectionError::unrecoverable:
-//     SKYWING_TRACE_LOG("\"{}\" setting {} to dead due to unrecoverable error
-//     upon message read", manager_->id(), id_); dead_ = true; return false;
-//   }
-//   return true;
-// }
-
-std::optional<MessageHandler>
-ExternalManager::try_to_get_message(SocketCommunicator& socket_comm) noexcept
-{
-    // std::cout << "Agent " << manager_->id() << " trying to get messages from
-    // " << id() << std::endl;
-    const auto bytes_to_read_or_error = read_network_size(socket_comm);
-    // std::cout << "Agent " << manager_->id() << " got bytes to read from " <<
-    // id() << std::endl;
-    if (std::holds_alternative<NetworkSizeType>(bytes_to_read_or_error)) {
-        // std::cout << "Agent " << manager_->id() << " about to read message
-        // size from " << id() << std::endl;
-        const auto bytes_to_read =
-            *std::get_if<NetworkSizeType>(&bytes_to_read_or_error);
-        // std::cout << "Agent " << manager_->id() << " successfully read
-        // message size from " << id() << std::endl;
-        //  Then read the actual message and parse it
-        if (const auto message_buffer =
-                read_chunked(socket_comm, bytes_to_read);
-            !message_buffer.empty())
-        {
-            // std::cout << "Agent " << manager_->id() << " read the actual
-            // message from " << id() << std::endl;
-            return MessageHandler::try_to_create(message_buffer);
-        }
-        else {
-            // Couldn't read the size bytes - bad message
-            SKYWING_TRACE_LOG("\"{}\" setting {} to dead due to bad message",
-                              manager_->id(),
-                              id_);
-            dead_ = true;
-            return {};
-        }
-    }
-    else {
-        const auto err = *std::get_if<ConnectionError>(&bytes_to_read_or_error);
-        if (err == ConnectionError::closed) {
-            SKYWING_TRACE_LOG(
-                "\"{}\" setting {} to dead because connection has closed",
-                manager_->id(),
-                id_);
-            dead_ = true;
-        }
-        else if (err != ConnectionError::would_block) {
-            SKYWING_TRACE_LOG(
-                "\"{}\" setting {} to dead because connection has some unknwon "
-                "error, perhaps received an RST packer",
-                manager_->id(),
-                id_);
-            dead_ = true;
-        }
-        // we get here if attempting to read_network_size returned
-        // ConnectionError::would_block, which indicates there's the
-        // connection is fine and there's just nothing currently on the
-        // wire
-        // std::cout << "Agent " << manager_->id() << " didn't receive anything
-        // from " << id() << std::endl;
-        return {};
-    }
-}
-
-// Handle status messages
-void ExternalManager::handle_message(MessageHandler& handle) noexcept
-{
-    const auto okay = handle.do_callback(
-        [&](const Greeting&) {
-            // shouldn't be seeing a greeting here
-            SKYWING_WARN_LOG(
-                "\"{}\" received an unexpected greeting from \"{}\"",
-                manager_->id(),
-                id_);
-            return false;
-        },
-        [&](const Goodbye&) {
-            SKYWING_TRACE_LOG(
-                "\"{}\" received goodbye from \"{}\"", manager_->id(), id_);
-            dead_ = true;
-            return true;
-        },
-        [&](const NewNeighbor& msg) {
-            // Don't error if the neighbor is already present (as was previously
-            // done) as if a machine disconnects and then re-connects it can
-            // send a NewNeighbor message with a repeated ID
-            const auto loc = std::lower_bound(
-                neighbors_.cbegin(), neighbors_.cend(), msg.neighbor_id());
-            SKYWING_TRACE_LOG(
-                "\"{}\" received new neighbor from \"{}\" with id \"{}\"",
-                manager_->id(),
-                id_,
-                msg.neighbor_id());
-            // Insert it if it isn't already present
-            if (loc == neighbors_.cend() || *loc != msg.neighbor_id()) {
-                neighbors_.insert(loc, msg.neighbor_id());
-            }
-            return true;
-        },
-        [&](const RemoveNeighbor& msg) {
-            SKYWING_TRACE_LOG(
-                "\"{}\" received remove neighbor from \"{}\" with id \"{}\"",
-                manager_->id(),
-                id_,
-                msg.neighbor_id());
-            const auto loc = std::lower_bound(
-                neighbors_.begin(), neighbors_.end(), msg.neighbor_id());
-            // Neighbors that don't exist will often be reported if it's a
-            // shared neighbor and it has already been removed due to the
-            // goodbye message
-            if (loc != neighbors_.end()) {
-                // otherwise just remove it
-                using std::swap;
-                swap(*loc, neighbors_.back());
-                neighbors_.pop_back();
-            }
-            return true;
-        },
-        [this](const Heartbeat&) {
-            // If trace logging isn't enable then `this` isn't used, so make
-            // sure it is marked as used
-            (void) this;
-            // Nothing to do; this is just to acknowledge it exists
-            // (Last heard time was already updated)
-            SKYWING_TRACE_LOG(
-                "\"{}\" received heartbeat from \"{}\"", manager_->id(), id_);
-            return true;
-        },
-        [&](const ReportPublishers& msg) {
-            SKYWING_TRACE_LOG("\"{}\" received report publishers from \"{}\" "
-                              "with remote tags \"{}\" and local tags \"{}\"",
-                              manager_->id(),
-                              id_,
-                              msg.tags(),
-                              msg.locally_produced_tags());
-
-            manager_->add_publishers_and_propagate(msg, *this);
-            // Mark there as not being a request out there and update the time
-            // to send out
-            pending_tag_request_ = false;
-            request_tags_time_ = calc_next_request_time();
-            return true;
-        },
-        [&](const GetPublishers& msg) {
-            SKYWING_TRACE_LOG(
-                "\"{}\" received get publishers from \"{}\" requesting tags {}",
-                manager_->id(),
-                id_,
-                msg.tags());
-
-            manager_->handle_get_publishers(msg, *this);
-            return true;
-        },
-        [&](const PublishData& msg) {
-            return manager_->handle_publish_data(msg, *this);
-        },
-        [&](const SubscriptionNotice& msg) {
-            SKYWING_TRACE_LOG("\"{}\" received subscription notice from \"{}\" "
-                              "for tags {}, is unsubscribe: {}",
-                              manager_->id(),
-                              id_,
-                              msg.tags(),
-                              msg.is_unsubscribe());
-            const auto reject_notice =
-                [&]([[maybe_unused]] const std::string& why) {
-                    SKYWING_TRACE_LOG(
-                        "\"{}\" rejected subscription notice from \"{}\" as {}",
-                        manager_->id(),
-                        id_,
-                        why);
-                };
-            for (const auto& tag : msg.tags()) {
-                const auto [iter, inserted] =
-                    remote_subscriptions_.emplace(tag);
-                (void) iter;
-                // Shouldn't receive multiple subscriptions to the same tag
-                if (!inserted) {
-                    reject_notice(
-                        fmt::format("repeated tag subscription to {}", tag));
-                    return false;
-                }
-            }
-            if (!manager_->subscription_tags_are_produced(msg)) {
-                // TODO: Send a cancellation notice instead for the tags that
-                // aren't there when this happens
-                reject_notice(fmt::format(
-                    "machine does not produce asked for tags {}", msg.tags()));
-                return false;
-            }
-            manager_->notify_subscriptions();
-            SKYWING_TRACE_LOG("\"{}\" accepted subscription notice from \"{}\"",
-                              manager_->id(),
-                              id_);
-            return true;
-        },
-        [](...) {
-            // Anything else is a programming bug, this shouldn't be reached
-            assert(
-                false
-                && "Missing message type in ExternalManager::handle_message");
-            return false;
-        });
-    // Something incorrect happened
-    if (!okay) {
-        SKYWING_TRACE_LOG("\"{}\" setting {} to dead because something "
-                          "incorrect happened upon message handle",
-                          manager_->id(),
-                          id_);
-        dead_ = true;
-    }
-}
-
-std::chrono::steady_clock::time_point
-ExternalManager::calc_next_request_time() const noexcept
-{
-    using namespace std::chrono_literals;
-    static constexpr std::array<std::chrono::milliseconds, 10> backoff_times{
-        20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms};
-    const auto add_time = backoff_counter_ >= backoff_times.size()
-                              ? backoff_times.back()
-                              : backoff_times[backoff_counter_];
-    return std::chrono::steady_clock::now() + add_time;
-}
-} // namespace internal
-
 ////////////////////////////////////////////////
 // Class Manager
 ////////////////////////////////////////////////
@@ -424,7 +29,8 @@ ExternalManager::calc_next_request_time() const noexcept
 Manager::Manager(const std::uint16_t port,
                  const MachineID& id,
                  const std::chrono::milliseconds heartbeat_interval) noexcept
-    : id_{id}, heartbeat_interval_{heartbeat_interval}, port_{port}
+  : id_{id}, heartbeat_interval_{heartbeat_interval}, port_{port},
+    message_handler_{std::make_unique<internal::MessageHandler>(*this)}
 {
     if (server_socket_.set_to_listen(port)
         != internal::ConnectionError::no_error)
@@ -585,29 +191,15 @@ void Manager::run() noexcept
                     ++iter;
                 }
             }
-            // std::cout << "Agent " << id() << " about to process pending
-            // conns. " << std::endl;
             process_pending_conns();
-            // std::cout << "Agent " << id() << " about to accept pending
-            // connections. " << std::endl;
             accept_pending_connections();
-            // std::cout << "Agent " << id() << " about to handle neighbor
-            // messages. " << std::endl;
             handle_neighbor_messages();
-            // std::cout << "Agent " << id() << " about to remove dead neighbors
-            // " << std::endl;
             remove_dead_neighbors();
-            // std::cout << "Agent " << id() << " about to find publishers for
-            // pending tags. " << std::endl;
             find_publishers_for_pending_tags();
-            // std::cout << "Agent " << id() << " about to send heartbeats. " <<
-            // std::endl;
             for (auto&& neighbor : neighbors_) {
-                neighbor.second.send_heartbeat_if_past_interval(
-                    heartbeat_interval_);
+		message_handler_->send_heartbeat_if_past_interval
+		  (neighbor.second, heartbeat_interval_);
             }
-            // std::cout << "Agent " << id() << " about to announce
-            // notifications. " << std::endl;
             using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
             std::array<cv_ref_pair, 2> cv_array{
                 cv_ref_pair{notify_subscriptions_, subscription_cv_},
@@ -622,13 +214,11 @@ void Manager::run() noexcept
         // Wait a bit for other messages
         std::this_thread::sleep_until(end_sleep_time);
     }
-    // std::cout << "Agent " << id() << " has no running jobs, waiting for
-    // threads to complete." << std::endl;
+
     //  Join all of the threads now
     for (auto& thread : threads) {
         thread.join();
     }
-    // std::cout << "Agent " << id() << " is shutting down." << std::endl;
 }
 
 const std::string& Manager::id() const noexcept
@@ -661,7 +251,8 @@ void Manager::handle_neighbor_messages() noexcept
     // std::cout << "Agent " << id() << " handling neighbor messages." <<
     // std::endl;
     for (auto&& neighbor : neighbors_) {
-        neighbor.second.get_and_handle_messages();
+        // neighbor.second.get_and_handle_messages();
+	message_handler_->get_and_handle_messages(neighbor.second);
     }
 }
 
@@ -705,7 +296,7 @@ bool Manager::add_data_to_queue(const internal::PublishData& msg) noexcept
 void Manager::notify_of_new_neighbor(const MachineID& id) noexcept
 {
     send_to_neighbors_if(internal::make_new_neighbor(id),
-                         [&](const internal::ExternalManager& neighbor) {
+                         [&](const internal::NeighborAgent& neighbor) {
                              return neighbor.id() != id;
                          });
 }
@@ -774,10 +365,21 @@ std::vector<MachineID> Manager::make_neighbor_vector() const noexcept
     return to_ret;
 }
 
+template <typename Callable>
+void Manager::send_to_neighbors_if(const std::vector<std::byte>& to_send,
+				   Callable condition) noexcept
+{
+  for (auto&& neighbor : neighbors_) {
+    if (condition(neighbor.second)) {
+      message_handler_->send_message(neighbor.second, to_send);
+    }
+  }
+}
+
 void Manager::send_to_neighbors(const std::vector<std::byte>& to_send) noexcept
 {
     send_to_neighbors_if(to_send,
-                         [](const internal::ExternalManager&) { return true; });
+                         [](const internal::NeighborAgent&) { return true; });
 }
 
 bool Manager::subscribe_is_done(
@@ -802,6 +404,11 @@ Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
     std::lock_guard lock{job_mut_};
     SKYWING_DEBUG_LOG(
         "\"{}\" initializing subscription for tags {}", id_, tag_ids);
+
+    // insert each tag id into list of pending tags (ie tags for which
+    // we're still looking for a publisher) if it's not already being
+    // looked for (ie already in pending_tags_) and not already found
+    // (ie in tag_to_machine_)
     std::copy_if(
         tag_ids.cbegin(),
         tag_ids.cend(),
@@ -817,12 +424,13 @@ Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
             }
             return true;
         });
-    if (!pending_tags_.empty()) {
-        for (auto& [name, neighbor] : neighbors_) {
-            neighbor.reset_backoff_counter();
-            neighbor.find_publishers_for_tags(tag_ids,
-                                              make_need_one_pub(tag_ids));
-        }
+
+    // if there are any tags for which we need to find a publisher,
+    // start the search.
+    if (!pending_tags_.empty())
+    {
+      message_handler_->find_publishers_for_tags
+	(neighbors_, tag_ids, make_need_one_pub(tag_ids));
     }
     // Can potentially finish subscribing right away, so notify things
     notify_subscriptions_ = true;
@@ -856,8 +464,9 @@ Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
         notify_subscriptions_ = true;
     }
     else if (iter != addr_to_machine_.cend()) {
-        iter->second->send_message(
-            internal::make_subscription_notice(tag_ids, false));
+      message_handler_->send_message
+	(*(iter->second), internal::make_subscription_notice(tag_ids, false));
+      
         notify_subscriptions_ = true;
     }
     else {
@@ -889,7 +498,7 @@ Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
 }
 
 void Manager::handle_get_publishers(const internal::GetPublishers& msg,
-                                    internal::ExternalManager& from) noexcept
+                                    internal::NeighborAgent& from) noexcept
 {
     // If all of the tag requirements are fulfilled then
     const auto [remaining_tags, num_left] =
@@ -901,7 +510,8 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
                           from.id(),
                           msg.tags());
         // Send the information back now
-        from.send_message(make_known_tag_publisher_message());
+	message_handler_->send_message
+	  (from, make_known_tag_publisher_message());
     }
     else {
         // Mark all tags from the message in the cache so that they will be
@@ -932,7 +542,8 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
                                   }
                                   return known_tags;
                               }());
-            from.send_message(make_known_tag_publisher_message());
+	    message_handler_->send_message
+	      (from, make_known_tag_publisher_message());
             return;
         }
         // Mark the information as needing to be propagated
@@ -944,13 +555,14 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
         }
         // If there's already a pending request another one can't be sent, so
         // just return now
-        if (from.has_pending_tag_request()) {
+        if (from.has_outstanding_publishers_request()) {
             SKYWING_TRACE_LOG("\"{}\" returning early for request for tags {} "
                               "from \"{}\" to avoid potential deadlock",
                               id_,
                               msg.tags(),
                               from.id());
-            from.send_message(make_known_tag_publisher_message());
+	    message_handler_->send_message
+	      (from, make_known_tag_publisher_message());
             // No longer need to propagate information to this neighbor, as it
             // is being sent now
             send_publisher_information_to_.erase(from.id());
@@ -962,13 +574,8 @@ void Manager::handle_get_publishers(const internal::GetPublishers& msg,
                 make_neighbor_vector(),
                 msg.tags(),
                 from.id());
-            for (auto& neighbor : neighbors_) {
-                if (&neighbor.second != &from) {
-                    neighbor.second.reset_backoff_counter();
-                    neighbor.second.find_publishers_for_tags(remaining_tags,
-                                                             num_left);
-                }
-            }
+	    message_handler_->find_publishers_for_tags
+	      (neighbors_, remaining_tags, num_left);
         }
     }
 }
@@ -1007,7 +614,7 @@ auto Manager::remove_tags_with_enough_publishers(
 
 void Manager::add_publishers_and_propagate(
     const internal::ReportPublishers& msg,
-    const internal::ExternalManager& from) noexcept
+    const internal::NeighborAgent& from) noexcept
 {
     const auto insert_publisher_infos =
         [](decltype(publishers_for_tag_)::iterator iter,
@@ -1054,7 +661,7 @@ void Manager::add_publishers_and_propagate(
         }();
         insert_publisher_infos(iter, publishers, machines);
     }
-    // Add the tags that the external manager produced
+    // Add the tags that the neighbor produced
     const auto external_tags = msg.locally_produced_tags();
     for (const auto& tag : external_tags) {
         const decltype(publishers_for_tag_)::iterator iter = [&]() noexcept {
@@ -1093,7 +700,8 @@ void Manager::add_publishers_and_propagate(
                     id_,
                     send_to,
                     local_tags());
-                loc->second.send_message(to_send);
+		message_handler_->send_message
+		  (loc->second, to_send);
             }
         }
     }
@@ -1337,9 +945,7 @@ void Manager::process_pending_conns() noexcept
                     "look for new ones.",
                     id_,
                     info.tag);
-                for (auto&& neighbor : neighbors_) {
-                    neighbor.second.ignore_cache_on_next_request();
-                }
+		message_handler_->set_must_find_more_publishers(true);
             }
             else {
                 SKYWING_TRACE_LOG("\"{}\" still has publishers for tag \"{}\", "
@@ -1440,7 +1046,7 @@ void Manager::process_pending_conns() noexcept
                     !message_buffer.empty())
                 {
                     if (const auto msg =
-                            internal::MessageHandler::try_to_create(
+                            internal::MessageDeserializer::try_to_create(
                                 message_buffer))
                     {
                         decltype(neighbors_)::iterator new_neighbor_iter;
@@ -1592,7 +1198,7 @@ bool Manager::subscription_tags_are_produced(
 
 bool Manager::handle_publish_data(
     const internal::PublishData& msg,
-    const internal::ExternalManager& from) noexcept
+    const internal::NeighborAgent& from) noexcept
 {
     (void) from;
     if (auto value = msg.value()) {
@@ -1617,7 +1223,7 @@ bool Manager::handle_publish_data(
 }
 
 void Manager::finalize_subscription(const std::string& tags,
-                                    internal::ExternalManager& source) noexcept
+                                    internal::NeighborAgent& source) noexcept
 {
     const auto tags_str_view = internal::split(tags, '\0');
     SKYWING_TRACE_LOG(
@@ -1634,7 +1240,7 @@ void Manager::finalize_subscription(const std::string& tags,
         tag_to_machine_[tag] = &source;
     }
     const auto msg = internal::make_subscription_notice(tags_to_sub_to, false);
-    source.send_message(msg);
+    message_handler_->send_message(source, msg);
     notify_subscriptions_ = true;
 }
 
@@ -1643,11 +1249,8 @@ void Manager::find_publishers_for_pending_tags(const bool force_ask) noexcept
     if (force_ask) {
         SKYWING_TRACE_LOG(
             "\"{}\" forcefully asking for {}", id_, pending_tags_);
-        for (auto& neighbor : neighbors_) {
-            neighbor.second.reset_backoff_counter();
-            neighbor.second.find_publishers_for_tags(
-                pending_tags_, make_need_one_pub(pending_tags_));
-        }
+	message_handler_->find_publishers_for_tags
+	  (neighbors_, pending_tags_, make_need_one_pub(pending_tags_));
     }
     else {
         const auto no_known_publishers = [&](const TagID& tag) noexcept {
@@ -1666,13 +1269,9 @@ void Manager::find_publishers_for_pending_tags(const bool force_ask) noexcept
                      std::back_inserter(to_ask_for),
                      no_known_publishers);
         if (!to_ask_for.empty()) {
-            for (auto& neighbor : neighbors_) {
-                if (neighbor.second.should_ask_for_tags()) {
-                    neighbor.second.increase_backoff_counter();
-                    neighbor.second.find_publishers_for_tags(
-                        to_ask_for, make_need_one_pub(to_ask_for));
-                }
-            }
+	  // find publishers for tags only if necessary (false param)
+	  message_handler_->find_publishers_for_tags
+	    (neighbors_, to_ask_for, make_need_one_pub(pending_tags_), false);
         }
     }
 }
