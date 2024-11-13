@@ -5,7 +5,6 @@
 #include "skywing_core/internal/devices/socket_communicator.hpp"
 #include "skywing_core/internal/manager_waiter_callables.hpp"
 // #include "skywing_core/basic_manager_config.hpp"
-#include "skywing_core/neighbor_agent.hpp"
 #include "tag.hpp"
 
 #include <algorithm>
@@ -24,6 +23,7 @@
 #include <vector>
 
 #include "skywing_core/job.hpp"
+#include "skywing_core/neighbor_agent.hpp"
 #include "skywing_core/types.hpp"
 
 // This has to be separate due to requiring hashing support for the structure
@@ -65,8 +65,8 @@ class Job;
 
 namespace internal
 {
-  class MessageHandler;
-  
+class MessageHandler;
+
 // The default hearbeat interval
 inline static constexpr std::chrono::milliseconds default_heartbeat_interval{
     5000};
@@ -130,6 +130,11 @@ public:
     ~Manager();
 
     /** \brief Configure the initial neighbor connections to be made
+     *
+     *  This sets multiple IP address / port number pairs to define the desired
+     *  initial handshake connections between agents. This function may be
+     *  called multiple times to configure multiple lists of address / port
+     *  pairs.
      */
     void configure_initial_neighbors(
         const std::vector<std::tuple<std::string, uint16_t>>&
@@ -137,6 +142,10 @@ public:
         std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
 
     /** \brief Configure the initial neighbor connections to be made
+     *
+     *  This sets a IP address / port number pair to define the desired
+     *  initial handshake connections between agents. This function may be
+     *  called multiple times to configure multiple address / port pairs.
      */
     void configure_initial_neighbors(
         const std::string address,
@@ -144,6 +153,11 @@ public:
         std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
 
     /** \brief Initiate the initial connections to neighbors
+     *
+     *  This is used internally within the Job.run() function to actually
+     *  make the initial neighbor connections (because this
+     *  must be done asynchronously) and is not meant to be
+     *  called by an application.
      */
     void make_neighbor_connection() noexcept;
 
@@ -194,15 +208,14 @@ public:
     void handle_get_publishers(const internal::GetPublishers& msg,
                                internal::NeighborAgent& from) noexcept;
 
-
     /** \brief Adds the publishers and propagate the information is required
      *
      * Returns a bool indicating if the next request for publishers should
      * ignore the cache
      */
-    void add_publishers_and_propagate(
-        const internal::ReportPublishers& msg,
-        const internal::NeighborAgent& from) noexcept;
+    void
+    add_publishers_and_propagate(const internal::ReportPublishers& msg,
+                                 const internal::NeighborAgent& from) noexcept;
 
     /** \brief Returns true if the subscription tags are all produced
      */
@@ -386,8 +399,7 @@ private:
 
     // Mapping from a machine address to a pointer to the neighbor agent
     // This is also used for testing that a connection has completed
-    std::unordered_map<AddrPortPair, internal::NeighborAgent*>
-        addr_to_machine_;
+    std::unordered_map<AddrPortPair, internal::NeighborAgent*> addr_to_machine_;
 
     // Mapping from a tag to the ID used for the subscription to the tag
     // Used to know when a subscription is done and for if multiple jobs
@@ -441,7 +453,7 @@ private:
     // Maximum time to wait for initial neighbor connection to be established
     mutable std::chrono::seconds initial_neighbor_connection_timeout_;
 
-  std::unique_ptr<internal::MessageHandler> message_handler_;
+    std::unique_ptr<internal::MessageHandler> message_handler_;
 
 }; // class Manager
 
