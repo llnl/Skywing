@@ -1271,7 +1271,7 @@ void Manager::find_publishers_for_pending_tags(const bool force_ask) noexcept
         if (!to_ask_for.empty()) {
 	  // find publishers for tags only if necessary (false param)
 	  message_handler_->find_publishers_for_tags
-	    (neighbors_, to_ask_for, make_need_one_pub(pending_tags_), false);
+	    (neighbors_, to_ask_for, make_need_one_pub(to_ask_for), false);
         }
     }
 }
