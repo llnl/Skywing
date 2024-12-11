@@ -108,7 +108,7 @@ cmake -G Ninja \
       -S . \
       -B ${BUILD_DIR} \
       \
-      -D CMAKE_BUILD_TYPE=RelWithDebInfo \
+      -D CMAKE_BUILD_TYPE=Debug \
       -D CMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
       \
       -D SKYWING_DEVELOPER_BUILD=ON \

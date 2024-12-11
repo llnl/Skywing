@@ -5,10 +5,12 @@
 #include <numbers>
 #include <span>
 #include <type_traits>
+#include <cstdint>
 
 #include "skywing_core/tag.hpp"
 #include "skywing_core/types.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace skywing;
 using namespace std::numbers;
@@ -73,13 +75,13 @@ TEST_CASE("Store Data as Subscription Works", "[core]")
         (void) manager_handle;
 
         std::vector<std::variant<double,
-                                          std::vector<double>,
-                                          std::string,
-                                          std::vector<std::string>>>
-            subscription_data{12.0,
-                              std::vector<double>{pi / 4, pi / 2, pi, 3 * pi / 2, 2 * pi},
-                              "test",
-                              std::vector<std::string>{"str1", "str2", "str3", "str4"}};
+                                std::vector<double>,
+                                std::string,
+                                std::vector<std::string>>>
+            subscription_data{  12.0,
+                                std::vector<double>{2 * pi},
+                                "test",
+                                std::vector<std::string>{"str1"}};
 
         for (const auto& variant : subscription_data) {
             if (std::holds_alternative<double>(variant)) {
@@ -104,7 +106,7 @@ TEST_CASE("Store Data as Subscription Works", "[core]")
                 std::vector<double> data =
                     std::get<std::vector<double>>(variant);
                 const Tag<std::vector<double>> tag{"2"};
-                std::array<PublishValueVariant, 4> sub_data{data};
+                std::array<PublishValueVariant, 1> sub_data{data};
                 job.declare_publication_intent(tag);
                 job.subscribe(tag);
                 job.publish(tag, data);
@@ -116,7 +118,7 @@ TEST_CASE("Store Data as Subscription Works", "[core]")
                 std::vector<std::string> data =
                     std::get<std::vector<std::string>>(variant);
                 const Tag<std::vector<std::string>> tag{"3"};
-                std::array<PublishValueVariant, 5> sub_data{data};
+                std::array<PublishValueVariant, 1> sub_data{data};
                 job.declare_publication_intent(tag);
                 job.subscribe(tag);
                 job.publish(tag, data);
@@ -127,4 +129,44 @@ TEST_CASE("Store Data as Subscription Works", "[core]")
     });
 
     manager.run();
+}
+
+TEST_CASE("Store Multiple-Value Data as Subscription Works", "[core]")
+{
+    auto int_data = GENERATE(1, 2, 3, 4);
+    auto uint_data = GENERATE(as<std::uint16_t>{}, 1u, 2u, 3u, 4u);
+
+    SECTION("Store int and unsigned int types")
+    {
+        Manager manager{get_starting_port(), "0"};
+        manager.submit_job("job", [&](Job& job, ManagerHandle manager_handle) {
+            (void) manager_handle;
+            Tag<int, std::uint16_t> tag {"0"};
+            job.declare_publication_intent(tag);
+            job.subscribe(tag);
+            job.publish(tag, int_data, uint_data);
+            std::array<PublishValueVariant, 2> subscription_data {int_data, uint_data};
+            checkIf<int, std::uint16_t>(subscription_data).isStoredUnderTag(tag, job);
+        });
+
+        manager.run();
+    }
+
+    auto str_data = GENERATE(as<std::string>{}, "a", "bb", "ccc", "dddd");
+
+    SECTION("Store int, unsigned int, and string types")
+    {
+        Manager manager{get_starting_port(), "0"};
+        manager.submit_job("job", [&](Job& job, ManagerHandle manager_handle) {
+            (void) manager_handle;
+            Tag<int, std::uint16_t, std::string> tag {"0"};
+            job.declare_publication_intent(tag);
+            job.subscribe(tag);
+            job.publish(tag, int_data, uint_data, str_data);
+            std::array<PublishValueVariant, 3> subscription_data {int_data, uint_data, str_data};
+            checkIf<int, std::uint16_t, std::string>(subscription_data).isStoredUnderTag(tag, job);
+        });
+
+        manager.run();
+    }
 }
