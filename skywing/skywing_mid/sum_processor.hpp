@@ -35,9 +35,7 @@ public:
     SumProcessor(data_t my_value, Args&&... args)
         : mean_processor_(my_value, std::forward<Args>(args)...),
           count_processor_(std::forward<Args>(args)...)
-    {
-        std::cout << "Starting value " << my_value << std::endl;
-    }
+    { }
 
     ValueType get_init_publish_values()
     {
@@ -45,20 +43,18 @@ public:
                          count_processor_.get_init_publish_values());
     }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+   template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
-        auto mean_data_handler =
-            nbr_data_handler
-                .template get_sub_handler<typename MeanProcessor::ValueType>(
-                    [](const ValueType& v) { return std::get<0>(v); });
+       auto mean_data_handler =
+            data_handler
+                .template get_kth_index_handler<typename MeanProcessor::ValueType,0>();
         mean_processor_.process_update(mean_data_handler, iter_method);
 
         auto count_data_handler =
-            nbr_data_handler
-                .template get_sub_handler<typename CountProcessor::ValueType>(
-                    [](const ValueType& v) { return std::get<1>(v); });
+            data_handler
+                .template get_kth_index_handler<typename CountProcessor::ValueType,1>();
         count_processor_.process_update(count_data_handler, iter_method);
     }
 

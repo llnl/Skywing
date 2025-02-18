@@ -52,6 +52,7 @@ set(TEST_SRCS
   skywing_mid/pubsub.cpp
   skywing_mid/stoppolicy_send.cpp
   skywing_mid/synchronous_iterative.cpp
+  skywing_mid/data_handler_test.cpp
   skywing_math_interface/jacobi_test.cpp
 )
 

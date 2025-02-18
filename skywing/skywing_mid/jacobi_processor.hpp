@@ -74,12 +74,12 @@ public:
      * @param nbr_values The new values from the neighbors.
      * @param caller The iterative wrapper calling this method.
      */
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         [[maybe_unused]] const IterMethod&)
     {
-        for (const auto& pTag : nbr_data_handler.get_updated_tags()) {
-            ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
+        for (const auto& pTag : data_handler.recvd_data_tags() ) {
+            ValueType nbr_value = data_handler.get_data(pTag);
             // This cycles through the received_values in order not to
             // replace a component that each process is updating with
             // another processes update if there's overlapping

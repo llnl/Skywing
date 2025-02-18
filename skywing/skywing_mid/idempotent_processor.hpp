@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "skywing_mid/data_handler.hpp"
 namespace skywing
 {
 
@@ -38,8 +39,7 @@ public:
     using ValueType = std::tuple<T, std::uint64_t, std::uint64_t>;
 
     IdempotentProcessor(T starting_value)
-        : curr_value_({starting_value, 0, 0}), my_value_(curr_value_)
-    {}
+        : curr_value_({starting_value, 0, 0}), my_value_(curr_value_){}
 
     IdempotentProcessor(BinaryOperation op, T starting_value)
         : op_(std::move(op)),
@@ -49,21 +49,21 @@ public:
 
     ValueType get_init_publish_values() { return curr_value_; }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename ValueType,typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod&)
     {
+
         // Function to compare two values taking into account versions,
         // where the higher version dominates the binary operator
         auto version_op = [this](ValueType v1, ValueType v2) -> ValueType {
             return this->version_aware_binary_op_(v1, v2);
         };
-
-        curr_value_ =
+            curr_value_ =
             version_op(curr_value_,
-                       nbr_data_handler.template f_accumulate<ValueType>(
+                       data_handler.template f_accumulate<ValueType>(
                            [](const ValueType& v) { return v; }, version_op));
-
+      
         // Based on the version and wrap counters, determine my_value_,
         // which always has the most up to date version, as it is my
         // active contribution and set the correct version and wrap counter
@@ -95,6 +95,7 @@ public:
         // Determine the current value of the operator, based
         // on the version and wrap counters
         curr_value_ = version_op(curr_value_, my_value_);
+
     }
 
     ValueType prepare_for_publication(ValueType) { return curr_value_; }

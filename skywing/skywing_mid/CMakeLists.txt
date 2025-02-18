@@ -15,12 +15,13 @@ target_sources(skywing_mid
   internal/pubsub_converter_helpers.hpp
   iterative_method.hpp
   iterative_resilience_policies.hpp
-  neighbor_data_handler.hpp
+  data_handler.hpp
   power_method_processor.hpp
   publish_policies.hpp
   pubsub_converter.hpp
   push_flow_processor.hpp
   push_sum_processor.hpp
+  push_sum_basic_processor.hpp
   quacc_processor.hpp
   stop_policies.hpp
   sum_processor.hpp

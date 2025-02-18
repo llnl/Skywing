@@ -1,0 +1,3 @@
+#!/bin/bash
+
+"@lc_push_sum_exe@" config.cfg $SLURM_NODEID $SLURM_LOCALID 1 4

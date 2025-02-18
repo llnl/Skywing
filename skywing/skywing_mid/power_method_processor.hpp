@@ -51,12 +51,12 @@ public:
                          sqnorm_sum_processor_.get_init_publish_values());
     }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
         auto sqnorm_data_handler =
-            nbr_data_handler
+            data_handler
                 .template get_sub_handler<typename SqNormSumProc_t::ValueType>(
                     [](const ValueType& v) { return std::get<1>(v); });
         sqnorm_sum_processor_.process_update(sqnorm_data_handler, iter_method);
@@ -68,7 +68,7 @@ public:
 
         // get estimate of my portion of Ax
         auto vec_data_handler =
-            nbr_data_handler.template get_sub_handler<AssocVec_t>(
+            data_handler.template get_sub_handler<AssocVec_t>(
                 [](const ValueType& v) { return std::get<0>(v); });
         AssocVec_t Ax = vec_data_handler.sum();
 

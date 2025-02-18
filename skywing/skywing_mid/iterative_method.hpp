@@ -1,11 +1,13 @@
 #ifndef SKYWING_MID_INTERNAL_ITERATIVE_BASE_HPP
 #define SKYWING_MID_INTERNAL_ITERATIVE_BASE_HPP
 
+#include <typeindex>  // Add this line to include the necessary header
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
 #include "skywing_core/tag.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
-#include "skywing_mid/neighbor_data_handler.hpp"
+#include "skywing_mid/data_handler.hpp"
+
 #include "skywing_mid/pubsub_converter.hpp"
 
 namespace skywing
@@ -51,8 +53,7 @@ public:
             if (!job_->tag_has_active_publisher(*tag_iter)) {
                 dead_tags_.push_back(std::move(*tag_iter));
                 tag_iter = tags_.erase(tag_iter);
-            }
-            else {
+            } else {
                 ++tag_iter;
             }
         }
@@ -118,6 +119,7 @@ public:
                 num_updated++;
             ++tag_iter;
         }
+
         if (num_updated == 0)
             return false;
 
@@ -136,6 +138,7 @@ public:
                 updated_tags_.push_back(&tag);
             }
         }
+
         return true;
     }
 
@@ -161,47 +164,96 @@ public:
 
     Job& get_job() const noexcept { return *job_; }
 
-    /** @brief Get a NeighborDataHandler to the recieved data.
-     *
-     *  The NeighborDataHandler acts as a resilient interface to data,
-     *  so that client iterative methods can leverage that resilience
-     *  without implementing it themselves.
-     *
-     *  Often, the raw DataType is a concatenation of values used by
-     *  different policies in the IterativeMethod, and so we want to
-     *  only present an interface to an element of the DataType. This
-     *  function enables getting a NeighborDataHandler that provides an
-     *  interface to only the underlying data of interest.
-     *
-     * @param f A function that converts an object of type DataType into
-     * something of type SubDataType. For example, a common function to
-     * pass here would be the tuple element-getter function
-     * <tt>[](const DataType& v){return std::get<0>(v);}</tt>
-     */
-    template <typename SubDataType>
-    NeighborDataHandler<DataType, SubDataType>
-    get_neighbor_data_handler(std::function<SubDataType(const DataType& v)> f)
-    {
-        return NeighborDataHandler<DataType, SubDataType>(
-            std::move(f), tags_, neighbor_values_, updated_tags_);
+
+    template <typename InnerDataType>
+    void addHandler(std::type_index type, std::unique_ptr<DataHandler<InnerDataType>> handler) {
+        policy_data_handlers_.emplace(type, DataHandlerBaseWrapper(std::move(handler)));
     }
 
 protected:
+    template <typename Policy, typename IterMethod>
+    void initialize_policy_data_handler() {
+        using ret_t = typename Policy::ValueType;
+        constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
+
+        // Create a lambda to extract the specific element from ValueType
+        auto extractor = [](const ValueType& v) { return std::get<ind>(v); };
+
+        // Apply the extractor to transform the neighbor values
+        std::unordered_map<std::string, ret_t> transformed_values;
+        for (const auto& [tag, data] : neighbor_values_) {
+            transformed_values[tag.id()] = extractor(data);
+        }
+
+        // Apply create strings for tags for the data handler
+        std::vector<std::string> transformed_tags;
+        for (const auto& tag : tags_) {
+            transformed_tags.push_back(tag.id());
+        }
+
+        // Store the DataHandler in the map
+        addHandler(std::type_index(typeid(Policy)),(std::make_unique<DataHandler<ret_t>>(transformed_tags, transformed_values)) ); 
+        // policy_data_handlers_[std::type_index(typeid(Policy))] =  std::move(std::make_unique<DataHandler<ret_t>>(transformed_tags, transformed_values));
+    }
     /** @brief Get the NeighborDataHandler for the Policy data.
      *
      * If the Policy does not define a ValueType, then attempting to
      * instantiate this function will induce a compile-time error.
      */
     template <typename Policy, typename IterMethod>
-    NeighborDataHandler<ValueType, typename Policy::ValueType>
-    get_policy_data_handler()
-    {
+    DataHandler<typename Policy::ValueType> get_policy_data_handler() {
         using ret_t = typename Policy::ValueType;
-        constexpr std::size_t ind =
-            IndexInPublishers<Policy, IterMethod>::index;
-        return this->template get_neighbor_data_handler<ret_t>(
-            [](const ValueType& v) { return std::get<ind>(v); });
+
+        // Check if the DataHandler already exists
+        auto it = policy_data_handlers_.find(std::type_index(typeid(Policy)));
+        if (it == policy_data_handlers_.end()) {
+            // Initialize if it doesn't exist
+            initialize_policy_data_handler<Policy, IterMethod>();
+            it = policy_data_handlers_.find(std::type_index(typeid(Policy)));
+        }
+
+        // Transform and update the DataHandler
+        try {
+            update_policy_data_handler<Policy, IterMethod>(it);
+        } catch (const std::exception& e) {
+            std::cerr << "Error updating DataHandler: " << e.what() << std::endl;
+            throw; // or handle the error appropriately
+        }
+
+        // Return the existing DataHandler
+        return *(it->second.template get<ret_t>());
     }
+
+    template <typename Policy, typename IterMethod>
+    void update_policy_data_handler(typename std::unordered_map<std::type_index, DataHandlerBaseWrapper>::iterator& it) {
+        using ret_t = typename Policy::ValueType;
+        auto transform_func = [](const ValueType& v) {
+            constexpr std::size_t ind = IndexInPublishers<Policy, IterMethod>::index;
+            return std::get<ind>(v);
+        };
+
+    std::unordered_map<std::string, ret_t> transformed_values;
+       for (const auto& [tag, data] : neighbor_values_) {
+            try {
+                // Cast std::any to the expected type
+                ret_t value = std::any_cast<ret_t>(transform_func(data)); 
+                transformed_values[tag.id()] = value;
+            } catch (const std::bad_any_cast& e) {
+                std::cerr << "Error casting std::any to expected type: " << e.what() << std::endl;
+            }
+        }
+
+        if (it != policy_data_handlers_.end()) {
+            DataHandler<ret_t>* handler = it->second.template get<ret_t>();
+            if (handler) {
+                handler->update(transformed_values);
+            } else {
+                throw std::runtime_error("Failed to cast to DataHandler");
+            }
+        }
+    }
+
+
 
     /** @brief Ask this Policy to process an update.
      *
@@ -289,11 +341,16 @@ protected:
     ResiliencePolicy resilience_policy_;
 
 private:
+
     tag_map<TagType, DataType> neighbor_values_;
     std::vector<const TagType*> updated_tags_;
 
-    template <typename Callable, typename IterMethod>
-    friend class NeighborDataHandler;
+    template <typename Callable>
+    friend class DataHandler;
+
+    // Member variable for DataHandler
+    std::unordered_map<std::type_index, DataHandlerBaseWrapper> policy_data_handlers_;
+
 }; // class IterativeBase
 
 } // namespace skywing

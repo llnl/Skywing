@@ -73,7 +73,7 @@ public:
         : my_val_(get_exponential_dist_value()),
           min_processor_(my_val_),
           mean_processor_(exp(-my_val_), std::forward<Args>(args)...)
-    {}
+    { }
 
     ValueType get_init_publish_values()
     {
@@ -81,21 +81,17 @@ public:
                          mean_processor_.get_init_publish_values());
     }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
-        auto min_data_handler =
-            nbr_data_handler
-                .template get_sub_handler<typename MinProc::ValueType>(
-                    [](const ValueType& v) { return std::get<0>(v); });
+       // Ensure that the data handler retrieves the correct type
+        auto min_data_handler = data_handler.template get_kth_index_handler<typename MinProc::ValueType,0>(); 
         min_processor_.process_update(min_data_handler, iter_method);
 
-        auto mean_data_handler =
-            nbr_data_handler
-                .template get_sub_handler<typename MeanProc::ValueType>(
-                    [](const ValueType& v) { return std::get<1>(v); });
+        auto mean_data_handler = data_handler.template get_kth_index_handler<typename MeanProc::ValueType,1>();
         mean_processor_.process_update(mean_data_handler, iter_method);
+        
     }
 
     ValueType prepare_for_publication(ValueType v)
@@ -139,6 +135,10 @@ private:
         real_t p = distribution(generator);
         // should actually be 1-p but the distribution of p and
         // distribution of 1-p are the same so it's fine.
+         do {
+            p = distribution(generator);
+        } while (p == 0.0); // Ensure p is not zero
+
         return -log(p) / LAMBDA;
     }
 
