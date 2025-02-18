@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <sstream>
 
 #include "skywing_core/types.hpp"
 #include "spdlog/spdlog.h"
@@ -175,5 +176,50 @@ struct fmt::formatter<skywing::AddrPortPair>
         return fmt::format_to(ctx.out(), "{}:{}", data.first, data.second);
     }
 };
+
+
+// Support logging of ValueOrTuple<Ts...> buffer data
+// ValueOrTuple<Ts...> is an alias for std::tuple<T> or T
+// Specialization for a single type ValueOrTuple<Ts...> did not work
+// with spdlog since it is a type alias. 
+// Instead, specialize on implemented types separately.
+namespace fmt {
+
+    // Tuple formatting helper function
+    template <typename... Ts>
+    std::string format_tuple(const std::tuple<Ts...>& tuple)
+    {
+        std::ostringstream oss;
+        std::apply([&oss](auto&&... args) { ((oss << args << ", "), ...); }, tuple);
+        std::string result = oss.str();
+        if (!result.empty())
+        {
+            result.pop_back();
+        }
+        return result;
+    }
+
+    // Specialization for ValueOrTupleImpl<Ts...> aka std::tuple
+    template<typename... Ts>
+    struct formatter<std::tuple<Ts...>> {
+        template <typename FormatContext>
+        auto format(const std::tuple<Ts...>& value, FormatContext& ctx) {
+                    return fmt::format_to(ctx.out(), "{}", format_tuple(value));
+        }
+
+        constexpr auto parse(fmt::format_parse_context& ctx) {
+                return ctx.begin();
+        }
+    };
+
+    // Specialization for just a simple type T, ValueOrTupleImpl<T>
+    template<typename T, typename = void>
+    struct formatter {
+        template <typename FormatContext>
+        auto format(const T& value, FormatContext& ctx) {
+            return fmt::format_to(ctx.out(), "{}", value);
+        }
+    };
+}
 
 #endif // SKYWING_INTERNAL_UTILITY_LOGGING

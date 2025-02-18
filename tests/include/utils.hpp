@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "skywing_core/internal/tag_buffer.hpp"
+#include "skywing_core/internal/buffer.hpp"
 #include "skywing_core/manager.hpp"
 #include <catch2/catch_test_macros.hpp>
 

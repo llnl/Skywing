@@ -12,7 +12,6 @@
 
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/types.hpp"
-#include "skywing_mid/internal/iterative_helpers.hpp"
 
 namespace skywing
 {
@@ -96,8 +95,6 @@ class Tag final : public AbstractTag
 public:
     using DataTypeRef = std::uint8_t;
     using ValueType = ValueOrTuple<Types...>;
-    using BufferType =
-        UnwrapAndApply_t<ValueType, internal::DiscardOldVersionTagBuffer>;
 
     /**
      * Constructor to create a Tag.
@@ -139,5 +136,15 @@ private:
     std::vector<DataTypeRef> expected_types_;
 };
 
+template <typename TagT>
+struct hash
+{
+    std::size_t operator()(const TagT& tb) const
+    {
+        return std::hash<TagID>{}(tb.id());
+    }
+}; // struct hash<TagBase<BaseTagType>>
+
 } // namespace skywing
+
 #endif // SKYWING_SKYWING_CORE_TAG_HPP

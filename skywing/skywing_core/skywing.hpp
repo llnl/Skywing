@@ -8,6 +8,7 @@
 #include "types.hpp"
 #include "waiter.hpp"
 #include "subscription.hpp"
+#include "buffer.hpp"
 
 #include "enable_logging.hpp"
 

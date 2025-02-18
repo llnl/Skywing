@@ -45,7 +45,9 @@ target_sources(skywing_core
   "${_endian_header}"
   internal/manager_waiter_callables.hpp
   internal/message_creators.hpp
-  internal/tag_buffer.hpp
+  internal/buffer.hpp
+  internal/most_recent_buffer.hpp
+  internal/queue_buffer.hpp
   internal/utility/algorithms.hpp
   internal/utility/logging.hpp
   internal/utility/mutex_guarded.hpp
@@ -61,6 +63,7 @@ target_sources(skywing_core
   waiter.hpp
   tag.hpp
   subscription.hpp
+  buffer.hpp
 )
 
 # "Private" headers, enumerated to help IDEs

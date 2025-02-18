@@ -42,6 +42,7 @@ set(TEST_SRCS
   skywing_core/multiple_jobs_test.cpp
   skywing_core/tag.cpp
   skywing_core/subscription.cpp
+  skywing_core/buffers.cpp
 
   skywing_mid/associative_vector.cpp
   skywing_mid/idempotent_processor_test.cpp

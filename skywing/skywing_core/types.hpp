@@ -2,9 +2,11 @@
 #define SKYWING_TYPES_HPP
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <variant>
@@ -65,6 +67,17 @@ using PublishValueVariant =
 
 namespace internal::detail
 {
+// Checks if a span representing a tag's value is valid compared to what is
+// expected
+template <typename... Ts, std::size_t... Is>
+bool span_is_valid(const std::span<const PublishValueVariant> value,
+                   std::index_sequence<Is...>) noexcept
+{
+    return value.size() == sizeof...(Ts)
+           && (...
+               && (value[Is].index() == index_of<Ts, PublishValueTypeList>) );
+}
+
 // Can't use std::conditional_t because of At not working for 0 size packs
 // but conditional_t requires both types to be well-formed
 template <typename... Ts>
@@ -83,6 +96,46 @@ struct ValueOrTupleImpl<T>
 /// turns it into a single type
 template <typename... Ts>
 using ValueOrTuple = typename internal::detail::ValueOrTupleImpl<Ts...>::Type;
+
+namespace internal::detail
+{
+// Takes a tag value and turns it into either a value (single element) or tuple
+// non-const version
+template <typename... Ts, std::size_t... Is>
+ValueOrTuple<Ts...> make_value(std::span<PublishValueVariant> value,
+                               std::index_sequence<Is...> seq) noexcept
+{
+    (void) seq; // avoid compiler warning in release buiild
+    //assert(span_is_valid<Ts...>(value, seq));
+    if constexpr (sizeof...(Ts) == 1) {
+        assert(std::get_if<Ts...>(&value[0]));
+        return std::move(*std::get_if<Ts...>(&value[0]));
+    }
+    else {
+        // Is lines up for the span, Ts is the types for the tuple
+        assert((... && std::get_if<Ts>(&value[Is])));
+        return std::make_tuple(std::move(*std::get_if<Ts>(&value[Is]))...);
+    }
+}
+
+// Const version of the above
+template <typename... Ts, std::size_t... Is>
+ValueOrTuple<Ts...> make_value(std::span<const PublishValueVariant> value,
+                               std::index_sequence<Is...> seq) noexcept
+{
+    (void) seq; // avoid compiler warning in release buiild
+    //assert(span_is_valid<Ts...>(value, seq));
+    if constexpr (sizeof...(Ts) == 1) {
+        assert(std::get_if<Ts...>(&value[0]));
+        return *std::get_if<Ts...>(&value[0]);
+    }
+    else {
+        assert((... && std::get_if<Ts>(&value[Is])));
+        return std::make_tuple(*std::get_if<Ts>(&value[Is])...);
+    }
+}
+
+} // namespace internal::detail
 
 /// Address/port pair
 using AddrPortPair = std::pair<std::string, std::uint16_t>;
