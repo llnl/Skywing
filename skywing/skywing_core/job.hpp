@@ -13,8 +13,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "skywing_core/buffer.hpp"
+#include "skywing_core/internal/buffer.hpp"
 #include "skywing_core/internal/manager_waiter_callables.hpp"
-#include "skywing_core/internal/tag_buffer.hpp"
 #include "skywing_core/internal/utility/mutex_guarded.hpp"
 #include "skywing_core/internal/utility/type_list.hpp"
 #include "skywing_core/subscription.hpp"
@@ -34,7 +35,6 @@ class ManagerHandle;
 class Job
 {
 public:
-
     /** \brief Creates a job with the specified manager and work
      */
     Job(const std::string& id,
@@ -81,8 +81,7 @@ public:
      * \pre The tag is subscribed to
      */
     template <typename... Ts>
-    Waiter<std::optional<ValueOrTuple<Ts...>>>
-    get_waiter(const Tag<Ts...>& tag) noexcept
+    Waiter<std::optional<ValueOrTuple<Ts...>>> get_waiter(const Tag<Ts...>& tag)
     {
         using ValueType = ValueOrTuple<Ts...>;
         // Can just capture the reference to the value as it
@@ -106,7 +105,12 @@ public:
                 // have errored between storing the value in the buffer and then
                 // retrieving it
                 if (subscription.has_data()) {
-                    return *static_cast<ValueType*>(subscription.get_data());
+                    ValueType value;
+                    std::any any_value = value;
+                    subscription.get_data(any_value);
+                    return std::make_optional(
+                        internal::detail::cast_to_value_or_tuple<Ts...>(
+                            any_value));
                 }
                 else {
                     return std::nullopt;
@@ -154,18 +158,23 @@ public:
         // TODO: Make this std::terminate or something instead?
         assert("Tag attempted to be subscribed to twice!"
                && (... && tag_is_not_subscribed(tags)));
-	{
-	  [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
-	  for (const auto& tag : {tags...}) {
-            if (subscriptions.contains(tag.id())) {
-	      Subscription& sub = subscriptions.at(tag.id());
-	      sub.reset();
+        {
+            [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+            for (const auto& tag : {tags...}) {
+                if (subscriptions.contains(tag.id())) {
+                    Subscription& sub = subscriptions.at(tag.id());
+                    sub.reset();
+                }
+                else {
+                    auto sub{tmp_buffer_ ? Subscription(tag, *tmp_buffer_)
+                                         : Subscription(tag)};
+                    subscriptions.insert_or_assign(
+                        tag.id(),
+                        tmp_buffer_ ? Subscription(tag, *tmp_buffer_)
+                                    : Subscription(tag));
+                }
             }
-            else {
-	      subscriptions.insert_or_assign(tag.id(), Subscription(tag));
-            }
-	  }
-	}
+        }
 
         using TagPtr = const AbstractTag*;
         std::array<TagPtr, sizeof...(Ts)> tag_ptrs{&tags...};
@@ -180,19 +189,24 @@ public:
     {
         std::vector<const AbstractTag*> tag_span;
         tag_span.reserve(tags.size());
-	{
-	  [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
-	  for (auto const& tag : tags) {
-            tag_span.push_back(&tag);
-            if (subscriptions.contains(tag.id())) {
-	      Subscription& sub = subscriptions.at(tag.id());
-	      sub.reset();
+        {
+            [[maybe_unused]] auto [subscriptions, lock] = subs_.get();
+            for (auto const& tag : tags) {
+                tag_span.push_back(&tag);
+                if (subscriptions.contains(tag.id())) {
+                    Subscription& sub = subscriptions.at(tag.id());
+                    sub.reset();
+                }
+                else {
+                    auto sub{tmp_buffer_ ? Subscription(tag, *tmp_buffer_)
+                                         : Subscription(tag)};
+                    subscriptions.insert_or_assign(
+                        tag.id(),
+                        tmp_buffer_ ? Subscription(tag, *tmp_buffer_)
+                                    : Subscription(tag));
+                }
             }
-            else {
-	      subscriptions.insert_or_assign(tag.id(), Subscription(tag));
-            }
-	  }
-	}
+        }
         return get_subscribe_future(tag_span);
     }
 
@@ -248,6 +262,29 @@ public:
     /** \brief Returns true if the job is finished, false if it is not
      */
     bool is_finished() const noexcept;
+
+    /**
+     * @brief Set the buffer type for all subscriptions in this job
+     *
+     * @param buffer_type A Buffer object that is a template specialization
+     * of Buffer types, one of specializations defined from wrapper functions in
+     * skywing_core/buffer.hpp
+     *
+     * @details Users can specify buffer types by using the following syntax
+     * job.set_buffer( Buffer::IntQueue() );
+     * job.set_buffer( Buffer::IntMostRecent() );
+     * 
+     * For custom buffer types, see function overload.
+     */
+    void set_buffer(const Buffer& buffer_type)
+    {
+        tmp_buffer_ = buffer_type.get_buffer();
+    }
+
+    void set_buffer(const internal::Buffer& buffer)
+    {
+        tmp_buffer_ = buffer;
+    }
 
     /** \brief Returns a list of the produced tags
      */
@@ -371,6 +408,8 @@ private:
     // The last version published on each tag
     std::unordered_map<std::string, VersionID> last_published_version_;
 
+    static constexpr int tag_no_data = -1;
+
     // The manager that this job is working with
     Manager* manager_;
 
@@ -382,6 +421,9 @@ private:
 
     // Condition variable when data is added to buffers or an error occurs
     std::condition_variable data_buffer_modified_cv_;
+
+    // Temporary variable to hold buffer type until subscription is made
+    std::optional<internal::Buffer> tmp_buffer_;
 }; // Class Job
 } // namespace skywing
 

@@ -5,13 +5,13 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include "skywing_core/internal/tag_buffer.hpp"
+#include "skywing_core/tag.hpp"
 
 namespace skywing
 {
 template <typename TagType, typename T>
 using tag_map =
-    std::unordered_map<TagType, T, skywing::internal::hash<TagType>>;
+    std::unordered_map<TagType, T, skywing::hash<TagType>>;
 
 /*************************************************************************
  * @brief struct that checks if a type is one of the ones that

@@ -5,7 +5,8 @@
 #include <memory>
 #include <span>
 
-#include "skywing_core/internal/tag_buffer.hpp"
+#include "skywing_core/internal/buffer.hpp"
+#include "skywing_core/internal/most_recent_buffer.hpp"
 #include "skywing_core/tag.hpp"
 
 namespace skywing
@@ -29,14 +30,19 @@ public:
      * @param tag a Tag to uniquely identify this publication stream. The
      * expected data types are extracted from the template parameter to create
      * the expected types for the data buffer.
-     * TODO : The buffer member variable should be templated to work with many
-     * types of buffers. For now, we use buffer type DiscardOldVersionTagBuffer.
+     * @param buffer a Buffer object which sets the buffer type for data.
      */
     template <typename... Ts>
-    explicit Subscription(Tag<Ts...> tag)
-        : tag_(std::make_unique<Tag<Ts...>>(std::move(tag))),
-          buffer_(
-              std::make_unique<internal::DiscardOldVersionTagBuffer<Ts...>>())
+    Subscription(Tag<Ts...> tag, internal::Buffer buffer)
+        : tag_(std::make_unique<Tag<Ts...>>(std::move(tag))), buffer_{buffer}
+    {}
+
+    /**
+     * Delegating constructor.
+     */
+    template <typename... Ts>
+    Subscription(Tag<Ts...> tag)
+        : Subscription(tag, internal::MostRecentBuffer<Ts...>())
     {}
 
     Subscription(Subscription const&) = delete;
@@ -49,7 +55,8 @@ public:
     void reset()
     {
         connection_id_++;
-        buffer_->reset();
+        using internal::reset;
+        reset(buffer_);
         error_ = Error::no_error;
     }
 
@@ -74,12 +81,16 @@ public:
     void add_data(std::span<const PublishValueVariant> value,
                   const VersionID version)
     {
-        buffer_->add(value, version);
+        add(buffer_, value, version);
     }
 
-    bool has_data() { return buffer_->has_data(); }
+    bool has_data()
+    {
+        using internal::has_data;
+        return has_data(buffer_);
+    }
 
-    void* get_data() const { return buffer_->get(); }
+    void get_data(std::any& value) const { get(buffer_, value); }
 
 private:
     enum class Error
@@ -91,7 +102,7 @@ private:
     Error error_{Error::no_error};
     std::uint16_t connection_id_{0};
     std::unique_ptr<AbstractTag> tag_;
-    std::unique_ptr<internal::DiscardOldVersionTagBufferBase> buffer_;
+    internal::Buffer buffer_;
 };
 
 } // namespace skywing

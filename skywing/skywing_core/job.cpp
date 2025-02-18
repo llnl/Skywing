@@ -137,7 +137,7 @@ void Job::publish_impl(const AbstractTag& tag,
     //   && "Attempted to publish the wrong type on a tag!");
     // Find / create the last version and obtain a reference to it
     auto& last_version =
-        last_published_version_.try_emplace(tag.id(), internal::tag_no_data)
+        last_published_version_.try_emplace(tag.id(), tag_no_data)
             .first->second;
     last_version = last_version + 1;
     manager_->publish(last_version, tag.id(), to_send);
