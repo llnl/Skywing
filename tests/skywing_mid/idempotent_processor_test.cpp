@@ -4,13 +4,13 @@
 #include "skywing_core/tag.hpp"
 #include "skywing_mid/idempotent_processor.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
-#include "skywing_mid/neighbor_data_handler.hpp"
+#include "skywing_mid/data_handler.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace skywing;
 
 using IValueT = std::tuple<double, std::uint64_t, std::uint64_t>;
-using NbrDataHandlerT = NeighborDataHandler<IValueT, IValueT>;
+using DataHandlerT = DataHandler<IValueT>;
 using TagType = Tag<double, std::uint64_t, std::uint64_t>;
 
 using OtherTagType =
@@ -34,16 +34,36 @@ tag_map<TagType, IValueT> make_nbr_values(double d1,
                                             {tags[2], {d3, v3, wc3}}};
     return nbr_values;
 }
-
+template <typename IValueT>
+std::tuple<std::vector<std::string>, std::unordered_map<std::string, IValueT>> transform_data(
+    const std::vector<TagType>& tags, const tag_map<TagType, IValueT>& nbr_values) {
+    
+    // Transform tags to a vector of strings
+    std::vector<std::string> transformed_tags;
+    for (const auto& tag : tags) {
+        transformed_tags.push_back(tag.id());
+    }
+    
+    // Identity function for IValueT
+    auto ident = [](const IValueT& iv) -> const IValueT& {
+        return iv;
+    };
+    
+    // Transform neighbor values to an unordered map with string keys
+    std::unordered_map<std::string, IValueT> transformed_values;
+    for (const auto& [tag, data] : nbr_values) {
+        transformed_values[tag.id()] = ident(data);
+    }
+    
+    return {transformed_tags, transformed_values};
+}
+    
 TEST_CASE("Idempotent Processor", "[mid][unit]")
 {
     // make MaxProcessor (ie IdempotentProcessor with max operator)
     MaxProcessor<double> max_proc(1.0);
 
     // data needed to build NeighborDataHandler object
-    auto ident = [](const IValueT& iv) -> const IValueT& {
-        return iv;
-    };
     std::vector<TagType> tags = {{"A"}, {"B"}, {"C"}};
     tag_map<TagType, IValueT> nbr_values =
         make_nbr_values(0.0, 0, 0, 1.0, 0, 0, 2.0, 0, 0, tags);
@@ -51,7 +71,10 @@ TEST_CASE("Idempotent Processor", "[mid][unit]")
 
     // values are 1.0 from me, and 0.0, 1.0, and 2.0 from others
     // so max is 2.0, version 0
-    NbrDataHandlerT ndh1(ident, tags, nbr_values, updated_tags);
+    auto transformed_data  = transform_data(tags,nbr_values);
+    auto& transformed_tags = std::get<0>(transformed_data);
+    auto& transformed_values = std::get<1>(transformed_data);
+    DataHandlerT ndh1(transformed_tags, transformed_values);
     max_proc.process_update(ndh1, nullptr);
     REQUIRE(max_proc.get_value() == 2.0);
     REQUIRE(max_proc.get_version() == 0);
@@ -60,7 +83,10 @@ TEST_CASE("Idempotent Processor", "[mid][unit]")
     // new max is 3.0, version 1
     max_proc.set_value(3.0);
     nbr_values = make_nbr_values(0.0, 1, 0, 1.0, 1, 0, 2.0, 1, 0, tags);
-    NbrDataHandlerT ndh2(ident, tags, nbr_values, updated_tags);
+    transformed_data  = transform_data(tags,nbr_values);
+    transformed_tags = std::get<0>(transformed_data);
+    transformed_values = std::get<1>(transformed_data);    
+    DataHandlerT ndh2(transformed_tags, transformed_values);    
     max_proc.process_update(ndh2, nullptr);
     REQUIRE(max_proc.get_value() == 3.0);
     REQUIRE(max_proc.get_version() == 1);
@@ -70,7 +96,10 @@ TEST_CASE("Idempotent Processor", "[mid][unit]")
     // increased to 2
     // so max is 3.0, version 2
     nbr_values = make_nbr_values(0.0, 1, 0, 1.0, 2, 0, 2.0, 1, 0, tags);
-    NbrDataHandlerT ndh3(ident, tags, nbr_values, updated_tags);
+    transformed_data  = transform_data(tags,nbr_values);
+    transformed_tags = std::get<0>(transformed_data);
+    transformed_values = std::get<1>(transformed_data);     
+    DataHandlerT ndh3(transformed_tags, transformed_values);    
     max_proc.process_update(ndh3, nullptr);
     REQUIRE(max_proc.get_value() == 3.0);
     REQUIRE(max_proc.get_version() == 2);
@@ -88,7 +117,10 @@ TEST_CASE("Idempotent Processor", "[mid][unit]")
     // but my contribution is 0.0, and 1.0 is larger
     // so max is 1.0, version 4
     nbr_values = make_nbr_values(0.0, 3, 0, 1.0, 4, 0, 2.0, 3, 0, tags);
-    NbrDataHandlerT ndh4(ident, tags, nbr_values, updated_tags);
+    transformed_data  = transform_data(tags,nbr_values);
+    transformed_tags = std::get<0>(transformed_data);
+    transformed_values = std::get<1>(transformed_data);
+    DataHandlerT ndh4(transformed_tags, transformed_values);    
     max_proc.process_update(ndh4, nullptr);
     REQUIRE(max_proc.get_value() == 1.0);
     REQUIRE(max_proc.get_version() == 4);
@@ -116,7 +148,10 @@ TEST_CASE("Idempotent Processor", "[mid][unit]")
                                  std::numeric_limits<std::uint64_t>::max(),
                                  0,
                                  tags);
-    NbrDataHandlerT ndhr5(ident, tags, nbr_values, updated_tags);
+    transformed_data  = transform_data(tags,nbr_values);
+    transformed_tags = std::get<0>(transformed_data);
+    transformed_values = std::get<1>(transformed_data);     
+    DataHandlerT ndhr5(transformed_tags, transformed_values);    
     max_proc.process_update(ndhr5, nullptr);
     max_proc.set_value(3.0);
     REQUIRE(max_proc.get_value() == 3.0);

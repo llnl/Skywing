@@ -45,10 +45,10 @@ public:
     {
         std::string my_id = iter_method.my_tag().id();
         // Neighbor updates
-        for (const auto& pTag : nbr_data_handler.get_updated_tags()) {
-            if (*pTag == iter_method.my_tag())
+         for (const auto& pTag : nbr_data_handler.recvd_data_tags() ) {
+            if (pTag == iter_method.my_tag())
                 continue;
-            const ValueType& nbr_data = nbr_data_handler.get_data_unsafe(*pTag);
+            const ValueType& nbr_data = nbr_data_handler.get_data(pTag);
             std::vector<index_t> updated_keys = nbr_data.get_keys();
             for (index_t key : updated_keys) {
                 x_[key] = nbr_data.at(key);

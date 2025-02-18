@@ -4,6 +4,8 @@
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
 
+#include "skywing_mid/data_handler.hpp" // Ensure this include is present
+
 namespace skywing
 {
 
@@ -55,16 +57,16 @@ public:
      * @param nbr_values The new values from the neighbors.
      * @param caller The iterative wrapper calling this method.
      */
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
-        for (const auto& pTag : nbr_data_handler.get_updated_tags()) {
+        for (const auto& pTag : data_handler.get_updated_tags()) {
             if (*pTag == iter_method.my_tag())
                 continue;
 
             std::string nbr_tag_id = pTag->id();
-            ValueType nbr_value = nbr_data_handler.get_data_unsafe(*pTag);
+            ValueType nbr_value = data_handler.get_data_unsafe(*pTag);
 
             if (rho_x_.count(nbr_tag_id) == 0) {
                 rho_x_[nbr_tag_id] = 0.0;

@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "skywing_mid/data_handler.hpp" // Ensure this include is present
+
 namespace skywing
 {
 
@@ -54,7 +56,7 @@ public:
           curr_num_(my_val_),
           curr_denom_(my_weight_),
           information_count_(0)
-    {}
+    { }
 
     PushFlowProcessor(data_t my_val, weight_t my_weight)
         : my_val_(my_val),
@@ -62,23 +64,23 @@ public:
           curr_num_(my_val_),
           curr_denom_(my_weight_),
           information_count_(0)
-    {}
+    { }
 
     ValueType get_init_publish_values() { return {f_ij_num_, f_ij_denom_}; }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
         std::string my_id = iter_method.my_tag().id();
-        for (const auto& pTag : nbr_data_handler.get_updated_tags()) {
-            if (*pTag == iter_method.my_tag())
+        for (const auto& pTag : data_handler.recvd_data_tags()) {
+            if (pTag == my_id)
                 continue;
 
-            const ValueType& nbr_data = nbr_data_handler.get_data_unsafe(*pTag);
-            f_ij_num_[pTag->id()] =
+            const ValueType& nbr_data = data_handler.get_data(pTag);
+            f_ij_num_[pTag] =
                 -get_if_present_or_default<0>(nbr_data, my_id);
-            f_ij_denom_[pTag->id()] =
+            f_ij_denom_[pTag] =
                 -get_if_present_or_default<1>(nbr_data, my_id);
 
             ++information_count_;
@@ -95,6 +97,7 @@ public:
     ValueType prepare_for_publication(ValueType)
     {
         update_fij_to_send();
+
         return {f_ij_num_, f_ij_denom_};
     }
 

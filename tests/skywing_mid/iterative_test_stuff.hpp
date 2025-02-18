@@ -8,6 +8,7 @@
 #include <string>
 
 #include <catch2/catch_test_macros.hpp>
+#include "skywing_mid/data_handler.hpp"
 
 int expected_result(std::string& tag_id, size_t ind);
 
@@ -21,15 +22,15 @@ struct TestWaitForNbrsStopPolicy
 
     ValueType get_init_publish_values() { return get_curr_val(); }
 
-    template <typename NbrDataHandler, typename IterMethod>
-    void process_update(const NbrDataHandler& nbr_data_handler,
+    template <typename IterMethod>
+    void process_update(const skywing::DataHandler<ValueType>& data_handler,
                         [[maybe_unused]] const IterMethod&)
     {
         ++curr_iter_;
         // gets the minimum of all neighbor values
-        min_val_ = nbr_data_handler.template f_accumulate<double>(
+         min_val_ = data_handler.template f_accumulate<double>(
             [](const double& d) { return d; },
-            [](double d1, double d2) { return d1 < d2 ? d1 : d2; });
+            [](double d1, double d2) { return d1 < d2 ? d1 : d2; }); 
 
         // if my value is less than the neighbor min, set my val to be min
         double curr_val = get_curr_val();
@@ -81,8 +82,6 @@ public:
     {
         double pub_val =
             TARGET_VAL + (INIT_VAL - TARGET_VAL) / (1.0 + curr_iter);
-        //    std::cout << "Machine " << machine_ind_ << " sending " << pub_val
-        //    << std::endl;
         return pub_val;
     }
 
@@ -96,9 +95,7 @@ public:
                       << nbr_data_handler.num_neighbors() << std::endl;
             std::exit(1);
         }
-        //    std::cout << "Machine " << machine_ind_ << " seeing sum of " <<
-        //    nbr_data_handler.sum() << " and " <<
-        //    nbr_data_handler.num_neighbors() << " neighbors" << std::endl;
+
         double next_avg = nbr_data_handler.average();
         REQUIRE(fabs(next_avg - TARGET_VAL) <= fabs(curr_avg - TARGET_VAL));
         curr_avg = next_avg;
@@ -110,8 +107,7 @@ public:
     {
         double pub_val =
             TARGET_VAL + (INIT_VAL - TARGET_VAL) / (1.0 + curr_iter);
-        //    std::cout << "Machine " << machine_ind_ << " sending " << pub_val
-        //    << std::endl;
+
         return pub_val;
     }
 

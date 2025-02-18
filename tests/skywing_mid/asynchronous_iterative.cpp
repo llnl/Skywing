@@ -51,6 +51,7 @@ void machine_task(const NetworkInfo* const info, const int index)
                                                  AlwaysPublish,
                                                  StopAfterTime,
                                                  TrivialResiliencePolicy>;
+        
         IterMethod iter_method =
             WaiterBuilder<IterMethod>(
                 manager, job_handle, tag_ids[index], tag_ids)
