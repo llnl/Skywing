@@ -1,0 +1,7 @@
+add_executable(jacobi jacobi.cpp)
+target_link_libraries(jacobi skywing_core skywing_math_interface)
+configure_file(run.py run.py @ONLY)
+configure_file(generate_config_info.py generate_config_info.py @ONLY)
+configure_file(data/matrix.txt data/matrix.txt @ONLY)
+configure_file(data/rhs.txt data/rhs.txt @ONLY)
+configure_file(data/partition.txt data/partition.txt @ONLY)

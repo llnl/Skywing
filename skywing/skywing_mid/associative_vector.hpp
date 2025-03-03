@@ -8,31 +8,74 @@
 namespace skywing
 {
 
+/**
+* @class AssociativeVector
+* @brief A data structure that combines properties of a vector and a map, allowing for associative access and mathematical operations.
+*
+* @tparam index_t The type of the keys used for indexing the vector.
+* @tparam val_t The type of the values stored in the vector.
+* @tparam isOpen Whether the vector is open (allows dynamic key insertion) or closed (fixed keys).
+*
+* This class provides a vector-like interface with associative access, allowing elements to be accessed and modified using keys.
+* It supports various mathematical operations such as addition, subtraction, scalar multiplication, and dot product.
+*/
 template <typename index_t = std::uint32_t,
           typename val_t = double,
           bool isOpen = true>
 class AssociativeVector
 {
 public:
+    /**
+    * @brief Default constructor.
+    * Initializes an empty AssociativeVector with a default value.
+    */
     AssociativeVector(val_t default_value = 0) : default_value_(default_value)
     {}
 
+    /**
+    * @brief Constructor for closed AssociativeVector.
+    * @param keys A vector of keys to initialize the AssociativeVector.
+    * @param default_value The default value for uninitialized keys.
+    */
     AssociativeVector(std::vector<index_t>&& keys, val_t default_value = 0)
         : default_value_(default_value)
     {
         for (auto it : keys)
             data_[it] = default_value_;
     }
-
+    /**
+    * @brief Constructs an AssociativeVector from an unordered map.
+    * 
+    * @param data An unordered map containing key-value pairs to initialize the AssociativeVector.
+    * 
+    * This constructor allows the AssociativeVector to be initialized with a set of key-value pairs
+    * provided in an unordered map. This is useful for scenarios where you have existing data in a map
+    * and want to leverage the mathematical and associative capabilities of the AssociativeVector.
+    */
     AssociativeVector(std::unordered_map<index_t, val_t> data,
                       val_t default_value = 0)
         : default_value_(default_value), data_(std::move(data))
     {}
 
+    /**
+    * @brief Conversion constructor for AssociativeVector.
+    * 
+    * @param other An AssociativeVector with the same key and value types but opposite openness state.
+    * 
+    * This constructor allows for the conversion between an open and a closed AssociativeVector.
+    * It initializes the new AssociativeVector with the default value and data from the provided
+    * AssociativeVector. This is useful when you need to switch between open and closed states
+    * while preserving the data and default value.
+    */
     AssociativeVector(AssociativeVector<index_t, val_t, !isOpen> other)
         : default_value_(other.default_value_), data_(other.data_)
     {}
 
+    /**
+    * @brief Accesses or modifies the value associated with a given key.
+    * @param ind The key to access.
+    * @return A reference to the value associated with the key.
+    */
     val_t& operator[](const index_t& ind)
     {
         if constexpr (isOpen) {
@@ -51,10 +94,42 @@ public:
         }
     }
 
+    /**
+    * @brief Accesses the value associated with the specified index.
+    * 
+    * @param ind The index (key) whose associated value is to be accessed.
+    * @return A constant reference to the value associated with the specified index.
+    * 
+    * This method provides read-only access to the value associated with a given index in the
+    * AssociativeVector. If the index does not exist in the vector, the method throws an
+    * `std::out_of_range` exception. This behavior is consistent with the `at` method in
+    * standard associative containers like `std::map` and `std::unordered_map`.
+    * 
+    * @throws std::out_of_range if the index is not found in the AssociativeVector.
+    */
     const val_t& at(const index_t& ind) const { return data_.at(ind); }
 
+    /**
+    * @brief Checks if the specified index exists in the AssociativeVector.
+    * 
+    * @param ind The index (key) to check for existence in the AssociativeVector.
+    * @return `true` if the index exists in the AssociativeVector, `false` otherwise.
+    * 
+    * This method determines whether a given index is present in the AssociativeVector.
+    * It returns `true` if the index is found, indicating that there is an associated
+    * value stored in the vector. Otherwise, it returns `false`.
+    * 
+    * The method utilizes the `count` function of the underlying data structure, which
+    * checks for the presence of the index. This is typically efficient and provides
+    * a quick way to verify the existence of a key.
+    */
     bool contains(const index_t& ind) const { return data_.count(ind) == 1; }
 
+
+    /**
+    * @brief Gets the keys of the AssociativeVector.
+    * @return A vector of keys.
+    */
     std::vector<index_t> get_keys() const
     {
         std::vector<index_t> keys;
@@ -66,7 +141,11 @@ public:
                    pair) { return pair.first; });
         return keys;
     }
-
+    /**
+    * @brief Computes the dot product with another AssociativeVector.
+    * @param other The AssociativeVector to compute the dot product with.
+    * @return The dot product result.
+    */
     val_t dot(const AssociativeVector<index_t, val_t, isOpen>& b)
     {
         val_t result = 0;
@@ -77,6 +156,11 @@ public:
         return result;
     }
 
+    /**
+    * @brief Adds another AssociativeVector to this one.
+    * @param other The AssociativeVector to add.
+    * @return A reference to this AssociativeVector.
+    */
     AssociativeVector&
     operator+=(const AssociativeVector<index_t, val_t, isOpen>& b)
     {
@@ -96,7 +180,11 @@ public:
         }
         return *this;
     }
-
+    /**
+    * @brief Subtracts another AssociativeVector from this one.
+    * @param other The AssociativeVector to subtract.
+    * @return A reference to this AssociativeVector.
+    */
     AssociativeVector&
     operator-=(const AssociativeVector<index_t, val_t, isOpen>& b)
     {
@@ -118,6 +206,11 @@ public:
         return *this;
     }
 
+    /**
+    * @brief Multiplies this AssociativeVector by a scalar.
+    * @param scalar The scalar to multiply by.
+    * @return A reference to this AssociativeVector.
+    */
     template <typename float_t>
     AssociativeVector& operator*=(float_t f)
     {
@@ -125,7 +218,12 @@ public:
             iter.second *= f;
         return *this;
     }
-
+    /**
+    * @brief Divides each value in the AssociativeVector by a scalar.
+    * 
+    * @param f The scalar by which each value in the AssociativeVector will be divided.
+    * @return A reference to the modified AssociativeVector.
+    */
     template <typename float_t>
     AssociativeVector& operator/=(float_t f)
     {
@@ -134,23 +232,91 @@ public:
         return *this;
     }
 
+    /**
+    * @brief Compares two AssociativeVectors for equality.
+    * 
+    * @param other The AssociativeVector to compare against.
+    * @return `true` if both AssociativeVectors have the same keys and values, `false` otherwise.
+    * 
+    * This operator checks if the current AssociativeVector is equal to another by comparing
+    * both the keys and their corresponding values. Two AssociativeVectors are considered equal
+    * if they contain the same key-value pairs.
+    */
+    bool operator==(const AssociativeVector& other) const {
+        // Check if sizes are equal
+        if (this->size() != other.size()) {
+            return false;
+        }
+
+        // Check if all keys and corresponding values are equal
+        for (const auto& key : this->get_keys()) {
+            if (this->at(key) != other.at(key)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+    * @brief Compares two AssociativeVectors for inequality.
+    * 
+    * @param other The AssociativeVector to compare against.
+    * @return `true` if the AssociativeVectors differ in keys or values, `false` if they are identical.
+    */
+    bool operator!=(const AssociativeVector& other) const {
+        return !(*this == other);
+    }
+
+    /**
+    * @brief Retrieves the default value for the AssociativeVector.
+    * 
+    * @return The default value (`val_t`) used for uninitialized keys.
+    * 
+    * This method returns the default value that is assigned to keys in the
+    * AssociativeVector when they are accessed but not explicitly set.
+    */
     val_t get_default_value() const { return default_value_; }
+
+    /**
+    * @brief Returns the number of key-value pairs in the AssociativeVector.
+    * 
+    * @return The number of elements (`size_t`) currently stored in the AssociativeVector.
+    * 
+    * This method provides the current count of key-value pairs stored in the
+    * AssociativeVector, reflecting its size.
+    */
     size_t size() const { return data_.size(); }
 
 private:
-    val_t default_value_;
-    std::unordered_map<index_t, val_t> data_;
+    val_t default_value_; //Stores the default value assigned to keys that are accessed but not explicitly set.
+    std::unordered_map<index_t, val_t> data_; //The underlying data structure that holds the key-value pairs in the AssociativeVector.
 
     template <typename I, typename V, bool O>
     friend AssociativeVector<I, V, O>
-    operator-(const AssociativeVector<I, V, O>& a);
+    operator-(const AssociativeVector<I, V, O>& a);// A friend function that allows subtraction operations on AssociativeVector instances.
+    // A friend function that enables output streaming of an AssociativeVector to an output stream, typically for debugging or logging purposes.
     template <typename I, typename V, bool O>
     friend std::ostream& operator<<(std::ostream& out,
                                     const AssociativeVector<I, V, O>& a);
+    // A friend class that allows access to private members of an AssociativeVector with the opposite isOpen template parameter.
     friend class AssociativeVector<index_t, val_t, !isOpen>;
+    // A friend struct that facilitates conversion between AssociativeVector and a pub-sub compatible format.
     friend struct PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>;
 }; // class AssociativeVector
 
+
+/**
+* @brief Adds two AssociativeVectors element-wise.
+* 
+* @param a The first AssociativeVector.
+* @param b The second AssociativeVector.
+* @return A new AssociativeVector containing the element-wise sum of `a` and `b`.
+* 
+* This operator creates a new AssociativeVector by adding corresponding elements
+* from two input AssociativeVectors. If a key exists in one vector but not the other,
+* the missing value is considered as the default value.
+*/
 template <typename index_t, typename val_t, bool isOpen>
 AssociativeVector<index_t, val_t, isOpen>
 operator+(const AssociativeVector<index_t, val_t, isOpen>& a,
@@ -161,6 +327,17 @@ operator+(const AssociativeVector<index_t, val_t, isOpen>& a,
     return AssociativeVector<index_t, val_t, isOpen>(c);
 }
 
+/**
+* @brief Subtracts one AssociativeVector from another element-wise.
+* 
+* @param a The AssociativeVector to subtract from.
+* @param b The AssociativeVector to subtract.
+* @return A new AssociativeVector containing the element-wise difference of `a` and `b`.
+* 
+* This operator creates a new AssociativeVector by subtracting corresponding elements
+* of `b` from `a`. If a key exists in one vector but not the other, the missing value
+* is considered as the default value.
+*/
 template <typename index_t, typename val_t, bool isOpen>
 AssociativeVector<index_t, val_t, isOpen>
 operator-(const AssociativeVector<index_t, val_t, isOpen>& a,
@@ -171,6 +348,15 @@ operator-(const AssociativeVector<index_t, val_t, isOpen>& a,
     return AssociativeVector<index_t, val_t, isOpen>(c);
 }
 
+/**
+* @brief Negates all values in the AssociativeVector.
+* 
+* @param a The AssociativeVector to negate.
+* @return A new AssociativeVector with all values negated.
+* 
+* This operator creates a new AssociativeVector by negating each value in the input
+* AssociativeVector `a`.
+*/
 template <typename index_t, typename val_t, bool isOpen>
 AssociativeVector<index_t, val_t, isOpen>
 operator-(const AssociativeVector<index_t, val_t, isOpen>& a)
@@ -181,6 +367,15 @@ operator-(const AssociativeVector<index_t, val_t, isOpen>& a)
     return new_vec;
 }
 
+/**
+* @brief Multiplies all values in the AssociativeVector by a scalar.
+* 
+* @param f The scalar value to multiply with.
+* @param b The AssociativeVector to be scaled.
+* @return A new AssociativeVector with all values multiplied by `f`.
+* 
+* This operator scales each value in the AssociativeVector `b` by the scalar `f`.
+*/
 template <typename index_t, typename val_t, bool isOpen, typename float_t>
 AssociativeVector<index_t, val_t, isOpen>
 operator*(float_t f, const AssociativeVector<index_t, val_t, isOpen>& b)
@@ -189,6 +384,15 @@ operator*(float_t f, const AssociativeVector<index_t, val_t, isOpen>& b)
     return c *= f;
 }
 
+/**
+* @brief Divides all values in the AssociativeVector by a scalar.
+* 
+* @param b The AssociativeVector to be scaled.
+* @param f The scalar value to divide by.
+* @return A new AssociativeVector with all values divided by `f`.
+* 
+* This operator scales each value in the AssociativeVector `b` by dividing it by the scalar `f`.
+*/
 template <typename index_t, typename val_t, bool isOpen, typename float_t>
 AssociativeVector<index_t, val_t, isOpen>
 operator/(const AssociativeVector<index_t, val_t, isOpen>& b, float_t f)
@@ -225,6 +429,16 @@ struct PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>
     using data_pubsub_t = PubSub_t<map_type>;
     using before_final_t = std::tuple<PubSub_t<val_t>, data_pubsub_t>;
     using pubsub_type = PubSub_t<before_final_t>;
+
+    /**
+    * @brief Converts an AssociativeVector to its pub-sub representation.
+    * 
+    * @param input The AssociativeVector to convert.
+    * @return The pub-sub representation of the AssociativeVector.
+    * 
+    * This method serializes the `AssociativeVector` into a format suitable for
+    * pub-sub systems, encapsulating both the default value and the data map.
+    */
     static pubsub_type convert(input_type input)
     {
         before_final_t bf(
@@ -234,6 +448,15 @@ struct PubSubConverter<AssociativeVector<index_t, val_t, isOpen>>
         return PubSubConverter<before_final_t>::convert(bf);
     }
 
+    /**
+    * @brief Converts a pub-sub representation back to an AssociativeVector.
+    * 
+    * @param ps_input The pub-sub representation to convert.
+    * @return The reconstructed AssociativeVector.
+    * 
+    * This method deserializes the pub-sub format back into an `AssociativeVector`,
+    * reconstructing both the default value and the data map.
+    */
     static input_type deconvert(pubsub_type ps_input)
     {
         before_final_t bf =

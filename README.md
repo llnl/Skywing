@@ -25,6 +25,10 @@ need to acquire yourself beforehand.
  * Cap'n Proto (https://capnproto.org/)
    * requires version 1.0 or newer
 
+## Dependencies for Math Interface Examples Not Automatically Managed
+* Eigen (https://eigen.tuxfamily.org)
+* Python3 (https://www.python.org/)
+
 ## Dependencies Managed as Git Submodules
 
    You do not need to acquire these yourself.
@@ -70,6 +74,8 @@ configuration. For example, using the CMake CLI:
 
 `cmake -DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON`
 
+If the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag is set to `ON`, Eigen will be rquired as a dependency and the `math_interface_examples` directory will be built.
+
 ## Guidance for building on LC
 
 If you are running on LLNL's LC clusters, these instructions can help you get set up.
@@ -78,6 +84,16 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
  * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must install to a local directory. To do this, on the configure step, use
    * `./configure --prefix=/path/to/capnp-prefix && make install`
    * This will create subdirectories `/path/to/capnp-prefix/{bin,include,lib}`
+
+   ### Building Eigen
+ * One way to build Eigen on your local machine is the following:
+  * To download:
+    `wget -O Eigen.zip https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip`
+    `unzip Eigen.zip`
+  * To build:
+    `cmake -DCMAKE_INSTALL_PREFIX=${EIGEN_PREFIX} /path/to/eigen-3.4.0`
+    `make install`
+  * Make sure to add `EIGEN_PREFIX` to your `CMAKE_PREFIX_PATH`
 
 ### Building Skywing
  * Load a more recent CMake and switch to more recent version of gcc
@@ -88,6 +104,11 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
  * Follow build instructions as normal
  * To build the LC Hello World example, also include `-DSKYWING_BUILD_LC_EXAMPLES=ON` in the CMake options.
  * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
+
+ * If you are using the `SKYWING_USE_EIGEN` flag, add capnp prefix directory to `CMAKE_PREFIX_PATH`
+   * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/eigen-prefix`
+
+
 
 ### Running Skywing
 
@@ -105,6 +126,9 @@ enable IP isolation. For SLURM jobs, add `--ip-isolate=yes` to the
 
 Note that Skywing configurations that involve many connections between agents can run into a file descriptor limit.
 The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)
+
+* To run the skywing_math_interface examples, go to `build/examples/math_interface_examples/linear_solvers/` and execute `python3 run.py num_agents= (number of agents) bank_name=(bank name) solver_type= (solver type)`. Note that you must have an active bank to run this test.
+* To edit the linear system or partition, edit the files in `build/examples/math_interface_examples/linear_solvers/data`.
 
 # Building an application on Skywing
 
