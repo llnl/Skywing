@@ -2,6 +2,7 @@
 #define SKYWING_MATH_LINEAR_SYSTEM_DRIVER
 
 #include <iostream>
+#include <chrono>
 
 #include "skywing_core/manager.hpp"
 #include "skywing_core/skywing.hpp"
@@ -11,7 +12,6 @@
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/stop_policies.hpp"
-
 
 namespace skywing
 {
@@ -44,13 +44,15 @@ public:
         unsigned agent_id,
         AssociativeMatrix A,
         ClosedVector b,
-        std::unordered_map<uint32_t, std::vector<uint32_t>> partition) //assignments of machines to the matrix rows they own
+        std::unordered_map<uint32_t, std::vector<uint32_t>> partition, //assignments of machines to the matrix rows they own
+        std::chrono::seconds timeout_duration) 
         : configurations_(configurations),
           agent_id_(agent_id),
           M_(A),
           c_(b),
           partition_(partition),
-          test_output_(b)
+          test_output_(b),
+          timeout_duration_(timeout_duration)
     {
         LinearProcessor::setup(A, b, M_, c_); // This sets M_ and c_ 
     }
@@ -110,7 +112,7 @@ public:
                 manager_handle, job, pubTagID_, tagIDs_for_sub)
                 .set_processor(M_, c_)
                 .set_publish_policy()
-                .set_stop_policy(std::chrono::seconds(10)) // stop iterating after 10 seconds
+                .set_stop_policy(timeout_duration_) // stop iterating after this duration
                 .set_resilience_policy()
                 .build_waiter();
 
@@ -168,6 +170,7 @@ private:
     ClosedVector c_;
     std::unordered_map<uint32_t, std::vector<uint32_t>> partition_;
     ClosedVector test_output_;
+    std::chrono::seconds timeout_duration_;
 };
 
 } // namespace skywing
