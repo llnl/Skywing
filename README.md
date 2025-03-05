@@ -105,7 +105,7 @@ If you are running on LLNL's LC clusters, these instructions can help you get se
  * To build the LC Hello World example, also include `-DSKYWING_BUILD_LC_EXAMPLES=ON` in the CMake options.
  * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
 
- * If you are using the `SKYWING_USE_EIGEN` flag, add capnp prefix directory to `CMAKE_PREFIX_PATH`
+ * If you are using the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag, add Eigen prefix directory to `CMAKE_PREFIX_PATH`
    * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/eigen-prefix`
 
 
