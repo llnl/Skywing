@@ -57,71 +57,10 @@ echo "    C Compiler: ${CC}"
 echo "  C++ Compiler: ${CXX}"
 echo "----------------------------------------------------------------------"
 
-echo "----------------------------------------------------------------------"
-echo "Building dependencies"
-echo "----------------------------------------------------------------------"
-
-
-CAPNPROTO_PREFIX=${project_dir}/capnproto-${CI_JOB_NAME_SLUG}
-
-cd ${project_dir}
-if [[ -d ${CAPNPROTO_PREFIX} ]]; then
-    # CapnProto's CMake uses pkg-config under the hood, but doesn't
-    # export relocatable pkg-config files. So we have to create our
-    # own relocatability. This is necessary because ${project_dir} has
-    # at least a runner-specific component that can change run-to-run.
-    find ${CAPNPROTO_PREFIX} -iname '*.pc' | xargs sed -i -e "s|^prefix=.*|prefix=${CAPNPROTO_PREFIX}|"
-
-    # This seems easier than rewriting all of the RPATHs.
-    export LD_LIBRARY_PATH=${CAPNPROTO_PREFIX}/lib:${LD_LIBRARY_PATH}
-else
-    #No CapnProto, so build it.
-    echo "----------------------------------------------------------------------"
-    echo "  Building CapnProto"
-    echo "----------------------------------------------------------------------"
-
-    wget https://capnproto.org/capnproto-c++-1.0.1.1.tar.gz
-    tar xf capnproto-c++-1.0.1.1.tar.gz
-    cd capnproto-c++-1.0.1.1
-    ./configure --prefix=${CAPNPROTO_PREFIX}
-    make -j 36 install
-fi
-
-if [[ "${TEST_EIGEN}" == "ON" ]]; then
-    EIGEN_PREFIX=${project_dir}/eigen-${CI_JOB_NAME_SLUG}
-
-    if [[ -d ${EIGEN_PREFIX} ]]; then
-        find ${EIGEN_PREFIX} -iname '*.pc' | xargs sed -i -e "s|^prefix=.*|prefix=${EIGEN_PREFIX}|"
-
-        # This seems easier than rewriting all of the RPATHs.
-        export LD_LIBRARY_PATH=${EIGEN_PREFIX}/lib:${LD_LIBRARY_PATH}
-    else
-    # No Eigen, so build and install it.
-        echo "----------------------------------------------------------------------"
-        echo "  Building Eigen"
-        echo "----------------------------------------------------------------------"
-
-        mkdir eigen_dir
-        cd eigen_dir
-        wget -O Eigen.zip https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-        unzip Eigen.zip
-        mkdir build
-        cd build
-        cmake -DCMAKE_INSTALL_PREFIX=${EIGEN_PREFIX} ../eigen-3.4.0
-        make install
-    fi
-    export CMAKE_PREFIX_PATH=${EIGEN_PREFIX}:${CMAKE_PREFIX_PATH}
-fi
-
-echo "----------------------------------------------------------------------"
-echo "Building and testing Skywing"
-echo "  C++ Compiler: ${CXX}"
-echo "----------------------------------------------------------------------"
 
 SOURCE_DIR=${project_dir}
 BUILD_DIR=${SOURCE_DIR}/ci-build
 INSTALL_DIR=${SOURCE_DIR}/ci-install
-export CMAKE_PREFIX_PATH=${CAPNPROTO_PREFIX}:${CMAKE_PREFIX_PATH}
 
 
 echo "----------------------------------------------------------------------"

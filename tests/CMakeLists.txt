@@ -1,7 +1,15 @@
-# Handle the submodule
-if (NOT SKYWING_EXTERNAL_CATCH2)
-    list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/subprojects/catch2/Catch2/contrib")
-endif ()
+# Get Catch2
+FetchContent_Declare(
+  Catch2
+  SYSTEM
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG fa43b77429ba76c462b1898d6cd2f2d7a9416b14 # v3.7.1
+  GIT_SHALLOW 1
+  FIND_PACKAGE_ARGS 3.0.0 CONFIG
+)
+FetchContent_MakeAvailable(Catch2)
+report_deps(Catch2)
+
 include(Catch)
 
 # NOTE (trb 2023/12/04) -- This should all move into a single catch
@@ -53,15 +61,19 @@ set(TEST_SRCS
 
 # Conditionally add jacobi_test.cpp if SKYWING_USE_EIGEN_MATH_EXAMPLES is ON
 if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
-    list(APPEND TEST_SRCS skywing_math_interface/jacobi_test.cpp)
-    file(COPY skywing_math_interface/data/ DESTINATION ${CMAKE_BINARY_DIR}/data)
+  list(APPEND TEST_SRCS skywing_math_interface/jacobi_test.cpp)
+  file(COPY
+    skywing_math_interface/data/
+    DESTINATION ${CMAKE_BINARY_DIR}/data)
 endif()
 
 # Add the executable for catch-tests
 add_executable(catch-tests ${TEST_HDRS})
 
 # Link libraries to catch-tests
-target_link_libraries(catch-tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(catch-tests
+  PRIVATE
+  Catch2::Catch2WithMain)
 
 # Set C++ standard
 target_compile_features(catch-tests PUBLIC cxx_std_17)
@@ -69,34 +81,59 @@ target_compile_features(catch-tests PUBLIC cxx_std_17)
 set(_test_list)
 
 foreach (src IN LISTS TEST_SRCS)
-    get_filename_component(TEST_NAME "${src}" NAME_WE)
-    add_executable(${TEST_NAME})
-    add_library(${TEST_NAME}-lib OBJECT "${src}")
+  get_filename_component(TEST_NAME "${src}" NAME_WE)
+  add_executable(${TEST_NAME})
+  add_library(${TEST_NAME}-lib OBJECT "${src}")
 
-    # Object library target_include_directories
-    target_include_directories(${TEST_NAME}-lib PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
-    target_link_libraries(${TEST_NAME}-lib PUBLIC Catch2::Catch2WithMain skywing_mid)
+  # Object library target_include_directories
+  target_include_directories(${TEST_NAME}-lib
+    PUBLIC
+    "${CMAKE_CURRENT_LIST_DIR}/include"
+  )
+  target_link_libraries(${TEST_NAME}-lib
+    PUBLIC
+    Catch2::Catch2WithMain
+    skywing_mid
+  )
 
-    # Conditionally link to skywing_math_interface for Eigen dependency
-    # and set location of input linear system data files
-    if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
-       target_link_libraries(${TEST_NAME}-lib PUBLIC skywing_math_interface)
-       target_compile_definitions(${TEST_NAME}-lib PRIVATE DATA_DIR_DEST="${CMAKE_BINARY_DIR}/data")
-    endif()
+  # Conditionally link to skywing_math_interface for Eigen dependency
+  # and set location of input linear system data files
+  if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
+    target_link_libraries(${TEST_NAME}-lib
+      PUBLIC
+      skywing_math_interface
+    )
+    target_compile_definitions(${TEST_NAME}-lib
+      PRIVATE
+      DATA_DIR_DEST="${CMAKE_BINARY_DIR}/data"
+    )
+  endif()
 
-    # Single-test executable
-    target_link_libraries(${TEST_NAME} PRIVATE ${TEST_NAME}-lib Catch2::Catch2WithMain)
+  # Single-test executable
+  target_link_libraries(${TEST_NAME}
+    PRIVATE
+    ${TEST_NAME}-lib
+    Catch2::Catch2WithMain)
 
-    # C++17
-    target_compile_features(${TEST_NAME}-lib PUBLIC cxx_std_17)
-    target_compile_features(${TEST_NAME} PUBLIC cxx_std_17)
+  # C++17
+  target_compile_features(${TEST_NAME}-lib
+    PUBLIC
+    cxx_std_17
+  )
+  target_compile_features(${TEST_NAME}
+    PUBLIC
+    cxx_std_17
+  )
 
-    # Add to the multiple-test driver version as well.
-    target_link_libraries(catch-tests PRIVATE ${TEST_NAME}-lib)
+  # Add to the multiple-test driver version as well.
+  target_link_libraries(catch-tests
+    PRIVATE
+    ${TEST_NAME}-lib
+  )
 
-    get_filename_component(dir_name "${src}" DIRECTORY)
-    string(REPLACE "skywing_" "" comp_name "${dir_name}")
-    string(APPEND _test_list "${comp_name}/${TEST_NAME} $<TARGET_FILE:${TEST_NAME}>\n")
+  get_filename_component(dir_name "${src}" DIRECTORY)
+  string(REPLACE "skywing_" "" comp_name "${dir_name}")
+  string(APPEND _test_list "${comp_name}/${TEST_NAME} $<TARGET_FILE:${TEST_NAME}>\n")
 endforeach()
 
 # Write out the test list for the tester script

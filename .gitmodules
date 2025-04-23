@@ -1,6 +1,0 @@
-[submodule "subprojects/catch2/Catch2"]
-	path = subprojects/catch2/Catch2
-	url = https://github.com/catchorg/Catch2.git
-[submodule "subprojects/spdlog"]
-	path = subprojects/spdlog
-	url = https://github.com/gabime/spdlog.git

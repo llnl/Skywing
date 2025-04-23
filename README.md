@@ -20,23 +20,36 @@ need to acquire yourself beforehand.
 
 ## Dependencies Not Automatically Managed
  * compiler that supports C++20 library
-   * tested: GCC/g++ (12.1.1) and LLVM/clang (14.0.6)
+   * tested: GCC/g++ (12.1.1), LLVM/clang (14.0.6), and AppleClang (17.0.0)
  * CMake (https://cmake.org/)
- * Cap'n Proto (https://capnproto.org/)
-   * requires version 1.0 or newer
 
 ## Dependencies for Math Interface Examples Not Automatically Managed
-* Eigen (https://eigen.tuxfamily.org)
 * Python3 (https://www.python.org/)
 
-## Dependencies Managed as Git Submodules
+## Dependencies Optionally Managed by the Build System
 
-   You do not need to acquire these yourself.
+You do not need to acquire these yourself.
+
+ * Cap'n Proto (https://capnproto.org/)
+   * requires version 1.0 or newer
+   * defaults to the `v1.1.0` git tag
+ * spdlog
+   * requires version 1.0 or newer
+   * defaults to the `v1.14.1` git tag
+ * Eigen (https://eigen.tuxfamily.org)
+   * only relevant for Math Interface examples
 
  * Catch2
    * requires version 3.0 or newer
- * spdlog
-   * requires version 1.0 or newer
+   * defaults to the `v3.7.1` git tag
+   * only relevant when building unit test suite
+
+These packages may be installed separately if different versions are
+required or if if these packages are used across various projects. The
+usual CMake `find_package` mechanism searches for each of these before
+downloading and building, so users doing separate builds should take
+care to configure their environments appropriately (e.g., setting
+`CMAKE_PREFIX_PATH` and `PKG_CONFIG_PATH`).
 
 ## Build instructions
 
@@ -48,9 +61,7 @@ CapnProto and a Bourne-like shell, `export
 CMAKE_PREFIX_PATH=/path/to/capnproto/install:${CMAKE_PREFIX_PATH}`
 (prepending ensures your version will be found before any system install).
 
- * Build non-managed dependencies separately
- * Get dependencies
-   * `git submodule update --init`
+ * Ensure any non-managed or externally built dependencies are available.
  * Configure the project
    * `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSKYWING_BUILD_TESTS=ON`
  * Build the project
@@ -80,33 +91,13 @@ If the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag is set to `ON`, Eigen will be rqui
 
 If you are running on LLNL's LC clusters, these instructions can help you get set up.
 
-### Building capnp
- * Cap'n Proto must be manually built first. Follow the instructions at https://capnproto.org/install.html#installation-unix, except you must install to a local directory. To do this, on the configure step, use
-   * `./configure --prefix=/path/to/capnp-prefix && make install`
-   * This will create subdirectories `/path/to/capnp-prefix/{bin,include,lib}`
-
-   ### Building Eigen
- * One way to build Eigen on your local machine is the following:
-  * To download:
-    `wget -O Eigen.zip https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip`
-    `unzip Eigen.zip`
-  * To build:
-    `cmake -DCMAKE_INSTALL_PREFIX=${EIGEN_PREFIX} /path/to/eigen-3.4.0`
-    `make install`
-  * Make sure to add `EIGEN_PREFIX` to your `CMAKE_PREFIX_PATH`
-
 ### Building Skywing
  * Load a more recent CMake and switch to more recent version of gcc
    * `ml cmake/3.26.3`
    * `ml gcc/12.1.1-magic`
- * Add capnp prefix directory to `CMAKE_PREFIX_PATH`
-   * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/capnp-prefix`
  * Follow build instructions as normal
  * To build the LC Hello World example, also include `-DSKYWING_BUILD_LC_EXAMPLES=ON` in the CMake options.
  * To run the LC example, go to `(skywing_root)/build/examples/lc_hello_world/` and execute `source run.sh (bank_name)`. Note that you must have an active bank to run this test.
-
- * If you are using the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag, add Eigen prefix directory to `CMAKE_PREFIX_PATH`
-   * `export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/eigen-prefix`
 
 
 
@@ -127,7 +118,7 @@ enable IP isolation. For SLURM jobs, add `--ip-isolate=yes` to the
 Note that Skywing configurations that involve many connections between agents can run into a file descriptor limit.
 The soft limit can be increased by executing `ulimit -n <N>` where `<N>` must not exceed the hard limit (which can be determined by executing `ulimit -Hn`)
 
-* To run the skywing_math_interface examples, go to `build/examples/math_interface_examples/linear_solvers/` and execute `python3 run.py num_agents= (number of agents) bank_name=(bank name) solver_type= (solver type)`. Note that you must have an active bank to run this test.
+* To run the `skywing_math_interface` examples, go to `build/examples/math_interface_examples/linear_solvers/` and execute `python3 run.py num_agents= (number of agents) bank_name=(bank name) solver_type= (solver type)`. Note that you must have an active bank to run this test.
 * To edit the linear system or partition, edit the files in `build/examples/math_interface_examples/linear_solvers/data`.
 
 # Building an application on Skywing
@@ -160,10 +151,11 @@ target_link_libraries(MyApp PRIVATE skywing::skywing)
 This should fully capture any dependencies for Skywing. Users should
 be aware that the CMake configuration of projects that use the Skywing
 export will need to be aware of any Skywing dependencies' locations on
-disk. For example, if CapnProto is installed to a nonstandard
-location, CMake must be told via any of the standard CMake mechanisms,
-such as `CMAKE_PREFIX_PATH=${capnp_prefix}:${CMAKE_PREFIX_PATH}`. See
-the [CMake `find_package()`
+disk. For example, if CapnProto has been separately built and
+installed to a nonstandard location, CMake must be told via any of the
+standard CMake mechanisms, such as
+`CMAKE_PREFIX_PATH=${capnp_prefix}:${CMAKE_PREFIX_PATH}`. See the
+[CMake `find_package()`
 documentation](https://cmake.org/cmake/help/git-stage/command/find_package.html#config-mode-search-procedure)
 for a detailed description of the way CMake searches for dependencies.
 

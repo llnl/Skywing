@@ -36,10 +36,6 @@ workflow:
       - "${CI_PROJECT_DIR}/build-outerr.log"
       - "${CI_PROJECT_DIR}/testing-outerr.log"
       - "${CI_PROJECT_DIR}/install-outerr.log"
-  cache:
-    key: $CI_JOB_NAME_SLUG
-    paths:
-      - capnproto-$CI_JOB_NAME_SLUG/
 
 # Extra compilers may be added if you care.
 gcc-12-1-1-eigen:
