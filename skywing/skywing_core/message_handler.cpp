@@ -67,12 +67,12 @@ void MessageHandler::find_publishers_for_tags
     if (!urgent && (nbr.has_outstanding_publishers_request() ||
 		    !nbr.is_time_for_another_request()))
       continue;
-    
+
     SKYWING_TRACE_LOG("\"{}\" asking \"{}\" for tags {}{}",
                       manager_->id(),
                       nbr.id(),
                       tags,
-                      pending_tag_request_
+                      nbr.has_outstanding_publishers_request()
                           ? ", but ignored due to already pending request"
                           : "");
     nbr.update_time_for_next_request(urgent);
@@ -88,7 +88,7 @@ void MessageHandler::find_publishers_for_tags
   set_must_find_more_publishers(false);
 }
 
-  
+
 std::optional<MessageDeserializer>
 MessageHandler::try_to_get_message(internal::NeighborAgent& nbr_agent,
 				   SocketCommunicator& socket_comm) noexcept
@@ -108,7 +108,7 @@ MessageHandler::try_to_get_message(internal::NeighborAgent& nbr_agent,
             // Couldn't read the size bytes - bad message
             SKYWING_TRACE_LOG("\"{}\" setting {} to dead due to bad message",
                               manager_->id(),
-                              id_);
+                              nbr_agent.id());
             nbr_agent.mark_as_dead();
             return {};
         }
@@ -119,7 +119,7 @@ MessageHandler::try_to_get_message(internal::NeighborAgent& nbr_agent,
             SKYWING_TRACE_LOG(
                 "\"{}\" setting {} to dead because connection has closed",
                 manager_->id(),
-                id_);
+                nbr_agent.id());
             nbr_agent.mark_as_dead();
         }
         else if (err != ConnectionError::would_block) {
@@ -127,7 +127,7 @@ MessageHandler::try_to_get_message(internal::NeighborAgent& nbr_agent,
                 "\"{}\" setting {} to dead because connection has some unknwon "
                 "error, perhaps received an RST packer",
                 manager_->id(),
-                id_);
+                nbr_agent.id());
             nbr_agent.mark_as_dead();
         }
         // we get here if attempting to read_network_size returned
@@ -167,7 +167,7 @@ void MessageHandler::handle_message(NeighborAgent& nbr_agent,
                 manager_->id(),
                 nbr_agent.id(),
                 msg.neighbor_id());
-	    
+
 	    nbr_agent.add_new_neighbor(msg.neighbor_id());
             return true;
         },
@@ -177,11 +177,11 @@ void MessageHandler::handle_message(NeighborAgent& nbr_agent,
                 manager_->id(),
                 nbr_agent.id(),
                 msg.neighbor_id());
-	    
+
 	    nbr_agent.remove_neighbor(msg.neighbor_id());
             return true;
         },
-        [this](const Heartbeat&) {
+        [&, this](const Heartbeat&) {
             // If trace logging isn't enable then `this` isn't used, so make
             // sure it is marked as used
             (void) this;
@@ -211,7 +211,7 @@ void MessageHandler::handle_message(NeighborAgent& nbr_agent,
             SKYWING_TRACE_LOG(
                 "\"{}\" received get publishers from \"{}\" requesting tags {}",
                 manager_->id(),
-                nbr_agent.id_,
+                nbr_agent.id(),
                 msg.tags());
 
 	    manager_->handle_get_publishers(msg, nbr_agent);
@@ -239,9 +239,8 @@ void MessageHandler::handle_message(NeighborAgent& nbr_agent,
 	    {
 	        if (nbr_agent.is_subscribed_to(tag))
 		{
-		    reject_notice(
-		      fmt::format("repeated tag subscription to {}", tag));
-		    return false;		  
+		    reject_notice(fmt::format("repeated tag subscription to {}", tag));
+		    return false;
 		}
 		else
 		    nbr_agent.add_new_subscription(tag);
