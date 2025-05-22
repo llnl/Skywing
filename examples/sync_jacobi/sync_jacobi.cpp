@@ -96,7 +96,7 @@ void machine_task(const int machine_number,
             std::cout << "Agent " << machine_number
                       << " finished connecting to neighbors." << std::endl;
 
-            using IterMethod = SynchronousIterative<OldJacobiProcessor<double>,
+            using IterMethod = SynchronousIterative<ProcessorSyncWrapper<OldJacobiProcessor, double>,
                                                     StopAfterTime,
                                                     TrivialResiliencePolicy>;
             // using IterMethod = AsynchronousIterative<JacobiProcessor<double>,

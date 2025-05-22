@@ -47,6 +47,9 @@ public:
             }
         }
     }
+    /**
+     * @brief Default constructor for the DataHandler.
+     */    DataHandler() {}
        //AF Note: Something to be mindful here. Until we get actual data for a tag the DataHandler object data_handler_ is not keeping track of it. 
        // But the tags_ is the number of tags that was passed to the DataHandler. Might need to update this in the future. 
 

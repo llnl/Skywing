@@ -18,6 +18,77 @@ namespace skywing
 using namespace std::chrono_literals;
 
 /**
+ * @brief Wrapper for processors that require synchronous iteration.
+ *
+ * This class is designed to wrap processors that require synchronous
+ * iteration such that each agent requires exactly the iterate info from
+ * iteration (i-1) from its neighbors in order to compute iteration i.
+ * This is not explicitly guaranteed if using the synchronous iterative
+ * method without this wrapper, e.g. neighbors may have already computed
+ * and published info from iteration i by the time the agent reads its
+ * subscription (thus receiving info from one iteration ahead of what's
+ * expected). This class overrides the publication routines and the main
+ * process update routine in order to package two iterates at a time for
+ * publication (the current and previous iterate) as well as the current
+ * iteration count. Thus, when receiving information, an agent can
+ * determine which iterate is the appropriate one to use based on its
+ * own stored iteration count. No change is required for the underlying
+ * processors. For use of this class, see:
+ * examples/sync_jacobi/sync_jacobi.cpp.
+ *
+ */
+
+template <template<typename> class Processor, typename element_t>
+class ProcessorSyncWrapper
+    : public Processor<element_t>
+{
+public:
+    using ValueType = std::tuple<int, typename Processor<element_t>::ValueType, typename Processor<element_t>::ValueType>;
+
+    template <typename... Args>
+    ProcessorSyncWrapper(Args&&... args) :
+        Processor<element_t>(args...),
+        prev_iterate_(Processor<element_t>::get_init_publish_values()),
+        iteration_count_(0)
+    {}
+
+    ValueType get_init_publish_values()
+    {
+        return ValueType(iteration_count_, prev_iterate_, Processor<element_t>::get_init_publish_values());
+    }
+
+    template <typename IterMethod>
+    void process_update(const DataHandler<ValueType>& wrapper_data_handler,
+                        [[maybe_unused]] const IterMethod& iter_method)
+    {
+        std::unordered_map<std::string, typename Processor<element_t>::ValueType> p_handler_update_map;
+        for (const auto& pTag : wrapper_data_handler.recvd_data_tags() ) {
+            ValueType nbr_value = wrapper_data_handler.get_data(pTag);
+            if (std::get<0>(nbr_value) == iteration_count_) {
+                p_handler_update_map[pTag] = std::get<2>(nbr_value);
+            }
+            else {
+                p_handler_update_map[pTag] = std::get<1>(nbr_value);
+            }
+        }
+        processor_data_handler_.update(p_handler_update_map);
+        prev_iterate_ = Processor<element_t>::prepare_for_publication(prev_iterate_);
+        Processor<element_t>::process_update(processor_data_handler_, iter_method);
+        iteration_count_++;
+    }
+
+    ValueType prepare_for_publication(ValueType vals_to_publish)
+    {
+        return ValueType(iteration_count_, prev_iterate_, Processor<element_t>::prepare_for_publication(std::get<2>(vals_to_publish)));
+    }
+
+private:
+    typename Processor<element_t>::ValueType prev_iterate_;
+    DataHandler<typename Processor<element_t>::ValueType> processor_data_handler_;
+    int iteration_count_;
+};
+
+/**
  * @brief A decentralized iterative method with synchronized rounds.
  *
  * This class template implements the framework of an iterative method
