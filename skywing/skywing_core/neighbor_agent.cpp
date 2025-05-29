@@ -6,13 +6,13 @@ namespace skywing
 {
 namespace internal
 {
-  NeighborAgent::NeighborAgent(SocketCommunicator conn,
-                                 const MachineID& id,
-                                 const std::vector<MachineID>& neighbors,
-                                 Manager& manager,
-                                 const std::uint16_t port) noexcept
+NeighborAgent::NeighborAgent(SocketCommunicator conn,
+                             const MachineID& id,
+                             const std::vector<MachineID>& neighbors,
+                             Manager& manager,
+                             const std::uint16_t port) noexcept
     : id_{id},
-      last_heard_{std::chrono::steady_clock::now()},
+      last_heard_(std::chrono::steady_clock::now()),
       neighbors_{neighbors},
       manager_{&manager},
       port_{port}
