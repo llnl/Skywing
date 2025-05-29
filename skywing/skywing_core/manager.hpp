@@ -67,10 +67,6 @@ namespace internal
 {
 class MessageHandler;
 
-// The default hearbeat interval
-inline static constexpr std::chrono::milliseconds default_heartbeat_interval{
-    5000};
-
 /** \brief Tag to indicate that this connection was made by accepting a
  * connection
  */
@@ -85,6 +81,23 @@ struct ByRequest
 
 } // namespace internal
 
+namespace
+{
+inline std::int64_t to_ms(auto dur)
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+}
+} // namespace
+
+/// @brief 1 heartbeat_cycle = 5000 ms
+using heartbeat_cycle = std::chrono::duration<int, std::ratio<5000, 1000>>;
+
+/// @brief User-defined literal for creating heartbeat cycles.
+constexpr heartbeat_cycle operator"" _hb(unsigned long long val)
+{
+    return heartbeat_cycle{static_cast<int>(val)};
+}
+
 /** \brief The manager Skywing instance used for communication
  */
 class Manager
@@ -96,27 +109,31 @@ public:
      *
      * \param port The port to listen on
      * \param id The ID to assign to this machine
-     * \param heartbeat_interval The interval to wait between heartbeats
+     * \param heartbeat_interval The interval to wait between heartbeats,
+     * default = 5000 ms \param neighbor_timeout_factor Heartbeat cycles to wait
+     * before marking a neighbor as intentionally disconnected.
      */
-    template <
-        typename Rep = decltype(internal::default_heartbeat_interval)::rep,
-        typename Period =
-            decltype(internal::default_heartbeat_interval)::period>
     Manager(const std::uint16_t port,
             const MachineID& id,
-            const std::chrono::duration<Rep, Period> heartbeat_interval =
-                internal::default_heartbeat_interval) noexcept
+            const heartbeat_cycle heartbeat_interval = 1_hb,
+            const std::size_t neighbor_timeout_factor = 3) noexcept;
+
+    /**
+     * \brief Utility ctor for general durations to keep
+     * backward compatibilty with regression tests
+     */
+    template <typename Rep, typename Period>
+    Manager(std::uint16_t port,
+            const MachineID& id,
+            const std::chrono::duration<Rep, Period> heartbeat_interval,
+            std::size_t neighbor_timeout_factor = 3) noexcept
         : Manager{port,
                   id,
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
-                      heartbeat_interval)}
+                  std::chrono::duration_cast<heartbeat_cycle>(
+                      std::max(heartbeat_interval,
+                               std::chrono::duration<Rep, Period>{1_hb})),
+                  neighbor_timeout_factor}
     {}
-
-    /** \brief Constructor specifically for milliseconds
-     */
-    Manager(const std::uint16_t port,
-            const MachineID& id,
-            const std::chrono::milliseconds heartbeat_interval) noexcept;
 
     // /** \brief Constructor for building from a file format specified in
     //  * basic_manager_config.hpp
@@ -246,6 +263,14 @@ public:
      */
     void report_new_publish_tags(const std::vector<TagID>& tags) noexcept;
 
+    bool request_disconnect(const MachineID& neighbor_agent_id) noexcept;
+
+    /** \brief Returns a vector of all the neighboring ID's
+     */
+    std::vector<MachineID> make_neighbor_vector() const noexcept;
+
+    size_t number_of_neighbors() const noexcept;
+
 private:
     ///////////////////////////////////////
     // Interface for ManagerHandle
@@ -253,7 +278,6 @@ private:
 
     Waiter<bool> connect_to_server(const char* const address,
                                    const std::uint16_t port) noexcept;
-    size_t number_of_neighbors() const noexcept;
     size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
     std::uint16_t port() const noexcept;
 
@@ -300,9 +324,14 @@ private:
      */
     void remove_dead_neighbors() noexcept;
 
-    /** \brief Returns a vector of all the neighboring ID's
+    /** @brief Cleans up local neighbor related state */
+    void cleanup_neighbor_state(const MachineID& id,
+                                internal::NeighborAgent& neighbor,
+                                bool& new_tags) noexcept;
+
+    /** @brief Checks if a neighbor has timed out based on time last heard
      */
-    std::vector<MachineID> make_neighbor_vector() const noexcept;
+    void check_neighbor_timeout(internal::NeighborAgent& neighbor) noexcept;
 
     /** \brief Broadcasts a message to all neighbors that fit a criteria
      */
@@ -373,7 +402,11 @@ private:
     MachineID id_;
 
     // The time to send a heartbeat if nothing has been heard in the time
-    std::chrono::milliseconds heartbeat_interval_;
+    heartbeat_cycle heartbeat_interval_;
+
+    /// @brief Heartbeat cycles to wait before marking a neighbor as
+    /// intentionally disconnected.
+    heartbeat_cycle neighbor_timeout_threshold_;
 
     // Only allow one job access to the manager at a time
     mutable std::mutex job_mut_;
@@ -477,6 +510,11 @@ public:
     int number_of_neighbors() const noexcept
     {
         return handle_->number_of_neighbors();
+    }
+
+    bool request_disconnect(const MachineID& neighbor_agent_id) noexcept
+    {
+        return handle_->request_disconnect(neighbor_agent_id);
     }
 
     /** \brief Returns the id of the manager

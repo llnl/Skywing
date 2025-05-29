@@ -1,12 +1,13 @@
 #ifndef SKYWING_NEIGHBOR_AGENT_HPP
 #define SKYWING_NEIGHBOR_AGENT_HPP
 
+#include <atomic>
+#include <unordered_set>
+#include <vector>
+
 #include "skywing_core/internal/capn_proto_wrapper.hpp"
 #include "skywing_core/internal/devices/socket_communicator.hpp"
 #include "skywing_core/types.hpp"
-
-#include <unordered_set>
-#include <vector>
 
 namespace skywing
 {
@@ -102,18 +103,17 @@ public:
     /** Return the time point when this neighbor agent was last heard
 	from.
      */
-    std::chrono::steady_clock::time_point time_last_heard()
-    { return last_heard_; }
+    std::chrono::steady_clock::time_point time_last_heard() const noexcept
+    {
+        return last_heard_.load();
+    }
 
     /** Note that we just heard from this device.
      */
-    void heard_from()
-    {
-      last_heard_ = std::chrono::steady_clock::now();
-    }
+    void heard_from() { last_heard_.store(std::chrono::steady_clock::now()); }
 
-  /** \brief Returns a reference to the known neighbors of this neighbor.
-   */
+    /** \brief Returns a reference to the known neighbors of this neighbor.
+     */
     const std::vector<MachineID>& neighbors() { return neighbors_; }
 
     void add_communicator(SocketCommunicator&& comm)
@@ -142,6 +142,35 @@ public:
       return std::chrono::steady_clock::now() > request_tags_time_;
     }
 
+    class AtomicTime
+    {
+    public:
+        AtomicTime() = default;
+
+        explicit AtomicTime(std::chrono::steady_clock::time_point t)
+        {
+            store(t);
+        }
+
+        void store(std::chrono::steady_clock::time_point t) noexcept
+        {
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          t.time_since_epoch())
+                          .count();
+            timestamp_ms_.store(ms, std::memory_order_relaxed);
+        }
+
+        std::chrono::steady_clock::time_point load() const noexcept
+        {
+            auto ms = timestamp_ms_.load(std::memory_order_relaxed);
+            return std::chrono::steady_clock::time_point(
+                std::chrono::milliseconds(ms));
+        }
+
+    private:
+        std::atomic<int64_t> timestamp_ms_{0};
+    };
+
 private:
   /** \brief Calculate and set the next time tags should be requested
    */
@@ -161,7 +190,7 @@ private:
     MachineID id_;
 
     // The last time the machine was heard from
-    std::chrono::steady_clock::time_point last_heard_;
+    AtomicTime last_heard_;
 
     // Vector representing this `neighbor_agent`'s neighbors. Not to
     // be confused with `Manager::neighbors_`.

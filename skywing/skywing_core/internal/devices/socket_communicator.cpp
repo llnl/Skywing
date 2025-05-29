@@ -99,7 +99,9 @@ SocketCommunicator::operator=(SocketCommunicator&& other) noexcept
 SocketCommunicator::~SocketCommunicator()
 {
     if (handle_ != invalid_handle) {
+        shutdown(handle_, SHUT_RDWR);
         close(handle_);
+        handle_ = invalid_handle;
     }
 }
 
