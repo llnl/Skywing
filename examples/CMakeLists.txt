@@ -15,5 +15,6 @@ if (SKYWING_BUILD_LC_EXAMPLES)
 endif ()
 
 if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
-  add_subdirectory(math_interface_examples) 
+  add_subdirectory(math_interface_examples)
+  add_subdirectory(barbell_jacobi)  
 endif ()

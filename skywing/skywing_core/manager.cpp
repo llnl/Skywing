@@ -204,6 +204,11 @@ void Manager::run() noexcept
                 message_handler_->send_heartbeat_if_past_interval(
                     neighbor.second, heartbeat_interval_);
             }
+
+            // // Process dynamic neighbor additions and removals
+            // process_neighbor_changes();
+
+
             using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
             std::array<cv_ref_pair, 2> cv_array{
                 cv_ref_pair{notify_subscriptions_, subscription_cv_},

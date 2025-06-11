@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <filesystem>
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -19,9 +20,9 @@
 #include "skywing_mid/linear_system_processors/jacobi_processors/jacobi_processor.hpp"
 #include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_math_interface/machine_setup.hpp"
-
+#include "example_input.hpp"
 #include "skywing_core/manager.hpp"
-#include "skywing_math_interface/io/io.hpp"
+#include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/stop_policies.hpp"
@@ -134,7 +135,11 @@ void machine_task(const int index)
     std::unordered_map<std::string, MachineConfig> configurations = {{"agent0", config0}, {"agent1", config1}, {"agent2", config2}};
     std::chrono::seconds timeout = std::chrono::seconds(10);
 
-    MyJacobiDriver driver(configurations, agent_id, A, b, partition, timeout);
+    std::string output_directory = "./temp_output";
+    std::filesystem::create_directories(output_directory); // Create the folder
+
+
+    MyJacobiDriver driver(configurations, agent_id, A, b, partition, timeout, output_directory);
     driver.solve();
     std::vector<double> targets = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}; 
     std::cout<< driver.test_output()<<std::endl;

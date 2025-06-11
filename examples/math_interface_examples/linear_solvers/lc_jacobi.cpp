@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <thread>
+#include <filesystem>
 
 #include "skywing_core/skywing.hpp"
 #include "skywing_mid/linear_system_processors/jacobi_processors/jacobi_processor.hpp"
@@ -55,6 +56,7 @@ int main(const int argc, const char* const argv[])
     // This reads in the entire matrix. To be more efficient, it could read in only
     // this agent's rows as a sparse matrix based on partition[agent_id]
     Eigen::MatrixXd A = readMatrix<Eigen::MatrixXd>(matrixfile);
+
     Eigen::VectorXd b = readVector(rhsfile);
 
     AssociativeMatrix A_assoc = convert_eigen_matrix_to_associative_matrix(A, partition[agent_id]);
@@ -64,7 +66,15 @@ int main(const int argc, const char* const argv[])
     // This associates with each machine name a MachineConfig struct
     // A MachineConfig struct stores that machine's name, port, address, and its neighbors' machine names
     std::unordered_map<std::string, MachineConfig> configurations = read_machine_configurations_from_file(machine_config_file);
-    MyJacobiDriver driver(configurations, agent_id, A_assoc, b_assoc, partition, timeout);
+
+    // Get the current working directory
+    std::filesystem::path current_path = std::filesystem::current_path();
+
+    // Convert the path to a string if needed
+    std::string output_directory = current_path.string();
+
+    MyJacobiDriver driver(configurations, agent_id, A_assoc, b_assoc, partition, timeout,output_directory);
+
     driver.solve();
 }
 

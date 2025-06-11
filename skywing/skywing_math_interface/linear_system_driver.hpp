@@ -45,14 +45,17 @@ public:
         AssociativeMatrix A,
         ClosedVector b,
         std::unordered_map<uint32_t, std::vector<uint32_t>> partition, //assignments of machines to the matrix rows they own
-        std::chrono::seconds timeout_duration) 
+        std::chrono::seconds timeout_duration, 
+        const std::string& output_directory) // output directory location
+
         : configurations_(configurations),
           agent_id_(agent_id),
           M_(A),
           c_(b),
           partition_(partition),
           test_output_(b),
-          timeout_duration_(timeout_duration)
+          timeout_duration_(timeout_duration),
+          output_directory_(output_directory) // Initialize the new member variable
     {
         LinearProcessor::setup(A, b, M_, c_); // This sets M_ and c_ 
     }
@@ -118,14 +121,45 @@ public:
 
         // Callback called on each iteration of the iterative method.
         auto update_fun = [&](IterMethod& p) {
-            std::cout << p.run_time().count() << "ms: Machine " << agent_id_
-                      << " has value " << p.get_processor().get_value()
-                      << std::endl;
+            std::cout << p.run_time().count() << "ms: Machine " << agent_id_ << " has value " << p.get_processor().get_value() << std::endl;
+
+            // Construct the full file paths using the output directory
+            std::string output_file_path = output_directory_ + "/output" + std::to_string(agent_id_) + ".txt";
+            std::string history_file_path = output_directory_ + "/history" + std::to_string(agent_id_) + ".txt";
+
+            // Open both files
+            std::ofstream output_file(output_file_path, std::ios::trunc); // Use trunc mode to overwrite
+            std::ofstream history_file(history_file_path, std::ios::app); // Append mode to keep history
+
+            if (output_file.is_open() && history_file.is_open()) {
+                // Write the matrix M_ to the output file
+                output_file << "Matrix M_ for Machine " << agent_id_ << ":\n";
+                for (auto it = M_.begin(); it != M_.end(); ++it) {
+                    unsigned int row = it->first;
+                    const auto& columns = it->second;
+                    for (auto col_it = columns.begin(); col_it != columns.end(); ++col_it) {
+                        unsigned int col = col_it->first;
+                        double value = col_it->second;
+                        output_file << "M_(" << row << ", " << col << ") = " << value << "\n";
+                    }
+                }
+                output_file << p.run_time().count() << "ms: Machine " << agent_id_ << " has value " << p.get_processor().get_value() << std::endl;
+
+                // Write to the history file
+                history_file << p.run_time().count() << "\t" << p.get_processor().get_value() << std::endl;
+            } else {
+                std::cerr << "Unable to open files for writing." << std::endl;
+            }
+
+            // Close the files
+            output_file.close();
+            history_file.close();
         };
 
         IterMethod linear_system_solver = iter_waiter.get();
 
         linear_system_solver.run(update_fun);
+        
         test_output_ = linear_system_solver.get_processor().get_value();
     }
 
@@ -137,30 +171,42 @@ public:
         std::cout << "Agent " << agent_id_ << " is listening on port "
                   << port << std::endl;
 
-        skywing::Manager manager(port, name);
+        // skywing::Manager manager(port, name);
+        manager_ = std::make_unique<skywing::Manager>(port, name);
+
         // use helper function to convert machine configurations object to
         // the address-port pairs object needed by the manager 
         std::vector<std::tuple<std::string, uint16_t>>
             neighbor_address_port_pairs =
                 create_address_port_pairs_from_machine_configurations(
                     configurations_, name);
-        manager.configure_initial_neighbors(neighbor_address_port_pairs,
-                                            std::chrono::seconds(30)); //set timeout for forming initial connections
-        
+
+        manager_->configure_initial_neighbors(neighbor_address_port_pairs,
+                                          std::chrono::seconds(30)); // Set timeout for forming initial connections                                            std::chrono::seconds(30)); //set timeout for forming initial connections
+
         // define job to run the linear system iterative method
         auto linear_system_lambda = [&](Job& job, ManagerHandle manager_handle)
         {
             linear_system_job(job, manager_handle);
         };
 
-        manager.submit_job("linear_system_job", linear_system_lambda);
-        manager.run();
+        manager_->submit_job("linear_system_job", linear_system_lambda);
+
+
+
+        manager_->run();
+
+    
     }
 
    ClosedVector test_output()
     {
         return test_output_;
     }
+
+    Manager* get_manager() {
+        return manager_.get(); // Use .get() to return the raw pointer
+    }   
 
 
 private:
@@ -171,6 +217,10 @@ private:
     std::unordered_map<uint32_t, std::vector<uint32_t>> partition_;
     ClosedVector test_output_;
     std::chrono::seconds timeout_duration_;
+    std::string output_directory_;
+    std::unique_ptr<skywing::Manager> manager_; // Store the Manager instance
+
+
 };
 
 } // namespace skywing

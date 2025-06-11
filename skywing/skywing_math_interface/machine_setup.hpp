@@ -54,6 +54,20 @@ struct MachineConfig
         readUntilDash(in, config.serverMachineNames);
         return in;
     }
+
+    /**
+     *  For printing MachineConfig information for debugging. 
+    */
+    friend std::ostream& operator<<(std::ostream& os, const MachineConfig& config) {
+        os << "Agent Name: " << config.name << ", "
+           << "Remote Address: " << config.remoteAddress << ", "
+           << "Neighbors: [";
+        for (const auto& neighbor : config.serverMachineNames) {
+            os << neighbor << " ";
+        }
+        os << "], Port: " << config.port;
+        return os;
+    }
 }; // struct MachineConfig
 
 
