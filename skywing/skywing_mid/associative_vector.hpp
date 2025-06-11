@@ -288,6 +288,27 @@ public:
     */
     size_t size() const { return data_.size(); }
 
+    // Iterator types
+    using iterator = typename std::unordered_map<index_t, val_t>::iterator;
+    using const_iterator = typename std::unordered_map<index_t, val_t>::const_iterator;
+
+    // Begin and end functions for iteration
+    iterator begin() {
+        return data_.begin();
+    }
+
+    const_iterator begin() const {
+        return data_.begin();
+    }
+
+    iterator end() {
+        return data_.end();
+    }
+
+    const_iterator end() const {
+        return data_.end();
+    }
+
 private:
     val_t default_value_; //Stores the default value assigned to keys that are accessed but not explicitly set.
     std::unordered_map<index_t, val_t> data_; //The underlying data structure that holds the key-value pairs in the AssociativeVector.

@@ -382,6 +382,12 @@ private:
      */
     std::vector<TagID> local_tags() const noexcept;
 
+
+    // void process_neighbor_changes() noexcept; 
+
+    // void queue_remove_neighbor(const std::string& ip_address, const std::uint16_t port) noexcept; 
+
+
     // For listening to connection requests
     internal::SocketCommunicator server_socket_;
 
