@@ -253,6 +253,9 @@ add_subdirectory(generated_files)
 add_subdirectory(skywing/skywing_core)
 add_subdirectory(skywing/skywing_mid)
 add_subdirectory(skywing/skywing_math_interface)
+if (SKBUILD)
+  add_subdirectory(python/bindings)
+endif ()
 
 # Helper targets for consistent view of linking
 add_library(skywing::core ALIAS skywing_core)

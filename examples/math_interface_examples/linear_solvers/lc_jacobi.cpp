@@ -8,6 +8,7 @@
 #include <filesystem>
 
 #include "skywing_core/skywing.hpp"
+#include "skywing_core/enable_logging.hpp"
 #include "skywing_mid/linear_system_processors/jacobi_processors/jacobi_processor.hpp"
 #include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_math_interface/io/io.hpp"
@@ -39,7 +40,7 @@ int main(const int argc, const char* const argv[])
     unsigned slurm_nodeid = std::stoi(argv[2]);
     unsigned slurm_localid = std::stoi(argv[3]);
     unsigned agents_per_node = std::stoi(argv[4]);
-    // Calculate the agent ID 
+    // Calculate the agent ID
     unsigned agent_id = agents_per_node * slurm_nodeid + slurm_localid;
 
     using MyJacobiProcessor = JacobiProcessor<uint32_t, double>;
@@ -77,4 +78,3 @@ int main(const int argc, const char* const argv[])
 
     driver.solve();
 }
-

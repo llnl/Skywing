@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "skywing_core/enable_logging.hpp"
 #include "skywing_core/skywing.hpp"
 
 using namespace skywing;

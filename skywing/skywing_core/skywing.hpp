@@ -10,6 +10,6 @@
 #include "subscription.hpp"
 #include "buffer.hpp"
 
-#include "enable_logging.hpp"
+//#include "enable_logging.hpp"
 
 #endif // SKYWING_SKYWING_HPP

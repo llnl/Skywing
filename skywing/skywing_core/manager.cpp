@@ -176,9 +176,7 @@ void Manager::run() noexcept
         const auto end_sleep_time = std::chrono::steady_clock::now() + 100us;
         {
             // Ensure there's no data race with jobs
-            // std::cout << "Agent " << id() << " at top of loop." << std::endl;
             std::lock_guard lock{job_mut_};
-            // std::cout << "Agent " << id() << " acquired mutex." << std::endl;
             //   Remove any finished jobs
             for (auto iter = jobs_.begin(); iter != jobs_.end();) {
                 std::unique_lock lock{iter->second.get_mutex(),

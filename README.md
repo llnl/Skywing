@@ -77,6 +77,8 @@ CMAKE_PREFIX_PATH=/path/to/capnproto/install:${CMAKE_PREFIX_PATH}`
 To use Skywing as a library in a downstream application, it is
 recommended that it be installed to simplify the build process.
 
+To use the Python interface to Skywing, see the [Python README](python/README.md)
+
 ## Enabling Tests and Examples
 
 Tests will be built if `SKYWING_BUILD_TESTS` is enabled, and examples

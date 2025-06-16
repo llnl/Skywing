@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "skywing_core/manager.hpp"
+#include "skywing_core/enable_logging.hpp"
 #include "skywing_core/skywing.hpp"
 #include "skywing_mid/push_sum_basic_processor.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"

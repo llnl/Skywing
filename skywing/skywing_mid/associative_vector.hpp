@@ -95,6 +95,22 @@ public:
     }
 
     /**
+    * @brief Modifies the value associated with a given key.
+    * @param ind The key to access.
+    * @param value The value to set the key to.
+    */
+    void set(index_t ind, val_t value)
+    {
+      if constexpr (!isOpen) {
+	if (!contains(ind))
+	  throw std::runtime_error(
+	      "AssociativeVector::set Attempted to set a "
+	      "nonexistet index in a closer vector.");
+      }
+      data_[ind] = value;
+    }
+
+    /**
     * @brief Accesses the value associated with the specified index.
     * 
     * @param ind The index (key) whose associated value is to be accessed.
