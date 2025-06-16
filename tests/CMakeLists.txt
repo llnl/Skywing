@@ -63,6 +63,7 @@ set(TEST_SRCS
 # Conditionally add jacobi_test.cpp if SKYWING_USE_EIGEN_MATH_EXAMPLES is ON
 if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
   list(APPEND TEST_SRCS skywing_math_interface/jacobi_test.cpp)
+  list(APPEND TEST_SRCS skywing_mid/cola_test.cpp)
   file(COPY
     skywing_math_interface/data/
     DESTINATION ${CMAKE_BINARY_DIR}/data)

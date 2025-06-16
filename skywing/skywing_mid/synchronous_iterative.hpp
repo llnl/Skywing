@@ -38,30 +38,30 @@ using namespace std::chrono_literals;
  *
  */
 
-template <template<typename> class Processor, typename element_t>
+template <template<typename...> class Processor, typename... Args>
 class ProcessorSyncWrapper
-    : public Processor<element_t>
+    : public Processor<Args...>
 {
 public:
-    using ValueType = std::tuple<int, typename Processor<element_t>::ValueType, typename Processor<element_t>::ValueType>;
+    using ValueType = std::tuple<int, typename Processor<Args...>::ValueType, typename Processor<Args...>::ValueType>;
 
-    template <typename... Args>
-    ProcessorSyncWrapper(Args&&... args) :
-        Processor<element_t>(args...),
-        prev_iterate_(Processor<element_t>::get_init_publish_values()),
+    template <typename... UArgs>
+    ProcessorSyncWrapper(UArgs&&... args) :
+        Processor<Args...>(std::forward<UArgs>(args)...),
+        prev_iterate_(Processor<Args...>::get_init_publish_values()),
         iteration_count_(0)
     {}
 
     ValueType get_init_publish_values()
     {
-        return ValueType(iteration_count_, prev_iterate_, Processor<element_t>::get_init_publish_values());
+        return ValueType(iteration_count_, prev_iterate_, Processor<Args...>::get_init_publish_values());
     }
 
     template <typename IterMethod>
     void process_update(const DataHandler<ValueType>& wrapper_data_handler,
                         [[maybe_unused]] const IterMethod& iter_method)
     {
-        std::unordered_map<std::string, typename Processor<element_t>::ValueType> p_handler_update_map;
+        std::unordered_map<std::string, typename Processor<Args...>::ValueType> p_handler_update_map;
         for (const auto& pTag : wrapper_data_handler.recvd_data_tags() ) {
             ValueType nbr_value = wrapper_data_handler.get_data(pTag);
             if (std::get<0>(nbr_value) == iteration_count_) {
@@ -72,19 +72,19 @@ public:
             }
         }
         processor_data_handler_.update(p_handler_update_map);
-        prev_iterate_ = Processor<element_t>::prepare_for_publication(prev_iterate_);
-        Processor<element_t>::process_update(processor_data_handler_, iter_method);
+        prev_iterate_ = Processor<Args...>::prepare_for_publication(prev_iterate_);
+        Processor<Args...>::process_update(processor_data_handler_, iter_method);
         iteration_count_++;
     }
 
     ValueType prepare_for_publication(ValueType vals_to_publish)
     {
-        return ValueType(iteration_count_, prev_iterate_, Processor<element_t>::prepare_for_publication(std::get<2>(vals_to_publish)));
+        return ValueType(iteration_count_, prev_iterate_, Processor<Args...>::prepare_for_publication(std::get<2>(vals_to_publish)));
     }
 
 private:
-    typename Processor<element_t>::ValueType prev_iterate_;
-    DataHandler<typename Processor<element_t>::ValueType> processor_data_handler_;
+    typename Processor<Args...>::ValueType prev_iterate_;
+    DataHandler<typename Processor<Args...>::ValueType> processor_data_handler_;
     int iteration_count_;
 };
 
