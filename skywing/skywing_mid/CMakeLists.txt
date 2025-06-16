@@ -26,5 +26,6 @@ target_sources(skywing_mid
   stop_policies.hpp
   sum_processor.hpp
   synchronous_iterative.hpp
+  python_processor.hpp
   linear_system_processors/jacobi_processors/jacobi_processor.hpp
 )

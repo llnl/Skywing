@@ -99,31 +99,6 @@ void machine_task(int machine_number,
             std::vector<std::string> tagIDs_for_sub{
                 tagIDs[wrap_ind(i - 1)], tagIDs[i], tagIDs[wrap_ind(i + 1)]};
 
-            // (void)number_of_neighbors;
-            // using MeanMethod = PushFlowProcessor<BigFloat, BigFloat>;
-            // using IterMethod = AsynchronousIterative
-            //   <MeanMethod, AlwaysPublish, StopAfterTime,
-            //   TrivialResiliencePolicy>;
-            // Waiter<IterMethod> iter_waiter =
-            //   WaiterBuilder<IterMethod>(manager_handle, job, pubTagID,
-            //   tagIDs_for_sub) .set_processor(starting_value)
-            //   .set_publish_policy()
-            //   .set_stop_policy(std::chrono::seconds(10))
-            //   .set_resilience_policy()
-            //   .build_waiter();
-
-            // using MeanMethod = PushSumProcessor<double>;
-            // using IterMethod = AsynchronousIterative
-            //   <MeanMethod, AlwaysPublish, StopAfterTime,
-            //   TrivialResiliencePolicy>;
-            // Waiter<IterMethod> iter_waiter =
-            //   WaiterBuilder<IterMethod>(manager_handle, job, pubTagID,
-            //   tagIDs_for_sub) .set_processor(starting_value,
-            //   number_of_neighbors) .set_publish_policy()
-            //   .set_stop_policy(std::chrono::seconds(5))
-            //   .set_resilience_policy()
-            //   .build_waiter();
-
             (void) number_of_neighbors;
             using CountProcessor = QUACCProcessor<BigFloat,
                                                   MinProcessor<BigFloat>,
