@@ -173,6 +173,20 @@ public:
     }
 
     /**
+    * @brief Sets all values in the AssociativeVector equal to the given value.
+    * @param x The value to set equal to.
+    * @return A reference to this AssociativeVector.
+    */
+    AssociativeVector&
+    operator=(const val_t& x)
+    {
+        for (auto iter : data_) {
+            const index_t& ind = iter.first;
+            data_[ind] = x;
+        }
+        return *this;
+    }
+    /**
     * @brief Adds another AssociativeVector to this one.
     * @param other The AssociativeVector to add.
     * @return A reference to this AssociativeVector.

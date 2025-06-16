@@ -1,0 +1,98 @@
+#!/bin/bash
+
+print_usage() {
+  echo "Usage: run.sh [options]"
+  echo
+  echo "Options:"
+  echo "  -n, --num_agents N      Specify the number of agents (default 3)"
+  echo "  -t, --topology T        Specify the communication topology among agents (default 2)"
+  echo "                             0    : Line"
+  echo "                             1    : Ring"
+  echo "                             else : All-to-all"
+  echo "  -l, --lambda L          Specify the value of the regularization parameter, lambda (default 0.0001)"
+  echo "  -s, --shift_scale S     Choose whether to shift and scale the data (default 0)"
+  echo "  -p, --problem P         Specify the problem to solve (default 2)"
+  echo "                            -1    : Read problem from file (provide filename with -f)"
+  echo "                             0    : Identity matrix"
+  echo "                             1    : Tridiagonal matrix"
+  echo "                             else : Random matrix"
+  echo "  -f, --data_file FILE    Specify data file to read (no default)"
+  echo "  -o, --output_dir DIR    Specify output directory (default output)"
+  echo "  -h, --help              Display this help message and exit"
+}
+
+# Defaults
+num_agents=3
+topology=2
+lambda=0.0001
+shift_scale=0
+problem=2
+data_file="a"
+output_dir="output"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--num_agents)
+      num_agents=$2
+      shift 2
+      ;;
+    -t|--topology)
+      topology=$2
+      shift 2
+      ;;
+    -l|--lambda)
+      lambda=$2
+      shift 2
+      ;;
+    -s|--shift_scale)
+      shift_scale=$2
+      shift 2
+      ;;
+    -p|--problem)
+      problem=$2
+      shift 2
+      ;;
+    -f|--data_file)
+      data_file=$2
+      shift 2
+      ;;
+    -o|--output_dir)
+      output_dir=$2
+      shift 2
+      ;;
+    -h|--help)
+      print_usage
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      print_usage
+      exit 1
+      ;;
+    *)
+      echo "Bad positional argument: $1"
+      print_usage
+      shift
+      ;;
+  esac
+done
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( ind=0 ;  ind < num_agents ; ind++ ))
+  do
+      var="erase${ind}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
+
+for (( agent_ind = 0; agent_ind < $num_agents ; agent_ind++ ))
+do
+    echo "@cola_exe@" $agent_ind
+    "@cola_exe@" $agent_ind -n $num_agents -t $topology -l $lambda -s $shift_scale -p $problem -f $data_file -o $output_dir &
+    declare "erase${agent_ind}=$!"
+done
+
+sleep 30
+kill_progs

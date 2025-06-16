@@ -7,6 +7,7 @@ target_sources(skywing_mid
   associative_vector.hpp
   asynchronous_iterative.hpp
   big_float.hpp
+  cola_processor.hpp
   data_input.hpp
   helpers/skywing_config.hpp
   helpers/skywing_helper.hpp
