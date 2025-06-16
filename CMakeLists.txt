@@ -7,6 +7,12 @@ project(Skywing
   LANGUAGES CXX
 )
 
+# Setup some things related to the package registry and CI
+if (DEFINED ENV{CI})
+  set(CMAKE_EXPORT_PACKAGE_REGISTRY OFF)
+  set(CMAKE_FIND_USE_PACKAGE_REGISTRY OFF)
+endif ()
+
 # CMake modules
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
