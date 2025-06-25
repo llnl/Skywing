@@ -15,7 +15,7 @@
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/push_flow_processor.hpp"
 #include "skywing_mid/quacc_processor.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/sum_processor.hpp"
 #include "arg_parser.hpp"
 
@@ -29,7 +29,7 @@ using SumMethod =
     SumProcessor<double, PushFlowProcessor<double>, CountProcessor>;
 using IterMethod = AsynchronousIterative<SumMethod,
                                          AlwaysPublish,
-                                         StopAfterTime,
+                                         IterateUntilTime,
                                          TrivialResiliencePolicy>;
 
 std::chrono::steady_clock::time_point start_time;
@@ -209,7 +209,7 @@ void calculate_total_charge_job(Job& job,
         WaiterBuilder<IterMethod>(manager_handle, job, this_ID, iter_sub_tag_IDs)
             .set_processor(starting_value)
             .set_publish_policy()
-            .set_stop_policy(std::chrono::seconds(run_duration))
+            .set_iteration_policy(std::chrono::seconds(run_duration))
             .set_resilience_policy()
             .build_waiter();
     IterMethod summation_iteration = iter_waiter.get();

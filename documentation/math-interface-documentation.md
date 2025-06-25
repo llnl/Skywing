@@ -21,7 +21,7 @@ Skywing Math Interface
     * `linear_system_driver.hpp`
         * defines the `LinearSystemDriver` class
         * **Constructor parameters:** `configuration, agent_id, A, b, partition, and timeout duration`
-        * **Template parameters:** `LinearProcessor, PublishPolicy, StopPolicy, ResiliencePolicy`
+        * **Template parameters:** `LinearProcessor, PublishPolicy, IterationPolicy, ResiliencePolicy`
         * **To run:** call `linear_system_driver.solve()`
 
 ## In skywing mid - processors

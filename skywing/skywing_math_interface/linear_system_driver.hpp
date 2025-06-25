@@ -11,7 +11,7 @@
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 
 namespace skywing
 {
@@ -24,13 +24,13 @@ namespace skywing
  * 
  * @tparam LinearProcessor A processor to be used in the IterativeMethod class.
  * @tparam PublishPolicy The policy for when an agent should publish an update to a tag.
- * @tparam StopPolicy The policy for when this agent should stop, such as stopping after 
+ * @tparam IterationPolicy The policy for when this agent should iterate, such as iterating until
  * a certain time has elapsed. 
  * @tparam ResiliencePolicy the policy for handling or dropping unresponsive nodes
  */
 template <typename LinearProcessor,
           typename PublishPolicy,
-          typename StopPolicy,
+          typename IterationPolicy,
           typename ResiliencePolicy>
 
 class LinearSystemDriver
@@ -107,15 +107,15 @@ public:
 
         // initialize a linear sytem solver with the specified linear processor
         using IterMethod = AsynchronousIterative<LinearProcessor,
-                                                 AlwaysPublish,
-                                                 StopAfterTime,
-                                                 TrivialResiliencePolicy>;
+                                                 PublishPolicy,
+                                                 IterationPolicy,
+                                                 ResiliencePolicy>;
         Waiter<IterMethod> iter_waiter =
             WaiterBuilder<IterMethod>(
                 manager_handle, job, pubTagID_, tagIDs_for_sub)
                 .set_processor(M_, c_)
                 .set_publish_policy()
-                .set_stop_policy(timeout_duration_) // stop iterating after this duration
+                .set_iteration_policy(timeout_duration_) // stop iterating after this duration
                 .set_resilience_policy()
                 .build_waiter();
 

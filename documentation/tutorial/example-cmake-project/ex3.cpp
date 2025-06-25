@@ -6,7 +6,7 @@
 #include <skywing_core/skywing.hpp>
 #include <skywing_mid/publish_policies.hpp>
 #include <skywing_mid/push_flow_processor.hpp>
-#include <skywing_mid/stop_policies.hpp>
+#include <skywing_mid/iteration_policies.hpp>
 #include <skywing_mid/synchronous_iterative.hpp>
 
 std::vector<size_t> ports{20000, 20001, 20002};
@@ -27,13 +27,13 @@ int main(const int argc, const char* const argv[])
 
         using MeanMethod = PushFlowProcessor<double, double>;
         using IterMethod = SynchronousIterative<MeanMethod,
-                                                StopAfterTime,
+                                                IterateUntilTime,
                                                 TrivialResiliencePolicy>;
         Waiter<IterMethod> iter_waiter =
             WaiterBuilder<IterMethod>(
                 manager_handle, job, tagIDs[machine_num], tagIDs)
                 .set_processor(val_to_contribute)
-                .set_stop_policy(std::chrono::seconds(10))
+                .set_iteration_policy(std::chrono::seconds(10))
                 .set_resilience_policy()
                 .build_waiter();
 

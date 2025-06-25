@@ -14,7 +14,7 @@
 #include "skywing_mid/power_method_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/push_flow_processor.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
@@ -125,14 +125,14 @@ void machine_task(int machine_number,
             using PowerMethod = PowerMethodProcessor<std::uint32_t, double>;
             using IterMethod = AsynchronousIterative<PowerMethod,
                                                      AlwaysPublish,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
             Waiter<IterMethod> iter_waiter =
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, pubTagID, tagIDs_for_sub)
                     .set_processor(matrix_column, i)
                     .set_publish_policy()
-                    .set_stop_policy(std::chrono::seconds(180))
+                    .set_iteration_policy(std::chrono::seconds(180))
                     .set_resilience_policy()
                     .build_waiter();
 

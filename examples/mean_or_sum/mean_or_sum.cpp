@@ -15,7 +15,7 @@
 #include "skywing_mid/push_flow_processor.hpp"
 #include "skywing_mid/push_sum_processor.hpp"
 #include "skywing_mid/quacc_processor.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/sum_processor.hpp"
 
 using namespace skywing;
@@ -107,14 +107,14 @@ void machine_task(int machine_number,
                 SumProcessor<double, PushFlowProcessor<double>, CountProcessor>;
             using IterMethod = AsynchronousIterative<SumMethod,
                                                      AlwaysPublish,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
             Waiter<IterMethod> iter_waiter =
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, pubTagID, tagIDs_for_sub)
                     .set_processor(starting_value)
                     .set_publish_policy()
-                    .set_stop_policy(std::chrono::seconds(50))
+                    .set_iteration_policy(std::chrono::seconds(50))
                     .set_resilience_policy()
                     .build_waiter();
 

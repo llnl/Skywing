@@ -14,7 +14,7 @@
 #include "skywing_mid/push_sum_basic_processor.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/power_method_processor.hpp"
 #include "skywing_mid/push_sum_processor.hpp"
@@ -120,7 +120,7 @@ void runJob(const MachineConfig& config,
         using PushSumBasicAverage = PushSumBasicProcessor<double,double>; 
         using IterMethod = AsynchronousIterative<PushSumBasicAverage,
                                                      AlwaysPublish,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
 
         double starting_value = (agent_id+1)*1.0; 
@@ -136,7 +136,7 @@ void runJob(const MachineConfig& config,
             WaiterBuilder<IterMethod>(managerHandle, job, pubTagID, tagIDs_for_sub)
             .set_processor(starting_value,pubTagID)
             .set_publish_policy()
-            .set_stop_policy(std::chrono::seconds(60))
+            .set_iteration_policy(std::chrono::seconds(60))
             .set_resilience_policy()
             .build_waiter();
 

@@ -55,7 +55,7 @@ set(TEST_SRCS
   skywing_mid/ex4.cpp
   skywing_mid/max_test.cpp
   skywing_mid/pubsub.cpp
-  skywing_mid/stoppolicy_send.cpp
+  skywing_mid/iterationpolicy_send.cpp
   skywing_mid/synchronous_iterative.cpp
   skywing_mid/data_handler_test.cpp
 )

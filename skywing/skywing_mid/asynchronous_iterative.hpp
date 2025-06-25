@@ -15,7 +15,7 @@
 #include "skywing_mid/internal/iterative_helpers.hpp"
 #include "skywing_mid/iterative_method.hpp"
 #include "skywing_mid/iterative_resilience_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 
 namespace skywing
 {
@@ -44,7 +44,7 @@ using namespace std::chrono_literals;
  * update to its neighbors. Must define a member function
  * @p bool operator()(const ValueType& new_vals, const ValueType& old_vals)
  *
- * @tparam StopPolicy Determines when to stop the
+ * @tparam IterationPolicy Determines when to stop the
  * iteration. Must define a member function @ bool operator()(constCallerT&)
  *
  * @tparam ResiliencePolicy Determines how this IterativeMethod
@@ -52,23 +52,23 @@ using namespace std::chrono_literals;
  */
 template <typename Processor,
           typename PublishPolicy,
-          typename StopPolicy,
+          typename IterationPolicy,
           typename ResiliencePolicy>
 class AsynchronousIterative
     : public IterativeMethod<ResiliencePolicy,
                              TupleOfValueTypes_t<Processor,
                                                  PublishPolicy,
-                                                 StopPolicy,
+                                                 IterationPolicy,
                                                  ResiliencePolicy>>
 {
 public:
     using ValueType = TupleOfValueTypes_t<Processor,
                                           PublishPolicy,
-                                          StopPolicy,
+                                          IterationPolicy,
                                           ResiliencePolicy>;
     using ThisT = AsynchronousIterative<Processor,
                                         PublishPolicy,
-                                        StopPolicy,
+                                        IterationPolicy,
                                         ResiliencePolicy>;
     using BaseT = IterativeMethod<ResiliencePolicy, ValueType>;
 
@@ -76,7 +76,7 @@ public:
 
     using ProcessorT = Processor;
     using PublishPolicyT = PublishPolicy;
-    using StopPolicyT = StopPolicy;
+    using IterationPolicyT = IterationPolicy;
     using ResiliencePolicyT = ResiliencePolicy;
 
     /**
@@ -87,7 +87,7 @@ public:
      * from neighbors this iteration relies on.
      * @param processor The Processor object used in iteration.
      * @param publish_policy The PublishPolicy object used in iteration.
-     * @param stop_policy The StopPolicy object used in iteration.
+     * @param iteration_policy The IterationPolicy object used in iteration.
      * @param resilience_policy The ResiliencePolicy object used in iteration.
      * @param loop_delay_max The maximum amount of time to wait for an update
      * before at least checking the stopping criterion.
@@ -98,14 +98,14 @@ public:
         const std::vector<TagType>& tags,
         Processor processor,
         PublishPolicy publish_policy,
-        StopPolicy stop_policy,
+        IterationPolicy iteration_policy,
         ResiliencePolicy resilience_policy,
         std::chrono::milliseconds loop_delay_max = 1000ms) noexcept
         : BaseT{job, produced_tag, tags, std::move(resilience_policy)},
           processor_(std::move(processor)),
           publish_values_(gather_initial_publications_()),
           publish_policy_(std::move(publish_policy)),
-          stop_policy_(std::move(stop_policy)),
+          iteration_policy_(std::move(iteration_policy)),
           wait_max_(loop_delay_max)
     {}
 
@@ -138,13 +138,13 @@ public:
 
                 if constexpr (has_callback)
                     callback(*this);
-                should_iterate_ = !stop_policy_(*this);
+                should_iterate_ = iteration_policy_(*this);
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
             if (!should_iterate_)
                 break;
             this->get_job().wait_for_update(wait_max_);
-            should_iterate_ = stop_policy_(*this);
+            should_iterate_ = iteration_policy_(*this);
         }
         stop_time_ = clock_t::now();
     }
@@ -201,8 +201,8 @@ private:
         this->template process_policy_update_<PublishPolicy, ThisT>(
             publish_policy_,
             std::bool_constant<has_ValueType_v<PublishPolicy>>{});
-        this->template process_policy_update_<StopPolicy, ThisT>(
-            stop_policy_, std::bool_constant<has_ValueType_v<StopPolicy>>{});
+        this->template process_policy_update_<IterationPolicy, ThisT>(
+            iteration_policy_, std::bool_constant<has_ValueType_v<IterationPolicy>>{});
         this->template process_policy_update_<ResiliencePolicy, ThisT>(
             this->resilience_policy_,
             std::bool_constant<has_ValueType_v<ResiliencePolicy>>{});
@@ -218,7 +218,7 @@ private:
             this->template get_init_tuple_<Processor, ThisT>(processor_),
             this->template get_init_tuple_<PublishPolicy, ThisT>(
                 publish_policy_),
-            this->template get_init_tuple_<StopPolicy, ThisT>(stop_policy_),
+            this->template get_init_tuple_<IterationPolicy, ThisT>(iteration_policy_),
             this->template get_init_tuple_<ResiliencePolicy, ThisT>(
                 this->resilience_policy_));
     }
@@ -234,7 +234,7 @@ private:
                                                             publish_values_),
             this->template get_pub_tuple_<PublishPolicy, ThisT>(
                 publish_policy_, publish_values_),
-            this->template get_pub_tuple_<StopPolicy, ThisT>(stop_policy_,
+            this->template get_pub_tuple_<IterationPolicy, ThisT>(iteration_policy_,
                                                              publish_values_),
             this->template get_pub_tuple_<ResiliencePolicy, ThisT>(
                 this->resilience_policy_, publish_values_));
@@ -243,7 +243,7 @@ private:
     Processor processor_;
     ValueType publish_values_;
     PublishPolicy publish_policy_;
-    StopPolicy stop_policy_;
+    IterationPolicy iteration_policy_;
 
     using clock_t = std::chrono::steady_clock;
     std::optional<std::chrono::time_point<clock_t>>
@@ -276,7 +276,7 @@ private:
  * AlwaysUpdateNbrs, StopAfterTime, TrivialResiliencePolicy>; Waiter<IterMethod>
  * iter_waiter = WaiterBuilder<IterMethod>(manager_handle, job, my_tag,
  * nbr_tags) .set_processor(A, b, row_inds) .set_nbr_update_criterion()
- *  .set_stop_policy(std::chrono::seconds(5))
+ *  .set_iteration_policy(std::chrono::seconds(5))
  *  .set_resilience_policy()
  *  .build_waiter();
  * IterMethod sync_jacobi = iter_waiter.get();
@@ -284,17 +284,17 @@ private:
  */
 template <typename Processor,
           typename PublishPolicy,
-          typename StopPolicy,
+          typename IterationPolicy,
           typename ResiliencePolicy>
 class WaiterBuilder<AsynchronousIterative<Processor,
                                           PublishPolicy,
-                                          StopPolicy,
+                                          IterationPolicy,
                                           ResiliencePolicy>>
 {
 public:
     using ObjectT = AsynchronousIterative<Processor,
                                           PublishPolicy,
-                                          StopPolicy,
+                                          IterationPolicy,
                                           ResiliencePolicy>;
     using ThisT = WaiterBuilder<ObjectT>;
     using TagType = typename ObjectT::BaseT::TagType;
@@ -357,14 +357,14 @@ public:
         return *this;
     }
 
-    /** @brief Build a Waiter<StopPolicy> that will construct the
-        StopPolicy for this iterative method.
+    /** @brief Build a Waiter<IterationPolicy> that will construct the
+        IterationPolicy for this iterative method.
      */
     template <typename... Args>
-    ThisT& set_stop_policy(Args&&... args)
+    ThisT& set_iteration_policy(Args&&... args)
     {
-        stop_policy_waiter_ = std::make_shared<Waiter<StopPolicy>>(
-            WaiterBuilder<StopPolicy>(std::forward<Args>(args)...)
+        iteration_policy_waiter_ = std::make_shared<Waiter<IterationPolicy>>(
+            WaiterBuilder<IterationPolicy>(std::forward<Args>(args)...)
                 .build_waiter());
         return *this;
     }
@@ -383,12 +383,12 @@ public:
 
     /* @brief Build a Waiter to the desired synchronous iterative method.
      * @returns A Waiter<AsynchronousIterative<Processor, PublishPolicy,
-     * StopPolicy>>
+     * IterationPolicy>>
      */
     Waiter<ObjectT> build_waiter()
     {
         if (!(subscribe_waiter_ && processor_waiter_ && publish_policy_waiter_
-              && stop_policy_waiter_ && resilience_policy_waiter_))
+              && iteration_policy_waiter_ && resilience_policy_waiter_))
             throw std::runtime_error(
                 "WaiterBuilder<AsynchronousIterative> requires having built "
                 "all necessary components prior to calling build_waiter().");
@@ -397,13 +397,13 @@ public:
         auto is_ready = [subscribe_waiter_ = this->subscribe_waiter_,
                          processor_waiter = this->processor_waiter_,
                          publish_policy_waiter = this->publish_policy_waiter_,
-                         stop_policy_waiter = this->stop_policy_waiter_,
+                         iteration_policy_waiter = this->iteration_policy_waiter_,
                          resilience_policy_waiter =
                              this->resilience_policy_waiter_]() {
             return (subscribe_waiter_->is_ready()
                     && processor_waiter->is_ready()
                     && publish_policy_waiter->is_ready()
-                    && stop_policy_waiter->is_ready()
+                    && iteration_policy_waiter->is_ready()
                     && resilience_policy_waiter->is_ready());
         };
 
@@ -412,7 +412,7 @@ public:
                                          tags_vec_,
                                          processor_waiter_->get(),
                                          publish_policy_waiter_->get(),
-                                         stop_policy_waiter_->get(),
+                                         iteration_policy_waiter_->get(),
                                          resilience_policy_waiter_->get());
         auto get_object = [cons_args = std::move(cons_args)]() {
             return std::make_from_tuple<ObjectT>(cons_args);
@@ -433,7 +433,7 @@ private:
     std::shared_ptr<Waiter<void>> subscribe_waiter_;
     std::shared_ptr<Waiter<Processor>> processor_waiter_;
     std::shared_ptr<Waiter<PublishPolicy>> publish_policy_waiter_;
-    std::shared_ptr<Waiter<StopPolicy>> stop_policy_waiter_;
+    std::shared_ptr<Waiter<IterationPolicy>> iteration_policy_waiter_;
     std::shared_ptr<Waiter<ResiliencePolicy>> resilience_policy_waiter_;
 }; // class WaiterBuilder<...>
 

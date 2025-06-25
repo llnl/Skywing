@@ -14,7 +14,7 @@
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/jacobi_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 
 // all jacobi_include files for matrix input and data aggregation.
 #include "jacobi_data_output.hpp"
@@ -85,14 +85,14 @@ void machine_task(int machine_number,
 
             using IterMethod = AsynchronousIterative<OldJacobiProcessor<double>,
                                                      PublishOnLinfShift<double>,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
             Waiter<IterMethod> iter_waiter =
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, tag_ids[machine_number], tag_ids)
                     .set_processor(A_partition, b_partition, row_indices)
                     .set_publish_policy(1e-6)
-                    .set_stop_policy(std::chrono::seconds(5))
+                    .set_iteration_policy(std::chrono::seconds(5))
                     .set_resilience_policy()
                     .build_waiter();
             std::cout << "Machine " << machine_number

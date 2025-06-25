@@ -289,7 +289,7 @@ protected:
      * \code{.cpp}
      * std::tuple_cat
      *   (this->template get_init_tuple_<Processor, ThisT>(processor_),
-     *    this->template get_init_tuple_<StopPolicy, ThisT>(stop_policy_),
+     *    this->template get_init_tuple_<IterationPolicy, ThisT>(iteration_policy_),
      *    this->template get_init_tuple_<ResiliencePolicy,
      * ThisT>(this->resilience_policy_)); \code
      */
@@ -314,8 +314,8 @@ protected:
      * \code{.cpp}
      * std::tuple_cat
      *   (this->template get_pub_tuple_<Processor, ThisT>(processor_,
-     * publish_values_), this->template get_pub_tuple_<StopPolicy,
-     * ThisT>(stop_policy_, publish_values_), this->template
+     * publish_values_), this->template get_pub_tuple_<IterationPolicy,
+     * ThisT>(iteration_policy_, publish_values_), this->template
      * get_pub_tuple_<ResiliencePolicy, ThisT>(this->resilience_policy_,
      * publish_values_)); \code
      */

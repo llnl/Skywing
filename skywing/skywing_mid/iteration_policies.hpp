@@ -1,5 +1,5 @@
-#ifndef STOPPING_CRITERION_HPP
-#define STOPPING_CRITERION_HPP
+#ifndef ITERATION_CRITERION_HPP
+#define ITERATION_CRITERION_HPP
 
 #include <chrono>
 
@@ -9,30 +9,30 @@
 namespace skywing
 {
 
-/* This file contains a number of common iterative methods StopPolicy
+/* This file contains a number of common iterative methods IterationPolicy
    (stopping criteria) options.
  */
 
-/** @brief StopPolicy that stops after a given amount of time has
+/** @brief IterationPolicy that stops after a given amount of time has
     passed.
  */
-class StopAfterTime
+class IterateUntilTime
 {
 public:
     template <typename Duration>
-    StopAfterTime(Duration d) : max_run_time_(d)
+    IterateUntilTime(Duration d) : max_run_time_(d)
     {}
 
     template <typename CallerT>
     bool operator()(const CallerT& caller)
     {
-        return caller.run_time() > max_run_time_;
+        return caller.run_time() <= max_run_time_;
     }
 
 private:
     std::chrono::milliseconds max_run_time_;
 
-}; // class StopAfterTime
+}; // class IterateUntilTime
 
 // template<typename LocalStopPolicy>
 // class SynchronousConsensusStop
