@@ -25,7 +25,7 @@
 #include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "example_input.hpp"
 
@@ -109,7 +109,7 @@ void machine_task(const int index)
     using MyJacobiProcessor = JacobiProcessor<uint32_t, double>;
 
     // Set the processor, stop, publish, and resilience policies
-    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, IterateUntilTime, TrivialResiliencePolicy>;
 
     // Read in the partition of the linear system, and this agent's portion of A and b from specified files
     std::unordered_map<uint32_t, std::vector<uint32_t>> partition = read_partition_from_file();        

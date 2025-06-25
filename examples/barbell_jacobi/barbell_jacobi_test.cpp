@@ -19,7 +19,7 @@
 #include "skywing_core/manager.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/publish_policies.hpp"
 
 using namespace skywing;
@@ -98,7 +98,7 @@ void runSolver(
     
     std::chrono::seconds timeout(1);
     using MyJacobiProcessor = JacobiProcessor<uint32_t, double>;
-    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, IterateUntilTime, TrivialResiliencePolicy>;
 
     MyJacobiDriver driver(configurations, agentId, A, b, partition, timeout, outputDirectory);
     driver.solve();

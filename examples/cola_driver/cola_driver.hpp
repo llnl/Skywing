@@ -9,7 +9,7 @@
 
 #include "skywing_mid/synchronous_iterative.hpp"
 #include "skywing_mid/associative_vector.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/cola_processor.hpp"
 
 using namespace skywing;
@@ -475,7 +475,7 @@ int drive_COLA(size_t       agent_num,
 
             // Setup our iterative method type
             using IterMethod = SynchronousIterative<ProcessorSyncWrapper<COLAProcessor, index_t, scalar_t, tag_t>,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
 
             // Build a waiter via the WaiterBuilder for the iterative method
@@ -483,7 +483,7 @@ int drive_COLA(size_t       agent_num,
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, tag_ids[agent_num], tag_ids)
                     .set_processor(A_k[agent_num], b, W_k, lambda, num_agents, shift_scale)
-                    .set_stop_policy(std::chrono::seconds(20))
+                    .set_iteration_policy(std::chrono::seconds(20))
                     .set_resilience_policy()
                     .build_waiter();
 

@@ -7,7 +7,7 @@
 #include "iterative_test_stuff.hpp"
 #include "skywing_core/enable_logging.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace skywing;
@@ -49,7 +49,7 @@ void machine_task(const NetworkInfo* const info, const int index)
 
         using IterMethod = AsynchronousIterative<TestAsyncProcessor,
                                                  AlwaysPublish,
-                                                 StopAfterTime,
+                                                 IterateUntilTime,
                                                  TrivialResiliencePolicy>;
         
         IterMethod iter_method =
@@ -57,7 +57,7 @@ void machine_task(const NetworkInfo* const info, const int index)
                 manager, job_handle, tag_ids[index], tag_ids)
                 .set_processor(index, num_machines)
                 .set_publish_policy()
-                .set_stop_policy(std::chrono::seconds(5))
+                .set_iteration_policy(std::chrono::seconds(5))
                 .set_resilience_policy()
                 .build_waiter()
                 .get();

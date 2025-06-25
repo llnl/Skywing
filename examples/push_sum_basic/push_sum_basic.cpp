@@ -12,7 +12,7 @@
 #include "skywing_mid/big_float.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/push_sum_basic_processor.hpp"
 
 
@@ -96,7 +96,7 @@ void machine_task(int machine_number,
             using PushSumBasicAverage = PushSumBasicProcessor<double,double>; 
             using IterMethod = AsynchronousIterative<PushSumBasicAverage,
                                                      AlwaysPublish,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
 
             Waiter<IterMethod> iter_waiter =
@@ -104,7 +104,7 @@ void machine_task(int machine_number,
                     manager_handle, job, pubTagID, tagIDs_for_sub)
                     .set_processor(starting_value,pubTagID)
                     .set_publish_policy()
-                    .set_stop_policy(std::chrono::seconds(1))
+                    .set_iteration_policy(std::chrono::seconds(1))
                     .set_resilience_policy()
                     .build_waiter();
 

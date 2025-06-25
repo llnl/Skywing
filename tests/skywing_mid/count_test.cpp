@@ -8,7 +8,7 @@
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/quacc_processor.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace skywing;
@@ -40,14 +40,14 @@ void machine_task(const NetworkInfo* const info, const int index)
                   << std::endl;
         using IterMethod = AsynchronousIterative<QUACCProcessor<>,
                                                  AlwaysPublish,
-                                                 StopAfterTime,
+                                                 IterateUntilTime,
                                                  TrivialResiliencePolicy>;
         IterMethod iter_method =
             WaiterBuilder<IterMethod>(
                 manager, job_handle, tag_ids[index], tag_ids)
                 .set_processor(num_machines - 1)
                 .set_publish_policy()
-                .set_stop_policy(std::chrono::seconds(3))
+                .set_iteration_policy(std::chrono::seconds(3))
                 .set_resilience_policy()
                 .build_waiter()
                 .get();

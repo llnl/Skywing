@@ -13,7 +13,7 @@
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/jacobi_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/synchronous_iterative.hpp"
 
 // all jacobi_include files for matrix input and data aggregation.
@@ -97,7 +97,7 @@ void machine_task(const int machine_number,
                       << " finished connecting to neighbors." << std::endl;
 
             using IterMethod = SynchronousIterative<ProcessorSyncWrapper<OldJacobiProcessor, double>,
-                                                    StopAfterTime,
+                                                    IterateUntilTime,
                                                     TrivialResiliencePolicy>;
             // using IterMethod = AsynchronousIterative<JacobiProcessor<double>,
             // PublishOnLinfShift<double>,
@@ -107,7 +107,7 @@ void machine_task(const int machine_number,
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, tag_ids[machine_number], tag_ids)
                     .set_processor(A_partition, b_partition, row_indices)
-                    .set_stop_policy(std::chrono::seconds(5))
+                    .set_iteration_policy(std::chrono::seconds(5))
                     .set_resilience_policy()
                     .build_waiter();
             std::cout << "Machine " << machine_number

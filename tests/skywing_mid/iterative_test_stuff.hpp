@@ -12,11 +12,11 @@
 
 int expected_result(std::string& tag_id, size_t ind);
 
-struct TestWaitForNbrsStopPolicy
+struct TestWaitForNbrsIterationPolicy
 {
     using ValueType = double;
 
-    TestWaitForNbrsStopPolicy(double coef, double stop_val, size_t machine_ind)
+    TestWaitForNbrsIterationPolicy(double coef, double stop_val, size_t machine_ind)
         : coef_(coef), stop_val_(stop_val), machine_ind_(machine_ind)
     {}
 
@@ -35,7 +35,7 @@ struct TestWaitForNbrsStopPolicy
         // if my value is less than the neighbor min, set my val to be min
         double curr_val = get_curr_val();
         std::cout << "Machine " << machine_ind_
-                  << " in TestWaitForNbrsStopPolicy::process_update: (min "
+                  << " in TestWaitForNbrsIterationPolicy::process_update: (min "
                      "nbrval, currval) = ("
                   << min_val_ << ", " << curr_val << ")" << std::endl;
         if (curr_val < min_val_)
@@ -53,10 +53,10 @@ struct TestWaitForNbrsStopPolicy
     bool operator()(const CallerT&)
     {
         std::cout << "Machine " << machine_ind_
-                  << " in TestWaitForNbrsStopPolicy::operator(): (min_val, "
+                  << " in TestWaitForNbrsIterationPolicy::operator(): (min_val, "
                      "stop_val) = ("
                   << min_val_ << ", " << stop_val_ << ")" << std::endl;
-        return min_val_ > stop_val_;
+        return min_val_ <= stop_val_;
     }
 
 private:
@@ -67,7 +67,7 @@ private:
     size_t curr_iter_ = 0;
     double min_val_ = 999999.0;
     size_t machine_ind_;
-}; // struct TestWaitForNbrsStopPolicy
+}; // struct TestWaitForNbrsIterationPolicy
 
 class TestAsyncProcessor
 {
@@ -124,7 +124,7 @@ private:
     size_t num_machines_;
 
     friend class TestAsyncPublishPolicy;
-    friend class TestAsyncStopPolicy;
+    friend class TestAsyncIterationPolicy;
 }; // class TestAsyncProcessor
 
 #endif // ITERATIVE_TEST_STUFF_HPP

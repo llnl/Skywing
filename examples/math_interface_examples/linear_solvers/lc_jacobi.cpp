@@ -15,7 +15,7 @@
 #include "skywing_core/manager.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/publish_policies.hpp"
 
 using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
@@ -45,7 +45,7 @@ int main(const int argc, const char* const argv[])
 
     using MyJacobiProcessor = JacobiProcessor<uint32_t, double>;
     // Set the processor, stop, publish, and resilience policies
-    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, StopAfterTime, TrivialResiliencePolicy>;
+    using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, IterateUntilTime, TrivialResiliencePolicy>;
 
     std::string partitionfile ="data/partition.txt";
     std::string rhsfile =  "data/rhs.txt";

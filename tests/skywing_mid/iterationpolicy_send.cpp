@@ -5,7 +5,7 @@
 
 #include "iterative_test_stuff.hpp"
 #include "skywing_core/enable_logging.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/synchronous_iterative.hpp"
 #include <catch2/catch_test_macros.hpp>
 
@@ -50,13 +50,13 @@ void machine_task(const NetworkInfo* const info, const int index)
         ///////////////////////////////
         size_t NUM_ITERS = 20;
         using IterMethod = SynchronousIterative<TestAsyncProcessor,
-                                                TestWaitForNbrsStopPolicy,
+                                                TestWaitForNbrsIterationPolicy,
                                                 TrivialResiliencePolicy>;
         IterMethod iter_method =
             WaiterBuilder<IterMethod>(
                 manager, job_handle, tag_ids[index], tag_ids)
                 .set_processor(index, num_machines)
-                .set_stop_policy(static_cast<double>(index + 1),
+                .set_iteration_policy(static_cast<double>(index + 1),
                                  static_cast<double>(NUM_ITERS),
                                  index)
                 .set_resilience_policy()
@@ -75,7 +75,7 @@ void machine_task(const NetworkInfo* const info, const int index)
 }
 } // namespace
 
-TEST_CASE("StopPolicy Send", "[mid]")
+TEST_CASE("IterationPolicy Send", "[mid]")
 {
     const auto network_info = make_network(num_machines, num_connections);
     std::vector<std::thread> threads;

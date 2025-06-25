@@ -13,7 +13,7 @@
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/quacc_processor.hpp"
-#include "skywing_mid/stop_policies.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 
 using namespace skywing;
 
@@ -93,14 +93,14 @@ void machine_task(int machine_number,
 
             using IterMethod = AsynchronousIterative<QUACCProcessor<>,
                                                      AlwaysPublish,
-                                                     StopAfterTime,
+                                                     IterateUntilTime,
                                                      TrivialResiliencePolicy>;
             IterMethod iter_method =
                 WaiterBuilder<IterMethod>(
                     manager_handle, job, pubTagID, tagIDs_for_sub)
                     .set_processor(number_of_neighbors)
                     .set_publish_policy()
-                    .set_stop_policy(std::chrono::seconds(15))
+                    .set_iteration_policy(std::chrono::seconds(15))
                     .set_resilience_policy()
                     .build_waiter()
                     .get();
