@@ -39,6 +39,7 @@ Manager::Manager(const std::uint16_t port,
     if (server_socket_.set_to_listen(port)
         != internal::ConnectionError::no_error)
     {
+        std::cerr << "Machine " << id << " failed to connect to listening port. Exiting...\n";
         std::exit(1);
     }
 }
