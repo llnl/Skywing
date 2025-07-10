@@ -81,7 +81,6 @@ FetchContent_Declare(
   SYSTEM
   GIT_REPOSITORY https://github.com/gabime/spdlog.git
   GIT_TAG 27cb4c76708608465c413f6d0e6b8d99a4d84302 # v1.14.1
-  GIT_SHALLOW 1
   FIND_PACKAGE_ARGS 1.0 CONFIG
 )
 
@@ -90,7 +89,6 @@ FetchContent_Declare(
   SYSTEM
   GIT_REPOSITORY https://github.com/capnproto/capnproto
   GIT_TAG b34ec28cceaf15b1082b74b50f03f770873c3636 # v1.1.0
-  GIT_SHALLOW 1
   FIND_PACKAGE_ARGS 1.0 CONFIG
 )
 
@@ -121,7 +119,6 @@ if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
     SYSTEM
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen
     GIT_TAG 68f4e58cfacc686583d16cff90361f0b43bc2c1b # '3.4' branch on 04/21/2025
-    GIT_SHALLOW 1
     FIND_PACKAGE_ARGS 3.0 CONFIG
   )
   FetchContent_MakeAvailable(Eigen3)
