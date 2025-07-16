@@ -4,6 +4,7 @@ target_sources(skywing_mid
   FILE_SET mid_api
   TYPE HEADERS
   FILES
+  admm_processor.hpp
   associative_vector.hpp
   asynchronous_iterative.hpp
   big_float.hpp

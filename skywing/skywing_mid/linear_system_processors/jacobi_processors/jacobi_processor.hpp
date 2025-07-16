@@ -5,7 +5,6 @@
 
 #include "skywing_mid/associative_vector.hpp"
 
-
 namespace skywing
 {
 /**
@@ -32,7 +31,6 @@ public:
         : matrix_(matrix),
           matrix_keys_(matrix.get_keys()),
           x_(matrix.get_keys()),
-          x_keys_(matrix.get_keys()),
           local_x_(matrix.get_keys()), // defaults to 0, x_0 = 0
           c_(rhs)
     {}
@@ -45,34 +43,36 @@ public:
     {
         std::string my_id = iter_method.my_tag().id();
         // Neighbor updates
-         for (const auto& pTag : nbr_data_handler.recvd_data_tags() ) {
+        for (const auto& pTag : nbr_data_handler.recvd_data_tags()) {
             if (pTag == iter_method.my_tag())
                 continue;
             const ValueType& nbr_data = nbr_data_handler.get_data(pTag);
             std::vector<index_t> updated_keys = nbr_data.get_keys();
             for (index_t key : updated_keys) {
                 x_[key] = nbr_data.at(key);
-                x_keys_.push_back(key);
             }
         }
         // Local updates
         std::vector<index_t> matrix_keys_copy = matrix_keys_;
         ClosedVector dx = (std::move(matrix_keys_copy));
         for (const index_t& key : matrix_keys_) {
-            ClosedVector row = matrix_.at(key); 
+            ClosedVector row = matrix_.at(key);
             // dxi = xi^{k+1} - xi^k as dxi = Mij*xj^k + ci - xi^k
             dx[key] = row.dot(x_) + c_.at(key) - x_.at(key);
         }
         // Compute xi^{k+1} = xi^k + dx
-        local_x_ += dx; 
-        x_ += dx;      
+        local_x_ += dx;
+        x_ += dx;
     }
 
     ValueType prepare_for_publication(ValueType) { return local_x_; }
 
     ValueType get_value() const { return local_x_; }
 
-    static void setup(const AssociativeMatrix& A,const ClosedVector& b, AssociativeMatrix& M, ClosedVector& c)
+    static void setup(const AssociativeMatrix& A,
+                      const ClosedVector& b,
+                      AssociativeMatrix& M,
+                      ClosedVector& c)
     {
         for (const auto& key : A.get_keys()) {
             M[key] = -A.at(key) / A.at(key).at(key); // this is vector / scalar
@@ -82,11 +82,10 @@ public:
     }
 
 private:
-    const AssociativeMatrix matrix_; 
+    const AssociativeMatrix matrix_;
     const std::vector<index_t> matrix_keys_;
 
     OpenVector x_; // keys slowly added, starts just with the local keys
-    std::vector<index_t> x_keys_;
 
     ClosedVector local_x_; // a copy of x_ for only matrix_keys_
     ClosedVector c_;

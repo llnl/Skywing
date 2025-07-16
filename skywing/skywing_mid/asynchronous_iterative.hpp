@@ -127,7 +127,7 @@ public:
                 //        processor_.process_update(get_processor_data_handler(),
                 //        *this);
                 process_all_updates_();
-
+                ++iteration_count_;
                 ValueType new_vals = gather_data_for_publication_();
                 if (publish_policy_(std::get<0>(new_vals),
                                     std::get<0>(publish_values_)))
