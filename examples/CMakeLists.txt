@@ -11,10 +11,10 @@ add_subdirectory(sync_jacobi)
 if (SKYWING_BUILD_LC_EXAMPLES)
   add_subdirectory(lc_hello_world)
   add_subdirectory(lc_push_sum)
-
 endif ()
 
 if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
+  add_subdirectory(admm)
   add_subdirectory(barbell_jacobi)
   add_subdirectory(cola_driver)
   add_subdirectory(math_interface_examples)

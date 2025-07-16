@@ -87,7 +87,7 @@ configuration. For example, using the CMake CLI:
 
 `cmake -DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON`
 
-If the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag is set to `ON`, Eigen will be rquired as a dependency and the `math_interface_examples` directory will be built.
+If the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag is set to `ON`, Eigen will be required as a dependency and the `math_interface_examples` directory will be built.
 
 ## Guidance for building on LC
 
