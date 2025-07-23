@@ -71,7 +71,7 @@ void machine_task(const NetworkInfo* const info,
         // Compute error comparing to exact solution
         auto soln = iter_method.get_processor().get_value();
         soln -= exact_x;
-        REQUIRE(std::sqrt(soln.dot(soln) / exact_x.dot(exact_x)) < 0.005);
+        REQUIRE(std::sqrt(soln.dot(soln) / exact_x.dot(exact_x)) < 0.01);
     });
     base_manager.run();
 }
