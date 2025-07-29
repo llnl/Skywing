@@ -48,6 +48,12 @@ struct Greeting {
   port      @2 : UInt16;
 }
 
+struct Reconnect {
+  from      @0 : Text;
+  neighbors @1 : List(Text);
+  port      @2 : UInt16;
+}
+
 struct NewNeighbor {
   neighborID @0 : Text;
 }
@@ -87,5 +93,6 @@ struct StatusMessage {
     getPublishers             @6  : GetPublishers;
     publishData               @7 : PublishData;
     subscriptionNotice        @8 : SubscriptionNotice;
+    reconnect                 @9 : Reconnect;
   }
 }

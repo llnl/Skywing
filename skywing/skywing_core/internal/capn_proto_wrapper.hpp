@@ -54,6 +54,22 @@ private:
     explicit Greeting(cpnpro::Greeting::Reader reader) noexcept;
 };
 
+/** \brief Class representing a reconnect message
+ */
+class Reconnect
+{
+public:
+    MachineID from() const noexcept;
+    std::vector<MachineID> neighbors() const noexcept;
+    std::uint16_t port() const noexcept;
+
+private:
+    cpnpro::Reconnect::Reader r;
+
+    friend class MessageDeserializer;
+    explicit Reconnect(cpnpro::Reconnect::Reader reader) noexcept;
+};
+
 /** \brief Class representing a goodbye message
  */
 class Goodbye
@@ -182,6 +198,7 @@ private:
                                         Goodbye,
                                         NewNeighbor,
                                         RemoveNeighbor,
+                                        Reconnect,
                                         Heartbeat,
                                         ReportPublishers,
                                         GetPublishers,

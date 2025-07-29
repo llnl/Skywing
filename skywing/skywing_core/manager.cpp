@@ -890,6 +890,17 @@ void Manager::init_connections_for_pending_tags() noexcept
                 }
             }
             else {
+                const auto [addrstr, port] = internal::split_address(addr);
+
+                if (reconnecting_addrs_.count(AddrPortPair{addrstr, port})) {
+                    SKYWING_TRACE_LOG("\"{}\" is skipping new subscription to "
+                                      "{}:{} because reconnect is in progress",
+                                      id_,
+                                      addrstr,
+                                      port);
+                    ++tag_iter;
+                    continue;
+                }
                 SKYWING_TRACE_LOG(
                     "\"{}\" will try to connect to {} \"{}\"", id_, addr, tag);
                 auto [conn_iter, inserted] = to_conn.try_emplace(addr, tag);
@@ -917,6 +928,23 @@ void Manager::init_connections_for_pending_tags() noexcept
         internal::SocketCommunicator conn{};
         SKYWING_DEBUG_LOG(
             "\"{}\" about to connect to \"{}\" for tag \"{}\"", id_, addr, tag);
+
+        auto [addrstr, port] = internal::split_address(addr);
+        AddrPortPair key{addrstr, port};
+        // Check if a reconnect connection is already pending for this
+        // address/port
+        auto pending_iter = pending_conns_.find(key);
+        if (pending_iter != pending_conns_.end()
+            && pending_iter->second.type == ConnType::reconnect)
+        {
+            SKYWING_DEBUG_LOG("\"{}\" skipping subscription connect to {}:{} "
+                              "due to reconnect in progress",
+                              id_,
+                              addrstr,
+                              port);
+            continue; // Skip this connection, reconnect will handle it
+        }
+
         const auto err = conn.connect_non_blocking(addr);
         if (err == internal::ConnectionError::connection_in_progress
             || err == internal::ConnectionError::no_error)
@@ -978,6 +1006,7 @@ const char* Manager::to_c_str(ConnType type) noexcept
     case ConnType::by_accept: return "by_accept";
     case ConnType::subscription: return "subscription";
     case ConnType::specific_ip: return "specific_ip";
+    case ConnType::reconnect: return "reconnect";
     }
     // This should never be reached
     assert(false);
@@ -1019,7 +1048,7 @@ void Manager::process_pending_conns() noexcept
         case ConnType::specific_ip:
             // nothing special needs to happen
             break;
-
+        case ConnType::reconnect: break;
         case ConnType::subscription:
         {
             const auto tags = internal::split(info.tag, '\0');
@@ -1041,14 +1070,10 @@ void Manager::process_pending_conns() noexcept
 
             case internal::ConnectionError::no_error:
             {
-                SKYWING_TRACE_LOG(
-                    "\"{}\" sending greeting from {} to {} for tag \"{}\"",
-                    id_,
-                    info.conn.host_ip_address_and_port(),
-                    info.conn.ip_address_and_port(),
-                    info.tag);
-                // Send message and mark as waiting
-                const auto message = make_handshake();
+                std::vector<std::byte> message =
+                    (info.type == ConnType::reconnect) ? make_reconnect()
+                                                       : make_handshake();
+
                 if (info.conn.send_message(message.data(), message.size())
                     != internal::ConnectionError::no_error)
                 {
@@ -1056,6 +1081,22 @@ void Manager::process_pending_conns() noexcept
                     iter = pending_conns_.erase(iter);
                     continue;
                 }
+
+                if (info.type == ConnType::reconnect) {
+                    SKYWING_TRACE_LOG("\"{}\" sent reconnect from {} to {}",
+                                      id_,
+                                      info.conn.host_ip_address_and_port(),
+                                      info.conn.ip_address_and_port());
+                }
+                else {
+                    SKYWING_TRACE_LOG(
+                        "\"{}\" sent greeting from {} to {} for tag \"{}\"",
+                        id_,
+                        info.conn.host_ip_address_and_port(),
+                        info.conn.ip_address_and_port(),
+                        info.tag);
+                }
+
                 info.status = ConnStatus::waiting_for_resp;
             } break;
 
@@ -1068,7 +1109,7 @@ void Manager::process_pending_conns() noexcept
                                      iter->first,
                                      to_c_str(info.type),
                                      info.tag);
-                else
+                else {
                     SKYWING_WARN_LOG(
                         "\"{}\" errored trying to connect to {}, type {}",
                         id_,
@@ -1080,7 +1121,8 @@ void Manager::process_pending_conns() noexcept
                 iter = pending_conns_.erase(iter);
                 okay = false;
                 break;
-            }
+                }
+        }
         }
         else if (info.status == ConnStatus::waiting_for_resp) {
             // TODO: Add timeout here?
@@ -1144,6 +1186,41 @@ void Manager::process_pending_conns() noexcept
                                         neighbor_iter->first);
                                     return true;
                                 },
+                                [&](const internal::Reconnect& reconnect) {
+                                    // New reconnect handler
+                                    auto [neighbor_iter, inserted] =
+                                        neighbors_.try_emplace(
+                                            reconnect.from(),
+                                            std::move(info.conn),
+                                            reconnect.from(),
+                                            reconnect.neighbors(),
+                                            *this,
+                                            reconnect.port());
+
+                                    new_neighbor_iter = neighbor_iter;
+                                    if (!inserted) {
+                                        SKYWING_TRACE_LOG(
+                                            "\"{}\" already has a connection "
+                                            "from "
+                                            "\"{}\" so will simply add to "
+                                            "communicators.",
+                                            id_,
+                                            neighbor_iter->first);
+                                        new_neighbor_iter->second
+                                            .add_communicator(
+                                                std::move(info.conn));
+                                        return true;
+                                    }
+                                    addr_to_machine_.try_emplace(
+                                        new_neighbor_iter->second
+                                            .address_pair(),
+                                        &neighbor_iter->second);
+                                    SKYWING_TRACE_LOG(
+                                        "\"{}\" received reconnect from \"{}\"",
+                                        id_,
+                                        neighbor_iter->first);
+                                    return true;
+                                },
                                 [&](...) {
                                     SKYWING_WARN_LOG(
                                         "\"{}\" received unexpected message "
@@ -1163,6 +1240,7 @@ void Manager::process_pending_conns() noexcept
                             switch (info.type) {
                             case ConnType::by_accept:
                             case ConnType::user_requested: break;
+                            case ConnType::reconnect: break;
 
                             case ConnType::subscription:
                                 finalize_subscription(
@@ -1239,6 +1317,11 @@ void Manager::process_pending_conns() noexcept
 std::vector<std::byte> Manager::make_handshake() const noexcept
 {
     return internal::make_greeting(id_, make_neighbor_vector(), port_);
+}
+
+std::vector<std::byte> Manager::make_reconnect() const noexcept
+{
+    return internal::make_reconnect(id_, make_neighbor_vector(), port_);
 }
 
 bool Manager::subscription_tags_are_produced(
@@ -1362,20 +1445,88 @@ bool Manager::request_disconnect(const MachineID& neighbor_agent_id) noexcept
         return true;
     }
     bool new_tags = false;
+    reconnect_cache[neighbor_agent_id] = it->second.address_pair();
     cleanup_neighbor_state(it->first, it->second, new_tags);
 
     // SocketCommunicator destructor called here to close neighbor socket.
     neighbors_.erase(neighbor_agent_id);
 
-    if (new_tags) {
-        SKYWING_TRACE_LOG("\"{}\" finding publishers for new tag after "
-                          "disconnect of neighbor \"{}\"",
-                          id_,
-                          neighbor_agent_id);
-        find_publishers_for_pending_tags(true);
+    return true;
+}
+
+bool Manager::request_reconnect(const MachineID& neighbor_agent_id) noexcept
+{
+    if (!reconnect_cache.contains(neighbor_agent_id)) {
+        SKYWING_WARN_LOG("Neighbor ID {} not found in \"{}\"'s reconnect map; "
+                         "not reconnecting.",
+                         neighbor_agent_id,
+                         id_);
+        return false;
     }
 
+    const auto& [server_address, server_port] =
+        reconnect_cache.at(neighbor_agent_id);
+    AddrPortPair reconnect_addr{server_address, server_port};
+
+    reconnecting_addrs_.insert(AddrPortPair{server_address, server_port});
+    SKYWING_DEBUG_LOG(
+        "\"{}\" added reconnect address {}:{} to reconnecting_addrs_",
+        id_,
+        server_address,
+        server_port);
+
+    internal::SocketCommunicator new_conn;
+    auto err =
+        new_conn.connect_non_blocking(server_address.c_str(), server_port);
+    if (err != internal::ConnectionError::no_error
+        && err != internal::ConnectionError::connection_in_progress)
+    {
+        SKYWING_DEBUG_LOG("Reconnect failed immediately with error {}",
+                          static_cast<int>(err));
+        reconnecting_addrs_.erase(reconnect_addr);
+        return false;
+    }
+
+    PendingInfo info{
+        std::move(new_conn), ConnStatus::waiting_for_conn, ConnType::reconnect};
+
+    auto [iter, inserted] = pending_conns_.try_emplace(
+        AddrPortPair{server_address, server_port}, std::move(info));
+    if (!inserted) {
+        SKYWING_WARN_LOG(
+            "Failed to insert reconnect pending connection id {} for {}:{}",
+            info.id,
+            server_address,
+            server_port);
+        reconnecting_addrs_.erase(reconnect_addr);
+        return false;
+    }
+
+    SKYWING_DEBUG_LOG(
+        "Reconnect initiated with pending id {} and stored for {}:{}",
+        iter->second.id,
+        server_address,
+        server_port);
     return true;
+}
+
+bool Manager::request_reconnect_with_retry(const MachineID& neighbor_agent_id,
+                                           int max_retries) noexcept
+{
+    for (int attempt = 0; attempt < max_retries; ++attempt) {
+        if (request_reconnect(neighbor_agent_id)) {
+            SKYWING_DEBUG_LOG("Reconnect succeeded on attempt {}", attempt + 1);
+            return true;
+        }
+        SKYWING_WARN_LOG("Reconnect attempt {} failed for {}",
+                         attempt + 1,
+                         neighbor_agent_id);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    SKYWING_ERROR_LOG("All reconnect attempts failed for {}",
+                      neighbor_agent_id);
+    return false;
 }
 
 } // namespace skywing

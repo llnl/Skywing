@@ -106,6 +106,21 @@ std::vector<std::byte> make_greeting(const MachineID& from,
     return finalize_message(builder);
 }
 
+std::vector<std::byte> make_reconnect(const MachineID& from,
+                                      const std::vector<MachineID>& neighbors,
+                                      std::uint16_t port) noexcept
+{
+    capnp::MallocMessageBuilder builder;
+
+    auto message = builder.initRoot<cpnpro::StatusMessage>().initReconnect();
+
+    message.setFrom(from);
+    set_vector(&decltype(message)::initNeighbors, message, neighbors);
+    message.setPort(port);
+
+    return finalize_message(builder);
+}
+
 std::vector<std::byte> make_goodbye() noexcept
 {
     capnp::MallocMessageBuilder builder;

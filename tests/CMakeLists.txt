@@ -47,6 +47,7 @@ set(TEST_SRCS
   skywing_core/subscription.cpp
   skywing_core/buffers.cpp
   skywing_core/agent_disconnect.cpp
+  skywing_core/agent_reconnect.cpp
 
   skywing_mid/associative_vector.cpp
   skywing_mid/idempotent_processor_test.cpp
