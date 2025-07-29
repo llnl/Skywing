@@ -22,6 +22,12 @@ std::vector<std::byte> make_greeting(const MachineID& from,
                                      const std::vector<MachineID>& neighbors,
                                      std::uint16_t port) noexcept;
 
+/** \brief Create data for a reconnect
+ */
+std::vector<std::byte> make_reconnect(const MachineID& from,
+                                      const std::vector<MachineID>& neighbors,
+                                      std::uint16_t port) noexcept;
+
 /** \brief Create data for a goodbyte
  */
 std::vector<std::byte> make_goodbye() noexcept;

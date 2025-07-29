@@ -129,6 +129,26 @@ Greeting::Greeting(cpnpro::Greeting::Reader reader) noexcept
 {}
 
 /////////////////////////////////////////////////////
+// Reconnect
+/////////////////////////////////////////////////////
+
+MachineID Reconnect::from() const noexcept
+{
+    return r.getFrom();
+}
+std::vector<MachineID> Reconnect::neighbors() const noexcept
+{
+    return detail::list_to_vector<MachineID>(r.getNeighbors());
+}
+std::uint16_t Reconnect::port() const noexcept
+{
+    return r.getPort();
+}
+Reconnect::Reconnect(cpnpro::Reconnect::Reader reader) noexcept
+    : r{std::move(reader)}
+{}
+
+/////////////////////////////////////////////////////
 // NewNeighbor
 /////////////////////////////////////////////////////
 
@@ -264,6 +284,7 @@ auto MessageDeserializer::extract_message() const noexcept
         case vals::GOODBYE: return Goodbye{/* impl_->root.getGoodbye() */};
         case vals::NEW_NEIGHBOR:
             return NewNeighbor{impl_->root.getNewNeighbor()};
+        case vals::RECONNECT: return Reconnect{impl_->root.getReconnect()};
         case vals::REMOVE_NEIGHBOR:
             return RemoveNeighbor{impl_->root.getRemoveNeighbor()};
         case vals::HEARTBEAT:

@@ -138,10 +138,20 @@ ConnectionError
 SocketCommunicator::set_to_listen(const std::uint16_t port) noexcept
 {
     constexpr int listen_queue_size = 10;
-    sockaddr_in servaddr;
+    sockaddr_in servaddr{};
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = INADDR_ANY;
     servaddr.sin_port = htons(port);
+
+    int optval = 1;
+    if (setsockopt(handle_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
+        < 0)
+    {
+        SKYWING_DEBUG_LOG("setsockopt(SO_REUSEADDR) failed: {}",
+                          strerror(errno));
+        return ConnectionError::unrecoverable;
+    }
+
     if (bind(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr))
         < 0)
     {

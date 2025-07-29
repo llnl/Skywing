@@ -265,6 +265,11 @@ public:
 
     bool request_disconnect(const MachineID& neighbor_agent_id) noexcept;
 
+    bool request_reconnect(const MachineID& neighbor_agent_id) noexcept;
+
+    bool request_reconnect_with_retry(const MachineID& neighbor_id,
+                                      int max_retries = 3) noexcept;
+
     /** \brief Returns a vector of all the neighboring ID's
      */
     std::vector<MachineID> make_neighbor_vector() const noexcept;
@@ -366,6 +371,10 @@ private:
      */
     std::vector<std::byte> make_handshake() const noexcept;
 
+    /** \brief Creates the message for reconnecting two agents.
+     */
+    std::vector<std::byte> make_reconnect() const noexcept;
+
     /** \brief Finalizes a subscription connection.
      *
      * \param tags '\0' seperated list of tags
@@ -440,6 +449,9 @@ private:
     // This is also used for testing that a connection has completed
     std::unordered_map<AddrPortPair, internal::NeighborAgent*> addr_to_machine_;
 
+    // Cache ip and port for disconnected agents for reconnection later
+    std::unordered_map<MachineID, AddrPortPair> reconnect_cache;
+
     // Mapping from a tag to the ID used for the subscription to the tag
     // Used to know when a subscription is done and for if multiple jobs
     // subscribe to the same tag
@@ -461,16 +473,35 @@ private:
         user_requested,
         by_accept,
         subscription,
+        reconnect,
         specific_ip
     };
     static const char* to_c_str(ConnType type) noexcept;
     // Pending connections for all types
     struct PendingInfo
     {
+        inline static std::atomic<std::uint64_t> next_id{0};
+        std::uint64_t id;
         internal::SocketCommunicator conn;
         ConnStatus status;
         ConnType type;
-        std::string tag;
+        std::string tag{};
+
+        PendingInfo(internal::SocketCommunicator&& c,
+                    ConnStatus s,
+                    ConnType t,
+                    std::string tag = {})
+            : id(next_id.fetch_add(1, std::memory_order_relaxed)),
+              conn(std::move(c)),
+              status(s),
+              type(t),
+              tag(std::move(tag))
+        {}
+
+        PendingInfo(const PendingInfo&) = delete;
+        PendingInfo& operator=(const PendingInfo&) = delete;
+        PendingInfo(PendingInfo&&) = default;
+        PendingInfo& operator=(PendingInfo&&) = default;
     };
     std::unordered_map<AddrPortPair, PendingInfo> pending_conns_;
 
@@ -493,6 +524,8 @@ private:
     mutable std::chrono::seconds initial_neighbor_connection_timeout_;
 
     std::unique_ptr<internal::MessageHandler> message_handler_;
+
+    std::unordered_set<AddrPortPair> reconnecting_addrs_;
 
 }; // class Manager
 
@@ -521,6 +554,18 @@ public:
     bool request_disconnect(const MachineID& neighbor_agent_id) noexcept
     {
         return handle_->request_disconnect(neighbor_agent_id);
+    }
+
+    bool request_reconnect(const MachineID& neighbor_agent_id) noexcept
+    {
+        return handle_->request_reconnect(neighbor_agent_id);
+    }
+
+    bool request_reconnect_with_retry(const MachineID& neighbor_agent_id,
+                                      int max_retries = 3) noexcept
+    {
+        return handle_->request_reconnect_with_retry(neighbor_agent_id,
+                                                     max_retries);
     }
 
     /** \brief Returns the id of the manager
