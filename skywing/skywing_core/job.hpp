@@ -118,6 +118,39 @@ public:
             });
     }
 
+      /** \brief Retrieves the specified version for the tag, or latest if no
+     * version is specified
+     *
+     * \return A void waiter
+     * \pre The tag is subscribed to.
+     * \pre The value to wait to recieve.
+     */
+    template <typename... Ts>
+    Waiter<void> get_target_val_waiter(const Tag<Ts...>& tag, ValueOrTuple<Ts...> target_val)
+    {
+        using ValueType = ValueOrTuple<Ts...>;
+        auto [subscriptions, lock] = subs_.get();
+        (void) lock;
+        const auto tag_iter = subscriptions.find(tag.id());
+        assert(tag_iter != subscriptions.cend());
+        auto& subscription = tag_iter->second;
+        return make_waiter(
+            subs_.mutex(),
+            data_buffer_modified_cv_,
+            [&subscription, target_val]() {
+                if (subscription.has_data()){
+                    ValueType value;
+                    std::any any_value = value;
+                    subscription.get_data(any_value);
+                    ValueOrTuple<Ts...> out_val = internal::detail::cast_to_value_or_tuple<Ts...>(any_value);
+                    // std::cout << "Recieved value " << out_val << " from" << tag_conn_id << std::endl;
+                    // std::cout << "Target value " << target_val << std::endl;
+                    return (out_val == target_val);      
+                }
+                return false;
+                });
+    }
+
     /** \brief Get a value from a subscription, if there is data to get.
 
         \return std::optional<Ts...> An optional that, if there is data,

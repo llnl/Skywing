@@ -1,12 +1,11 @@
 
-#include <iostream>
-#include <fstream>
-#include "skywing_math_interface/io/io.hpp"
-
-
 #ifndef SKYWING_MATH_TEST_EXAMPLE
 #define SKYWING_MATH_TEST_EXAMPLE
 
+
+#include <iostream>
+#include <fstream>
+#include "skywing_math_interface/io/io.hpp"
 
 
 using namespace skywing;
@@ -22,20 +21,20 @@ using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
 std::string partitionfile; 
 std::string rhsfile; 
 std::string matrixfile; 
-void set_dataDir(){
+
+inline void set_dataDir(){
     #ifdef DATA_DIR_DEST
         std::cout << "Data directory: " << DATA_DIR_DEST << std::endl;
     #else
         std::cerr << "DATA_DIR_DEST is not defined!" << std::endl;
     #endif
 
-
     partitionfile = std::string(DATA_DIR_DEST) +"/partition.txt";
     rhsfile =  std::string(DATA_DIR_DEST) + "/rhs.txt";
     matrixfile = std::string(DATA_DIR_DEST) + "/matrix.txt";
 }
 
-void printUnorderedMap(const std::unordered_map<uint32_t, std::vector<uint32_t>>& map) {
+inline void printUnorderedMap(const std::unordered_map<uint32_t, std::vector<uint32_t>>& map) {
     for (const auto& pair : map) {
         uint32_t key = pair.first;
         const std::vector<uint32_t>& values = pair.second;
@@ -51,20 +50,20 @@ void printUnorderedMap(const std::unordered_map<uint32_t, std::vector<uint32_t>>
     }
 }
 
-std::unordered_map<uint32_t, std::vector<uint32_t>> read_partition_from_file(){
+inline std::unordered_map<uint32_t, std::vector<uint32_t>> read_partition_from_file(){
     std::unordered_map<uint32_t, std::vector<unsigned>> partition = readPartition(partitionfile);
     // printUnorderedMap(partition);
     return partition;
 }
 
 // These functions are used for testing before i/o functionality is added
-AssociativeMatrix read_matrix_from_file(std::vector<unsigned> rowList)
+inline AssociativeMatrix read_matrix_from_file(std::vector<unsigned> rowList)
 {
     Eigen::MatrixXd A = readMatrix<Eigen::MatrixXd>(matrixfile);
     return convert_eigen_matrix_to_associative_matrix(A,rowList);
 }
 
-ClosedVector read_rhs_from_file(std::vector<unsigned> rowList)
+inline ClosedVector read_rhs_from_file(std::vector<unsigned> rowList)
 {
     // std::cout<<"loading vector"<<std::endl; 
     Eigen::VectorXd b = readVector(rhsfile);
@@ -75,7 +74,5 @@ ClosedVector read_rhs_from_file(std::vector<unsigned> rowList)
     return  b_av;
 
 }
-
-
 
 #endif // SKYWING_MATH_TEST_EXAMPLE

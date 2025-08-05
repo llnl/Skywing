@@ -22,6 +22,9 @@ using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
 using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
 using namespace skywing;
 
+/* This main function is for running on LC. To do so,
+   use the run.py script.
+*/
 int main(const int argc, const char* const argv[])
 
 {
@@ -47,9 +50,9 @@ int main(const int argc, const char* const argv[])
     // Set the processor, stop, publish, and resilience policies
     using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, IterateUntilTime, TrivialResiliencePolicy>;
 
-    std::string partitionfile ="data/partition.txt";
-    std::string rhsfile =  "data/rhs.txt";
-    std::string matrixfile = "data/matrix.txt";
+    std::string partitionfile ="../data/partition.txt";
+    std::string rhsfile =  "../data/rhs.txt";
+    std::string matrixfile = "../data/matrix.txt";
 
     std::unordered_map<uint32_t, std::vector<unsigned>> partition = readPartition(partitionfile);
     std::cout << "Reading in linear system information..." << std::endl;

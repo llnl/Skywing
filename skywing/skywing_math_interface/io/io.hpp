@@ -43,8 +43,7 @@ using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
  *     convert_eigen_matrix_to_associative_matrix(matrix, rowList);
  * // converts [0, 8] to an AssociativeMatrix = {0, {{0, 1}, {1, 8}}}
  */
-AssociativeMatrix
-convert_eigen_matrix_to_associative_matrix(Eigen::MatrixXd matrix,
+inline AssociativeMatrix convert_eigen_matrix_to_associative_matrix(Eigen::MatrixXd matrix,
                                            std::vector<unsigned> rowList = {},
                                            std::vector<unsigned> colList = {},
                                            bool row_major = true)
@@ -120,8 +119,7 @@ convert_eigen_matrix_to_associative_matrix(Eigen::MatrixXd matrix,
  * // vector (with values 9 and 7, respectively) are used to produce the closed
  * // vector
  */
-ClosedVector
-convert_eigen_vector_to_associative_vector(Eigen::VectorXd vector,
+inline ClosedVector convert_eigen_vector_to_associative_vector(Eigen::VectorXd vector,
                                            std::vector<unsigned> rowList = {})
 {
     if (rowList.size() == 0) {
@@ -162,7 +160,7 @@ convert_eigen_vector_to_associative_vector(Eigen::VectorXd vector,
  * // partition will be {{0, {0, 1, 2, 3}}, {1, {4, 5}}, {2, {6}}}, e.g.,
  * // machine 0 will control rows 0 through 3.
  */
-std::unordered_map<uint32_t, std::vector<unsigned>>
+inline std::unordered_map<uint32_t, std::vector<unsigned>>
 readPartition(const std::string& filename)
 {
     std::ifstream partitionDataFile(filename);
@@ -214,7 +212,7 @@ MatrixType readMatrix(std::string filename,
  * @return The matrix read from the file, converted to Eigen::VectorXd.
  */
 
-Eigen::VectorXd
+inline Eigen::VectorXd
 readVector(std::string filename,
            std::vector<unsigned> rowList = std::vector<unsigned>())
 {
