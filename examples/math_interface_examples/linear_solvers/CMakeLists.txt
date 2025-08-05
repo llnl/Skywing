@@ -1,7 +1,7 @@
-add_executable(lc_jacobi lc_jacobi.cpp)
-target_link_libraries(lc_jacobi skywing_core skywing_math_interface)
-configure_file(run.py run.py @ONLY)
-configure_file(generate_config_info.py generate_config_info.py @ONLY)
 configure_file(data/matrix.txt data/matrix.txt @ONLY)
 configure_file(data/rhs.txt data/rhs.txt @ONLY)
 configure_file(data/partition.txt data/partition.txt @ONLY)
+
+add_subdirectory(jacobi)
+add_subdirectory(lc_jacobi)
+add_subdirectory(synchronizing_jacobi)

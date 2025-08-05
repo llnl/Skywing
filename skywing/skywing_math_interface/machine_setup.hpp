@@ -94,7 +94,7 @@ struct MachineConfig
     {agent2, {agent2, dane81.llnl.gov, [], 30002}}
 
 */
-std::unordered_map<std::string, MachineConfig> read_machine_configurations_from_file(std::string filename)
+inline std::unordered_map<std::string, MachineConfig> read_machine_configurations_from_file(std::string filename)
 {
     std::ifstream fin(filename);
     if (!fin) {
@@ -117,7 +117,7 @@ std::unordered_map<std::string, MachineConfig> read_machine_configurations_from_
   [{dane80.llnl.gov, 30001}]
   Since agent 1 is the only neighbor of agent0, and agent1 has address dane80.llnl.gov and port 30001.
  */
-std::vector<std::tuple<std::string, uint16_t>> create_address_port_pairs_from_machine_configurations(std::unordered_map<std::string, MachineConfig> configurations, std::string agent_name)
+inline std::vector<std::tuple<std::string, uint16_t>> create_address_port_pairs_from_machine_configurations(std::unordered_map<std::string, MachineConfig> configurations, std::string agent_name)
 {
     std::vector<std::tuple<std::string, uint16_t>> neighbor_address_port_pairs;
     std::vector<std::string> neighbor_names = configurations.at(agent_name).serverMachineNames;
@@ -129,6 +129,41 @@ std::vector<std::tuple<std::string, uint16_t>> create_address_port_pairs_from_ma
     }
     return neighbor_address_port_pairs;
 }
+
+
+/* 
+  Given a map of strings to MachineConfigs, returns a vector of all address-port pairs in the collective.
+  For example, given configuration file such as
+    agent0
+    dane79.llnl.gov
+    30000
+    agent1
+    ---
+    agent1
+    dane80.llnl.gov
+    30001
+    agent2
+    ---
+    agent2
+    dane81.llnl.gov
+    30002
+    ---
+    then this would return the vector 
+    {{dane79.llnl.gov, 30000},
+    {dane80.llnl.gov, 30001},
+    {dane81.llnl.gov, 30002}}
+ */
+inline std::vector<std::tuple<std::string, uint16_t>> collect_all_address_port_pairs_from_machine_configurations(std::unordered_map<std::string, MachineConfig> configurations)
+{
+    std::vector<std::tuple<std::string, uint16_t>> all_address_port_pairs;
+    for (const auto& [machine_name,config] : configurations) 
+    {
+        std::tuple address_port_pair = std::make_tuple(config.remoteAddress, config.port);
+        all_address_port_pairs.push_back(address_port_pair);
+    }
+    return all_address_port_pairs;
+}
+
 
 
 

@@ -234,7 +234,7 @@ private:
 * @throws std::logic_error if the dense matrix is not initialized.
 */
 template<>
-Eigen::MatrixXd& Matrix::as<Eigen::MatrixXd>()
+inline Eigen::MatrixXd& Matrix::as<Eigen::MatrixXd>()
 {
   assert(dense);
   return *dense;
@@ -250,7 +250,7 @@ Eigen::MatrixXd& Matrix::as<Eigen::MatrixXd>()
 * @throws std::logic_error if the sparse matrix is not initialized.
 */
 template<>
-Eigen::SparseMatrix<double>& Matrix::as<Eigen::SparseMatrix<double>>()
+inline Eigen::SparseMatrix<double>& Matrix::as<Eigen::SparseMatrix<double>>()
 {
   assert(sparse);
   return *sparse;

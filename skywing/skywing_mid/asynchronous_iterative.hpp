@@ -13,9 +13,9 @@
 #include "skywing_core/job.hpp"
 #include "skywing_core/manager.hpp"
 #include "skywing_mid/internal/iterative_helpers.hpp"
+#include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/iterative_method.hpp"
 #include "skywing_mid/iterative_resilience_policies.hpp"
-#include "skywing_mid/iteration_policies.hpp"
 
 namespace skywing
 {
@@ -118,7 +118,8 @@ public:
     {
         start_time_ = clock_t::now();
         this->submit_values(publish_values_);
-        should_iterate_ = true;
+        // Initialize the iteration policy
+        should_iterate_ = iteration_policy_.init(*this);
         while (should_iterate_) {
             while (should_iterate_) {
                 if (!this->gather_values())

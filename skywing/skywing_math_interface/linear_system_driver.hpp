@@ -159,7 +159,7 @@ public:
         IterMethod linear_system_solver = iter_waiter.get();
 
         linear_system_solver.run(update_fun);
-        
+        iteration_count_ = linear_system_solver.get_iteration_count();
         test_output_ = linear_system_solver.get_processor().get_value();
     }
 
@@ -189,11 +189,8 @@ public:
         {
             linear_system_job(job, manager_handle);
         };
-
-        manager_->submit_job("linear_system_job", linear_system_lambda);
-
-
-
+        // The first argument to submit_job is the job ID
+        manager_->submit_job("linear_system_job" + std::to_string(agent_id_), linear_system_lambda);
         manager_->run();
 
     
@@ -204,6 +201,9 @@ public:
         return test_output_;
     }
 
+    int iteration_count(){
+        return iteration_count_;
+    }
     Manager* get_manager() {
         return manager_.get(); // Use .get() to return the raw pointer
     }   
@@ -216,6 +216,7 @@ private:
     ClosedVector c_;
     std::unordered_map<uint32_t, std::vector<uint32_t>> partition_;
     ClosedVector test_output_;
+    int iteration_count_;
     std::chrono::seconds timeout_duration_;
     std::string output_directory_;
     std::unique_ptr<skywing::Manager> manager_; // Store the Manager instance
