@@ -3,7 +3,7 @@ build Python-based Skywing software.
 
 To install this,
 * (Recommended) Create a Python virtual environment and activate it.
-* From the `python` folder, run `pip install .`
+* From the `Skywing` folder, run `pip install .`
 
 Extra control is possible, e.g.,
 

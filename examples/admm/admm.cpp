@@ -7,8 +7,10 @@
 #include <vector>
 
 #include "skywing_core/skywing.hpp"
-#include "skywing_math_interface/io/io.hpp"
+#include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_mid/admm_processor.hpp"
+#include "skywing_mid/associative_matrix.hpp"
+#include "skywing_mid/associative_vector.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/publish_policies.hpp"
@@ -19,7 +21,7 @@ using namespace skywing;
 using index_t = uint32_t;
 using scalar_t = double;
 using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
-using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
+using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
 
 // Helper functions for the Skywing setup step.
 // Utility function: Generate the machine names
@@ -60,7 +62,7 @@ obtain_tag_ids(std::vector<unsigned> agents_to_subscribe)
 }
 
 void machine_task(size_t machine_number,
-                  AssociativeMatrix A,
+                  ClosedMatrix A,
                   ClosedVector b,
                   ClosedVector exact_x,
                   std::vector<std::uint16_t> ports,
@@ -145,7 +147,7 @@ void setup_and_run_14_bus_problem(size_t machine_number,
         "14_bus_problem_data/communication_pattern.txt";
     // Check length is 4 to correspond to number of agents
     std::unordered_map<uint32_t, std::vector<unsigned>> comm_pattern =
-        readPartition(comm_patternfile);
+        readPartition<index_t>(comm_patternfile);
     if (comm_pattern.size() != 4)
         throw std::runtime_error(
             "Incorrect size of 14-bus communication_pattern");
@@ -163,45 +165,45 @@ void setup_and_run_14_bus_problem(size_t machine_number,
     // Assume each agent has a subset (both portions of rows and cols
     // of the original global matrix A)
     std::unordered_map<uint32_t, std::vector<unsigned>> row_partition =
-        readPartition(row_partitionfile);
+        readPartition<index_t>(row_partitionfile);
     std::unordered_map<uint32_t, std::vector<unsigned>> col_partition =
-        readPartition(col_partitionfile);
+        readPartition<index_t>(col_partitionfile);
     if (row_partition.size() != 4 || col_partition.size() != 4)
         throw std::runtime_error("Incorrect size of 14-bus partition");
 
     std::cout << "Reading in global linear system information..." << std::endl;
-    Eigen::MatrixXd A_eigen = readMatrix<Eigen::MatrixXd>(matrixfile);
-    Eigen::VectorXd b_eigen = readVector(rhsfile);
-    Eigen::VectorXd x_exact_eigen = readVector(exactsolnfile);
+    ClosedMatrix A_global =
+        ReadAssocitiveMatrix<index_t, scalar_t, false>(matrixfile);
+    ClosedMatrix A = ReadAssocitiveMatrix<index_t, scalar_t, false>(
+        matrixfile,
+        row_partition[machine_number],
+        col_partition[machine_number]);
+    ClosedVector b_global =
+        ReadAssocitiveVector<index_t, scalar_t, false>(rhsfile);
+    ClosedVector b = ReadAssocitiveVector<index_t, scalar_t, false>(
+        rhsfile, row_partition[machine_number]);
+    ClosedVector x_exact_global =
+        ReadAssocitiveVector<index_t, scalar_t, false>(exactsolnfile);
+    ClosedVector x_exact = ReadAssocitiveVector<index_t, scalar_t, false>(
+        exactsolnfile, col_partition[machine_number]);
     // Check expected size of linear system components
-    if (A_eigen.rows() != 18 || A_eigen.cols() != 14)
+    if (A_global.size() != 18 || A_global[0].size() != 14)
         throw std::runtime_error("Incorrect size of 14-bus input matrix");
-    if (b_eigen.size() != 18)
+    if (b_global.size() != 18)
         throw std::runtime_error(
             "Incorrect size of 14-bus input right hand size");
-    if (x_exact_eigen.size() != 14)
+    if (x_exact_global.size() != 14)
         throw std::runtime_error(
             "Incorrect size of 14-bus input exact solution size");
 
-    // Convert Eigen data structures to Associative-type structures
-    // RHS's keys should correspond to the secondary (row) keys of the matrix,
-    // that is, the keys within each ClosedVector within the AssociativeMatrix
-    std::cout << "Converting linear system information..." << std::endl;
-    ClosedVector b = convert_eigen_vector_to_associative_vector(
-        b_eigen, row_partition[machine_number]);
-    ClosedVector x_exact = convert_eigen_vector_to_associative_vector(
-        x_exact_eigen, col_partition[machine_number]);
-    // A contains this machine's rows and columns and is stored column-wise
-    // so that the keys correspond to the columns (as well as the solution x)
-    AssociativeMatrix A = convert_eigen_matrix_to_associative_matrix(
-        A_eigen,
-        row_partition[machine_number],
-        col_partition[machine_number],
-        false);
-
     // Call to Skywing job
-    machine_task(
-        machine_number, A, b, x_exact, ports, machine_names, sub_tag_ids);
+    machine_task(machine_number,
+                 A.transpose(),
+                 b,
+                 x_exact,
+                 ports,
+                 machine_names,
+                 sub_tag_ids);
 }
 
 // Helper function to set-up the linear least squares problem
@@ -257,7 +259,7 @@ void setup_and_run_random_signal_problem(size_t machine_number,
         x_map[j] = j + 1;
     }
     // Construct Associative data structures
-    AssociativeMatrix A(A_map);
+    ClosedMatrix A(A_map);
     ClosedVector x(x_map);
     ClosedVector eps(eps_map);
     // Determine b = A * x + eps

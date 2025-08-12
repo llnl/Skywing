@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Define the source directory for Skywing
+SKYWING_SOURCE="@PROJECT_SOURCE_DIR@"
+
+# This script calls sync_jacobi
+
+# Check if a starting port number is provided as an argument
+if [[ $# -lt 1 ]]; then
+  echo "Usage: source $(basename "${BASH_SOURCE[0]}") starting_port_number"
+  return
+fi
+
+# Set the starting port number
+STARTING_PORT=$1
+
+# Function to clean up processes on exit
+trap kill_progs EXIT
+kill_progs() {
+  for (( counter_for_network_elements=0; counter_for_network_elements < size_of_network; counter_for_network_elements++ )); do
+    var="erase${counter_for_network_elements}"
+    kill -9 "${!var}" > /dev/null 2> /dev/null
+  done
+}
+
+# Define the size of the network based on matrix rows
+size_of_barbell_1=4
+size_of_barbell_2=4
+size_of_network=$((size_of_barbell_2 + size_of_barbell_1))
+
+echo "Size of the network: ${size_of_network}"
+
+
+# Define the directory where Skywing agents load their information
+SYSTEM_NAME="system"
+
+# Check if the folder exists and delete it if necessary
+if [ -d "$SYSTEM_NAME" ]; then
+  rm -rf "$SYSTEM_NAME"
+  echo "Folder '$SYSTEM_NAME' existed and has been deleted."
+else
+  echo "Folder '$SYSTEM_NAME' does not exist."
+fi
+
+# Create the folder
+mkdir -p "$SYSTEM_NAME"
+
+# Generate topology using the Python script
+python3 "${SKYWING_SOURCE}/skywing/skywing_math_interface/python_helpers/matrix_gen.py" \
+  graph_laplacian -g barbell --barbell_size "${size_of_barbell_1}" "${size_of_barbell_2}" -o "$SYSTEM_NAME" -b random --adjust_laplacian -r "${size_of_network}"
+
+# Run the Jacobi executable
+"@barbell_jacobi_exe@" 0 "${STARTING_PORT}" "${SYSTEM_NAME}" "${SYSTEM_NAME}" "${size_of_network}"
+sleep 10
+
+# Plot convergence using the Python script
+python3 "${SKYWING_SOURCE}/skywing/skywing_math_interface/python_helpers/plot_convergence.py" \
+  --base_dir "$SYSTEM_NAME" --history_dir "$SYSTEM_NAME" --output_dir plots
+
+# Generate a video of solution progress using the Python script
+python3 "${SKYWING_SOURCE}/skywing/skywing_math_interface/python_helpers/video_solution_progress.py" \
+  --base_dir "$SYSTEM_NAME" --history_dir "$SYSTEM_NAME" --output_dir plots

@@ -41,7 +41,7 @@ def add_plotting_arguments(parser):
       help='Prefix to prepend to output filename, likely ending with a human readable separator')
     plot_output_group.add_argument('--output_suffix', type=str,
       help='Suffix to prepend to output filename (extension/filetype).')
-    
+
 def save_plots(fig_name_pairs: Tuple[plt.Figure, str],  output_folder: Optional[Path] = None, output_prefix: Optional[str] = None):
     """Either show the active plots, or save the passed in figures to (roughly) {output_folder}/{output_prefix}{name}{rcSuffix} for an rcSuffix from configure_matplotlib
 
@@ -103,7 +103,8 @@ def construct_global_iterate_history(partition_file: Path,
   #   node_dict[<timestamp>] = which node the <timestamp> came from
   # using history0.txt, history1.txt, ..., history{N-1}.txt
 
-  # AF Note: This needs to be generalized. Right now its assuming one element per agent! 
+  # WM: todo - do the generalization below...
+  # AF Note: This needs to be generalized. Right now its assuming one element per agent!
 
   partition = read_partition(partition_file)
   N = len(partition)
@@ -137,7 +138,7 @@ def construct_global_iterate_history(partition_file: Path,
 
       if row[0] not in iterate_dict.keys():
         elements = partition[n]
-        iterate_dict[row[0]] = np.zeros(N) 
+        iterate_dict[row[0]] = np.zeros(N)
         iterate_dict[row[0]][elements] = (row[1:])
         node_dict[row[0]] = [n]
       else:
@@ -212,7 +213,7 @@ def load_or_construct_global_iterate_history(partition_file: Path,
     time, iterates = load_timeseries(history_file, partial_data)
   else:
     print(f'Constructing global iterate history and writing to {history_file}...')
-    
+
     time, iterates = construct_global_iterate_history(partition_file,
       history_dir=history_file.parent, partial_data=partial_data)
     save_timeseries(time, iterates, history_file)
@@ -220,14 +221,9 @@ def load_or_construct_global_iterate_history(partition_file: Path,
 
 def compute_global_error(global_iterates: np.ndarray, base_dir: Path) -> np.array:
   '''Compute the global relative error defined as e_n = ||x_n - x||_2 / ||x||_2'''
-  b = np.loadtxt(base_dir / 'rhs.txt')
-  try:
-    A = np.loadtxt(base_dir / 'laplacian.txt')
-    x_exact = np.linalg.solve(A, b)
-  except:
-    import scipy.sparse.linalg as splinalg
-    A = load_sparse_matrix_file(base_dir / 'laplacian.txt')
-    x_exact = splinalg.spsolve(A, b)
+  b = np.loadtxt(base_dir / 'b.txt')
+  A = np.loadtxt(base_dir / 'A.txt')
+  x_exact = np.loadtxt(base_dir / 'x.txt')
   errors = np.asarray([
     np.linalg.norm(x - x_exact) / np.linalg.norm(x_exact)
       for x in global_iterates])
@@ -236,22 +232,18 @@ def compute_global_error(global_iterates: np.ndarray, base_dir: Path) -> np.arra
 def compute_global_solution(global_iterates: np.ndarray, base_dir: Path) -> np.array:
   '''Compute the global relative error defined as e_n = ||x_n - x||_2 / ||x||_2'''
   solutions = np.asarray([
-   x 
+   x
       for x in global_iterates])
   return solutions
 
 def compute_partition_error(global_iterates: np.ndarray, base_dir: Path) -> List[np.array]:
   '''Compute the relative error for each partition, defined as
      e_n = ||(x_i)_n - x_i||_2 / ||x_i||_2'''
-  b = np.loadtxt(base_dir / 'rhs.txt')
-  try:
-    A = np.loadtxt(base_dir / 'laplacian.txt')
-    x_exact = np.linalg.solve(A, b)
-  except:
-    import scipy.sparse.linalg as splinalg
-    A = load_sparse_matrix_file(base_dir / 'laplacian.txt')
-    x_exact = splinalg.spsolve(A, b)
-  partition = read_partition(base_dir / 'partition.txt')
+  b = np.loadtxt(base_dir / 'b.txt')
+  A = np.loadtxt(base_dir / 'A.txt')
+  x_exact = np.loadtxt(base_dir / 'x.txt')
+  # WM: todo - this should be the column partition for COLA? Different algs will have different behavior...
+  partition = read_partition(base_dir / 'row_partition.txt')
   errors = []
   for rows in partition:
     error = np.asarray([

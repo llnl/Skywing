@@ -94,7 +94,8 @@ struct MachineConfig
     {agent2, {agent2, dane81.llnl.gov, [], 30002}}
 
 */
-inline std::unordered_map<std::string, MachineConfig> read_machine_configurations_from_file(std::string filename)
+inline std::unordered_map<std::string, MachineConfig>
+read_machine_configurations_from_file(std::string filename)
 {
     std::ifstream fin(filename);
     if (!fin) {
@@ -117,7 +118,10 @@ inline std::unordered_map<std::string, MachineConfig> read_machine_configuration
   [{dane80.llnl.gov, 30001}]
   Since agent 1 is the only neighbor of agent0, and agent1 has address dane80.llnl.gov and port 30001.
  */
-inline std::vector<std::tuple<std::string, uint16_t>> create_address_port_pairs_from_machine_configurations(std::unordered_map<std::string, MachineConfig> configurations, std::string agent_name)
+inline std::vector<std::tuple<std::string, uint16_t>>
+create_address_port_pairs_from_machine_configurations(
+    std::unordered_map<std::string, MachineConfig> configurations,
+    std::string agent_name)
 {
     std::vector<std::tuple<std::string, uint16_t>> neighbor_address_port_pairs;
     std::vector<std::string> neighbor_names = configurations.at(agent_name).serverMachineNames;
@@ -129,7 +133,6 @@ inline std::vector<std::tuple<std::string, uint16_t>> create_address_port_pairs_
     }
     return neighbor_address_port_pairs;
 }
-
 
 /* 
   Given a map of strings to MachineConfigs, returns a vector of all address-port pairs in the collective.

@@ -1,10 +1,12 @@
+#include "utils.hpp"
+
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <filesystem>
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -12,25 +14,26 @@
 #include "utils.hpp"
 
 #include "skywing_core/enable_logging.hpp"
-#include <catch2/catch_test_macros.hpp>
-
+#include "skywing_core/manager.hpp"
 #include "skywing_core/skywing.hpp"
-#include "skywing_mid/linear_system_processors/jacobi_processors/jacobi_processor.hpp"
 #include "skywing_math_interface/linear_system_driver.hpp"
 #include "skywing_math_interface/machine_setup.hpp"
-#include "example_input.hpp"
-#include "skywing_core/manager.hpp"
-#include "skywing_math_interface/linear_system_driver.hpp"
+#include "skywing_mid/associative_matrix.hpp"
+#include "skywing_mid/associative_vector.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/iteration_policies.hpp"
+#include "skywing_mid/linear_system_processors/jacobi_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
+#include <catch2/catch_test_macros.hpp>
 
-
-using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
-using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
+using index_t = uint32_t;
+using scalar_t = double;
 
 using namespace skywing;
+
+using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
+using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
 
 namespace{
     
@@ -65,7 +68,11 @@ void machine_task(const int index)
     machine_2_partition.push_back(7);
     machine_2_partition.push_back(8);
 
-    set_dataDir() ; 
+    std::string commtopologyfile =
+        std::string(DATA_DIR_DEST) + "/comm_topology.txt";
+    std::string partitionfile = std::string(DATA_DIR_DEST) + "/partition.txt";
+    std::string rhsfile = std::string(DATA_DIR_DEST) + "/rhs.txt";
+    std::string matrixfile = std::string(DATA_DIR_DEST) + "/matrix.txt";
 
     ClosedVector machine_0_rhs = createClosedVector({0, 1, 2, 3}, {1.0, 0.0, 0.0, 0.0});
     ClosedVector machine_1_rhs = createClosedVector({4, 5}, {0.0, 0.0});
@@ -80,19 +87,18 @@ void machine_task(const int index)
     ClosedVector row_6 = createClosedVector({0, 1, 2, 3, 4, 5 ,6, 7, 8}, {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 2.0, -1.0, 0.0});
     ClosedVector row_7 = createClosedVector({0, 1, 2, 3, 4, 5 ,6, 7, 8}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-1.0, 2.0, -1.0});
     ClosedVector row_8 = createClosedVector({0, 1, 2, 3, 4, 5 ,6, 7, 8}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, -1.0, 2.0});
-    
-    
-    AssociativeMatrix machine_0_A(std::vector<index_t>{0, 1, 2, 3},ClosedVector(0));
+
+    ClosedMatrix machine_0_A(std::vector<index_t>{0, 1, 2, 3}, ClosedVector(0));
     machine_0_A[0] = row_0; 
-    machine_0_A[1] = row_1; 
-    machine_0_A[2] = row_2; 
-    machine_0_A[3] = row_3; 
+    machine_0_A[1] = row_1;
+    machine_0_A[2] = row_2;
+    machine_0_A[3] = row_3;
 
-    AssociativeMatrix machine_1_A(std::vector<index_t>{4, 5},ClosedVector(0));
-    machine_1_A[4] = row_4; 
-    machine_1_A[5] = row_5; 
+    ClosedMatrix machine_1_A(std::vector<index_t>{4, 5}, ClosedVector(0));
+    machine_1_A[4] = row_4;
+    machine_1_A[5] = row_5;
 
-    AssociativeMatrix machine_2_A(std::vector<index_t>{6, 7, 8 },ClosedVector(0));
+    ClosedMatrix machine_2_A(std::vector<index_t>{6, 7, 8}, ClosedVector(0));
     machine_2_A[6] = row_6; 
     machine_2_A[7] = row_7; 
     machine_2_A[8] = row_8; 
@@ -107,10 +113,15 @@ void machine_task(const int index)
     using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, IterateUntilTime, TrivialResiliencePolicy>;
 
     // Read in the partition of the linear system, and this agent's portion of A and b from specified files
-    std::unordered_map<uint32_t, std::vector<uint32_t>> partition = read_partition_from_file();        
-    MyJacobiProcessor::ClosedVector b = read_rhs_from_file( partition[agent_id]); 
-    MyJacobiProcessor::AssociativeMatrix A = read_matrix_from_file(partition[agent_id]);
-    
+    std::unordered_map<uint32_t, std::vector<uint32_t>> partition =
+        readPartition<unsigned>(partitionfile);
+    MyJacobiProcessor::ClosedVector b =
+        ReadAssocitiveVector<index_t, scalar_t, false>(rhsfile,
+                                                       partition[agent_id]);
+    MyJacobiProcessor::ClosedMatrix A =
+        ReadAssocitiveMatrix<index_t, scalar_t, false>(matrixfile,
+                                                       partition[agent_id]);
+
     // This associates with each machine name a MachineConfig struct
     // A MachineConfig struct stores that machine's name, port, address, and its neighbors' machine names
     // configurations = read_machine_configurations_from_file(machine_config_file);
@@ -131,11 +142,17 @@ void machine_task(const int index)
     std::string output_directory = "./temp_output";
     std::filesystem::create_directories(output_directory); // Create the folder
 
-
-    MyJacobiDriver driver(configurations, agent_id, A, b, partition, timeout, output_directory);
+    MyJacobiDriver driver(configurations,
+                          agent_id,
+                          matrixfile,
+                          rhsfile,
+                          partitionfile,
+                          "",
+                          commtopologyfile,
+                          timeout,
+                          output_directory);
     driver.solve();
-    std::vector<double> targets = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}; 
-    std::cout<< driver.test_output()<<std::endl;
+    std::vector<double> targets = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
     if( agent_id == 0 ){
         REQUIRE(partition[agent_id] == machine_0_partition); 

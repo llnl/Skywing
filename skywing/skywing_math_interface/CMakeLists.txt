@@ -5,9 +5,7 @@ target_sources(skywing_math_interface
     TYPE HEADERS
     FILES
     machine_setup.hpp
-    io/io.hpp
-    io/matrix.hpp
-    io/vector.hpp
+    eigen_helpers/eigen_helpers.hpp
     linear_system_driver.hpp
 )
 
