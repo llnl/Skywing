@@ -1,12 +1,72 @@
 #ifndef ASSOCIATIVE_VECTOR_HPP
 #define ASSOCIATIVE_VECTOR_HPP
 
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 #include "skywing_mid/pubsub_converter.hpp"
 
 namespace skywing
 {
+
+// Typecasting helpers
+template <typename T>
+concept Arithmetic = std::is_arithmetic_v<T>;
+
+template <typename T>
+concept Stringy = std::is_same_v<T, std::string>;
+
+// string to integral
+template <std::integral out_T>
+out_T type_cast_helper(std::string const& input)
+{
+    return std::stoll(input);
+}
+
+// string to floating point
+template <std::floating_point out_T>
+out_T type_cast_helper(std::string const& input)
+{
+    return std::stold(input);
+}
+
+// string to string
+template <Stringy out_T>
+out_T type_cast_helper(std::string const& input)
+{
+    return input;
+}
+
+// arithmetic to string
+template <Stringy out_T>
+out_T type_cast_helper(Arithmetic auto const& input)
+{
+    return std::to_string(input);
+}
+
+// arithmetic to arithmetic
+template <Arithmetic out_T>
+out_T type_cast_helper(Arithmetic auto const& input)
+{
+    return input;
+}
+
+// helper function for checking the delimiter
+// WM: todo - should really improve this...
+// This goes down a list checking for possible
+// delimiters in the order '\t', '|', ';', ',', ':',
+// and defaults to spaces if none of the above are found.
+inline char check_delimiter(std::string const& line)
+{
+    std::vector<char> possible_delimiters = {'\t', '|', ';', ',', ':'};
+    for (const auto& d : possible_delimiters) {
+        if (line.find(d) != std::string::npos) {
+            return d;
+        }
+    }
+    return ' ';
+}
 
 /**
 * @class AssociativeVector
@@ -103,9 +163,8 @@ public:
     {
       if constexpr (!isOpen) {
 	if (!contains(ind))
-	  throw std::runtime_error(
-	      "AssociativeVector::set Attempted to set a "
-	      "nonexistet index in a closer vector.");
+        throw std::runtime_error("AssociativeVector::set Attempted to set a "
+                                 "nonexistet index in a closed vector.");
       }
       data_[ind] = value;
     }
@@ -466,6 +525,75 @@ std::ostream& operator<<(std::ostream& out,
     }
     out << "]";
     return out;
+}
+
+/**
+ * @brief Read data from file into an AssociativeVector.
+ *
+ * @param filename The filename to read from.
+ * @param rowList Optional list of row keys to include (if none is passed, all
+ * rows are included).
+ * @param read_keys Flag indicating whether to read keys (if false, index by
+ * integers from 0).
+ * @return The AssociativeVector
+ *
+ * This method reads in data from file with optional keys.
+ */
+template <typename index_t, typename val_t, bool isOpen>
+AssociativeVector<index_t, val_t, isOpen> ReadAssocitiveVector(
+    std::string filename,
+    const std::vector<index_t> rowList = std::vector<index_t>(),
+    bool read_keys = false)
+{
+    // Open file
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::stringstream ss;
+        ss << filename << " file not found!";
+        throw std::invalid_argument(ss.str());
+    }
+
+    std::string line;
+    size_t i = 0;
+    index_t key;
+    std::string val;
+    std::unordered_map<index_t, val_t> map;
+    size_t expected_row_size = read_keys ? 2 : 1;
+    size_t val_idx = read_keys ? 1 : 0;
+    char delimiter = '\0';
+
+    // Read file and parse values
+    while (std::getline(file, line)) {
+        // Check for the delimiter on the first line
+        if (delimiter == '\0') {
+            delimiter = check_delimiter(line);
+        }
+        // Read items in the line
+        std::stringstream ss(line);
+        std::vector<std::string> line_vals;
+        while (std::getline(ss, val, delimiter)) {
+            line_vals.push_back(val);
+        }
+        // Expect keys to be in the first column (if present), values in the
+        // second column
+        if (line_vals.size() != expected_row_size) {
+            std::stringstream ss;
+            ss << "ERROR: wrong number of columns in file " << filename
+               << " when reading AssociativeVector";
+            throw std::runtime_error(ss.str());
+        }
+        key = read_keys ? type_cast_helper<index_t>(line_vals[0])
+                        : type_cast_helper<index_t>(i++);
+        // If the row list is empty, include all rows, otherwise
+        // check to see if the row key was in the requested list.
+        if (rowList.empty()
+            || std::find(rowList.begin(), rowList.end(), key) != rowList.end())
+        {
+            map[key] = type_cast_helper<val_t>(line_vals[val_idx]);
+        }
+    }
+
+    return AssociativeVector<index_t, val_t, isOpen>(map);
 }
 
 /**************************************************

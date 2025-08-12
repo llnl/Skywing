@@ -66,7 +66,7 @@ if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
   list(APPEND TEST_SRCS skywing_math_interface/jacobi_test.cpp)
   list(APPEND TEST_SRCS skywing_math_interface/jacobi_root_node_test.cpp)
   list(APPEND TEST_SRCS skywing_mid/admm_test.cpp)
-  list(APPEND TEST_SRCS skywing_mid/cola_test.cpp)
+  list(APPEND TEST_SRCS skywing_math_interface/cola_test.cpp)
   file(COPY
     skywing_math_interface/data/
     DESTINATION ${CMAKE_BINARY_DIR}/data)

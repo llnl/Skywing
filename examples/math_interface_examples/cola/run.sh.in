@@ -1,0 +1,108 @@
+#!/bin/bash
+
+print_usage() {
+  echo "Usage: run.sh [options]"
+  echo
+  echo "Options:"
+  echo "  -n, --num_agents N             Specify the number of agents (default 3)"
+  echo "  -p, --starting_port P          Specify the starting port (default 20000)\n"
+  echo "  -l, --lambda L                 Specify the value of the regularization parameter, lambda (default 0.0001)\n"
+  echo "  -s, --shift_scale S            Choose whether to shift and scale the data (default 0)\n"
+  echo "  -A, --A_file FILE              Specify file to read for data matrix (default data/A.csv)\n"
+  echo "  -b, --b_file FILE              Specify file to read for rhs vector (default data/b.csv)\n"
+  echo "  -r, --row_partition_file FILE  Specify file to read for row partition (default data/row_partition.txt)\n"
+  echo "  -c, --col_partition_file FILE  Specify file to read for column partition (default data/col_partition.txt)\n"
+  echo "  -t, --comm_topology_file FILE  Specify file to read for communication topology (default data/comm_topology.txt)\n"
+  echo "  -o, --output_dir DIR           Specify output directory (default output)"
+  echo "  -h, --help                     Display this help message and exit"
+}
+
+# Defaults
+num_agents=3
+starting_port=20000
+lambda=0.0001
+shift_scale=0
+A_file="data/A.txt"
+b_file="data/b.txt"
+row_partition_file="data/row_partition.txt"
+col_partition_file="data/col_partition.txt"
+comm_topology_file="data/comm_topology.txt"
+output_dir="output"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--num_agents)
+      num_agents=$2
+      shift 2
+      ;;
+    -p|--starting_port)
+      starting_port=$2
+      shift 2
+      ;;
+    -l|--lambda)
+      lambda=$2
+      shift 2
+      ;;
+    -s|--shift_scale)
+      shift_scale=$2
+      shift 2
+      ;;
+    -A|--A_file)
+      A_file=$2
+      shift 2
+      ;;
+    -b|--b_file)
+      b_file=$2
+      shift 2
+      ;;
+    -r|--row_partition_file)
+      row_partition_file=$2
+      shift 2
+      ;;
+    -c|--col_partition_file)
+      col_partition_file=$2
+      shift 2
+      ;;
+    -t|--comm_topology_file)
+      comm_topology_file=$2
+      shift 2
+      ;;
+    -o|--output_dir)
+      output_dir=$2
+      shift 2
+      ;;
+    -h|--help)
+      print_usage
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      print_usage
+      exit 1
+      ;;
+    *)
+      echo "Bad positional argument: $1"
+      print_usage
+      shift
+      ;;
+  esac
+done
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( ind=0 ;  ind < num_agents ; ind++ ))
+  do
+      var="erase${ind}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
+
+mkdir -p $output_dir
+
+echo "@cola_exe@" $agent_ind
+"@cola_exe@" $agent_ind -n $num_agents -p $starting_port -l $lambda -s $shift_scale -A $A_file -b $b_file -r $row_partition_file -c $col_partition_file -t $comm_topology_file -o $output_dir &
+declare "erase${agent_ind}=$!"
+
+sleep 30
+kill_progs

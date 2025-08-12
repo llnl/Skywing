@@ -15,7 +15,5 @@ endif ()
 
 if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
   add_subdirectory(admm)
-  add_subdirectory(barbell_jacobi)
-  add_subdirectory(cola_driver)
   add_subdirectory(math_interface_examples)
 endif ()

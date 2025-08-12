@@ -170,7 +170,7 @@ public:
      * iteration.
      */
     template <bool has_callback = true>
-    void run(std::function<void(const ThisT&)> callback)
+    void run(std::function<void(ThisT&)> callback)
     {
         start_time_ = clock_t::now();
         this->submit_values(publish_values_);

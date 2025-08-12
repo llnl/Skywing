@@ -32,6 +32,9 @@ classifiers = [
 ]
 dependencies=[
   "numpy", # Just for the example, but why not?
+  "matplotlib", # For plotting scripts
+  "networkx", # For topology_gen.py
+  "scipy", # For topology_gen.py
 ]
 
 [project.optional-dependencies]
