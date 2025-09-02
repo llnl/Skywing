@@ -59,17 +59,19 @@ set(TEST_SRCS
   skywing_mid/iterationpolicy_send.cpp
   skywing_mid/synchronous_iterative.cpp
   skywing_mid/data_handler_test.cpp
+
+  skywing_math_interface/jacobi_test.cpp
+  skywing_math_interface/jacobi_root_node_test.cpp
 )
 
-# Conditionally add jacobi_test.cpp if SKYWING_USE_EIGEN_MATH_EXAMPLES is ON
-if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
-  list(APPEND TEST_SRCS skywing_math_interface/jacobi_test.cpp)
-  list(APPEND TEST_SRCS skywing_math_interface/jacobi_root_node_test.cpp)
+file(COPY
+  skywing_math_interface/data/
+  DESTINATION ${CMAKE_BINARY_DIR}/data)
+
+# Conditionally add tests for Eigen processors if SKYWING_USE_EIGEN is ON
+if (SKYWING_USE_EIGEN)
   list(APPEND TEST_SRCS skywing_mid/admm_test.cpp)
   list(APPEND TEST_SRCS skywing_math_interface/cola_test.cpp)
-  file(COPY
-    skywing_math_interface/data/
-    DESTINATION ${CMAKE_BINARY_DIR}/data)
 endif()
 
 # Add the executable for catch-tests
@@ -101,16 +103,17 @@ foreach (src IN LISTS TEST_SRCS)
     skywing_mid
   )
 
+  # Set location of input linear system data files
+  target_compile_definitions(${TEST_NAME}-lib
+    PRIVATE
+    DATA_DIR_DEST="${CMAKE_BINARY_DIR}/data"
+  )
+
   # Conditionally link to skywing_math_interface for Eigen dependency
-  # and set location of input linear system data files
-  if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
+  if (SKYWING_USE_EIGEN)
     target_link_libraries(${TEST_NAME}-lib
       PUBLIC
       skywing_math_interface
-    )
-    target_compile_definitions(${TEST_NAME}-lib
-      PRIVATE
-      DATA_DIR_DEST="${CMAKE_BINARY_DIR}/data"
     )
   endif()
 

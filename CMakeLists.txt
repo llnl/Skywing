@@ -42,7 +42,7 @@ option(SKYWING_WARNINGS_AS_ERRORS
   "Build with compiler warnings promoted to errors"
   ${SKYWING_DEVELOPER_BUILD}
 )
-option(SKYWING_USE_EIGEN_MATH_EXAMPLES
+option(SKYWING_USE_EIGEN
   "Include Eigen library for skywing_math_interface"
   OFF
 )
@@ -109,7 +109,7 @@ set(BUILD_TESTING ${SKYWING_BUILD_TESTS}
   "Build testing infrastructure"
 )
 
-if (SKYWING_USE_EIGEN_MATH_EXAMPLES)
+if (SKYWING_USE_EIGEN)
   set(EIGEN_BUILD_TESTING OFF)
   set(EIGEN_BUILD_CMAKE_PACKAGE ON)
 

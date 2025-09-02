@@ -1,10 +1,10 @@
 add_executable(synchronizing_jacobi synchronizing_jacobi.cpp)
-target_link_libraries(synchronizing_jacobi skywing_core skywing_math_interface)
+target_link_libraries(synchronizing_jacobi skywing_math_interface)
 
 add_executable(root_node root_node.cpp)
-target_link_libraries(root_node skywing_core skywing_math_interface)
+target_link_libraries(root_node skywing_math_interface)
 
-configure_file(config.cfg config.cfg COPYONLY) 
+configure_file(config.cfg config.cfg COPYONLY)
 
 
   # NOTE (trb 2023/12/05) -- Hack until I can change run.sh.in to use

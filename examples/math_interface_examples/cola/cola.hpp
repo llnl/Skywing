@@ -16,7 +16,6 @@
 #include "skywing_mid/linear_system_processors/cola_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
 #include "skywing_mid/synchronous_iterative.hpp"
-#include <Eigen/Dense>
 
 using namespace skywing;
 

@@ -1,5 +1,5 @@
 add_executable(cola cola.cpp)
-target_link_libraries(cola skywing_core Eigen3::Eigen)
+target_link_libraries(cola skywing_math_interface)
 
 file(COPY
   data/
