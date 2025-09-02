@@ -37,8 +37,8 @@ You do not need to acquire these yourself.
    * requires version 1.0 or newer
    * defaults to the `v1.14.1` git tag
  * Eigen (https://eigen.tuxfamily.org)
-   * only relevant for Math Interface examples
-
+   * enables using COLA and ADMM processors for linear least squares optimization problems
+   * provides support for converting from Eigen structures to Skywing data structures
  * Catch2
    * requires version 3.0 or newer
    * defaults to the `v3.7.1` git tag
@@ -87,7 +87,7 @@ configuration. For example, using the CMake CLI:
 
 `cmake -DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON`
 
-If the `SKYWING_USE_EIGEN_MATH_EXAMPLES` flag is set to `ON`, Eigen will be required as a dependency and the `math_interface_examples` directory will be built.
+If the `SKYWING_USE_EIGEN` flag is set to `ON`, Eigen will be required as a dependency and the ADMM and COLA processor examples will be built.
 
 ## Guidance for building on LC
 

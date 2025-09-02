@@ -1,6 +1,5 @@
 add_executable(barbell_jacobi barbell_jacobi.cpp)
-target_link_libraries(barbell_jacobi skywing_core skywing_math_interface)
-
+target_link_libraries(barbell_jacobi skywing_math_interface)
 
 # NOTE (trb 2023/12/05) -- See hello_world for details
 set(barbell_jacobi_exe $<TARGET_FILE:barbell_jacobi>)

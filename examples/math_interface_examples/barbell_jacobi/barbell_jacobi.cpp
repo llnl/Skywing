@@ -21,7 +21,6 @@
 #include "skywing_mid/iteration_policies.hpp"
 #include "skywing_mid/linear_system_processors/jacobi_processor.hpp"
 #include "skywing_mid/publish_policies.hpp"
-#include <Eigen/Dense>
 
 using namespace skywing;
 

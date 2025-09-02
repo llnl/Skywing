@@ -1,5 +1,5 @@
 add_executable(jacobi jacobi.cpp)
-target_link_libraries(jacobi skywing_core skywing_math_interface)
+target_link_libraries(jacobi skywing_math_interface)
 
 configure_file(config.cfg config.cfg COPYONLY)
 
