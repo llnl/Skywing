@@ -1,3 +1,4 @@
+@defgroup barbell Barbell Jacobi
 # Barbell Example: Asynchronous Jacobi Method with Skywing
 
 ## Overview

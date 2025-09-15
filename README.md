@@ -31,16 +31,21 @@ need to acquire yourself beforehand.
 You do not need to acquire these yourself.
 
  * Cap'n Proto (https://capnproto.org/)
-   * requires version 1.0 or newer
+   * supported version: 1.1.0
    * defaults to the `v1.1.0` git tag
+
  * spdlog
-   * requires version 1.0 or newer
+   * supported version: 1.14.1
    * defaults to the `v1.14.1` git tag
+
  * Eigen (https://eigen.tuxfamily.org)
+   * Supported version: 3.4
+   * defaults to the `3.4` branch
    * enables using COLA and ADMM processors for linear least squares optimization problems
    * provides support for converting from Eigen structures to Skywing data structures
+
  * Catch2
-   * requires version 3.0 or newer
+   * supported version: 3.7.1 
    * defaults to the `v3.7.1` git tag
    * only relevant when building unit test suite
 
@@ -186,10 +191,13 @@ you can push your changes up to GitHub and create PRs.
 * Be explicit when opening issues and reporting bugs. What behavior are you expecting? What is your justification or use case for the new feature/enhancement? How can the bug be recreated? What are any environment variables to consider?
 
 # Development team
- * Aly Fox <fox33@llnl.gov>
- * Kendall Harter <harter8@llnl.gov>
- * **Colin Ponce <ponce11@llnl.gov>** (corresponding author)
- * Chris Vogl <vogl2@llnl.gov>
+ * Tom Benson <benson31@llnl.gov>
+ * Michael Brzustowicz <brzustowicz1@llnl.gov>
+ * **Aly Fox <fox33@llnl.gov>** (corresponding author)
+ * Annika Mauro <mauro3@llnl.gov>
+ * Wayne Mitchell <mitchell82@llnl.gov>
+ * Sarah Osborn <osborn9@llnl.gov>
+ * Colin Ponce <ponce11@llnl.gov>  
 
 # License
 

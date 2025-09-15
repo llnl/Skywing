@@ -1,14 +1,6 @@
-```
-           _|                                  _|
-   _|_|_|  _|  _|    _|    _|  _|          _|      _|_|_|      _|_|
- _|_|      _|_|      _|    _|  _|    _|    _|  _|  _|    _|  _|    _|
-     _|_|  _|  _|    _|    _|  _|  _|  _|  _|  _|  _|    _|  _|    _|
- _|_|_|    _|    _|    _|_|_|    _|      _|    _|  _|    _|    _|_|_|
-                           _|                                      _|
-                       _|_|                                    _|_|
-```
+@defgroup sync-jacobi Synchronizing Jacobi 
 
-Skywing Debug mode - Synchronizing root node
+# Skywing Debug mode - Synchronizing root node
 
 # Overview
 

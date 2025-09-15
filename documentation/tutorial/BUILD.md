@@ -1,10 +1,12 @@
+@defgroup build-tutorial Building Tutorials
+
 Building the examples from the tutorial is a straightforward CMake
 project. The Skywing library must be built **and installed** prior to
 building the example executables.
 
 Once Skywing has been built and installed, the tutorials can be built
 as any other CMake project. For the following, suppose that Skywing
-has been installed to `${SKYWING_PREFIX}` and CapnProto has been
+has been installed to `${SKYWING_PREFIX}` and if you are acquiring the dependency yourself, CapnProto has been
 installed to `${CAPNPROTO_PREFIX}`. The directory in which this
 `BUILD.md` file is located will be `${TUTORIAL_HOME}`.
 
