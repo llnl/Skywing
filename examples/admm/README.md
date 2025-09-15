@@ -1,3 +1,4 @@
+@defgroup admm ADMM
 # ADMM for solving a linear least squares optimization problem
 
 ## Overview

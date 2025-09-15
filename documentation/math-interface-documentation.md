@@ -1,3 +1,5 @@
+@defgroup math-interface
+
 ```
            _|                                  _|
    _|_|_|  _|  _|    _|    _|  _|          _|      _|_|_|      _|_|
@@ -7,38 +9,6 @@
                            _|                                      _|
                        _|_|                                    _|_|
 ```
-
-Skywing Math Interface
-
-# Structure and content of files
-
-## In Skywing math interface - i/o and drivers
-
-* Files:
-    * `io/io.hpp` 
-        * Functions to convert between Eigen matricies and associative vectors
-        * Functions to read a matrix from a file and read a partition from a file
-    * `linear_system_driver.hpp`
-        * defines the `LinearSystemDriver` class
-        * **Constructor parameters:** `configuration, agent_id, A, b, partition, and timeout duration`
-        * **Template parameters:** `LinearProcessor, PublishPolicy, IterationPolicy, ResiliencePolicy`
-        * **To run:** call `linear_system_driver.solve()`
-
-## In skywing mid - processors
-
- * Files: 
-    * `jacobi_processor.hpp`
-        * Contains the actual processor to be passed to a Linear System Driver or similar
-
-## In math interface examples
-
-* Files
-    * `jacobi.cpp` 
-        * The script that recieves arguments and puts everything together
-    * `run.py` 
-        * Creates the shell scripts needed to make config.cfg and submit job to LC
-    * `generate_config_info.py`
-        * This is part of the running script, it is run on LC which is why it cannot be part of `run.py`
 
 # Linear system processors
 
