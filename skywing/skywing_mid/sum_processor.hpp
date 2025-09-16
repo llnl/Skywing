@@ -2,6 +2,7 @@
 #define SUM_PROCESSOR_HPP
 
 #include <iostream>
+#include <type_traits>
 
 #include "skywing_mid/push_sum_processor.hpp"
 #include "skywing_mid/quacc_processor.hpp"
@@ -27,6 +28,9 @@ template <typename data_t,
           typename CountProcessor = QUACCProcessor<>>
 class SumProcessor
 {
+    // Compile-time check for floating-point type
+    static_assert(std::is_floating_point<data_t>::value,
+                  "SumProcessor: data_t must be a floating-point type.");
 public:
     using ValueType = std::tuple<typename MeanProcessor::ValueType,
                                  typename CountProcessor::ValueType>;
