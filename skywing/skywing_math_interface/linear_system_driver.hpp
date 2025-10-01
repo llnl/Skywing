@@ -108,13 +108,9 @@ public:
         std::unordered_map<std::string, MachineConfig>
             configurations, // map from machine names to MachineCongfigs
         unsigned agent_id,
-        std::string A_file,
-        std::string b_file,
-        std::string row_partition_file,
-        std::string col_partition_file,
-        std::string comm_topology_file,
-        std::chrono::seconds timeout_duration,
+        const std::string& data_directory,
         const std::string& output_directory,
+        std::chrono::seconds timeout_duration,
         bool synchronous = false) // output directory location
 
         : configurations_(configurations),
@@ -123,17 +119,23 @@ public:
           output_directory_(output_directory),
           synchronous_(synchronous)
     {
+        std::filesystem::path dir = data_directory;
+        std::filesystem::path file;
+
         // Read partitions and communication topology
         std::unordered_map<uint32_t, std::vector<IndexType>> row_partition;
-        if (!row_partition_file.empty()) {
-            row_partition = readPartition<IndexType>(row_partition_file);
+        file = dir / "row_partition.txt";
+        if (std::filesystem::exists(file)) {
+            row_partition = readPartition<IndexType>(file);
         }
         std::unordered_map<uint32_t, std::vector<IndexType>> col_partition;
-        if (!col_partition_file.empty()) {
-            col_partition = readPartition<IndexType>(col_partition_file);
+        file = dir / "col_partition.txt";
+        if (std::filesystem::exists(file)) {
+            col_partition = readPartition<IndexType>(file);
         }
+        file = dir / "comm_topology.txt";
         std::unordered_map<uint32_t, std::vector<uint32_t>> comm_topology =
-            readPartition<uint32_t>(comm_topology_file);
+            readPartition<uint32_t>(file);
 
         // Setup publication and subscription tags
         pubTagID_ = "linear_system_tag" + std::to_string(agent_id_);
@@ -142,16 +144,15 @@ public:
                                       + std::to_string(nbr));
         }
 
-        std::filesystem::path A_path = A_file;
-        std::filesystem::path b_path = b_file;
-
         // Read matrix from file
+        file = dir / "A.txt";
         A_ = ReadAssocitiveMatrix<IndexType, ScalarType, false>(
-            A_file, row_partition[agent_id_], col_partition[agent_id_]);
+            file, row_partition[agent_id_], col_partition[agent_id_]);
 
         // Read vector from file
+        file = dir / "b.txt";
         b_ = ReadAssocitiveVector<IndexType, ScalarType, false>(
-            b_file, row_partition[agent_id_]);
+            file, row_partition[agent_id_]);
     }
 
     /* @brief Skywing Job which subscribes to tags based on the communication
@@ -172,15 +173,18 @@ public:
             std::cout << runtime.count() << "ms: Machine " << agent_id_
                       << " has value " << processor.get_value() << std::endl;
 
-            // Construct the full file paths using the output directory
-            std::string output_file_path = output_directory_ + "/output" + std::to_string(agent_id_) + ".txt";
-            std::string history_file_path = output_directory_ + "/history" + std::to_string(agent_id_) + ".txt";
+            std::filesystem::path dir = output_directory_;
+            std::filesystem::path file;
 
-            // Open both files
-            std::ofstream output_file(output_file_path, std::ios::trunc); // Use trunc mode to overwrite
-            std::ofstream history_file(history_file_path, std::ios::app); // Append mode to keep history
+            // Open output files
+            file = dir / ( "output" + std::to_string(agent_id_) + ".txt" );
+            std::ofstream output_file(file, std::ios::trunc); // Use trunc mode to overwrite
+            file = dir / ( "history" + std::to_string(agent_id_) + ".txt" );
+            std::ofstream history_file(file, std::ios::app); // Append mode to keep history
+            file = dir / ( "error_metrics" + std::to_string(agent_id_) + ".txt" );
+            std::ofstream error_metrics_file(file, std::ios::app); // Append mode to keep error metrics
 
-            if (output_file.is_open() && history_file.is_open()) {
+            if (output_file.is_open() && history_file.is_open() && error_metrics_file.is_open()) {
                 // Write the matrix A_ to the output file
                 output_file << "Matrix A_ for Machine " << agent_id_ << ":\n";
                 for (auto it = A_.begin(); it != A_.end(); ++it) {
@@ -202,6 +206,13 @@ public:
                 // Write to the history file
                 history_file << runtime.count() << "\t" << processor.get_value()
                              << std::endl;
+
+                // Write to the error metrics file
+                std::unordered_map<std::string, ScalarType> error_metrics = processor.get_local_error_metrics();
+                for (const auto& pair : error_metrics) {
+                    error_metrics_file << runtime.count() << "\t" << pair.first << "\t" << pair.second
+                                 << std::endl;
+                }
             }
             else {
                 std::cerr << "Unable to open files for writing." << std::endl;
@@ -210,6 +221,7 @@ public:
             // Close the files
             output_file.close();
             history_file.close();
+            error_metrics_file.close();
         };
 
         if (synchronous_) {

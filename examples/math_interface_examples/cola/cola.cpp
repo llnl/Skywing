@@ -13,16 +13,12 @@ void print_usage(const std::string& prog_name)
                  "regularization parameter, lambda (default 0.0001)\n"
               << "  -s, --shift_scale S            Choose whether to shift and "
                  "scale the data (default 0)\n"
-              << "  -A, --A_file FILE              Specify file to read for "
-                 "data matrix (default data/A.csv)\n"
-              << "  -b, --b_file FILE              Specify file to read for "
-                 "rhs vector (default data/b.csv)\n"
-              << "  -r, --row_partition_file FILE  Specify file to read for "
-                 "row partition (default data/row_partition.txt)\n"
-              << "  -c, --col_partition_file FILE  Specify file to read for "
-                 "column partition (default data/col_partition.txt)\n"
-              << "  -t, --comm_topology_file FILE  Specify file to read for "
-                 "communication topology (default data/comm_topology.txt)\n"
+              << "  -S, --sync S                   Choose whether to run COLA as "
+                 "a synchronous method (default 1)\n"
+              << "  -t, --timeout T                Choose the timeout in seconds "
+                 "(default 30)\n"
+              << "  -d, --data_dir DIR             Specify data directory "
+                 "(default data)\n"
               << "  -o, --output_dir DIR           Specify output directory "
                  "(default output)"
               << "  -h, --help                     Display this help message "
@@ -36,11 +32,9 @@ int main(int argc, char* argv[])
     size_t starting_port = 20000;
     scalar_t lambda = 0.0001;
     bool shift_scale = false;
-    std::string A_file = "data/A.csv";
-    std::string b_file = "data/b.csv";
-    std::string row_partition_file = "data/row_partition.txt";
-    std::string col_partition_file = "data/col_partition.txt";
-    std::string comm_topology_file = "data/comm_topology.txt";
+    bool sync = true;
+    size_t timeout = 30;
+    std::string data_dir = "data";
     std::string output_dir = "output";
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -57,20 +51,14 @@ int main(int argc, char* argv[])
         else if (arg == "-s" || arg == "--shift_scale") {
             shift_scale = std::stoi(argv[++i]);
         }
-        else if (arg == "-A" || arg == "--A_file") {
-            A_file = argv[++i];
+        else if (arg == "-S" || arg == "--synchronous") {
+            sync = std::stoi(argv[++i]);
         }
-        else if (arg == "-b" || arg == "--b_file") {
-            b_file = argv[++i];
+        else if (arg == "-t" || arg == "--timeout") {
+            timeout = std::stoi(argv[++i]);
         }
-        else if (arg == "-r" || arg == "--row_partition_file") {
-            row_partition_file = argv[++i];
-        }
-        else if (arg == "-c" || arg == "--col_partition_file") {
-            col_partition_file = argv[++i];
-        }
-        else if (arg == "-t" || arg == "--comm_topology_file") {
-            comm_topology_file = argv[++i];
+        else if (arg == "-d" || arg == "--data_dir") {
+            data_dir = argv[++i];
         }
         else if (arg == "-o" || arg == "--output_dir") {
             output_dir = argv[++i];
@@ -90,10 +78,8 @@ int main(int argc, char* argv[])
                       num_agents,
                       lambda,
                       shift_scale,
-                      A_file,
-                      b_file,
-                      row_partition_file,
-                      col_partition_file,
-                      comm_topology_file,
+                      sync,
+                      timeout,
+                      data_dir,
                       output_dir);
 }

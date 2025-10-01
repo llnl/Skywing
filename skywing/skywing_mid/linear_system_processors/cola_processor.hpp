@@ -37,8 +37,7 @@ class COLAProcessor
 public:
     using OpenVector = AssociativeVector<index_t, scalar_t, true>;
     using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
-    using ClosedMatrix = AssociativeVector<index_t, ClosedVector, false>;
-    using OpenMatrix = AssociativeVector<index_t, ClosedVector, true>;
+    using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
 
     using ValueType = ClosedVector;
     using IndexType = index_t;
@@ -84,22 +83,38 @@ public:
 
         // Shift and scale the data matrix if requested
         if (shift_scale_) {
-            // Get column means and scaling
+            // Shift to zero mean
             for (const index_t& i : A_k_.get_keys()) {
                 for (const index_t& j : A_k_.at(i).get_keys()) {
-                    scalar_t A_ij = A_k_.at(i).at(j);
-                    col_mean_[j] += A_ij;
-                    col_scale_[j] += A_ij * A_ij;
+                    col_mean_[j] += A_k_.at(i).at(j) / A_k_.size();
                 }
+                b_mean_ += b_.at(i) / b_.size();
             }
-            for (const index_t& j : x_k_.get_keys()) {
-                col_mean_[j] /= A_k_.size();
-                col_scale_[j] /= A_k_.size();
+            for (const index_t& i : A_k_.get_keys()) {
+                for (const index_t& j : A_k_.at(i).get_keys()) {
+                    A_k_[i][j] -= col_mean_[j];
+                }
+                b_[i] -= b_mean_;
+            }
+            // Scale by standard deviation
+            for (const index_t& i : A_k_.get_keys()) {
+                for (const index_t& j : A_k_.at(i).get_keys()) {
+                    col_scale_[j] += A_k_.at(i).at(j) * A_k_.at(i).at(j) / A_k_.size();
+                }
+                b_scale_ += b_.at(i) * b_.at(i) / b_.size();
+            }
+            for (const index_t& j : A_k_.at(0).get_keys()) {
                 col_scale_[j] = sqrt(col_scale_[j]);
             }
+            b_scale_ = sqrt(b_scale_);
             for (const index_t& i : A_k_.get_keys()) {
                 for (const index_t& j : A_k_.at(i).get_keys()) {
-                    A_k_[i][j] = (A_k_[i][j] - col_mean_[j]) / col_scale_[j];
+                    if (col_scale_[j] > 0.0) {
+                        A_k_[i][j] /= col_scale_[j];
+                    }
+                }
+                if (b_scale_ > 0.0) {
+                    b_[i] /= b_scale_;
                 }
             }
         }
@@ -131,7 +146,7 @@ public:
             row_map_[row_key] = i++;
         }
         for (const auto& reg_key : x_keys) {
-            M_k_(i, i - d) = (double) lambda_;
+            M_k_(i, i - d) = (double) sqrt(lambda_);
             reg_map_[reg_key] = i++;
         }
 
@@ -160,8 +175,6 @@ public:
 
         // Update x_k <- x_k + gamma * delta_x_k
         x_k_ += gamma_ * delta_x_k_;
-        rel_norm_delta_ =
-            sqrt(delta_x_k_.dot(delta_x_k_)) / sqrt(x_k_.dot(x_k_));
 
         // Update v_k <- v_k + gamma * K * A * delta_x_k
         for (const index_t& row_key : A_k_.get_keys()) {
@@ -174,38 +187,14 @@ public:
 
     ClosedVector get_value() const { return ClosedVector(x_k_); }
 
-    ClosedVector get_local_v_k() const { return v_k_; }
-
-    scalar_t get_rel_norm_delta() const { return rel_norm_delta_; }
-
-    scalar_t compute_suboptimality() const
+    std::unordered_map<std::string, scalar_t> get_local_error_metrics() const
     {
-        scalar_t err = 0.0;
-        for (const auto& key : v_k_.get_keys()) {
-            scalar_t diff = b_.at(key) - v_k_.at(key);
-            err += diff * diff / K_;
-        }
-        for (const auto& key : x_k_.get_keys()) {
-            err += lambda_ * x_k_.at(key) * x_k_.at(key);
-        }
-        return err;
-    }
-
-    scalar_t compute_duality_gap() const
-    {
-        ClosedVector v_k_minus_b = v_k_ - b_;
-        ClosedVector x(x_k_);
-        scalar_t duality_gap = (1. / K_) * v_k_minus_b.dot(v_k_minus_b)
-                               + v_k_minus_b.dot(b_)
-                               + (lambda_ / 2.) * x.dot(x);
-        for (const auto& row_key : A_k_.get_keys()) {
-            for (const auto& col_key : A_k_.at(row_key).get_keys()) {
-                duality_gap += (1. / (2. * lambda_ * K_ * K_))
-                               * A_k_.at(row_key).at(col_key)
-                               * v_k_minus_b.at(row_key);
-            }
-        }
-        return duality_gap;
+        std::unordered_map<std::string, scalar_t> metrics;
+        metrics["norm_delta_x"] = compute_norm_delta_x();
+        metrics["local_suboptimality"] = compute_local_suboptimality();
+        metrics["rel_norm_v_k_minus_b"] = compute_rel_norm_v_k_minus_b();
+        metrics["duality_gap_local_cert"] = compute_duality_gap_local_cert();
+        return metrics;
     }
 
 private:
@@ -225,8 +214,9 @@ private:
             b_ls(reg_map_[reg_key]) = (double) -sqrt(lambda_) * x_k_[reg_key];
         }
 
+        Eigen::VectorXd soln;
         // Use Eigen QR to compute the least squares solution
-        Eigen::VectorXd soln = qr_.solve(b_ls);
+        soln = qr_.solve(b_ls);
 
         // Copy solution values to delta_x_k_
         // WM: todo - use convert_eigen_vector_to_associative_vector()
@@ -235,15 +225,56 @@ private:
         }
     }
 
+    scalar_t compute_norm_delta_x() const
+    {
+        return sqrt(delta_x_k_.dot(delta_x_k_));
+    }
+
+    scalar_t compute_local_suboptimality() const
+    {
+        scalar_t err = 0.0;
+        for (const auto& key : v_k_.get_keys()) {
+            scalar_t diff = b_.at(key) - v_k_.at(key);
+            err += diff * diff / K_;
+        }
+        for (const auto& key : x_k_.get_keys()) {
+            err += lambda_ * x_k_.at(key) * x_k_.at(key);
+        }
+        return err;
+    }
+
+    scalar_t compute_rel_norm_v_k_minus_b() const
+    {
+        ClosedVector v_k_minus_b = v_k_ - b_;
+        return sqrt( v_k_minus_b.dot(v_k_minus_b) / b_.dot(b_) );
+    }
+
+    scalar_t compute_duality_gap_local_cert() const
+    {
+        ClosedVector v_k_minus_b = v_k_ - b_;
+        scalar_t err = v_k_.dot(v_k_minus_b);
+        ClosedMatrix A_k_T = A_k_.transpose();
+        for (const auto& row_key : A_k_T.get_keys()) {
+           scalar_t val = A_k_T.at(row_key).dot(v_k_minus_b);
+           err += (lambda_ / 2.0) * x_k_.at(row_key) * x_k_.at(row_key);
+           err += (1.0 / (2.0 * lambda_)) * val * val;
+        }
+        err *= 2.0 * K_;
+        return err;
+    }
+
     ClosedMatrix A_k_;
     ClosedVector b_;
     Eigen::MatrixXd M_k_;
+    Eigen::MatrixXd M_k_T_M_k_;
     Eigen::FullPivHouseholderQR<Eigen::MatrixXd> qr_;
     AssociativeVector<tag_t, scalar_t, false> W_k_;
     OpenVector x_k_;
     OpenVector delta_x_k_;
     OpenVector col_mean_;
     OpenVector col_scale_;
+    scalar_t b_mean_ = 0.0;
+    scalar_t b_scale_ = 0.0;
     ClosedVector v_k_;
     ClosedVector v_k_prev_;
     std::unordered_map<index_t, int> col_map_;
@@ -253,7 +284,6 @@ private:
     scalar_t lambda_;
     index_t K_;
     bool shift_scale_;
-    scalar_t rel_norm_delta_ = 0.0;
 
 }; // class PushFlowProcessor
 } // namespace skywing

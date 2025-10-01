@@ -134,11 +134,9 @@ void machine_task(const int index)
         std::cerr << "DATA_DIR_DEST is not defined!" << std::endl;
     #endif
 
-    std::string commtopologyfile =
-        std::string(DATA_DIR_DEST) + "/comm_topology.txt";
-    std::string partitionfile = std::string(DATA_DIR_DEST) +"/partition.txt";
-    std::string rhsfile =  std::string(DATA_DIR_DEST) + "/rhs.txt";
-    std::string matrixfile = std::string(DATA_DIR_DEST) + "/matrix.txt";
+    std::string partitionfile = std::string(DATA_DIR_DEST) +"/row_partition.txt";
+    std::string rhsfile =  std::string(DATA_DIR_DEST) + "/b.txt";
+    std::string matrixfile = std::string(DATA_DIR_DEST) + "/A.txt";
 
     // Read in the partition of the linear system, and this agent's portion of A and b from specified files
     std::unordered_map<uint32_t, std::vector<index_t>> partition = readPartition<index_t>(partitionfile);        
@@ -157,13 +155,9 @@ void machine_task(const int index)
 
     MyJacobiDriver driver(configurations,
                           agent_id,
-                          matrixfile,
-                          rhsfile,
-                          partitionfile,
-                          "",
-                          commtopologyfile,
-                          timeout,
-                          output_directory);
+                          std::string(DATA_DIR_DEST),
+                          output_directory,
+                          timeout);
     driver.solve();
     std::vector<double> targets = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}; 
     std::cout<< driver.test_output()<<std::endl;

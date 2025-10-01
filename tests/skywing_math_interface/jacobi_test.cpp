@@ -68,11 +68,9 @@ void machine_task(const int index)
     machine_2_partition.push_back(7);
     machine_2_partition.push_back(8);
 
-    std::string commtopologyfile =
-        std::string(DATA_DIR_DEST) + "/comm_topology.txt";
-    std::string partitionfile = std::string(DATA_DIR_DEST) + "/partition.txt";
-    std::string rhsfile = std::string(DATA_DIR_DEST) + "/rhs.txt";
-    std::string matrixfile = std::string(DATA_DIR_DEST) + "/matrix.txt";
+    std::string partitionfile = std::string(DATA_DIR_DEST) + "/row_partition.txt";
+    std::string rhsfile = std::string(DATA_DIR_DEST) + "/b.txt";
+    std::string matrixfile = std::string(DATA_DIR_DEST) + "/A.txt";
 
     ClosedVector machine_0_rhs = createClosedVector({0, 1, 2, 3}, {1.0, 0.0, 0.0, 0.0});
     ClosedVector machine_1_rhs = createClosedVector({4, 5}, {0.0, 0.0});
@@ -144,13 +142,9 @@ void machine_task(const int index)
 
     MyJacobiDriver driver(configurations,
                           agent_id,
-                          matrixfile,
-                          rhsfile,
-                          partitionfile,
-                          "",
-                          commtopologyfile,
-                          timeout,
-                          output_directory);
+                          std::string(DATA_DIR_DEST),
+                          output_directory,
+                          timeout);
     driver.solve();
     std::vector<double> targets = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
