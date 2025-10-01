@@ -221,7 +221,7 @@ public:
     * @param other The AssociativeVector to compute the dot product with.
     * @return The dot product result.
     */
-    val_t dot(const AssociativeVector<index_t, val_t, isOpen>& b)
+    val_t dot(const AssociativeVector<index_t, val_t, isOpen>& b) const
     {
         val_t result = 0;
         for (auto&& iter : b.data_) {

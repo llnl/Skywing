@@ -84,6 +84,10 @@ public:
 
     ValueType get_value() const { return local_x_; }
 
+    std::unordered_map<std::string, scalar_t> get_local_error_metrics() const {
+        return std::unordered_map<std::string, scalar_t>();
+    }
+
 private:
     ClosedMatrix M_;
     const std::vector<index_t> matrix_keys_;

@@ -45,11 +45,7 @@ int main(const int argc, const char* const argv[])
     // Set the processor, stop, publish, and resilience policies
     using MyJacobiDriver = LinearSystemDriver<MyJacobiProcessor, AlwaysPublish, WaitForRootSignal, TrivialResiliencePolicy>;
 
-    std::string matrixfile = "../jacobi_data/matrix.txt";
-    std::string rhsfile = "../jacobi_data/rhs.txt";
-    std::string rowpartitionfile = "../jacobi_data/partition.txt";
-    std::string colpartitionfile = "";
-    std::string commtopologyfile = "../jacobi_data/comm_topology.txt";
+    std::string datadirectory = "../jacobi_data";
 
     std::chrono::seconds timeout = std::chrono::seconds(30);
 
@@ -65,13 +61,9 @@ int main(const int argc, const char* const argv[])
 
     MyJacobiDriver driver(configurations,
                           agent_id,
-                          matrixfile,
-                          rhsfile,
-                          rowpartitionfile,
-                          colpartitionfile,
-                          commtopologyfile,
-                          timeout,
-                          outputdirectory);
+                          datadirectory,
+                          outputdirectory,
+                          timeout);
     driver.solve();
 }
 

@@ -24,10 +24,8 @@ TEST_CASE("COLA", "[mid]")
 
     std::string data_dir = std::string(DATA_DIR_DEST) + "/mg";
 
-    std::string A_file = data_dir + "/A.csv";
-    std::string b_file = data_dir + "/b.csv";
-    std::string col_partition_file = data_dir + "/col_partition.txt";
-    std::string comm_topology_file = data_dir + "/comm_topology.txt";
+    std::string A_file = data_dir + "/A.txt";
+    std::string b_file = data_dir + "/b.txt";
 
     std::string output_dir = "./temp_output";
     std::filesystem::create_directories(output_dir); // Create the folder
@@ -41,11 +39,9 @@ TEST_CASE("COLA", "[mid]")
                num_agents,
                lambda,
                shift_scale,
-               A_file,
-               b_file,
-               "",
-               col_partition_file,
-               comm_topology_file,
+               true,
+               10,
+               data_dir,
                output_dir);
 
     // Get the outputs from each agent

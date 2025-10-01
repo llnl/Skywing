@@ -88,12 +88,8 @@ bool fileExists(const std::string& filename)
 void runSolver(
     const std::unordered_map<std::string, MachineConfig>& configurations,
     unsigned agentId,
-    std::string const& A_file,
-    std::string const& b_file,
-    std::string const& row_partition_file,
-    std::string const& col_partition_file,
-    std::string const& comm_topology_file,
-    const std::string& outputDirectory)
+    const std::string& dataDir,
+    const std::string& outputDir)
 {
     std::chrono::seconds timeout(5);
     using MyJacobiProcessor = JacobiProcessor<uint32_t, double>;
@@ -104,13 +100,9 @@ void runSolver(
 
     MyJacobiDriver driver(configurations,
                           agentId,
-                          A_file,
-                          b_file,
-                          row_partition_file,
-                          col_partition_file,
-                          comm_topology_file,
-                          timeout,
-                          outputDirectory);
+                          dataDir,
+                          outputDir,
+                          timeout);
     driver.solve();
 }
 
@@ -119,35 +111,17 @@ int main(int argc, char* argv[])
 {
     // Validate command-line arguments
     if (argc != 6) {
-        std::cerr << "Usage: <program> <starting_port> <system_folder> "
-                     "<data_folder> <size_of_system>"
+        std::cerr << "Usage: <program> <starting_port> <data_directory> "
+                     "<output_directory> <size_of_system>"
                   << std::endl;
         return 1;
     }
 
     // Parse command-line arguments
     unsigned startingPort = std::stoi(argv[2]);
-    std::string systemFolder = argv[3];
-    std::string dataFolder = argv[4];
+    std::string dataDir = argv[3];
+    std::string outputDir = argv[4];
     uint32_t systemSize = std::stoi(argv[5]);
-
-    // File paths
-    std::string matrixFile = systemFolder + "/A.txt";
-    std::string rhsFile = systemFolder + "/b.txt";
-    std::string rowPartitionFile = systemFolder + "/row_partition.txt";
-    std::string colPartitionFile = systemFolder + "/col_partition.txt";
-    std::string commTopologyFile = systemFolder + "/comm_topology.txt";
-
-    // Check file existence
-    if (!fileExists(rhsFile)) {
-        std::cerr << "File does not exist: " << rhsFile << std::endl;
-        return 1;
-    }
-
-    if (!fileExists(matrixFile)) {
-        std::cerr << "File does not exist: " << matrixFile << std::endl;
-        return 1;
-    }
 
     // Generate configurations
     auto configurations = setConfigurations(startingPort, systemSize);
@@ -159,12 +133,8 @@ int main(int argc, char* argv[])
         threads.emplace_back(runSolver,
                              configurations,
                              i,
-                             matrixFile,
-                             rhsFile,
-                             rowPartitionFile,
-                             colPartitionFile,
-                             commTopologyFile,
-                             dataFolder);
+                             dataDir,
+                             outputDir);
     }
 
     // Join threads

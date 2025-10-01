@@ -92,82 +92,84 @@ setConfigurations(std::uint16_t startingPort, std::uint16_t systemSize)
 void runSolver(
     const std::unordered_map<std::string, MachineConfig>& configurations,
     unsigned agentId,
-    std::string const& A_file,
-    std::string const& b_file,
-    std::string const& row_partition_file,
-    std::string const& col_partition_file,
-    std::string const& comm_topology_file,
+    const std::string& data_dir,
     const std::string& output_dir,
     const AssociativeVector<tag_t, scalar_t, false>& W_k,
     double lambda,
     size_t num_agents,
-    bool shift_scale)
+    bool shift_scale,
+    bool sync_,
+    size_t timeout_)
 {
-    std::chrono::seconds timeout(30);
-    using MyCOLAProcessor =
+    std::chrono::seconds timeout(timeout_);
+    using SyncCOLAProcessor =
         ProcessorSyncWrapper<COLAProcessor, index_t, scalar_t, tag_t>;
-    using MyCOLADriver = LinearSystemDriver<MyCOLAProcessor,
-                                            AlwaysPublish,
-                                            IterateUntilTime,
-                                            TrivialResiliencePolicy>;
+    using AsyncCOLAProcessor = COLAProcessor<index_t, scalar_t, tag_t>;
+    using SyncCOLADriver = LinearSystemDriver<SyncCOLAProcessor,
+                                              AlwaysPublish,
+                                              IterateUntilTime,
+                                              TrivialResiliencePolicy>;
+    using AsyncCOLADriver = LinearSystemDriver<AsyncCOLAProcessor,
+                                              AlwaysPublish,
+                                              IterateUntilTime,
+                                              TrivialResiliencePolicy>;
 
-    MyCOLADriver driver(configurations,
-                        agentId,
-                        A_file,
-                        b_file,
-                        row_partition_file,
-                        col_partition_file,
-                        comm_topology_file,
-                        timeout,
-                        output_dir,
-                        true);
-    driver.solve(W_k, lambda, num_agents, shift_scale);
+    if (sync_)
+    {
+        SyncCOLADriver driver(configurations,
+                              agentId,
+                              data_dir,
+                              output_dir,
+                              timeout,
+                              true);
+        driver.solve(W_k, lambda, num_agents, shift_scale);
+    }
+    else
+    {
+        AsyncCOLADriver driver(configurations,
+                               agentId,
+                               data_dir,
+                               output_dir,
+                               timeout,
+                               false);
+        driver.solve(W_k, lambda, num_agents, shift_scale);
+    }
 }
 
 int drive_COLA(size_t starting_port,
                size_t num_agents,
                scalar_t lambda,
                bool shift_scale,
-               std::string A_file,
-               std::string b_file,
-               std::string row_partition_file,
-               std::string col_partition_file,
-               std::string comm_topology_file,
+               bool sync,
+               size_t timeout,
+               std::string data_dir,
                std::string output_dir)
 {
     // Generate machine configurations
     auto configurations = setConfigurations(starting_port, num_agents);
     printConfigurations(configurations);
 
+    std::filesystem::path comm_topology_file = data_dir;
+    comm_topology_file /= "comm_topology.txt";
+    
     // Launch solver threads
     std::vector<std::thread> threads;
     for (uint32_t i = 0; i < num_agents; ++i) {
         // Generate mixing matrix and dump to file
         auto W_k = generate_mixing_matrix(comm_topology_file, i);
-        {
-            std::string const mixing_matrix_path =
-                output_dir + "/W_k_" + std::to_string(i) + ".txt";
-            std::ofstream mixing_matrix_file{mixing_matrix_path,
-                                             std::ios::trunc};
-            if (mixing_matrix_file.is_open()) {
-                mixing_matrix_file << W_k << std::endl;
-            }
-        }
 
         // Launch the linear system driver job
         threads.emplace_back(runSolver,
                              configurations,
                              i,
-                             A_file,
-                             b_file,
-                             row_partition_file,
-                             col_partition_file,
-                             comm_topology_file,
+                             data_dir,
                              output_dir,
                              W_k,
                              lambda,
                              num_agents,
-                             shift_scale);
+                             shift_scale,
+                             sync,
+                             timeout);
     }
 
     // Join threads

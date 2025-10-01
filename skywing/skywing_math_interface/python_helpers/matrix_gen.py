@@ -138,7 +138,7 @@ def generate_rhs(rhs_type, n, output_dir, **kwargs):
     print(f"RHS saved as {output_dir}/b.txt")
     return b
 
-def generate_solution(A, b, output_dir):
+def generate_solution(A, b, output_dir, **kwargs):
     """
     Solve the linear system and save the solution to file.
 
@@ -146,8 +146,14 @@ def generate_solution(A, b, output_dir):
     A (np.array): The matrix.
     b (np.array): The right-hand side vector.
     output_dir (str): The output directory.
+    kwargs: Additional arguments (e.g. l2 regularization term, lam).
     """
 
+    # Optional l2 regularization
+    if kwargs.get('lam'):
+        lam = kwargs.get('lam')
+        A = np.vstack((A, np.sqrt(lam) * np.eye(A.shape[1])))
+        b = np.concatenate((b, np.zeros(A.shape[1])))
     x, residuals, rank, singular_values = np.linalg.lstsq(A, b)
     np.savetxt(f"{output_dir}/x.txt", x, fmt='%.6f')
     print(f"Solution saved as {output_dir}/x.txt")
@@ -292,7 +298,7 @@ def main(matrix_type, output_dir, rhs_type, n, m, row_partitions, col_partitions
     b = generate_rhs(rhs_type, A.shape[0], output_dir, **kwargs)
 
     # Solve the system and save the solution
-    generate_solution(A, b, output_dir)
+    generate_solution(A, b, output_dir, **kwargs)
 
     # Save partitioning info
     generate_partitions(A, output_dir, row_partitions, col_partitions)
@@ -312,6 +318,7 @@ if __name__ == "__main__":
                         help='Output directory where the matrix and related files are saved.')
     parser.add_argument('-b', '--rhs', type=str, choices=['trivial', 'uniform', 'random', 'read'], default='trivial',
                         help='Option for the right-hand side vector.')
+    parser.add_argument('-l', '--lam', type=float, default=None, help='l2 regularization.')
     parser.add_argument('-n', '--n', type=int, default=10, help='Number of rows.')
     parser.add_argument('-m', '--m', type=int, default=None, help='Number of columns (defaults to number of rows).')
     parser.add_argument('-r', '--row_partitions', type=int, default=1, help='Number of row partitions.')
@@ -345,6 +352,7 @@ if __name__ == "__main__":
          args.row_partitions,
          args.col_partitions,
          args.comm_topology,
+         lam=args.lam,
          matrix_read_file=args.matrix_read_file,
          rhs_read_file=args.rhs_read_file,
          graph_type=args.graph_type,

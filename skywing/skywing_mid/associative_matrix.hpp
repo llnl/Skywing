@@ -80,7 +80,7 @@ public:
     /**
      * @brief Transpose the matrix (in place).
      */
-    AssociativeMatrix<index_t, val_t, isOpen> transpose()
+    AssociativeMatrix<index_t, val_t, isOpen> transpose() const
     {
         // Build up transposed data
         std::unordered_map<index_t, std::unordered_map<index_t, val_t>>
