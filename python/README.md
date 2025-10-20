@@ -7,10 +7,10 @@ To install this,
 
 Extra control is possible, e.g.,
 
-    CMAKE_ARGS="-DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON -DSKYWING_DEVELOPER_BUILD=ON DSKYWING_WARNINGS_AS_ERRORS=ON -DSKYWING_ENABLE_MEMCHECK=OFF -DSKYWING_LOG_LEVEL=trace DSKYWING_USE_EIGEN_MATH_EXAMPLES=ON" pip install .
+    CMAKE_ARGS="-DSKYWING_BUILD_TESTS=ON -DSKYWING_BUILD_EXAMPLES=ON -DSKYWING_DEVELOPER_BUILD=ON DSKYWING_WARNINGS_AS_ERRORS=ON -DSKYWING_ENABLE_MEMCHECK=OFF -DSKYWING_LOG_LEVEL=trace DSKYWING_USE_EIGEN=ON" pip install .
 
 
-The CMake build will happen in $PWD/skbuild. 
+The CMake build will happen in $PWD/skbuild.
 
 Editable installs are recommended to be run with --no-build-isolation, in which case the user is responsible for providing all of the required dependencies.
 
@@ -40,4 +40,4 @@ or
 
 If definining a C++ consensus operation, the `processor_name` must
 be an object made available through pybind11 in `skywing_cpp_interface`.
-If defining a Python consensus operation, the `processor_name` must be an object 
+If defining a Python consensus operation, the `processor_name` must be an object

@@ -4,11 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <vector>
 
-#include "skywing_core/internal/utility/network_conv.hpp"
 #include "skywing_core/types.hpp"
 
 namespace skywing::internal
@@ -33,6 +31,9 @@ enum class [[nodiscard]] ConnectionError
     closed
 }; // enum class ConnectionError
 
+// Forward declaration
+class SocketImplBase;
+
 /** \brief Socket based communicator
  */
 class SocketCommunicator
@@ -51,35 +52,27 @@ public:
     SocketCommunicator& operator=(SocketCommunicator&&) noexcept;
 
     // Destructor
-    ~SocketCommunicator();
-
-    /** \brief Accepts an incoming connection if one is pending
-     */
-    std::optional<SocketCommunicator> accept() noexcept;
-
-    /** \brief Listens for requests on the specified port
-     *
-     * \param port The port to listen for connections on
-     */
-    ConnectionError set_to_listen(std::uint16_t port) noexcept;
+    ~SocketCommunicator() noexcept;
 
     /** \brief Connects to a server
      *
      * \param address The address to connect to
      * \param port The port to connect on
      */
-    ConnectionError connect_to_server(const char* address,
-                                      std::uint16_t port) noexcept;
-
-    /** \brief Connects to a server given an address:port string
-     */
-    ConnectionError connect_to_server(std::string_view address) noexcept;
+    ConnectionError connect_to_server(SocketAddr const& address) noexcept;
 
     /** \brief Initiates a non-blocking connection to a server
+     *
+     *  \warning Unix sockets will still block. This should be very
+     *  low overhead, though, as we're just waiting for the
+     *  filesystem/kernel to catch up. There is a risk of deadlock,
+     *  however, if a neighbor agent fails to appear (e.g., if it's
+     *  spelled wrong or if it dies prematurely or the like). As a
+     *  corollary, there could be an issue if a single process tries
+     *  to manage multiple agents (please don't do this) and the
+     *  Managers are not setup properly.
      */
-    ConnectionError connect_non_blocking(const char* address,
-                                         std::uint16_t port) noexcept;
-    ConnectionError connect_non_blocking(std::string_view address) noexcept;
+    ConnectionError connect_non_blocking(SocketAddr const& address) noexcept;
 
     /** \brief Returns status on a pending connection
      *
@@ -107,23 +100,39 @@ public:
 
     /** \brief Returns the IP address and port of the socket's peer
      */
-    AddrPortPair ip_address_and_port() const noexcept;
+    SocketAddr ip_address_and_port() const noexcept;
 
     /** \brief Returns the IP address and port of the host end of the socket
      */
-    AddrPortPair host_ip_address_and_port() const noexcept;
+    SocketAddr host_ip_address_and_port() const noexcept;
+    // FIXME: This doesn't actually matter! It's just used for logging in
+    // manager.cpp.
 
 private:
-    // Tag for using the raw handle constructor
-    struct WithRawHandle
-    {};
+    friend class SocketListener;
 
-    // Construct a socket using a pre-exising handle
-    SocketCommunicator(WithRawHandle, const int handle) noexcept;
-
-    // The handle to the raw socket
-    int handle_;
+    SocketCommunicator(std::unique_ptr<SocketImplBase> socket);
+    std::unique_ptr<SocketImplBase> m_handle;
 }; // class SocketCommunicator
+
+/** @brief Just a little class to sit and listen for incoming connections. */
+class SocketListener
+{
+    std::unique_ptr<SocketImplBase> m_handle;
+
+public:
+    SocketListener(SocketAddr const& local_addr);
+    SocketListener(std::string const& local_addr);
+    SocketListener(unsigned short port);
+    SocketListener(SocketListener const&) = delete;
+    SocketListener& operator=(SocketListener const&) = delete;
+    SocketListener(SocketListener&& other) noexcept = default;
+    SocketListener& operator=(SocketListener&& other) noexcept = default;
+    ~SocketListener();
+
+    SocketAddr listening_addr() const;
+    std::optional<SocketCommunicator> accept();
+}; // class SocketListener
 
 /** \brief Read a message in chunks from a SocketCommunicator.
  */
@@ -133,7 +142,7 @@ std::vector<std::byte> read_chunked(SocketCommunicator& conn,
 /** \brief Splits an "ip:port" address into its parts
  * The string is empty if the input was invalid
  */
-AddrPortPair split_address(const std::string_view address) noexcept;
+SocketAddr split_address(const std::string_view address) noexcept;
 
 /** \brief Attempts to read a network size from a connection
  *
@@ -144,11 +153,11 @@ read_network_size(SocketCommunicator& conn) noexcept;
 
 /** \brief Returns an "IP:Port" string from a given address
  */
-std::string to_ip_port(const AddrPortPair& addr) noexcept;
+std::string to_ip_port(const SocketAddr& addr) noexcept;
 
-/** \brief Converts an AddrPortPair to the canonical representation
+/** \brief Converts an SocketAddr to the canonical representation
  */
-AddrPortPair to_canonical(const AddrPortPair& addr) noexcept;
+SocketAddr to_canonical(const SocketAddr& addr) noexcept;
 } // namespace skywing::internal
 
 #endif // SKYWING_INTERNAL_DEVICES_SOCKET_COMMUNICATOR_HPP

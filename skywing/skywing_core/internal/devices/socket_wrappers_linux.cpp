@@ -2,9 +2,9 @@
 
 namespace skywing::internal
 {
-int create_non_blocking() noexcept
+int create_non_blocking(int address_family) noexcept
 {
-    return socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    return socket(address_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
 }
 
 int accept_make_non_blocking(const int sockfd,

@@ -8,14 +8,32 @@
 
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 
 #include "generated/socket_no_sigpipe.hpp"
 #include "skywing_core/internal/utility/logging.hpp"
+#include "skywing_core/internal/utility/network_conv.hpp"
 #include "socket_wrappers.hpp"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+
+// NOTE (trb): I like abstract sockets. Especially on clusters that
+// might have a variety of filesystems mounted, this saves some
+// headache if the filesystem is slow or otherwise disgruntled. While
+// the Linux implementation allows a mixture of "abstract" and
+// "pathname" sockets to coexist peacefully, Skywing doesn't care --
+// Linux will only use "abstract" sockets and non-Linux will use
+// "pathname" sockets.
+#ifdef __linux__
+#define SKYWING_ABSTRACT_SOCKETS 1
+#define SKYWING_LINUX_NOEXCEPT noexcept
+#else
+#define SKYWING_ABSTRACT_SOCKETS 0
+#define SKYWING_LINUX_NOEXCEPT
+#endif
 
 namespace
 {
@@ -28,8 +46,7 @@ struct addrinfo_deleter
 
 using addrinfo_ptr = std::unique_ptr<addrinfo, addrinfo_deleter>;
 
-addrinfo_ptr resolve_addr(const char* const address,
-                          const std::uint16_t port) noexcept
+addrinfo_ptr resolve_ipv4_addr(skywing::SocketAddr const& addr) noexcept
 {
     addrinfo* result;
     addrinfo hints;
@@ -37,19 +54,20 @@ addrinfo_ptr resolve_addr(const char* const address,
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_IP;
-    const auto port_str = std::to_string(port);
+    const auto port_str = std::to_string(addr.port());
     const auto resaddr =
-        getaddrinfo(address, port_str.c_str(), &hints, &result);
+        getaddrinfo(addr.address().c_str(), port_str.c_str(), &hints, &result);
     if (resaddr != 0) {
-        std::perror("resolve_addr - resaddr");
-        std::exit(4);
+        std::cerr << "resolve_ipv4_addr - getaddrinfo failed (address=\""
+                  << addr.address() << "\", port=" << addr.port()
+                  << "): " << gai_strerror(resaddr) << std::endl;
+        std::terminate();
     }
     return {result, {}};
 }
 
-int init_connection(const int sockfd,
-                    const char* const address,
-                    const std::uint16_t port) noexcept
+int init_ipv4_connection(const int sockfd,
+                         skywing::SocketAddr const& addr) noexcept
 {
     // TODO: What is the correct address-acquisition approach?
 
@@ -60,10 +78,10 @@ int init_connection(const int sockfd,
     // static_cast<int>(result->ai_addrlen));
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, address, &serv_addr.sin_addr) <= 0) {
-        SKYWING_ERROR_LOG("Invalid address {}", address);
-        std::exit(4);
+    serv_addr.sin_port = htons(addr.port());
+    if (inet_pton(AF_INET, addr.address().c_str(), &serv_addr.sin_addr) <= 0) {
+        SKYWING_ERROR_LOG("Invalid IPv4 address \"{}\"", addr);
+        std::terminate();
     }
     return connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
 }
@@ -71,115 +89,174 @@ int init_connection(const int sockfd,
 
 namespace skywing::internal
 {
-SocketCommunicator::SocketCommunicator() noexcept
-    : handle_{create_non_blocking()}
+
+// NOTE (trb): This interface extracts essentially the core
+// capabilities we need from the socket API. Concrete implementations
+// will be provided for "SOCK_STREAM" type in the IPv4 (AF_INET) and
+// Unix/Local (AF_LOCAL) families. One will notice that I've left
+// essentially all of the interface abstract in the base class, even
+// though the concrete implementations share considerable similarity.
+// The fact is, though, that some element of virtuality is needed in
+// each of the functions (generally the specification of the concrete
+// "sockaddr" type), and it doesn't much matter where the virtuality
+// hits. IMO, the fully self-contained concrete implementations were
+// easier to ready and rather simple to implement. It also led to
+// greater consistency across the few instances were there is some
+// difference more subtle than just a sockaddr type.
+//
+// It is also possible to do this without any sort of virtuality with
+// explicit branching based on
+// `SocketAddr::is_unix()`/`SocketAddr::is_ipv4()`, using
+// `sockaddr_storage` as the common address type that could be passed
+// around when needed. However, none of the functions implemented here
+// are actually performance-critical -- may as well let C++'s virtual
+// functions try to be useful. It also seems that, if we add some
+// other sort of socket impl (IPv6, e.g.), the virtual inteface would
+// be easier to extend.
+class SocketImplBase
 {
-    if (handle_ == invalid_handle) {
-        std::perror("SocketCommunicator::SocketCommunicator - socket");
-        std::exit(4);
+protected:
+    int m_handle = -1;
+
+public:
+    SocketImplBase(int address_family);
+    virtual ~SocketImplBase();
+
+    int get() const noexcept { return m_handle; }
+
+    virtual void set_to_listen(SocketAddr const&) = 0;
+    virtual std::unique_ptr<SocketImplBase> accept() const noexcept = 0;
+
+    virtual ConnectionError connect_blocking(SocketAddr const& addr) = 0;
+    virtual ConnectionError connect_non_blocking(SocketAddr const& addr) = 0;
+
+    virtual ConnectionError connection_progress_status() noexcept = 0;
+
+    virtual SocketAddr ip_addr_and_port() const noexcept = 0;
+    virtual SocketAddr host_ip_addr_and_port() const noexcept = 0;
+};
+
+class IPv4Socket final : public SocketImplBase
+{
+public:
+    IPv4Socket() noexcept : SocketImplBase{AF_INET} {};
+    ~IPv4Socket() final = default;
+
+    void set_to_listen(SocketAddr const&) final;
+    std::unique_ptr<SocketImplBase> accept() const noexcept final;
+
+    ConnectionError connect_blocking(SocketAddr const& addr) final;
+    ConnectionError connect_non_blocking(SocketAddr const& addr) final;
+
+    ConnectionError connection_progress_status() noexcept final;
+
+    SocketAddr ip_addr_and_port() const noexcept final;
+    SocketAddr host_ip_addr_and_port() const noexcept final;
+}; // class IPv4Socket
+
+class UnixSocket final : public SocketImplBase
+{
+public:
+    UnixSocket() noexcept : SocketImplBase{AF_LOCAL} {}
+
+    ~UnixSocket() SKYWING_LINUX_NOEXCEPT final;
+
+    void set_to_listen(SocketAddr const&) final;
+    std::unique_ptr<SocketImplBase> accept() const noexcept final;
+
+    ConnectionError connect_blocking(SocketAddr const& addr) final;
+    ConnectionError connect_non_blocking(SocketAddr const& addr) final;
+
+    ConnectionError connection_progress_status() noexcept final;
+
+    SocketAddr ip_addr_and_port() const noexcept final;
+    SocketAddr host_ip_addr_and_port() const noexcept final;
+}; // class UnixSocket
+
+SocketImplBase::SocketImplBase(int address_family)
+    : m_handle{create_non_blocking(address_family)}
+{}
+
+SocketImplBase::~SocketImplBase()
+{
+    if (m_handle != invalid_handle) {
+        shutdown(m_handle, SHUT_RDWR);
+        close(m_handle);
+        m_handle = invalid_handle;
     }
 }
 
-SocketCommunicator::SocketCommunicator(SocketCommunicator&& other) noexcept
-    : handle_{other.handle_}
+void IPv4Socket::set_to_listen(SocketAddr const& addr)
 {
-    other.handle_ = invalid_handle;
-}
+    constexpr int listen_queue_size = 10;
 
-SocketCommunicator&
-SocketCommunicator::operator=(SocketCommunicator&& other) noexcept
-{
-    // Do this in a roundabout way to handle self-assignment
-    const auto new_handle = other.handle_;
-    other.handle_ = invalid_handle;
-    handle_ = new_handle;
-    return *this;
-}
+    sockaddr_in servaddr{};
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(addr.port());
 
-SocketCommunicator::~SocketCommunicator()
-{
-    if (handle_ != invalid_handle) {
-        shutdown(handle_, SHUT_RDWR);
-        close(handle_);
-        handle_ = invalid_handle;
+    int optval = 1;
+    if (setsockopt(m_handle, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
+        < 0)
+    {
+        SKYWING_DEBUG_LOG("setsockopt(SO_REUSEADDR) failed: {}",
+                          strerror(errno));
+        throw std::runtime_error("IPv4Socket - setsockopt failed.");
+    }
+
+    if (bind(m_handle, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr))
+        < 0)
+    {
+        std::perror("IPv4Socket::set_to_listen - bind");
+        throw std::runtime_error("IPv4Socket - bind failed.");
+    }
+    if (listen(m_handle, listen_queue_size) < 0) {
+        std::perror("IPv4Socket::set_to_listen - listen");
+        throw std::runtime_error("IPv4Socket - listen failed.");
     }
 }
 
-std::optional<SocketCommunicator> SocketCommunicator::accept() noexcept
+std::unique_ptr<SocketImplBase> IPv4Socket::accept() const noexcept
 {
     sockaddr_in client_address_struct;
-    // len can't be const as accept takes a non-const pointer
     socklen_t len = sizeof(client_address_struct);
 
     const int raw_handle = accept_make_non_blocking(
-        handle_, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
+        m_handle, reinterpret_cast<sockaddr*>(&client_address_struct), &len);
     if (raw_handle == invalid_handle) {
         // No connection to be made
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return {};
+            return nullptr;
         }
         // This should never happen and is a programming bug if it's reached
         // Not 100% sure how to handle it, but forcefully quitting with a
         // message seems to be fine for now
         SKYWING_DEBUG_LOG(
-            "accept had handle_ {}, raw_handle {}, threw error: {}",
-            handle_,
+            "accept had m_handle {}, raw_handle {}, threw error: {}",
+            m_handle,
             raw_handle,
             strerror(errno));
-        std::perror("SocketCommunicator::accept - accept");
-        std::exit(4);
+        std::perror("IPv4Socket::accept - accept");
+        std::terminate();
     }
 
-    // Read the address
-    return SocketCommunicator(WithRawHandle{}, raw_handle);
+    auto out = std::make_unique<IPv4Socket>();
+    out->m_handle = raw_handle;
+    return out;
 }
 
-ConnectionError
-SocketCommunicator::set_to_listen(const std::uint16_t port) noexcept
+ConnectionError IPv4Socket::connect_blocking(SocketAddr const& addr)
 {
-    constexpr int listen_queue_size = 10;
-    sockaddr_in servaddr{};
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
-    servaddr.sin_port = htons(port);
-
-    int optval = 1;
-    if (setsockopt(handle_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
-        < 0)
-    {
-        SKYWING_DEBUG_LOG("setsockopt(SO_REUSEADDR) failed: {}",
-                          strerror(errno));
-        return ConnectionError::unrecoverable;
-    }
-
-    if (bind(handle_, reinterpret_cast<sockaddr*>(&servaddr), sizeof(servaddr))
-        < 0)
-    {
-        // std::perror("SocketCommunicator::set_to_listen - bind");
-        // std::exit(-1);
-        return ConnectionError::unrecoverable;
-    }
-    if (listen(handle_, listen_queue_size) < 0) {
-        // std::perror("SocketCommunicator::set_to_listen - listen");
-        // std::exit(-1);
-        return ConnectionError::unrecoverable;
-    }
-    return ConnectionError::no_error;
-}
-
-ConnectionError
-SocketCommunicator::connect_to_server(const char* const address,
-                                      const std::uint16_t port) noexcept
-{
-    if (init_connection(handle_, address, port) == -1) {
+    // FIXME (trb): Can we just throw for errors? What happens with
+    // ConnectionError::unrecoverable?
+    auto const connect_status = init_ipv4_connection(m_handle, addr);
+    if (connect_status == -1) {
         if (errno == EINPROGRESS) {
             // wait for the connection to finish
             pollfd to_poll;
-            to_poll.fd = handle_;
+            to_poll.fd = m_handle;
             to_poll.events = POLLOUT;
             if (poll(&to_poll, 1, -1) < 0) {
-                // perror("SocketCommunicator::connect_to_server - poll");
-                // exit(-1);
                 return ConnectionError::unrecoverable;
             }
             // Check if any error occured
@@ -189,48 +266,29 @@ SocketCommunicator::connect_to_server(const char* const address,
             }
         }
         else {
-            // std::perror("SocketCommunicator::connect_to_server - connect");
-            // std::exit(-1);
             return ConnectionError::unrecoverable;
         }
     }
     return ConnectionError::no_error;
 }
 
-ConnectionError
-SocketCommunicator::connect_to_server(const std::string_view address) noexcept
+ConnectionError IPv4Socket::connect_non_blocking(SocketAddr const& addr)
 {
-    const auto [address_str, port] = split_address(address);
-    if (address_str.empty()) {
-        return ConnectionError::unrecoverable;
-    }
-    return connect_to_server(address_str.c_str(), port);
-}
+    auto const connect_status = init_ipv4_connection(m_handle, addr);
 
-ConnectionError
-SocketCommunicator::connect_non_blocking(const char* address,
-                                         std::uint16_t port) noexcept
-{
-    if (init_connection(handle_, address, port) == -1 && errno == EINPROGRESS) {
+    if (connect_status == 0) {
+        return ConnectionError::no_error;
+    }
+    if (connect_status == -1 && errno == EINPROGRESS) {
         return ConnectionError::connection_in_progress;
     }
     return ConnectionError::unrecoverable;
 }
 
-ConnectionError SocketCommunicator::connect_non_blocking(
-    const std::string_view address) noexcept
-{
-    const auto [address_str, port] = split_address(address);
-    if (address_str.empty()) {
-        return ConnectionError::unrecoverable;
-    }
-    return connect_non_blocking(address_str.c_str(), port);
-}
-
-ConnectionError SocketCommunicator::connection_progress_status() noexcept
+ConnectionError IPv4Socket::connection_progress_status() noexcept
 {
     pollfd to_poll;
-    to_poll.fd = handle_;
+    to_poll.fd = m_handle;
     to_poll.events = POLLOUT | POLLIN;
     if (poll(&to_poll, 1, 0) < 0) {
         // std::perror("SOCKET POLL ERROR: ");
@@ -252,17 +310,231 @@ ConnectionError SocketCommunicator::connection_progress_status() noexcept
     return ConnectionError::connection_in_progress;
 }
 
+SocketAddr IPv4Socket::ip_addr_and_port() const noexcept
+{
+    sockaddr_in client_address;
+    socklen_t len = sizeof(client_address);
+    int err = getpeername(m_handle, (struct sockaddr*) &client_address, &len);
+    if (err != 0)
+        SKYWING_DEBUG_LOG("IPv4Socket: ip_address_and_port threw error: {}",
+                          strerror(errno));
+
+    return {inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port)};
+}
+
+SocketAddr IPv4Socket::host_ip_addr_and_port() const noexcept
+{
+    sockaddr_in host_address;
+    socklen_t len = sizeof(host_address);
+    auto err = getsockname(m_handle, (struct sockaddr*) &host_address, &len);
+    if (err != 0) {
+        SKYWING_DEBUG_LOG(
+            "IPv4Socket: host_ip_address_and_port threw error: {}",
+            strerror(errno));
+    }
+    return {inet_ntoa(host_address.sin_addr), ntohs(host_address.sin_port)};
+}
+
+// UnixSocket impl
+
+UnixSocket::~UnixSocket() SKYWING_LINUX_NOEXCEPT
+{
+#if !SKYWING_ABSTRACT_SOCKETS
+    auto const addr = host_ip_addr_and_port();
+    if (!addr.address().empty())
+        ::unlink(addr.address().c_str());
+#endif
+}
+
+void UnixSocket::set_to_listen(SocketAddr const& addr)
+{
+    constexpr int listen_queue_size = 10;
+
+    sockaddr_un servaddr;
+    std::memset(&servaddr, 0, sizeof(sockaddr_un));
+    servaddr.sun_family = AF_LOCAL;
+#if SKYWING_ABSTRACT_SOCKETS
+    std::strncpy(&servaddr.sun_path[1],
+                 addr.address().c_str(),
+                 std::size(servaddr.sun_path) - 2);
+    // NOTE (trb): _technically_ the final null terminator doesn't
+    // matter. However, it simplifies things to have it (e.g., just
+    // casting the "char*" into a std::string). Also, Skywing is not
+    // supporting mid-socket-name null characters, since these
+    // wouldn't be valid for "pathname" sockets.
+#else
+    std::strncpy(servaddr.sun_path,
+                 addr.address().c_str(),
+                 std::size(servaddr.sun_path) - 1);
+#endif
+
+    int optval = 1;
+    if (setsockopt(m_handle, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
+        < 0)
+    {
+        SKYWING_DEBUG_LOG("setsockopt(SO_REUSEADDR) failed: {}",
+                          strerror(errno));
+        throw std::runtime_error("UnixSocket - setsockopt failed.");
+    }
+
+    if (bind(m_handle, (sockaddr*) &servaddr, sizeof(servaddr)) < 0) {
+        std::perror("UnixSocket::set_to_listen - bind");
+        throw std::runtime_error("UnixSocket - bind failed.");
+    }
+
+    if (listen(m_handle, listen_queue_size) < 0) {
+        std::perror("UnixSocket::set_to_listen - listen");
+        throw std::runtime_error("UnixSocket - listen failed.");
+    }
+}
+
+std::unique_ptr<SocketImplBase> UnixSocket::accept() const noexcept
+{
+    sockaddr_un client_address_struct;
+    socklen_t len = sizeof(client_address_struct);
+
+    const int raw_handle = accept_make_non_blocking(
+        m_handle, (sockaddr*) &client_address_struct, &len);
+    if (raw_handle == invalid_handle) {
+        // No connection to be made
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return nullptr;
+        }
+        // This should never happen and is a programming bug if it's reached
+        // Not 100% sure how to handle it, but forcefully quitting with a
+        // message seems to be fine for now
+        SKYWING_DEBUG_LOG(
+            "accept had m_handle {}, raw_handle {}, threw error: {}",
+            m_handle,
+            raw_handle,
+            strerror(errno));
+        std::perror("UnixSocket::accept - accept");
+        std::terminate();
+    }
+
+    auto out = std::make_unique<UnixSocket>();
+    out->m_handle = raw_handle;
+    return out;
+}
+
+ConnectionError UnixSocket::connect_blocking(SocketAddr const& addr)
+{
+    sockaddr_un servaddr;
+    std::memset(&servaddr, 0, sizeof(sockaddr_un));
+    servaddr.sun_family = AF_LOCAL;
+#if SKYWING_ABSTRACT_SOCKETS
+    std::strncpy(&servaddr.sun_path[1],
+                 addr.address().c_str(),
+                 std::size(servaddr.sun_path) - 2);
+#else
+    std::strncpy(servaddr.sun_path,
+                 addr.address().c_str(),
+                 std::size(servaddr.sun_path) - 1);
+#endif
+
+    while (::connect(m_handle, (sockaddr const*) &servaddr, sizeof(servaddr))
+           == -1)
+    {
+        if (errno == ENOENT || errno == ECONNREFUSED)
+            continue;
+        return ConnectionError::unrecoverable;
+    }
+    return ConnectionError::no_error;
+}
+
+ConnectionError UnixSocket::connect_non_blocking(SocketAddr const& addr)
+{
+    // NOTE (trb): This isn't super easy to emulate, so just do a
+    // blocking connect for now. There's also less overhead on the
+    // backend here, so this shouldn't block for long anyway.
+    return this->connect_blocking(addr);
+}
+
+ConnectionError UnixSocket::connection_progress_status() noexcept
+{
+    // NOTE (trb): Because all connections are blocking, this is
+    // always "no_error". If the above function changes, this will
+    // need to be updated.
+    return ConnectionError::no_error;
+}
+
+SocketAddr UnixSocket::ip_addr_and_port() const noexcept
+{
+    sockaddr_un client_address;
+    socklen_t len = sizeof(client_address);
+    int err = getpeername(m_handle, (struct sockaddr*) &client_address, &len);
+    if (err != 0)
+        SKYWING_DEBUG_LOG("UnixSocket: ip_address_and_port threw error: {}",
+                          strerror(errno));
+
+#if SKYWING_ABSTRACT_SOCKETS
+    return {&client_address.sun_path[1], 0};
+#else
+    return {client_address.sun_path, 0};
+#endif
+}
+
+SocketAddr UnixSocket::host_ip_addr_and_port() const noexcept
+{
+    sockaddr_un host_address;
+    socklen_t len = sizeof(host_address);
+    getsockname(m_handle, (struct sockaddr*) &host_address, &len);
+#if SKYWING_ABSTRACT_SOCKETS
+    return {&host_address.sun_path[1], 0};
+#else
+    return {host_address.sun_path, 0};
+#endif
+}
+
+// SocketCommunicator
+
+SocketCommunicator::SocketCommunicator() noexcept = default;
+SocketCommunicator::SocketCommunicator(SocketCommunicator&&) noexcept = default;
+SocketCommunicator&
+SocketCommunicator::operator=(SocketCommunicator&&) noexcept = default;
+
+SocketCommunicator::~SocketCommunicator() noexcept = default;
+
+namespace
+{
+std::unique_ptr<SocketImplBase> make_suitable_socket(SocketAddr const& addr)
+{
+    if (addr.is_ipv4())
+        return std::make_unique<IPv4Socket>();
+    else if (addr.is_unix())
+        return std::make_unique<UnixSocket>();
+    return nullptr;
+}
+} // namespace
+
+ConnectionError
+SocketCommunicator::connect_to_server(SocketAddr const& addr) noexcept
+{
+    m_handle = make_suitable_socket(addr);
+    return m_handle->connect_blocking(addr);
+}
+
+ConnectionError
+SocketCommunicator::connect_non_blocking(SocketAddr const& addr) noexcept
+{
+    m_handle = make_suitable_socket(addr);
+    return m_handle->connect_non_blocking(addr);
+}
+
+ConnectionError SocketCommunicator::connection_progress_status() noexcept
+{
+    return m_handle->connection_progress_status();
+}
+
 ConnectionError
 SocketCommunicator::send_message(const std::byte* const message,
                                  const std::size_t size) noexcept
 {
-    if (send(handle_, message, size, SKYWING_NO_SIGPIPE) < 0) {
+    if (send(m_handle->get(), message, size, SKYWING_NO_SIGPIPE) < 0) {
         SKYWING_DEBUG_LOG("send_message threw error: {}", strerror(errno));
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return ConnectionError::would_block;
         }
-        // std::perror("SocketCommunicator::send_message - write");
-        // std::exit(-1);
         return ConnectionError::unrecoverable;
     }
     return ConnectionError::no_error;
@@ -273,7 +545,7 @@ SocketCommunicator::read_message(std::byte* const buffer,
                                  const std::size_t size) noexcept
 {
     const auto read_bytes =
-        read(handle_, reinterpret_cast<char*>(buffer), size);
+        read(m_handle->get(), reinterpret_cast<char*>(buffer), size);
     if (read_bytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return ConnectionError::would_block;
@@ -282,33 +554,66 @@ SocketCommunicator::read_message(std::byte* const buffer,
         SKYWING_DEBUG_LOG("read_message threw error: {}", strerror(errno));
         return ConnectionError::unrecoverable;
     }
-    return read_bytes == 0 ? ConnectionError::closed
-                           : ConnectionError::no_error;
+    return (read_bytes == 0 ? ConnectionError::closed
+                            : ConnectionError::no_error);
 }
 
-AddrPortPair SocketCommunicator::ip_address_and_port() const noexcept
+SocketAddr SocketCommunicator::ip_address_and_port() const noexcept
 {
-    sockaddr_in client_address;
-    socklen_t len = sizeof(client_address);
-    int err = getpeername(handle_, (struct sockaddr*) &client_address, &len);
-    if (err != 0)
-        SKYWING_DEBUG_LOG("ip_address_and_port threw error: {}",
-                          strerror(errno));
-
-    return {inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port)};
+    return m_handle->ip_addr_and_port();
 }
 
-AddrPortPair SocketCommunicator::host_ip_address_and_port() const noexcept
+SocketAddr SocketCommunicator::host_ip_address_and_port() const noexcept
 {
-    sockaddr_in host_address;
-    socklen_t len = sizeof(host_address);
-    getsockname(handle_, (struct sockaddr*) &host_address, &len);
-    return {inet_ntoa(host_address.sin_addr), ntohs(host_address.sin_port)};
+    return m_handle->host_ip_addr_and_port();
 }
 
-SocketCommunicator::SocketCommunicator(WithRawHandle, const int handle) noexcept
-    : handle_{handle}
+SocketCommunicator::SocketCommunicator(std::unique_ptr<SocketImplBase> socket)
+    : m_handle{std::move(socket)}
 {}
+
+// SocketListener impl
+
+SocketListener::SocketListener(std::string const& addr)
+    : m_handle{std::make_unique<UnixSocket>()}
+{
+    m_handle->set_to_listen({addr, 0});
+}
+
+SocketListener::SocketListener(unsigned short port)
+    : m_handle{std::make_unique<IPv4Socket>()}
+{
+    m_handle->set_to_listen({"", port});
+}
+
+SocketListener::SocketListener(SocketAddr const& addr)
+{
+    if (addr.is_unix())
+        m_handle = std::make_unique<UnixSocket>();
+    else
+        m_handle = std::make_unique<IPv4Socket>();
+    m_handle->set_to_listen(addr);
+}
+
+SocketListener::~SocketListener()
+{}
+
+SocketAddr SocketListener::listening_addr() const
+{
+    auto out = m_handle->host_ip_addr_and_port();
+    if (out.is_ipv4())
+        return {"", out.port()};
+    return out;
+}
+
+std::optional<SocketCommunicator> SocketListener::accept()
+{
+    auto socket = m_handle->accept();
+    if (!socket)
+        return std::nullopt;
+
+    return SocketCommunicator{std::move(socket)};
+}
 
 std::vector<std::byte> read_chunked(SocketCommunicator& conn,
                                     const std::size_t num_bytes) noexcept
@@ -352,7 +657,7 @@ std::vector<std::byte> read_chunked(SocketCommunicator& conn,
     return read_bytes;
 }
 
-AddrPortPair split_address(const std::string_view address) noexcept
+SocketAddr split_address(const std::string_view address) noexcept
 {
     // Split the address by the colon
     const auto colon_loc = address.find(':');
@@ -369,8 +674,8 @@ AddrPortPair split_address(const std::string_view address) noexcept
     }
     // Try to connect to the publisher
     // Need to make a std::string to ensure that it is null-terminated
-    const std::string address_str{address.begin(), address.begin() + colon_loc};
-    return {address_str, port};
+    return SocketAddr{std::string{address.begin(), address.begin() + colon_loc},
+                      static_cast<uint16_t>(port)};
 }
 
 std::variant<NetworkSizeType, ConnectionError>
@@ -384,21 +689,23 @@ read_network_size(SocketCommunicator& conn) noexcept
     return err;
 }
 
-std::string to_ip_port(const AddrPortPair& addr) noexcept
+std::string to_ip_port(const SocketAddr& addr) noexcept
 {
-    const auto& [name, port] = to_canonical(addr);
-    return name + ':' + std::to_string(port);
+    return to_canonical(addr).str();
 }
 
-AddrPortPair to_canonical(const AddrPortPair& addr) noexcept
+SocketAddr to_canonical(const SocketAddr& addr) noexcept
 {
-    const auto result = resolve_addr(addr.first.c_str(), addr.second);
+    if (addr.is_unix())
+        return addr;
+
+    const auto result = resolve_ipv4_addr(addr);
     sockaddr_in* info = reinterpret_cast<sockaddr_in*>(result->ai_addr);
     const std::string to_ret =
         std::to_string((info->sin_addr.s_addr & 0x000000FF) >> 0) + '.'
         + std::to_string((info->sin_addr.s_addr & 0x0000FF00) >> 8) + '.'
         + std::to_string((info->sin_addr.s_addr & 0x00FF0000) >> 16) + '.'
         + std::to_string((info->sin_addr.s_addr & 0xFF000000) >> 24);
-    return {to_ret, addr.second};
+    return {to_ret, addr.port()};
 }
 } // namespace skywing::internal

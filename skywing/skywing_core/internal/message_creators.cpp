@@ -8,6 +8,7 @@
 #include "message_format.capnp.h"
 #include "publish_value_handler.hpp"
 #include "skywing_core/internal/capn_proto_wrapper.hpp"
+#include "skywing_core/internal/utility/logging.hpp"
 #include "skywing_core/internal/utility/network_conv.hpp"
 #include "skywing_core/types.hpp"
 #include <capnp/serialize.h>
@@ -96,28 +97,29 @@ make_publish(const VersionID version,
 
 std::vector<std::byte> make_greeting(const MachineID& from,
                                      const std::vector<MachineID>& neighbors,
-                                     const std::uint16_t port) noexcept
+                                     SocketAddr const& address) noexcept
 {
     capnp::MallocMessageBuilder builder;
     auto message = builder.initRoot<cpnpro::StatusMessage>().initGreeting();
     message.setFrom(from);
     set_vector(&decltype(message)::initNeighbors, message, neighbors);
-    message.setPort(port);
+    auto addr_builder = message.initAddress();
+    addr_builder.setAddress(address.address());
+    addr_builder.setPort(address.port());
     return finalize_message(builder);
 }
 
 std::vector<std::byte> make_reconnect(const MachineID& from,
                                       const std::vector<MachineID>& neighbors,
-                                      std::uint16_t port) noexcept
+                                      SocketAddr const& address) noexcept
 {
     capnp::MallocMessageBuilder builder;
-
     auto message = builder.initRoot<cpnpro::StatusMessage>().initReconnect();
-
     message.setFrom(from);
     set_vector(&decltype(message)::initNeighbors, message, neighbors);
-    message.setPort(port);
-
+    auto addr_builder = message.initAddress();
+    addr_builder.setAddress(address.address());
+    addr_builder.setPort(address.port());
     return finalize_message(builder);
 }
 
@@ -154,7 +156,7 @@ std::vector<std::byte> make_heartbeat() noexcept
 
 std::vector<std::byte>
 make_report_publishers(const std::vector<TagID>& tags,
-                       const std::vector<std::vector<std::string>>& addresses,
+                       const std::vector<std::vector<SocketAddr>>& addresses,
                        const std::vector<std::vector<MachineID>>& machines,
                        const std::vector<TagID>& locally_produced_tags) noexcept
 {
@@ -173,7 +175,18 @@ make_report_publishers(const std::vector<TagID>& tags,
         builder.initRoot<cpnpro::StatusMessage>().initReportPublishers();
     using MType = decltype(message);
     set_vector(&MType::initTags, message, tags);
-    set_nested_vector(message.initAddresses(tags.size()), addresses);
+    {
+        auto builder = message.initAddresses(addresses.size());
+        for (size_t i = 0; i < addresses.size(); ++i) {
+            auto addr_list_builder = builder.init(i, addresses[i].size());
+            for (size_t j = 0; j < addresses[i].size(); ++j) {
+                auto addr_builder = addr_list_builder[j];
+                auto const& addr = addresses[i][j];
+                addr_builder.setAddress(addr.address());
+                addr_builder.setPort(addr.port());
+            }
+        }
+    }
     set_nested_vector(message.initMachines(tags.size()), machines);
     auto msg_local_tags =
         message.initLocallyProducedTags(locally_produced_tags.size());

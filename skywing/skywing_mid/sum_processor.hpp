@@ -31,6 +31,7 @@ class SumProcessor
     // Compile-time check for floating-point type
     static_assert(std::is_floating_point<data_t>::value,
                   "SumProcessor: data_t must be a floating-point type.");
+
 public:
     using ValueType = std::tuple<typename MeanProcessor::ValueType,
                                  typename CountProcessor::ValueType>;

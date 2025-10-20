@@ -10,12 +10,13 @@ NeighborAgent::NeighborAgent(SocketCommunicator conn,
                              const MachineID& id,
                              const std::vector<MachineID>& neighbors,
                              Manager& manager,
-                             const std::uint16_t port) noexcept
+                             SocketAddr const& addr,
+                             std::string) noexcept
     : id_{id},
       last_heard_(std::chrono::steady_clock::now()),
       neighbors_{neighbors},
       manager_{&manager},
-      port_{port}
+      addr_{addr}
 {
     comms_.push_back(std::move(conn));
 }
@@ -27,16 +28,22 @@ MachineID NeighborAgent::id() const noexcept
 
 std::string NeighborAgent::address() const noexcept
 {
-    const auto [ip_address, dummy] = comms_[0].ip_address_and_port();
-    (void) dummy;
-    return ip_address + ':' + std::to_string(port_);
+    if (addr_.is_ipv4()) {
+        auto out = comms_[0].ip_address_and_port();
+        out.m_port = addr_.port();
+        return out.str();
+    }
+    return addr_.str();
 }
 
-AddrPortPair NeighborAgent::address_pair() const noexcept
+SocketAddr NeighborAgent::address_pair() const noexcept
 {
-    const auto [ip_address, dummy] = comms_[0].ip_address_and_port();
-    (void) dummy;
-    return {ip_address, port_};
+    if (addr_.is_ipv4()) {
+        auto out = comms_[0].ip_address_and_port();
+        out.m_port = addr_.port();
+        return out;
+    }
+    return addr_;
 }
 
 bool NeighborAgent::is_dead() const noexcept
@@ -94,27 +101,26 @@ bool NeighborAgent::add_new_subscription(TagID tag)
   (void) iter;
   return inserted;
 }
-  
+
 void NeighborAgent::update_time_for_next_request(bool urgent)
 {
-  if (urgent)
-    backoff_counter_ = 0;
-  else
-    ++backoff_counter_;
-  
-  calc_next_request_time();
-}
+    if (urgent)
+        backoff_counter_ = 0;
+    else
+        ++backoff_counter_;
 
+    calc_next_request_time();
+}
 
 void NeighborAgent::calc_next_request_time() noexcept
 {
-  using namespace std::chrono_literals;
-  static constexpr std::array<std::chrono::milliseconds, 10> backoff_times{
-    20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms};
-  const auto add_time = backoff_counter_ >= backoff_times.size()
-    ? backoff_times.back()
-    : backoff_times[backoff_counter_];
-  request_tags_time_ = std::chrono::steady_clock::now() + add_time;
+    using namespace std::chrono_literals;
+    static constexpr std::array<std::chrono::milliseconds, 10> backoff_times{
+        20ms, 40ms, 80ms, 160ms, 320ms, 500ms, 750ms, 1000ms, 2000ms, 5000ms};
+    const auto add_time = backoff_counter_ >= backoff_times.size()
+                              ? backoff_times.back()
+                              : backoff_times[backoff_counter_];
+    request_tags_time_ = std::chrono::steady_clock::now() + add_time;
 }
 
 } // namespace internal

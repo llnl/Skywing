@@ -137,8 +137,73 @@ ValueOrTuple<Ts...> make_value(std::span<const PublishValueVariant> value,
 
 } // namespace internal::detail
 
-/// Address/port pair
-using AddrPortPair = std::pair<std::string, std::uint16_t>;
+/** @struct SocketAddr
+ *  @brief Representation of a socket address.
+ *
+ *  IPv4 addresses have a nonzero port, as Skywing doesn't support
+ *  using the 0 port, e.g., in bind().
+ *
+ *  @note This will waste 2 bytes in the "testing-only" Unix-socket
+ *        scenario. I'm heartbroken.
+ */
+struct SocketAddr
+{
+    std::string m_addr;
+    std::uint16_t m_port = 0;
+
+    SocketAddr() noexcept = default;
+    SocketAddr(std::string&& local_address) noexcept
+        : m_addr{std::move(local_address)}, m_port{0}
+    {}
+
+    SocketAddr(std::string const& local_address)
+        : m_addr{local_address}, m_port{0}
+    {}
+
+    SocketAddr(std::string&& addr, std::uint16_t port) noexcept
+        : m_addr{std::move(addr)}, m_port{port}
+    {}
+
+    SocketAddr(std::string const& addr, std::uint16_t port)
+        : m_addr{addr}, m_port{port}
+    {}
+
+    SocketAddr(SocketAddr&& addr_port_pair) noexcept = default;
+    SocketAddr(SocketAddr const& addr_port_pair) = default;
+    SocketAddr& operator=(SocketAddr&& addr_port_pair) noexcept = default;
+    SocketAddr& operator=(SocketAddr const& addr_port_pair) = default;
+
+    bool is_ipv4() const noexcept { return m_port; }
+    bool is_unix() const noexcept { return !is_ipv4(); }
+
+    std::string const& address() const noexcept { return m_addr; }
+    std::uint16_t const& port() const noexcept { return m_port; }
+
+    std::string str() const { return m_addr + ':' + std::to_string(m_port); }
+}; // class SocketAddr
+
+struct SockAddrCompare
+{
+    bool operator()(SocketAddr const& l, SocketAddr const& r) const noexcept
+    {
+        return (l.port() < r.port()) || (l.address() < r.address());
+    }
+}; // struct SockAddrCompare
+
+inline bool operator<(SocketAddr const& a, SocketAddr const& b) noexcept
+{
+    return SockAddrCompare{}.operator()(a, b);
+}
+
+inline bool operator==(SocketAddr const& a, SocketAddr const& b) noexcept
+{
+    return (a.m_port == b.m_port) && (a.m_addr == b.m_addr);
+}
+
+inline bool operator!=(SocketAddr const& a, SocketAddr const& b) noexcept
+{
+    return !(a == b);
+}
 
 /** \brief Wrapper for returning void values in various situations
  */
@@ -192,14 +257,13 @@ struct any_of
 } // namespace internal
 } // namespace skywing
 
-// Hashing support
 template <>
-struct std::hash<skywing::AddrPortPair>
+struct std::hash<skywing::SocketAddr>
 {
-    std::size_t operator()(const skywing::AddrPortPair& val) const noexcept
+    std::size_t operator()(const skywing::SocketAddr& val) const noexcept
     {
-        return std::hash<std::string>{}(val.first)
-               ^ std::hash<std::uint16_t>{}(val.second);
+        return std::hash<std::string>{}(val.address())
+               ^ std::hash<std::uint16_t>{}(val.port());
     }
 };
 

@@ -31,40 +31,38 @@ class ManagerConnectionIsComplete
 {
 public:
     ManagerConnectionIsComplete(Manager& manager,
-                                const std::string& address,
-                                std::uint16_t port) noexcept;
+                                SocketAddr const& address) noexcept;
     bool operator()() const noexcept;
 
 private:
     Manager* manager_;
-    AddrPortPair address_;
+    SocketAddr address_;
 }; // class ManagerConnectionIsComplete
 
 class ManagerGetConnectionSuccess
 {
 public:
     ManagerGetConnectionSuccess(Manager& manager,
-                                const std::string& address,
-                                std::uint16_t port) noexcept;
+                                SocketAddr const& address) noexcept;
     bool operator()() const noexcept;
 
 private:
     Manager* manager_;
-    AddrPortPair address_;
+    SocketAddr address_;
 }; // class ManagerGetConnectionSuccess
 
 class ManagerIPSubscribeComplete
 {
 public:
     ManagerIPSubscribeComplete(Manager& manager,
-                               const AddrPortPair& address,
+                               const SocketAddr& address,
                                const std::vector<TagID>& tags,
                                bool is_self_sub) noexcept;
     bool operator()() const noexcept;
 
 private:
     Manager* manager_;
-    AddrPortPair address_;
+    SocketAddr address_;
     std::vector<TagID> tags_;
     bool is_self_sub_;
 };
@@ -73,14 +71,14 @@ class ManagerIPSubscribeSuccess
 {
 public:
     ManagerIPSubscribeSuccess(Manager& manager,
-                              const AddrPortPair& address,
+                              const SocketAddr& address,
                               const std::vector<TagID>& tags,
                               bool is_self_sub) noexcept;
     bool operator()() const noexcept;
 
 private:
     Manager* manager_;
-    AddrPortPair address_;
+    SocketAddr address_;
     std::vector<TagID> tags_;
     bool is_self_sub_;
 };

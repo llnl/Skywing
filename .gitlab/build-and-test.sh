@@ -83,7 +83,7 @@ cmake -G Ninja \
       \
       -D SKYWING_BUILD_EXAMPLES=ON \
       -D SKYWING_BUILD_LC_EXAMPLES=ON \
-      -D SKYWING_USE_EIGEN_MATH_EXAMPLES=${TEST_EIGEN} \
+      -D SKYWING_USE_EIGEN=${TEST_EIGEN} \
       -D SKYWING_BUILD_TESTS=ON |& tee ${SOURCE_DIR}/configure-outerr.log
 
 echo "----------------------------------------------------------------------"

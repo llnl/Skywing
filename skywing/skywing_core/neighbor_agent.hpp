@@ -2,6 +2,7 @@
 #define SKYWING_NEIGHBOR_AGENT_HPP
 
 #include <atomic>
+#include <chrono>
 #include <unordered_set>
 #include <vector>
 
@@ -12,7 +13,7 @@
 namespace skywing
 {
 class Manager;
-  
+
 namespace internal
 {
 /** \brief Represents our knowledge of another agent (a neighbor) in
@@ -21,19 +22,21 @@ namespace internal
 class NeighborAgent
 {
 public:
-  /** \brief Construct a new NeighborAgent
-   *
-   * \param comm A SocketCommunicator used to talk to the neighbor.
-   * \param id The MachineID of the neighbor.
-   * \param neigbhors Our knowledge of this neighbor's neighbors.
-   * \param Manager A reference to the Manager that builds (and owns) this NeighborAgent object.
-   * \param port The port we use to talk to this neighbor.
-   */
-  NeighborAgent(SocketCommunicator comm,
-		const MachineID& id,
-		const std::vector<MachineID>& neighbors,
-		Manager& manager,
-		std::uint16_t port) noexcept;
+    /** \brief Construct a new NeighborAgent
+     *
+     * \param comm A SocketCommunicator used to talk to the neighbor.
+     * \param id The MachineID of the neighbor.
+     * \param neigbhors Our knowledge of this neighbor's neighbors.
+     * \param Manager A reference to the Manager that builds (and owns) this
+     * NeighborAgent object.
+     * \param addr The address of this neighbor's server.
+     */
+    NeighborAgent(SocketCommunicator comm,
+                  const MachineID& id,
+                  const std::vector<MachineID>& neighbors,
+                  Manager& manager,
+                  SocketAddr const& addr,
+                  std::string hi) noexcept;
 
     /** \brief Returns the id of the computer this is connected to
      */
@@ -45,7 +48,7 @@ public:
 
     /** \brief Pair version of the address
      */
-    AddrPortPair address_pair() const noexcept;
+    SocketAddr address_pair() const noexcept;
 
     /** \brief Returns if the connection is believed dead or not
      */
@@ -97,11 +100,11 @@ public:
      */
     void set_has_outstanding_publishers_request(bool has_outst_req) noexcept
     {
-      has_outstanding_publishers_request_ = has_outst_req;
+        has_outstanding_publishers_request_ = has_outst_req;
     }
-  
+
     /** Return the time point when this neighbor agent was last heard
-	from.
+    from.
      */
     std::chrono::steady_clock::time_point time_last_heard() const noexcept
     {
@@ -121,25 +124,24 @@ public:
         comms_.push_back(std::move(comm));
     }
 
-  /** \brief Returns a reference to the set of SocketCommunicators to
-      communicate with this neighbor.
-   */
-    std::vector<SocketCommunicator>& get_comms()
-    { return comms_; }
+    /** \brief Returns a reference to the set of SocketCommunicators to
+        communicate with this neighbor.
+     */
+    std::vector<SocketCommunicator>& get_comms() { return comms_; }
 
-  /** \brief Update the time point when we should next ask for
-   *   publisher information from this neighbor.
-   *
-   * \param urgent True if we urgently need a response.  
-   */
-  void update_time_for_next_request(bool urgent);
+    /** \brief Update the time point when we should next ask for
+     *   publisher information from this neighbor.
+     *
+     * \param urgent True if we urgently need a response.
+     */
+    void update_time_for_next_request(bool urgent);
 
-  /** \brief Returns true if it is time to make another publishers
-      request.
-   */
+    /** \brief Returns true if it is time to make another publishers
+        request.
+     */
     bool is_time_for_another_request()
     {
-      return std::chrono::steady_clock::now() > request_tags_time_;
+        return std::chrono::steady_clock::now() > request_tags_time_;
     }
 
     class AtomicTime
@@ -206,8 +208,8 @@ private:
     // std::unordered_set for fast look-up
     std::unordered_set<TagID> remote_subscriptions_;
 
-    // The port to use to connect to the remote machine
-    std::uint16_t port_;
+    // The address to use to connect to the remote machine
+    SocketAddr addr_;
 
     // The number of times requests have been unfulfilled
     std::uint8_t backoff_counter_ = 0;
@@ -224,7 +226,7 @@ private:
 }; // class NeighborAgent
 
 } // namespace internal
-  
+
 } // namespace skywing
 
 #endif // SKYWING_NEIGHBOR_AGENT_HPP

@@ -1,21 +1,22 @@
 #ifndef SKYWING_MESSAGE_HANDLER_HPP
 #define SKYWING_MESSAGE_HANDLER_HPP
 
+#include <chrono>
+#include <unordered_map>
+#include <vector>
+
 #include "skywing_core/internal/capn_proto_wrapper.hpp"
 #include "skywing_core/internal/devices/socket_communicator.hpp"
 #include "skywing_core/types.hpp"
 
-#include <unordered_set>
-#include <vector>
-
 namespace skywing
 {
 class Manager;
-  
+
 namespace internal
 {
 class NeighborAgent;
-  
+
 /** \brief Handles message-sending and message-receiving between Skywing agents.
  *
  *  Messages need to get sent between agents for tasks such as finding
@@ -85,20 +86,18 @@ public:
    */
   bool get_must_find_more_publishers() const noexcept
   {
-    return must_find_more_publishers_;
+      return must_find_more_publishers_;
   }
 
-
-  
-private:
+  private:
   // Attempts to get a message
   std::optional<MessageDeserializer>
   try_to_get_message(internal::NeighborAgent& nbr_agent,
-		       SocketCommunicator& socket_comm) noexcept;
+                     SocketCommunicator& socket_comm) noexcept;
 
   // Handle status messages
   void handle_message(internal::NeighborAgent& nbr_agent,
-		      MessageDeserializer& handle) noexcept;
+                      MessageDeserializer& handle) noexcept;
 
   Manager* manager_;
 
@@ -110,7 +109,7 @@ private:
 }; // class MessageHandler
 
 } // namespace internal
-  
+
 } // namespace skywing
 
 #endif // SKYWING_MESSAGE_HANDLER_HPP

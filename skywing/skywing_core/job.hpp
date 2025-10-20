@@ -105,8 +105,7 @@ public:
                 // have errored between storing the value in the buffer and then
                 // retrieving it
                 if (subscription.has_data()) {
-                    ValueType value;
-                    std::any any_value = value;
+                    std::any any_value = ValueType{};
                     subscription.get_data(any_value);
                     return std::make_optional(
                         internal::detail::cast_to_value_or_tuple<Ts...>(
@@ -138,17 +137,19 @@ public:
             subs_.mutex(),
             data_buffer_modified_cv_,
             [&subscription, target_val]() {
-                if (subscription.has_data()){
-                    ValueType value;
-                    std::any any_value = value;
+                if (subscription.has_data()) {
+                    std::any any_value = ValueType{};
                     subscription.get_data(any_value);
-                    ValueOrTuple<Ts...> out_val = internal::detail::cast_to_value_or_tuple<Ts...>(any_value);
-                    // std::cout << "Recieved value " << out_val << " from" << tag_conn_id << std::endl;
-                    // std::cout << "Target value " << target_val << std::endl;
-                    return (out_val == target_val);      
+                    ValueOrTuple<Ts...> out_val =
+                        internal::detail::cast_to_value_or_tuple<Ts...>(
+                            any_value);
+                    // std::cout << "Recieved value " << out_val << " from" <<
+                    // tag_conn_id << std::endl; std::cout << "Target value " <<
+                    // target_val << std::endl;
+                    return (out_val == target_val);
                 }
                 return false;
-                });
+            });
     }
 
     /** \brief Get a value from a subscription, if there is data to get.
@@ -306,7 +307,7 @@ public:
      * @details Users can specify buffer types by using the following syntax
      * job.set_buffer( Buffer::IntQueue() );
      * job.set_buffer( Buffer::IntMostRecent() );
-     * 
+     *
      * For custom buffer types, see function overload.
      */
     void set_buffer(const Buffer& buffer_type)

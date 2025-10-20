@@ -2,8 +2,10 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 #include <catch2/catch_test_macros.hpp>
@@ -20,11 +22,8 @@ std::mutex catch_mutex;
 
 void server()
 {
-    SocketCommunicator conn;
-    {
-        std::lock_guard<std::mutex> lock{catch_mutex};
-        REQUIRE(conn.set_to_listen(port) == ConnectionError::no_error);
-    }
+    SocketListener conn{port};
+
     // Twice for non-blocking/blocking connection
     for (int i = 0; i < 2; ++i) {
         const auto get_client = [&]() {
@@ -67,7 +66,7 @@ void client()
     {
         SocketCommunicator conn;
         {
-            const auto res = conn.connect_to_server("127.0.0.1", port);
+            const auto res = conn.connect_to_server({"127.0.0.1", port});
             std::lock_guard<std::mutex> lock{catch_mutex};
             REQUIRE(res == ConnectionError::no_error);
         }
@@ -77,7 +76,7 @@ void client()
     {
         SocketCommunicator conn;
         {
-            const auto res = conn.connect_non_blocking("127.0.0.1", port);
+            const auto res = conn.connect_non_blocking({"127.0.0.1", port});
             std::lock_guard<std::mutex> lock{catch_mutex};
             REQUIRE(res == ConnectionError::connection_in_progress);
         }

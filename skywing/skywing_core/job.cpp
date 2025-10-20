@@ -186,7 +186,7 @@ Job::get_ip_subscribe_future(const std::string& address,
                    tag_ids.begin(),
                    [&](auto const& t) { return t->id(); });
     const auto addr_pair = internal::split_address(address);
-    if (addr_pair.first.empty()) {
+    if (addr_pair.address().empty()) {
         std::cerr << fmt::format(
             "Invalid address \"{}\" for Job::ip_subscribe!  Note that a port "
             "must be specified.\n",
