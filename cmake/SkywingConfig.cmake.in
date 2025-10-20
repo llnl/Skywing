@@ -6,7 +6,7 @@ find_dependency(spdlog)
 find_dependency(Threads)
 find_dependency(CapnProto 1.0 CONFIG)
 
-if (@SKYWING_USE_EIGEN_MATH_EXAMPLES@)
+if (@SKYWING_USE_EIGEN@)
   find_dependency(Eigen3 3.0 CONFIG)
 endif ()
 

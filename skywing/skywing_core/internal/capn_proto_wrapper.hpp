@@ -45,7 +45,7 @@ class Greeting
 public:
     MachineID from() const noexcept;
     std::vector<MachineID> neighbors() const noexcept;
-    std::uint16_t port() const noexcept;
+    SocketAddr address() const noexcept;
 
 private:
     cpnpro::Greeting::Reader r;
@@ -61,7 +61,7 @@ class Reconnect
 public:
     MachineID from() const noexcept;
     std::vector<MachineID> neighbors() const noexcept;
-    std::uint16_t port() const noexcept;
+    SocketAddr address() const noexcept;
 
 private:
     cpnpro::Reconnect::Reader r;
@@ -118,7 +118,7 @@ class ReportPublishers
 {
 public:
     std::vector<TagID> tags() const noexcept;
-    std::vector<std::vector<std::string>> addresses() const noexcept;
+    std::vector<std::vector<SocketAddr>> addresses() const noexcept;
     std::vector<std::vector<MachineID>> machines() const noexcept;
     std::vector<TagID> locally_produced_tags() const noexcept;
 

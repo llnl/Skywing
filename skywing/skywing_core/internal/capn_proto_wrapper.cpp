@@ -120,9 +120,10 @@ std::vector<MachineID> Greeting::neighbors() const noexcept
 {
     return detail::list_to_vector<MachineID>(r.getNeighbors());
 }
-std::uint16_t Greeting::port() const noexcept
+SocketAddr Greeting::address() const noexcept
 {
-    return r.getPort();
+    cpnpro::SocketAddr::Reader sock_addr = r.getAddress();
+    return {sock_addr.getAddress(), sock_addr.getPort()};
 }
 Greeting::Greeting(cpnpro::Greeting::Reader reader) noexcept
     : r{std::move(reader)}
@@ -140,9 +141,10 @@ std::vector<MachineID> Reconnect::neighbors() const noexcept
 {
     return detail::list_to_vector<MachineID>(r.getNeighbors());
 }
-std::uint16_t Reconnect::port() const noexcept
+SocketAddr Reconnect::address() const noexcept
 {
-    return r.getPort();
+    cpnpro::SocketAddr::Reader sock_addr = r.getAddress();
+    return {sock_addr.getAddress(), sock_addr.getPort()};
 }
 Reconnect::Reconnect(cpnpro::Reconnect::Reader reader) noexcept
     : r{std::move(reader)}
@@ -180,10 +182,26 @@ std::vector<TagID> ReportPublishers::tags() const noexcept
 {
     return detail::list_to_vector<TagID>(r.getTags());
 }
-std::vector<std::vector<std::string>>
+std::vector<std::vector<SocketAddr>>
 ReportPublishers::addresses() const noexcept
 {
-    return detail::list_to_vector<std::vector<std::string>>(r.getAddresses());
+    auto const addrs = r.getAddresses();
+    std::vector<std::vector<SocketAddr>> out;
+    out.reserve(addrs.size());
+    for (size_t i = 0; i < addrs.size(); ++i) {
+        auto const addr_list_reader = addrs[i];
+        auto& addr_list = out.emplace_back();
+        addr_list.reserve(addr_list_reader.size());
+        for (size_t j = 0; j < addr_list_reader.size(); ++j) {
+            typename cpnpro::SocketAddr::Reader const addr_reader =
+                addr_list_reader[j];
+            std::string const address = addr_reader.getAddress();
+            uint16_t const port = addr_reader.getPort();
+            addr_list.emplace_back(SocketAddr{address, port});
+        }
+    }
+
+    return out;
 }
 std::vector<std::vector<MachineID>> ReportPublishers::machines() const noexcept
 {

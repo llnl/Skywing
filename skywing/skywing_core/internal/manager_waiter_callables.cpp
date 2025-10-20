@@ -15,8 +15,8 @@ bool ManagerSubscribeIsDone::operator()() const noexcept
 }
 
 ManagerConnectionIsComplete::ManagerConnectionIsComplete(
-    Manager& manager, const std::string& address, std::uint16_t port) noexcept
-    : manager_{&manager}, address_{address, port}
+    Manager& manager, SocketAddr const& address) noexcept
+    : manager_{&manager}, address_{address}
 {}
 
 bool ManagerConnectionIsComplete::operator()() const noexcept
@@ -25,8 +25,8 @@ bool ManagerConnectionIsComplete::operator()() const noexcept
 }
 
 ManagerGetConnectionSuccess::ManagerGetConnectionSuccess(
-    Manager& manager, const std::string& address, std::uint16_t port) noexcept
-    : manager_{&manager}, address_{address, port}
+    Manager& manager, SocketAddr const& address) noexcept
+    : manager_{&manager}, address_{address}
 {}
 
 bool ManagerGetConnectionSuccess::operator()() const noexcept
@@ -36,7 +36,7 @@ bool ManagerGetConnectionSuccess::operator()() const noexcept
 
 ManagerIPSubscribeComplete::ManagerIPSubscribeComplete(
     Manager& manager,
-    const AddrPortPair& address,
+    const SocketAddr& address,
     const std::vector<TagID>& tags,
     bool is_self_sub) noexcept
     : manager_{&manager},
@@ -56,7 +56,7 @@ bool ManagerIPSubscribeComplete::operator()() const noexcept
 
 ManagerIPSubscribeSuccess::ManagerIPSubscribeSuccess(
     Manager& manager,
-    const AddrPortPair& address,
+    const SocketAddr& address,
     const std::vector<TagID>& tags,
     bool is_self_sub) noexcept
     : manager_{&manager},

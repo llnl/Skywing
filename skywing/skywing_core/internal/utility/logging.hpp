@@ -162,7 +162,7 @@ struct fmt::formatter<skywing::PublishValueVariant>
 // Don't make it a general pair format, since most thing won't want to be
 // printed seperated by a colon
 template <>
-struct fmt::formatter<skywing::AddrPortPair>
+struct fmt::formatter<skywing::SocketAddr>
 {
     template <typename ParseContext>
     constexpr auto parse(ParseContext& ctx) noexcept
@@ -171,55 +171,56 @@ struct fmt::formatter<skywing::AddrPortPair>
     }
 
     template <typename FormatContext>
-    auto format(const skywing::AddrPortPair& data, FormatContext& ctx) noexcept
+    auto format(const skywing::SocketAddr& data, FormatContext& ctx) noexcept
     {
-        return fmt::format_to(ctx.out(), "{}:{}", data.first, data.second);
+        return fmt::format_to(ctx.out(), "{}:{}", data.address(), data.port());
     }
 };
-
 
 // Support logging of ValueOrTuple<Ts...> buffer data
 // ValueOrTuple<Ts...> is an alias for std::tuple<T> or T
 // Specialization for a single type ValueOrTuple<Ts...> did not work
-// with spdlog since it is a type alias. 
+// with spdlog since it is a type alias.
 // Instead, specialize on implemented types separately.
-namespace fmt {
+namespace fmt
+{
 
-    // Tuple formatting helper function
-    template <typename... Ts>
-    std::string format_tuple(const std::tuple<Ts...>& tuple)
+// Tuple formatting helper function
+template <typename... Ts>
+std::string format_tuple(const std::tuple<Ts...>& tuple)
+{
+    std::ostringstream oss;
+    std::apply([&oss](auto&&... args) { ((oss << args << ", "), ...); }, tuple);
+    std::string result = oss.str();
+    if (!result.empty()) {
+        result.pop_back();
+    }
+    return result;
+}
+
+// Specialization for ValueOrTupleImpl<Ts...> aka std::tuple
+template <typename... Ts>
+struct formatter<std::tuple<Ts...>>
+{
+    template <typename FormatContext>
+    auto format(const std::tuple<Ts...>& value, FormatContext& ctx)
     {
-        std::ostringstream oss;
-        std::apply([&oss](auto&&... args) { ((oss << args << ", "), ...); }, tuple);
-        std::string result = oss.str();
-        if (!result.empty())
-        {
-            result.pop_back();
-        }
-        return result;
+        return fmt::format_to(ctx.out(), "{}", format_tuple(value));
     }
 
-    // Specialization for ValueOrTupleImpl<Ts...> aka std::tuple
-    template<typename... Ts>
-    struct formatter<std::tuple<Ts...>> {
-        template <typename FormatContext>
-        auto format(const std::tuple<Ts...>& value, FormatContext& ctx) {
-                    return fmt::format_to(ctx.out(), "{}", format_tuple(value));
-        }
+    constexpr auto parse(fmt::format_parse_context& ctx) { return ctx.begin(); }
+};
 
-        constexpr auto parse(fmt::format_parse_context& ctx) {
-                return ctx.begin();
-        }
-    };
-
-    // Specialization for just a simple type T, ValueOrTupleImpl<T>
-    template<typename T, typename = void>
-    struct formatter {
-        template <typename FormatContext>
-        auto format(const T& value, FormatContext& ctx) {
-            return fmt::format_to(ctx.out(), "{}", value);
-        }
-    };
-}
+// Specialization for just a simple type T, ValueOrTupleImpl<T>
+template <typename T, typename = void>
+struct formatter
+{
+    template <typename FormatContext>
+    auto format(const T& value, FormatContext& ctx)
+    {
+        return fmt::format_to(ctx.out(), "{}", value);
+    }
+};
+} // namespace fmt
 
 #endif // SKYWING_INTERNAL_UTILITY_LOGGING

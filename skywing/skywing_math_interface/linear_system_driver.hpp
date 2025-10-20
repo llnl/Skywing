@@ -283,7 +283,7 @@ public:
 
     template <typename... Args>
     void solve(Args&&... processor_parameters)
-    {  
+    {
         std::string name = "agent" + std::to_string(agent_id_);
         // look up port number for this agent for printing
         std::uint16_t port = configurations_.at(name).port;
@@ -291,10 +291,11 @@ public:
                   << port << std::endl;
 
         // skywing::Manager manager(port, name);
-        manager_ = std::make_unique<skywing::Manager>(port, name);
+        manager_ = std::make_unique<skywing::Manager>(
+            SocketAddr{configurations_.at(name).remoteAddress, port}, name);
 
         // use helper function to convert machine configurations object to
-        // the address-port pairs object needed by the manager 
+        // the address-port pairs object needed by the manager
         std::vector<std::tuple<std::string, uint16_t>>
             neighbor_address_port_pairs =
                 create_address_port_pairs_from_machine_configurations(
@@ -314,7 +315,7 @@ public:
         manager_->submit_job("linear_system_job" + std::to_string(agent_id_), linear_system_lambda);
         manager_->run();
 
-    
+
     }
 
     ClosedVector test_output() { return test_output_; }
@@ -324,7 +325,7 @@ public:
     }
     Manager* get_manager() {
         return manager_.get(); // Use .get() to return the raw pointer
-    }   
+    }
 
 
 private:

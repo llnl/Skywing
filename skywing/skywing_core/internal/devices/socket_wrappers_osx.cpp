@@ -19,9 +19,9 @@ int set_non_blocking(const int sockfd) noexcept
 }
 } // namespace
 
-int create_non_blocking() noexcept
+int create_non_blocking(int address_family) noexcept
 {
-    return set_non_blocking(socket(AF_INET, SOCK_STREAM, 0));
+    return set_non_blocking(socket(address_family, SOCK_STREAM, 0));
 }
 
 int accept_make_non_blocking(const int sockfd,

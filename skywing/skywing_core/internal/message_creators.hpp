@@ -20,13 +20,13 @@ make_publish(const VersionID version,
  */
 std::vector<std::byte> make_greeting(const MachineID& from,
                                      const std::vector<MachineID>& neighbors,
-                                     std::uint16_t port) noexcept;
+                                     SocketAddr const& address) noexcept;
 
 /** \brief Create data for a reconnect
  */
 std::vector<std::byte> make_reconnect(const MachineID& from,
                                       const std::vector<MachineID>& neighbors,
-                                      std::uint16_t port) noexcept;
+                                      SocketAddr const& address) noexcept;
 
 /** \brief Create data for a goodbyte
  */
@@ -52,7 +52,7 @@ std::vector<std::byte> make_heartbeat() noexcept;
  */
 std::vector<std::byte> make_report_publishers(
     const std::vector<TagID>& tags,
-    const std::vector<std::vector<std::string>>& addresses,
+    const std::vector<std::vector<SocketAddr>>& addresses,
     const std::vector<std::vector<MachineID>>& machines,
     const std::vector<TagID>& locally_produced_tags) noexcept;
 

@@ -1,10 +1,6 @@
 #ifndef SKYWING_MANAGER_HPP
 #define SKYWING_MANAGER_HPP
 
-#include "skywing_core/internal/capn_proto_wrapper.hpp"
-#include "skywing_core/internal/devices/socket_communicator.hpp"
-#include "skywing_core/internal/manager_waiter_callables.hpp"
-// #include "skywing_core/basic_manager_config.hpp"
 #include "tag.hpp"
 
 #include <algorithm>
@@ -22,6 +18,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "skywing_core/internal/capn_proto_wrapper.hpp"
+#include "skywing_core/internal/devices/socket_communicator.hpp"
+#include "skywing_core/internal/manager_waiter_callables.hpp"
 #include "skywing_core/job.hpp"
 #include "skywing_core/neighbor_agent.hpp"
 #include "skywing_core/types.hpp"
@@ -34,7 +33,7 @@ namespace skywing::internal
  */
 struct PublisherInfo
 {
-    std::string address;
+    SocketAddr address;
     MachineID machine_id;
 
     // Hidden friend idiom - will only be found via ADL
@@ -52,7 +51,7 @@ struct std::hash<skywing::internal::PublisherInfo>
     std::size_t
     operator()(const skywing::internal::PublisherInfo& i) const noexcept
     {
-        return std::hash<std::string>{}(i.address)
+        return std::hash<skywing::SocketAddr>{}(i.address)
                ^ std::hash<skywing::MachineID>{}(i.machine_id);
     }
 }; // struct std::hash
@@ -118,6 +117,16 @@ public:
             const heartbeat_cycle heartbeat_interval = 1_hb,
             const std::size_t neighbor_timeout_factor = 3) noexcept;
 
+    Manager(std::string const& local_addr,
+            const MachineID& id,
+            const heartbeat_cycle heartbeat_interval = 1_hb,
+            const std::size_t neighbor_timeout_factor = 3) noexcept;
+
+    explicit Manager(SocketAddr const& addr,
+                     const MachineID& id,
+                     const heartbeat_cycle heartbeat_interval = 1_hb,
+                     const std::size_t neighbor_timeout_factor = 3) noexcept;
+
     /**
      * \brief Utility ctor for general durations to keep
      * backward compatibilty with regression tests
@@ -154,7 +163,12 @@ public:
      *  pairs.
      */
     void configure_initial_neighbors(
-        const std::vector<std::tuple<std::string, uint16_t>>&
+        std::vector<SocketAddr> const& neighbor_address_port_pairs,
+        std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
+
+    // FIXME (trb): DEPRECATE!
+    void configure_initial_neighbors(
+        std::vector<std::tuple<std::string, std::uint16_t>> const&
             neighbor_address_port_pairs,
         std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
 
@@ -165,9 +179,18 @@ public:
      *  called multiple times to configure multiple address / port pairs.
      */
     void configure_initial_neighbors(
-        const std::string address,
-        const std::uint16_t port,
+        SocketAddr const& address,
         std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept;
+
+    // FIXME (trb): DEPRECATE!
+    void configure_initial_neighbors(
+        std::string address,
+        std::uint16_t const port,
+        std::chrono::seconds timeout = std::chrono::seconds(10)) noexcept
+    {
+        return configure_initial_neighbors(SocketAddr{std::move(address), port},
+                                           timeout);
+    }
 
     /** \brief Initiate the initial connections to neighbors
      *
@@ -197,7 +220,7 @@ public:
 
     /** \brief Subscribes to the passed tags only on a specific IP
      */
-    Waiter<bool> ip_subscribe(const AddrPortPair& addr,
+    Waiter<bool> ip_subscribe(const SocketAddr& addr,
                               const std::vector<TagID>& tag_ids) noexcept;
 
     /** \brief Subscribes to the passed tags.
@@ -211,14 +234,14 @@ public:
     /** \brief Returns true if the connection to the specified address is
      * complete
      */
-    bool conn_is_complete(const AddrPortPair& address) noexcept;
+    bool conn_is_complete(const SocketAddr& address) noexcept;
 
     /** \brief Returns true if the connection was successful, false otherwise
      *
      * More accurately, checks if an address is currently connected, which may
      * be useful to expose at some point?
      */
-    bool addr_is_connected(const AddrPortPair& address) const noexcept;
+    bool addr_is_connected(const SocketAddr& address) const noexcept;
 
     /** \brief Handles the get_publishers message
      */
@@ -281,8 +304,7 @@ private:
     // Interface for ManagerHandle
     ///////////////////////////////////////
 
-    Waiter<bool> connect_to_server(const char* const address,
-                                   const std::uint16_t port) noexcept;
+    Waiter<bool> connect_to_server(SocketAddr const&) noexcept;
     size_t number_of_subscribers(const AbstractTag& tag) const noexcept;
     std::uint16_t port() const noexcept;
 
@@ -391,14 +413,13 @@ private:
      */
     std::vector<TagID> local_tags() const noexcept;
 
+    // void process_neighbor_changes() noexcept;
 
-    // void process_neighbor_changes() noexcept; 
-
-    // void queue_remove_neighbor(const std::string& ip_address, const std::uint16_t port) noexcept; 
-
+    // void queue_remove_neighbor(const std::string& ip_address, const
+    // std::uint16_t port) noexcept;
 
     // For listening to connection requests
-    internal::SocketCommunicator server_socket_;
+    internal::SocketListener server_socket_;
 
     // List of the jobs that are present
     std::unordered_map<JobID, Job> jobs_;
@@ -447,10 +468,10 @@ private:
 
     // Mapping from a machine address to a pointer to the neighbor agent
     // This is also used for testing that a connection has completed
-    std::unordered_map<AddrPortPair, internal::NeighborAgent*> addr_to_machine_;
+    std::unordered_map<SocketAddr, internal::NeighborAgent*> addr_to_machine_;
 
     // Cache ip and port for disconnected agents for reconnection later
-    std::unordered_map<MachineID, AddrPortPair> reconnect_cache;
+    std::unordered_map<MachineID, SocketAddr> reconnect_cache;
 
     // Mapping from a tag to the ID used for the subscription to the tag
     // Used to know when a subscription is done and for if multiple jobs
@@ -503,7 +524,7 @@ private:
         PendingInfo(PendingInfo&&) = default;
         PendingInfo& operator=(PendingInfo&&) = default;
     };
-    std::unordered_map<AddrPortPair, PendingInfo> pending_conns_;
+    std::unordered_map<SocketAddr, PendingInfo> pending_conns_;
 
     // Notification for when new subscriptions are created
     std::condition_variable subscription_cv_;
@@ -517,15 +538,14 @@ private:
     bool notify_connection_ = false;
 
     // Requested initial neighbor address and port pairs for connections
-    mutable std::vector<std::tuple<std::string, uint16_t>>
-        initial_neighbor_address_port_pairs_;
+    mutable std::vector<SocketAddr> initial_neighbor_address_port_pairs_;
 
     // Maximum time to wait for initial neighbor connection to be established
     mutable std::chrono::seconds initial_neighbor_connection_timeout_;
 
     std::unique_ptr<internal::MessageHandler> message_handler_;
 
-    std::unordered_set<AddrPortPair> reconnecting_addrs_;
+    std::unordered_set<SocketAddr> reconnecting_addrs_;
 
 }; // class Manager
 
@@ -538,10 +558,15 @@ public:
      * \param address The address to connect to
      * \param port The port to connect on
      */
-    Waiter<bool> connect_to_server(const char* const address,
-                                   const std::uint16_t port) noexcept
+    Waiter<bool> connect_to_server(SocketAddr const& address) noexcept
     {
-        return handle_->connect_to_server(address, port);
+        return handle_->connect_to_server(address);
+    }
+
+    Waiter<bool> connect_to_server(std::string address,
+                                   std::uint16_t const port) noexcept
+    {
+        return connect_to_server(SocketAddr{std::move(address), port});
     }
 
     /** \brief Returns the number of machines connected

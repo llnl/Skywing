@@ -7,6 +7,7 @@ add_subdirectory(power_method)
 add_subdirectory(push_sum_basic)
 
 add_subdirectory(math_interface_examples)
+add_subdirectory(unix_hello_world)
 
 
 if (SKYWING_BUILD_LC_EXAMPLES)

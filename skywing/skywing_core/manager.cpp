@@ -30,30 +30,47 @@ Manager::Manager(const std::uint16_t port,
                  const MachineID& id,
                  const heartbeat_cycle heartbeat_interval,
                  const std::size_t neighbor_timeout_factor) noexcept
-    : id_{id},
+    : server_socket_{port},
+      id_{id},
       heartbeat_interval_{heartbeat_interval},
       neighbor_timeout_threshold_{heartbeat_interval * neighbor_timeout_factor},
       port_{port},
       message_handler_{std::make_unique<internal::MessageHandler>(*this)}
-{
-    if (server_socket_.set_to_listen(port)
-        != internal::ConnectionError::no_error)
-    {
-        std::cerr << "Machine " << id << " failed to connect to listening port. Exiting...\n";
-        std::exit(1);
-    }
-}
+{}
+
+Manager::Manager(std::string const& addr,
+                 const MachineID& id,
+                 const heartbeat_cycle heartbeat_interval,
+                 const std::size_t neighbor_timeout_factor) noexcept
+    : server_socket_{addr},
+      id_{id},
+      heartbeat_interval_{heartbeat_interval},
+      neighbor_timeout_threshold_{heartbeat_interval * neighbor_timeout_factor},
+      port_{0},
+      message_handler_{std::make_unique<internal::MessageHandler>(*this)}
+{}
+
+Manager::Manager(SocketAddr const& addr,
+                 const MachineID& id,
+                 const heartbeat_cycle heartbeat_interval,
+                 const std::size_t neighbor_timeout_factor) noexcept
+    : server_socket_{addr},
+      id_{id},
+      heartbeat_interval_{heartbeat_interval},
+      neighbor_timeout_threshold_{heartbeat_interval * neighbor_timeout_factor},
+      port_{addr.port()},
+      message_handler_{std::make_unique<internal::MessageHandler>(*this)}
+{}
 
 Manager::~Manager()
 {
     send_to_neighbors(internal::make_goodbye());
 }
 
-Waiter<bool> Manager::connect_to_server(const char* const address,
-                                        const std::uint16_t port) noexcept
+Waiter<bool> Manager::connect_to_server(SocketAddr const& addr) noexcept
 {
     std::lock_guard<std::mutex> lock{job_mut_};
-    const auto canonical = internal::to_canonical(AddrPortPair{address, port});
+    auto canonical = internal::to_canonical(addr);
     // Only actually try the connection if it doesn't already exist
     if (addr_to_machine_.find(canonical) == addr_to_machine_.cend()) {
         const auto [iter, inserted] = pending_conns_.try_emplace(
@@ -63,8 +80,8 @@ Waiter<bool> Manager::connect_to_server(const char* const address,
                         ConnType::user_requested,
                         ""});
         if (inserted) {
-            const auto status = iter->second.conn.connect_non_blocking(
-                canonical.first.c_str(), canonical.second);
+            const auto status =
+                iter->second.conn.connect_non_blocking(canonical);
             // Ignore status - if this initially fails it will be handled later
             (void) status;
             SKYWING_TRACE_LOG("\"{}\" making connection from {} to {}",
@@ -73,12 +90,11 @@ Waiter<bool> Manager::connect_to_server(const char* const address,
                               iter->second.conn.ip_address_and_port());
         }
     }
-    return make_waiter<bool>(job_mut_,
-                             connection_cv_,
-                             internal::ManagerConnectionIsComplete{
-                                 *this, canonical.first, canonical.second},
-                             internal::ManagerGetConnectionSuccess{
-                                 *this, canonical.first, canonical.second});
+    return make_waiter<bool>(
+        job_mut_,
+        connection_cv_,
+        internal::ManagerConnectionIsComplete{*this, canonical},
+        internal::ManagerGetConnectionSuccess{*this, canonical});
 }
 
 void Manager::accept_pending_connections() noexcept
@@ -87,6 +103,8 @@ void Manager::accept_pending_connections() noexcept
         // This feels gross since it's basically the same thing as above, but
         // I'm not sure how to condense them as they are slightly different
         const auto& [address, port] = conn->ip_address_and_port();
+        // NOTE (trb): this is a meaningful use of
+        // "SocketCommunicator::ip_address_and_port()"
         auto info = PendingInfo{std::move(*conn),
                                 ConnStatus::waiting_for_conn,
                                 ConnType::user_requested,
@@ -98,7 +116,7 @@ void Manager::accept_pending_connections() noexcept
         auto inc_port = port;
         while (true) {
             const auto [iter, inserted] = pending_conns_.try_emplace(
-                AddrPortPair{address, inc_port}, std::move(info));
+                SocketAddr{address, inc_port}, std::move(info));
             (void) iter;
             ++inc_port;
             if (inserted) {
@@ -120,8 +138,7 @@ size_t Manager::number_of_neighbors() const noexcept
 }
 
 void Manager::configure_initial_neighbors(
-    const std::vector<std::tuple<std::string, uint16_t>>&
-        neighbor_address_port_pairs,
+    std::vector<SocketAddr> const& neighbor_address_port_pairs,
     std::chrono::seconds timeout) noexcept
 {
     for (const auto& neighbor : neighbor_address_port_pairs) {
@@ -130,26 +147,36 @@ void Manager::configure_initial_neighbors(
     initial_neighbor_connection_timeout_ = timeout;
 }
 
+void Manager::configure_initial_neighbors(
+    std::vector<std::tuple<std::string, std::uint16_t>> const&
+        neighbor_address_port_pairs,
+    std::chrono::seconds timeout) noexcept
+{
+    for (const auto& [addr, port] : neighbor_address_port_pairs) {
+        initial_neighbor_address_port_pairs_.emplace_back(
+            SocketAddr{addr, port});
+    }
+    initial_neighbor_connection_timeout_ = timeout;
+}
+
 // NOTE: If calling multiple times, will overwrite the previously set timeout
 // values
-void Manager::configure_initial_neighbors(const std::string address,
-                                          const std::uint16_t port,
+void Manager::configure_initial_neighbors(SocketAddr const& addr,
                                           std::chrono::seconds timeout) noexcept
 {
-    initial_neighbor_address_port_pairs_.emplace_back(
-        std::make_tuple(address, port));
+    initial_neighbor_address_port_pairs_.emplace_back(addr);
     initial_neighbor_connection_timeout_ = timeout;
 }
 
 void Manager::make_neighbor_connection() noexcept
 {
-    for (const auto& [ip, port] : initial_neighbor_address_port_pairs_) {
+    for (const auto& addr : initial_neighbor_address_port_pairs_) {
         const auto time_limit = std::chrono::steady_clock::now()
                                 + initial_neighbor_connection_timeout_;
-        while (!connect_to_server(ip.c_str(), port).get()) {
+        while (!connect_to_server(addr).get()) {
             if (std::chrono::steady_clock::now() > time_limit) {
-                SKYWING_DEBUG_LOG(
-                    "WARNING: Took too long to connect to {} : {}", ip, port);
+                SKYWING_DEBUG_LOG("WARNING: Took too long to connect to {}",
+                                  addr);
                 return;
             }
         }
@@ -206,7 +233,6 @@ void Manager::run() noexcept
 
             // // Process dynamic neighbor additions and removals
             // process_neighbor_changes();
-
 
             using cv_ref_pair = std::pair<bool&, std::condition_variable&>;
             std::array<cv_ref_pair, 2> cv_array{
@@ -347,8 +373,7 @@ void Manager::cleanup_neighbor_state([[maybe_unused]] const MachineID& id,
                                      internal::NeighborAgent& neighbor,
                                      bool& new_tags) noexcept
 {
-    SKYWING_TRACE_LOG(
-        "\"{}\" cleaning up state for neighbor \"{}\"", id_, id);
+    SKYWING_TRACE_LOG("\"{}\" cleaning up state for neighbor \"{}\"", id_, id);
 
     // Remove corresponding address
     const auto erase_addr = [&](auto& erase_from, const auto& on_erase) {
@@ -496,7 +521,7 @@ Waiter<void> Manager::subscribe(const std::vector<TagID>& tag_ids) noexcept
                        internal::ManagerSubscribeIsDone{*this, tag_ids});
 }
 
-Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
+Waiter<bool> Manager::ip_subscribe(const SocketAddr& addr,
                                    const std::vector<TagID>& tag_ids) noexcept
 {
     std::lock_guard lock{job_mut_};
@@ -532,7 +557,8 @@ Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
         const std::string tag_list = std::accumulate(
             tag_ids.cbegin(),
             tag_ids.cend(),
-            canonical_addr.first + ':' + std::to_string(canonical_addr.second),
+            canonical_addr.address() + ':'
+                + std::to_string(canonical_addr.port()),
             [](const std::string& so_far, const std::string& next) {
                 return so_far + '\0' + next;
             });
@@ -544,8 +570,7 @@ Waiter<bool> Manager::ip_subscribe(const AddrPortPair& addr,
                         tag_list});
         assert(inserted);
         // Ignore the status - it is handeled later
-        (void) iter->second.conn.connect_non_blocking(
-            canonical_addr.first.c_str(), canonical_addr.second);
+        (void) iter->second.conn.connect_non_blocking(canonical_addr);
     }
     return make_waiter<bool>(job_mut_,
                              subscription_cv_,
@@ -676,7 +701,7 @@ void Manager::add_publishers_and_propagate(
 {
     const auto insert_publisher_infos =
         [](decltype(publishers_for_tag_)::iterator iter,
-           const std::vector<std::string>& addresses,
+           const std::vector<SocketAddr>& addresses,
            const std::vector<MachineID>& machines) noexcept {
             assert(addresses.size() == machines.size());
             const auto num_iters = addresses.size();
@@ -733,7 +758,11 @@ void Manager::add_publishers_and_propagate(
             }
             return loc;
         }();
-        iter->second.insert(internal::PublisherInfo{from.address(), from.id()});
+        SKYWING_DEBUG_LOG(
+            "TOM Add pubs and prop, tags from neighbors addr=\"{}\"",
+            from.address());
+        iter->second.insert(
+            internal::PublisherInfo{from.address_pair(), from.id()});
     }
     // Propagate to any machines that need this information, marking them
     // as no longer needing propagation as well
@@ -770,7 +799,7 @@ Manager::make_known_tag_publisher_message() const noexcept
 {
     // Produce vectors for the machines and tags
     std::vector<TagID> tags_to_send;
-    std::vector<std::vector<std::string>> addresses_to_send;
+    std::vector<std::vector<SocketAddr>> addresses_to_send;
     std::vector<std::vector<MachineID>> machines_to_send;
     for (const auto& [tag, infos] : publishers_for_tag_) {
         // Don't send data for tags that don't have any known publishers
@@ -819,7 +848,7 @@ void Manager::init_connections_for_pending_tags() noexcept
     // A single connection can supply multiple tags, so look through all the
     // pending tags first so that multiple connections to the same machine
     // aren't started
-    std::unordered_map<std::string, std::string> to_conn;
+    std::unordered_map<SocketAddr, std::string> to_conn;
     std::vector<decltype(pending_tags_)::iterator> to_delete;
 
     SKYWING_TRACE_LOG("\"{}\" in init_connections_for_pending_tags for "
@@ -868,8 +897,8 @@ void Manager::init_connections_for_pending_tags() noexcept
             const auto& [addr, connect_to_id] =
                 *publishers.begin(); // a PublisherInfo object
             // Check if the machine is already a neighbor, and handle it if so
-            const auto neighbor_iter =
-                addr_to_machine_.find(internal::split_address(addr));
+            const auto neighbor_iter = addr_to_machine_.find(addr);
+            SKYWING_DEBUG_LOG("neighbor iter has address \"{}\"", addr);
             if (neighbor_iter != addr_to_machine_.cend()) {
                 SKYWING_TRACE_LOG(
                     "\"{}\" already has connection for tag \"{}\"", id_, tag);
@@ -890,9 +919,9 @@ void Manager::init_connections_for_pending_tags() noexcept
                 }
             }
             else {
-                const auto [addrstr, port] = internal::split_address(addr);
+                const auto [addrstr, port] = addr;
 
-                if (reconnecting_addrs_.count(AddrPortPair{addrstr, port})) {
+                if (reconnecting_addrs_.count(addr)) {
                     SKYWING_TRACE_LOG("\"{}\" is skipping new subscription to "
                                       "{}:{} because reconnect is in progress",
                                       id_,
@@ -929,40 +958,41 @@ void Manager::init_connections_for_pending_tags() noexcept
         SKYWING_DEBUG_LOG(
             "\"{}\" about to connect to \"{}\" for tag \"{}\"", id_, addr, tag);
 
-        auto [addrstr, port] = internal::split_address(addr);
-        AddrPortPair key{addrstr, port};
+        auto const& key = addr;
+
+        // SocketAddr key{addrstr, port};
         // Check if a reconnect connection is already pending for this
         // address/port
         auto pending_iter = pending_conns_.find(key);
         if (pending_iter != pending_conns_.end()
             && pending_iter->second.type == ConnType::reconnect)
         {
-            SKYWING_DEBUG_LOG("\"{}\" skipping subscription connect to {}:{} "
+            SKYWING_DEBUG_LOG("\"{}\" skipping subscription connect to {} "
                               "due to reconnect in progress",
                               id_,
-                              addrstr,
-                              port);
+                              key);
+
             continue; // Skip this connection, reconnect will handle it
         }
 
-        const auto err = conn.connect_non_blocking(addr);
+        const auto err = conn.connect_non_blocking(key);
         if (err == internal::ConnectionError::connection_in_progress
             || err == internal::ConnectionError::no_error)
         {
             // Port can be recycled, so have to iterate until it gets inserted
             // Ignore the address as the IP isn't initialized until the
             // connection is complete
-            auto [addrstr, port] = internal::split_address(addr);
+            auto [addrstr, port] = addr;
             while (true) {
                 SKYWING_DEBUG_LOG(
                     "\"{}\" trying connecting to \"{}\" with key {} for tag "
                     "\"{}\"",
                     id_,
                     addr,
-                    AddrPortPair{addr.substr(0, addr.find(':')), port},
+                    addr,
                     tag);
                 const auto [iter, inserted] = pending_conns_.try_emplace(
-                    AddrPortPair{addrstr, port},
+                    SocketAddr{addrstr, port},
                     PendingInfo{std::move(conn),
                                 ConnStatus::waiting_for_conn,
                                 ConnType::subscription,
@@ -985,12 +1015,12 @@ void Manager::init_connections_for_pending_tags() noexcept
     });
 }
 
-bool Manager::conn_is_complete(const AddrPortPair& address) noexcept
+bool Manager::conn_is_complete(const SocketAddr& address) noexcept
 {
     return pending_conns_.find(address) == pending_conns_.cend();
 }
 
-bool Manager::addr_is_connected(const AddrPortPair& address) const noexcept
+bool Manager::addr_is_connected(const SocketAddr& address) const noexcept
 {
     const auto iter = addr_to_machine_.find(address);
     if (iter == addr_to_machine_.cend()) {
@@ -1116,13 +1146,13 @@ void Manager::process_pending_conns() noexcept
                         iter->first,
                         to_c_str(info.type));
 
-                handle_error(info);
-                notify_connection_ = true;
-                iter = pending_conns_.erase(iter);
-                okay = false;
-                break;
+                    handle_error(info);
+                    notify_connection_ = true;
+                    iter = pending_conns_.erase(iter);
+                    okay = false;
+                    break;
                 }
-        }
+            }
         }
         else if (info.status == ConnStatus::waiting_for_resp) {
             // TODO: Add timeout here?
@@ -1161,7 +1191,8 @@ void Manager::process_pending_conns() noexcept
                                             greeting.from(),
                                             greeting.neighbors(),
                                             *this,
-                                            greeting.port());
+                                            greeting.address(),
+                                            "FIXME");
                                     new_neighbor_iter = neighbor_iter;
                                     if (!inserted) {
                                         SKYWING_TRACE_LOG(
@@ -1195,7 +1226,8 @@ void Manager::process_pending_conns() noexcept
                                             reconnect.from(),
                                             reconnect.neighbors(),
                                             *this,
-                                            reconnect.port());
+                                            reconnect.address(),
+                                            "FIXME");
 
                                     new_neighbor_iter = neighbor_iter;
                                     if (!inserted) {
@@ -1316,12 +1348,20 @@ void Manager::process_pending_conns() noexcept
 
 std::vector<std::byte> Manager::make_handshake() const noexcept
 {
-    return internal::make_greeting(id_, make_neighbor_vector(), port_);
+    auto const addr = server_socket_.listening_addr();
+    if (addr.port() != port_) {
+        std::cerr << "BAD PORT (addr.port() = " << addr.port()
+                  << ", port_ = " << port_ << ")" << std::endl;
+        std::terminate(); // sanity check in debug mode
+    }
+    return internal::make_greeting(id_, make_neighbor_vector(), addr);
 }
 
 std::vector<std::byte> Manager::make_reconnect() const noexcept
 {
-    return internal::make_reconnect(id_, make_neighbor_vector(), port_);
+    auto const addr = server_socket_.listening_addr();
+    assert(addr.port() == port_); // sanity check in debug mode
+    return internal::make_reconnect(id_, make_neighbor_vector(), addr);
 }
 
 bool Manager::subscription_tags_are_produced(
@@ -1464,49 +1504,43 @@ bool Manager::request_reconnect(const MachineID& neighbor_agent_id) noexcept
         return false;
     }
 
-    const auto& [server_address, server_port] =
-        reconnect_cache.at(neighbor_agent_id);
-    AddrPortPair reconnect_addr{server_address, server_port};
+    auto const& server_address = reconnect_cache.at(neighbor_agent_id);
 
-    reconnecting_addrs_.insert(AddrPortPair{server_address, server_port});
+    reconnecting_addrs_.insert(server_address);
     SKYWING_DEBUG_LOG(
-        "\"{}\" added reconnect address {}:{} to reconnecting_addrs_",
+        "\"{}\" added reconnect address {} to reconnecting_addrs_",
         id_,
-        server_address,
-        server_port);
+        server_address);
 
     internal::SocketCommunicator new_conn;
-    auto err =
-        new_conn.connect_non_blocking(server_address.c_str(), server_port);
+    auto err = new_conn.connect_non_blocking(server_address);
     if (err != internal::ConnectionError::no_error
         && err != internal::ConnectionError::connection_in_progress)
     {
         SKYWING_DEBUG_LOG("Reconnect failed immediately with error {}",
                           static_cast<int>(err));
-        reconnecting_addrs_.erase(reconnect_addr);
+        reconnecting_addrs_.erase(server_address);
         return false;
     }
 
     PendingInfo info{
         std::move(new_conn), ConnStatus::waiting_for_conn, ConnType::reconnect};
 
-    auto [iter, inserted] = pending_conns_.try_emplace(
-        AddrPortPair{server_address, server_port}, std::move(info));
+    auto [iter, inserted] =
+        pending_conns_.try_emplace(server_address, std::move(info));
     if (!inserted) {
         SKYWING_WARN_LOG(
-            "Failed to insert reconnect pending connection id {} for {}:{}",
+            "Failed to insert reconnect pending connection id {} for {}",
             info.id,
-            server_address,
-            server_port);
-        reconnecting_addrs_.erase(reconnect_addr);
+            server_address);
+        reconnecting_addrs_.erase(server_address);
         return false;
     }
 
     SKYWING_DEBUG_LOG(
-        "Reconnect initiated with pending id {} and stored for {}:{}",
+        "Reconnect initiated with pending id {} and stored for {}",
         iter->second.id,
-        server_address,
-        server_port);
+        server_address);
     return true;
 }
 

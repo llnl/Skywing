@@ -16,7 +16,7 @@ namespace skywing::internal
 {
 /** \brief Creates a socket in non-blocking mode
  */
-int create_non_blocking() noexcept;
+int create_non_blocking(int address_family) noexcept;
 
 /** \brief Accepts on a socket and puts the connection in non-blocking mode
  */

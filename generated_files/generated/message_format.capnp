@@ -42,16 +42,21 @@ struct PublishData {
   tagID   @2 : Text;
 }
 
+struct SocketAddr {
+  address @0 : Text;
+  port    @1 : UInt16;
+}
+
 struct Greeting {
   from      @0 : Text;
   neighbors @1 : List(Text);
-  port      @2 : UInt16;
+  address   @2 : SocketAddr;
 }
 
 struct Reconnect {
   from      @0 : Text;
   neighbors @1 : List(Text);
-  port      @2 : UInt16;
+  address   @2 : SocketAddr;
 }
 
 struct NewNeighbor {
@@ -66,7 +71,7 @@ struct RemoveNeighbor {
 # Additionally, a list of tags that are produced by the machine that sent the message
 struct ReportPublishers {
   tags                @0 : List(Text);
-  addresses           @1 : List(List(Text));
+  addresses           @1 : List(List(SocketAddr));
   machines            @2 : List(List(Text));
   locallyProducedTags @3 : List(Text);
 }
