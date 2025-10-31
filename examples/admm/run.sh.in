@@ -16,7 +16,7 @@ print_usage() {
   echo "  --observations_per_agent M  Number of local samples for each agent (number of rows in local matrix)"
   echo "  --state_dim N               Dimension of feature space (size of global solution vector)"
   echo "  --noise V                   Variance of noise"
-  echo "  --help                      Display this help message and exit"
+  echo "  --help                      Display this help message and return"
 }
 
 # Defaults
@@ -29,13 +29,13 @@ noise=0.01
 # Check for help flag before anything else
 if [ "$1" == "--help" ]; then
     print_usage
-    exit 0
+    return 0
 fi
 
 # Check if at least one argument is provided
 if [ $# -lt 1 ]; then
     print_usage
-    exit 1
+    return 1
 fi
 
 STARTING_PORT=$1
@@ -66,12 +66,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --help)
       print_usage
-      exit 0
+      return 0
       ;;
     -*)
       echo "Unknown option: $1"
       print_usage
-      exit 1
+      return 1
       ;;
     *)
       echo "Bad positional argument: $1"

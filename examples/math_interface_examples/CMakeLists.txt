@@ -5,6 +5,7 @@ add_subdirectory(synchronizing_jacobi)
 
 if (SKYWING_USE_EIGEN)
   add_subdirectory(cola)
+  add_subdirectory(admm)
 endif ()
 
 file(COPY

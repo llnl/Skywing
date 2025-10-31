@@ -4,7 +4,6 @@ target_sources(skywing_mid
   FILE_SET mid_api
   TYPE HEADERS
   FILES
-  admm_processor.hpp
   associative_vector.hpp
   associative_matrix.hpp
   asynchronous_iterative.hpp
@@ -19,6 +18,8 @@ target_sources(skywing_mid
   iteration_policies.hpp
   iterative_method.hpp
   iterative_resilience_policies.hpp
+  linear_system_processors/admm_processor.hpp
+  linear_system_processors/admm_shared_processor.hpp
   linear_system_processors/cola_processor.hpp
   linear_system_processors/jacobi_processor.hpp
   power_method_processor.hpp

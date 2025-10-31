@@ -67,7 +67,7 @@ public:
      * @return The matvec product result.
      */
     AssociativeVector<index_t, val_t, isOpen>
-    matvec(const AssociativeVector<index_t, val_t, isOpen>& x)
+    matvec(const AssociativeVector<index_t, val_t, isOpen>& x) const
     {
         AssociativeVector<index_t, val_t, true> b_open;
         for (const index_t& row_key : this->get_keys()) {
@@ -78,7 +78,7 @@ public:
     }
 
     /**
-     * @brief Transpose the matrix (in place).
+     * @brief Transpose the matrix (returns a new matrix).
      */
     AssociativeMatrix<index_t, val_t, isOpen> transpose() const
     {

@@ -11,8 +11,9 @@
 
 #include "skywing_core/manager.hpp"
 #include "skywing_core/skywing.hpp"
-#include "skywing_mid/admm_processor.hpp"
+#include "skywing_mid/linear_system_processors/admm_processor.hpp"
 #include "skywing_mid/associative_vector.hpp"
+#include "skywing_mid/associative_matrix.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
 #include "skywing_mid/data_input.hpp"
 #include "skywing_mid/iteration_policies.hpp"
@@ -30,10 +31,10 @@ using index_t = uint32_t;
 using scalar_t = double;
 
 using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
-using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
+using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
 
 void machine_task(const NetworkInfo* const info,
-                  AssociativeMatrix A,
+                  ClosedMatrix A,
                   ClosedVector b,
                   ClosedVector exact_x,
                   const int index)
@@ -61,7 +62,7 @@ void machine_task(const NetworkInfo* const info,
         IterMethod iter_method =
             WaiterBuilder<IterMethod>(
                 manager, job_handle, tag_ids[index], tag_ids)
-                .set_processor(A, b, 1.0)
+                .set_processor(A, b)
                 .set_publish_policy()
                 .set_iteration_policy(std::chrono::seconds(3))
                 .set_resilience_policy()
@@ -89,7 +90,7 @@ TEST_CASE("ADMM", "[mid]")
     // Define the columns of the matrix
     auto c0 = ClosedVector({{0, 1.0}, {2, 4.0}, {4, 7.0}});
     auto c1 = ClosedVector({{0, 2.0}, {2, 5.0}, {4, 8.0}});
-    auto A = AssociativeMatrix({{1, c0}, {3, c1}});
+    auto A = ClosedMatrix({{1, c0}, {3, c1}});
 
     // RHS b - keys correspond to row keys of the matrix
     auto b = ClosedVector({{0, 3.0}, {2, 6.0}, {4, 9.0}});
@@ -98,7 +99,7 @@ TEST_CASE("ADMM", "[mid]")
     auto x = ClosedVector({{1, -1.0}, {3, 2.0}});
 
     for (auto i = 0; i < num_machines; ++i) {
-        threads.emplace_back(machine_task, &network_info, A, b, x, i);
+        threads.emplace_back(machine_task, &network_info, A.transpose(), b, x, i);
     }
     for (auto&& thread : threads) {
         thread.join();
