@@ -8,7 +8,7 @@
 
 #include "skywing_core/skywing.hpp"
 #include "skywing_math_interface/linear_system_driver.hpp"
-#include "skywing_mid/admm_processor.hpp"
+#include "skywing_mid/linear_system_processors/admm_processor.hpp"
 #include "skywing_mid/associative_matrix.hpp"
 #include "skywing_mid/associative_vector.hpp"
 #include "skywing_mid/asynchronous_iterative.hpp"
@@ -93,7 +93,7 @@ void machine_task(size_t machine_number,
                                           "tag"
                                               + std::to_string(machine_number),
                                           sub_tag_ids)
-                    .set_processor(A, b, 1.0)
+                    .set_processor(A, b)
                     .set_publish_policy()
                     .set_iteration_policy(std::chrono::seconds(5))
                     .set_resilience_policy()
@@ -198,7 +198,7 @@ void setup_and_run_14_bus_problem(size_t machine_number,
 
     // Call to Skywing job
     machine_task(machine_number,
-                 A.transpose(),
+                 A,
                  b,
                  x_exact,
                  ports,
@@ -274,7 +274,7 @@ void setup_and_run_random_signal_problem(size_t machine_number,
     b += eps;
 
     // Call to Skywing job
-    machine_task(machine_number, A, b, x, ports, machine_names, sub_tag_ids);
+    machine_task(machine_number, A.transpose(), b, x, ports, machine_names, sub_tag_ids);
 }
 
 int main(int argc, char* argv[])

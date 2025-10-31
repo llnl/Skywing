@@ -24,14 +24,14 @@ def generate_matrix(matrix_type, n, m, output_dir, **kwargs):
     if matrix_type == 'identity':
         matrix = np.eye(n, M=m)
     elif matrix_type == 'random':
-        matrix = np.random.rand(n,m)
+        matrix = generate_random(n, m, **kwargs)
     elif 'graph' in matrix_type:
         graph_type = kwargs.pop('graph_type', 'complete')
         graph = generate_graph(graph_type, n, output_dir, **kwargs)
         if matrix_type == 'graph_laplacian':
             matrix = nx.laplacian_matrix(graph).toarray()
             if kwargs.get('adjust_laplacian'):
-                matrix = matrix + matrix.shape[0] * np.eye(matrix.shape[0])
+                matrix = matrix + np.eye(matrix.shape[0])
         elif matrix_type == 'graph_adjacency':
             matrix = nx.adjacency_matrix(graph).toarray()
     elif matrix_type == 'read':
@@ -47,6 +47,35 @@ def generate_matrix(matrix_type, n, m, output_dir, **kwargs):
     np.savetxt(f"{output_dir}/A.txt", matrix, fmt='%.6f')
     print(f"Matrix saved as {output_dir}/A.txt")
     return matrix
+
+def generate_random(n, m, **kwargs):
+    """
+    Generate random matrix with specified conditioning
+    """
+
+    # Rank used for construction
+    r = kwargs.get('rank', min(n,m))
+    if r < 1 or r > min(n,m):
+        r = min(n,m)
+
+    # Orthonormal factors with r columns
+    # (QR on m×r and n×r random Gaussians -> Q is orthonormal)
+    rng = np.random.default_rng(1)
+    Qu, _ = np.linalg.qr(rng.standard_normal((n, r)))
+    Qv, _ = np.linalg.qr(rng.standard_normal((m, r)))
+
+    # Log-spaced singular values from 1 down to 1/condition_number
+    # length r; enforce exact ends for stability
+    condition_number = kwargs.get('condition_number', 10.0)
+    svals = np.logspace(0.0, -np.log10(condition_number), num=r)
+    if r >= 2:
+        svals[0] = 1.0
+        svals[-1] = 1.0 / condition_number
+    Sigma = np.diag(svals)
+
+    # Construct A = U Σ V^T (n×m) and scale
+    scale = kwargs.get('scale', 1.0)
+    return scale * Qu @ Sigma @ Qv.T
 
 def barbell_custom_graph(n1, n2):
     """
@@ -326,6 +355,11 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--comm_topology', type=str, choices=['sparsity', 'full', 'ring', 'line'],
                         default='sparsity', help='Communication topology.')
 
+    # Random matrix options
+    parser.add_argument('-k', '--condition_number', type=float, default=1.0, help='Condition number for random matrix (default 1.0).')
+    parser.add_argument('-s', '--scale', type=float, default=1.0, help='Scaling factor for random matrix (default 1.0).')
+    parser.add_argument('-R', '--rank', type=int, default=0, help='Rank of random matrix (default 0 corresponds to full rank).')
+
     # Options for reading matrix/rhs from file
     parser.add_argument('--matrix_read_file', type=str, help='Path to file to read matrix from (only used with matrix_type = read).')
     parser.add_argument('--rhs_read_file', type=str, help='Path to file to read righ-hand side from (only used with --rhs read).')
@@ -353,6 +387,9 @@ if __name__ == "__main__":
          args.col_partitions,
          args.comm_topology,
          lam=args.lam,
+         condition_number=args.condition_number,
+         scale=args.scale,
+         rank=args.rank,
          matrix_read_file=args.matrix_read_file,
          rhs_read_file=args.rhs_read_file,
          graph_type=args.graph_type,

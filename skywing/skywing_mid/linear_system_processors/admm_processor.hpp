@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "skywing_mid/associative_vector.hpp"
+#include "skywing_mid/associative_matrix.hpp"
 #include "skywing_mid/big_float.hpp"
 #include "skywing_mid/push_flow_processor.hpp"
 #include "skywing_mid/quacc_processor.hpp"
@@ -20,6 +21,9 @@ namespace skywing
 
 /** @brief Processor for the decentralized Alternating Direction Method of
  *  Multipliers (ADMM) for solving a linear least squares optimization problem
+ *  in a row-partitioned setting, that is, each agent owns the entire solution
+ *  (or at least the dofs required for a local matvec) and a partitioning of
+ *  the right-hand side (correponding to the owned rows of the matrix, A).
  *
  *  This ADMM implementation is for solving the least squares optimization
  *  problem: min f(x) where f(x) = (1/2) ||Ax - b||_2^2. Specifically, a
@@ -64,33 +68,29 @@ public:
 
     using OpenVector = AssociativeVector<index_t, scalar_t, true>;
     using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
-    using AssociativeMatrix = AssociativeVector<index_t, ClosedVector, false>;
+    using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
+
     using ValueType = ClosedVector;
+    using IndexType = index_t;
+    using ScalarType = scalar_t;
 
     /**
-     * @param A Matrix of the linear system - assume primary keys correspond to
-     * the columns of A
+     * @param A The linear system (assume keys correspond to the rows of A and
+     * note that we take the transpose to keep things in column-major format here)
      * @param b Right hand side (assume keys correspond to the rows of A)
-     * @param collective_connectivity_ratio Connectivity ratio of the collective
-     * (agent network) used to compute the algorithmic parameter c which impacts
-     * convergence rate. The connectivity ratio is the number of connections /
-     * number of agents.
      */
-    ADMMProcessor(AssociativeMatrix A,
-                  ClosedVector b,
-                  scalar_t collective_connectivity_ratio = 1.0)
-        : A_(A),
-          A_keys_(A.get_keys()),
-          x_(A.get_keys()),
-          c_scaled_sum_x_neighbors_(A.get_keys()),
-          alpha_(A.get_keys()),
-          neighbor_count_(A.get_keys()),
-          c_(compute_c_parameter(collective_connectivity_ratio))
+    ADMMProcessor(ClosedMatrix A, ClosedVector b)
+        : A_(A.transpose()),
+          A_keys_(A_.get_keys()),
+          x_(A_.get_keys()),
+          c_scaled_sum_x_neighbors_(A_.get_keys()),
+          alpha_(A_.get_keys()),
+          neighbor_count_(A_.get_keys())
     {
-        // Convert A from AssociativeMatrix to EigenMatrix and
+        // Convert A from ClosedMatrix to EigenMatrix and
         // b to EigenVector
-        size_t num_rows = A.at(A.get_keys()[0]).size();
-        EigenMatrix eigen_A(num_rows, A.size());
+        size_t num_rows = A_.at(A_.get_keys()[0]).size();
+        EigenMatrix eigen_A(num_rows, A_.size());
         EigenVector eigen_b(b.size());
         size_t row_count = 0;
         size_t col_count = 0;
@@ -107,6 +107,17 @@ public:
         }
         eigen_ATb_ = eigen_A.transpose() * eigen_b;
         eigen_ATA_ = eigen_A.transpose() * eigen_A;
+    }
+
+    /**
+     * @param collective_connectivity_ratio Connectivity ratio of the collective
+     * (agent network) used to compute the algorithmic parameter c which impacts
+     * convergence rate. The connectivity ratio is the number of connections /
+     * number of agents.
+     */
+    void set_parameters(scalar_t collective_connectivity_ratio = 1.0)
+    {
+        c_ = compute_c_parameter(collective_connectivity_ratio);
     }
 
     ValueType get_init_publish_values() { return x_; }
@@ -199,6 +210,7 @@ public:
 
         // Compute x update difference
         tmp -= x_;
+        norm_delta_x_ = sqrt(tmp.dot(tmp));
         SKYWING_INFO_LOG("Tag {} - ADMM primal error: ||x^k+1 - x^k|| = {}",
                          iter_method.my_tag().id(),
                          tmp.dot(tmp));
@@ -207,6 +219,12 @@ public:
     ValueType prepare_for_publication(ValueType) { return x_; }
 
     ValueType get_value() const { return x_; }
+
+    std::unordered_map<std::string, scalar_t> get_local_error_metrics() const {
+        std::unordered_map<std::string, scalar_t> metrics;
+        metrics["norm_delta_x"] = norm_delta_x_;
+        return metrics;
+    }
 
     /** @brief Update the right-hand side
      *
@@ -218,7 +236,7 @@ public:
      */
     void update_rhs(ClosedVector b)
     {
-        // Re-convert A from AssociativeMatrix to EigenMatrix and
+        // Re-convert A from ClosedMatrix to EigenMatrix and
         // b to EigenVector and compute A^Tb
         size_t num_rows = A_.at(A_.get_keys()[0]).size();
         EigenMatrix eigen_A(num_rows, A_.size());
@@ -243,7 +261,7 @@ public:
     }
 
 private:
-    const AssociativeMatrix A_;
+    const ClosedMatrix A_;
     const std::vector<index_t> A_keys_;
 
     ClosedVector x_;
@@ -263,6 +281,7 @@ private:
     EigenVector result;
 
     scalar_t c_;
+    scalar_t norm_delta_x_;
     // Eigen::ColPivHouseholderQR<EigenMatrix> solver;
     Eigen::PartialPivLU<EigenMatrix> solver;
 

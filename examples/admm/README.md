@@ -1,6 +1,11 @@
 @defgroup admm ADMM
 # ADMM for solving a linear least squares optimization problem
 
+**NOTE**: There is another example using ADMM leveraging the standardized `LinearSystemDriver` functionality
+for running iterative methods for linear systems, located in `examples/math_interface_examples/admm`.
+It demonstrates using ADMM as a synchronous or asynchronous method, as well as different
+data layout schemes for the linear system.
+
 ## Overview
 This example demonstrates using the decentralized Alternating Direction Method of
 Multipliers (ADMM) implemented in the Skywing framework for solving a linear least squares optimization problem.
