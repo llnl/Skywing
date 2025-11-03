@@ -1,0 +1,56 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.10",
+  "pybind11"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "skywing"
+version = "0.2"
+description = "A high-reliability, real-time, decentralized platform for collaborative autonomy."
+authors = [
+  { name = "Aly Fox", email = "fox33@llnl.gov" },
+  { name = "Sarah Osborn", email = "osborn9@llnl.gov" },
+  { name = "Colin Ponce", email = "ponce11@llnl.gov" },
+  { name = "Rachel Waldon", email = "waldon1@llnl.gov" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+
+  "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: System :: Distributed Computing",
+
+  "Private :: Do Not Upload"
+]
+dependencies=[
+  "numpy", # Just for the example, but why not?
+  "matplotlib", # For plotting scripts
+  "networkx", # For topology_gen.py
+  "scipy", # For topology_gen.py
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "skbuild"
+
+[tool.scikit-build.cmake]
+version = ">=3.30.0,<4.0"
+
+[tool.scikit-build.ninja]
+version = ">=1.11"
+make-fallback = false
+
+[tool.scikit-build.wheel]
+expand-macos-universal-tags = true
+install-dir = "skywing"

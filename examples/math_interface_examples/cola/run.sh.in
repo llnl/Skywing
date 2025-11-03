@@ -1,0 +1,97 @@
+#!/bin/bash
+
+print_usage() {
+  echo "Usage: run.sh [options]"
+  echo
+  echo "Options:"
+  echo "  -n, --num_agents N             Specify the number of agents (default 3)"
+  echo "  -p, --starting_port P          Specify the starting port (default 20000)"
+  echo "  -l, --lambda L                 Specify the value of the regularization parameter, lambda (default 0.0001)"
+  echo "  -s, --shift_scale S            Choose whether to shift and scale the data (default 0)"
+  echo "  -S, --synchronous S            Choose whether to run COLA as a synchronous method (default 1)"
+  echo "  -t, --timeout T                Choose the timeout in seconds (default 30)"
+  echo "  -d, --data_dir DIR             Specify the directory containing the data and problem decomposition files (default data)"
+  echo "  -o, --output_dir DIR           Specify output directory (default output)"
+  echo "  -h, --help                     Display this help message and exit"
+}
+
+# Defaults
+num_agents=3
+starting_port=20000
+lambda=0.0001
+shift_scale=0
+sync=1
+timeout=30
+data_dir="data"
+output_dir="output"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--num_agents)
+      num_agents=$2
+      shift 2
+      ;;
+    -p|--starting_port)
+      starting_port=$2
+      shift 2
+      ;;
+    -l|--lambda)
+      lambda=$2
+      shift 2
+      ;;
+    -s|--shift_scale)
+      shift_scale=$2
+      shift 2
+      ;;
+    -S|--synchronous)
+      sync=$2
+      shift 2
+      ;;
+    -t|--timeout)
+      timeout=$2
+      shift 2
+      ;;
+    -d|--data_dir)
+      data_dir=$2
+      shift 2
+      ;;
+    -o|--output_dir)
+      output_dir=$2
+      shift 2
+      ;;
+    -h|--help)
+      print_usage
+      return 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      print_usage
+      return 1
+      ;;
+    *)
+      echo "Bad positional argument: $1"
+      print_usage
+      shift
+      ;;
+  esac
+done
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( ind=0 ;  ind < num_agents ; ind++ ))
+  do
+      var="erase${ind}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
+
+rm -rf ${output_dir}
+mkdir -p ${output_dir}
+
+echo "@cola_exe@" ${agent_ind}
+"@cola_exe@" ${agent_ind} -n ${num_agents} -p ${starting_port} -l ${lambda} -s ${shift_scale} -S ${sync} -t ${timeout} -d ${data_dir} -o ${output_dir} &
+declare "erase${agent_ind}=$!"
+
+sleep $(expr ${timeout} + 5)
+kill_progs

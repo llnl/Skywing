@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH -N 4
+#SBATCH -J skywing_lc_push_sum
+#SBATCH -t 00:01:00
+#SBATCH -p pdebug
+#SBATCH -o lc_push_sum_out.txt
+
+#### Shell commands
+python3 generate_config_info.py num_agents=4 node_list=$SLURM_NODELIST port_start=30000 config_filename=config.cfg
+echo "SLURM_NODELIST is $SLURM_NODELIST"
+echo " "
+srun -n4 -exclusive ./call_executable.sh #"@lc_push_sum_exe@" config.cfg $SLURM_NODEID $SLURM_LOCALID 1 4

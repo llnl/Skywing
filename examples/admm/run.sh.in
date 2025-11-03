@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# This is a shell script which calls admm
+
+print_usage() {
+  echo "Usage: source run.sh starting_port_number [options]"
+  echo
+  echo "Options:"
+  echo "  --problem P                 Specify the problem to solve (default 14-bus)"
+  echo "                              14-bus        : Read problem from file with and run with 4 agents"
+  echo "                                              *NOTE*: If this problem is chosen, then all other options"
+  echo "                                              will be unused."
+  echo "                              random-signal : Generate a random linear least squares problem for"
+  echo "                                              determining an unknown signal."
+  echo "  --size_of_network L         Specify the number of agents (default 4) (NOTE: 14-bus uses 4 regardless)"
+  echo "  --observations_per_agent M  Number of local samples for each agent (number of rows in local matrix)"
+  echo "  --state_dim N               Dimension of feature space (size of global solution vector)"
+  echo "  --noise V                   Variance of noise"
+  echo "  --help                      Display this help message and return"
+}
+
+# Defaults
+size_of_network=4
+problem="14-bus"
+observations_per_agent=100
+state_dim=5
+noise=0.01
+
+# Check for help flag before anything else
+if [ "$1" == "--help" ]; then
+    print_usage
+    return 0
+fi
+
+# Check if at least one argument is provided
+if [ $# -lt 1 ]; then
+    print_usage
+    return 1
+fi
+
+STARTING_PORT=$1
+shift
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --problem)
+      problem=$2
+      shift 2
+      ;;
+    --size_of_network)
+      size_of_network=$2
+      shift 2
+      ;;
+    --observations_per_agent)
+      observations_per_agent=$2
+      shift 2
+      ;;
+    --state_dim)
+      state_dim=$2
+      shift 2
+      ;;
+    --noise)
+      noise=$2
+      shift 2
+      ;;
+    --help)
+      print_usage
+      return 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      print_usage
+      return 1
+      ;;
+    *)
+      echo "Bad positional argument: $1"
+      print_usage
+      shift
+      ;;
+  esac
+done
+
+trap kill_progs EXIT
+kill_progs() {
+  for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
+  do
+      var="erase${counter_for_network_elements}"
+    kill -9 ${!var} > /dev/null 2> /dev/null
+  done
+}
+
+for (( counter_for_network_elements=0 ;  counter_for_network_elements < size_of_network ; counter_for_network_elements++ ))
+do
+  "@admm_exe@" ${counter_for_network_elements} ${STARTING_PORT} --size_of_network $size_of_network --problem $problem --observations_per_agent $observations_per_agent --state_dim $state_dim --noise $noise &
+  declare "erase${counter_for_network_elements}=$!"
+done
+sleep 30
+kill_progs

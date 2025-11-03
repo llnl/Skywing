@@ -1,0 +1,24 @@
+include("${CMAKE_CURRENT_LIST_DIR}/SkywingConfigVersion.cmake")
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(spdlog)
+find_dependency(Threads)
+find_dependency(CapnProto 1.0 CONFIG)
+
+if (@SKYWING_USE_EIGEN@)
+  find_dependency(Eigen3 3.0 CONFIG)
+endif ()
+
+@PACKAGE_INIT@
+
+if (NOT TARGET skywing::skywing)
+  include("${CMAKE_CURRENT_LIST_DIR}/SkywingTargets.cmake")
+
+  add_library(skywing::skywing IMPORTED INTERFACE)
+  target_link_libraries(skywing::skywing INTERFACE skywing::core)
+  target_link_libraries(skywing::skywing INTERFACE skywing::math_interface)
+  target_link_libraries(skywing::skywing INTERFACE skywing::mid)
+endif (NOT TARGET skywing::skywing)
+
+check_required_components(Skywing)

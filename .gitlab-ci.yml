@@ -1,0 +1,123 @@
+include:
+  - project: 'lc-templates/id_tokens'
+    file: 'id_tokens.yml'
+
+stages:
+  - build-and-test
+  - documentation
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+.build-and-test:
+
+  stage: build-and-test
+
+  tags: [dane, batch]
+
+  variables:
+    LLNL_SLURM_SCHEDULER_PARAMETERS: "-N1 -t 10 -A shpshftr --reservation=ci --ip-isolate=yes"
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_DEPTH: 5
+
+  script:
+    - printenv > ${CI_PROJECT_DIR}/ci_environment.log
+    - ${CI_PROJECT_DIR}/.gitlab/build-and-test.sh test_eigen=true
+
+  artifacts:
+    when: always
+    paths:
+      - "${CI_PROJECT_DIR}/ci_environment.log"
+      - "${CI_PROJECT_DIR}/configure-outerr.log"
+      - "${CI_PROJECT_DIR}/build-outerr.log"
+      - "${CI_PROJECT_DIR}/testing-outerr.log"
+      - "${CI_PROJECT_DIR}/install-outerr.log"
+
+# Extra compilers may be added if you care.
+gcc-12-1-1-eigen:
+  variables:
+    MODULES: "gcc/12.1.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "g++"
+    # -fsanitize=address to add ASAN to CapnProto build
+    # -Wno-maybe-uninitialized to work around GCC12 bug
+    # Remove -Wno-maybe-uninitialized when upgrading to GCC13
+    CXXFLAGS: "-fsanitize=address -Wno-maybe-uninitialized"
+    TEST_EIGEN: "ON"
+  extends: .build-and-test
+
+clang-14-0-6-eigen:
+  variables:
+    MODULES: "clang/14.0.6-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "clang++"
+    TEST_EIGEN: "ON"
+  extends: .build-and-test
+
+gcc-12-1-1-noeigen:
+  variables:
+    MODULES: "gcc/12.1.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "g++"
+    # -fsanitize=address to add ASAN to CapnProto build
+    # -Wno-maybe-uninitialized to work around GCC12 bug
+    # Remove -Wno-maybe-uninitialized when upgrading to GCC13
+    CXXFLAGS: "-fsanitize=address -Wno-maybe-uninitialized"
+    TEST_EIGEN: "OFF"
+  extends: .build-and-test
+
+clang-14-0-6-noeigen:
+  variables:
+    MODULES: "clang/14.0.6-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+    CXX_COMPILER: "clang++"
+    TEST_EIGEN: "OFF"
+  extends: .build-and-test
+
+# NOTE: The Intel build fails at the testing stage with Capn Proto
+# exceptions that do not appear in the other builds. For the sake of
+# expediency of merging, I have commented this out until this has been
+# debugged.
+
+# intel-2023-2-1:
+#   variables:
+#     MODULES: "intel/2023.2.1-magic ninja/1.11.1 python/3.9.12 cmake/3.26.3"
+#     CXX_COMPILER: "icpx"
+#   extends: .build-and-test
+
+.build-documentation:
+  stage: documentation
+
+  tags: [dane, shell]
+
+  variables:
+    GIT_DEPTH: 5
+
+  needs: []
+
+  script:
+    - rm -rf public/
+    - cd documentation
+    - doxygen
+    - cd ..
+    - mv documentation/html/ public/
+
+# This builds the documentation for commits that are not on the 'main'
+# branch. This is an important test that a given commit doesn't break
+# the build of the documentation, but these docs should not be
+# published as they would override the main project docs. This should
+# only happen when things are added to the main branch.
+test-build-docs:
+  extends: .build-documentation
+  rules:
+    - if: $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH
+
+# This builds the documentation for commits to the main branch and
+# updates the main project documentation upon success.
+pages:
+  extends: .build-documentation
+  artifacts:
+    paths:
+    - public
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
