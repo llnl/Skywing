@@ -18,22 +18,33 @@ Job::Job(const std::string& id,
 
 std::thread Job::run() noexcept
 {
+    has_started_ = true;
     return std::thread{[=, this]() {
         // Make the initial neighbor connection here. This
         // is done in this location of the code (as opposed to
         // within the manager) because it must be done asynchronously.
+
+        // CVP: I'm not sure this call does anything? It looks like it
+        // has no side effects, and we don't use the return value here.
         manager_->make_neighbor_connection();
+	
         to_run_(*this, ManagerHandle{*manager_});
+	
         // Re-use the buffer mutex here
         std::lock_guard lock{subs_.mutex()};
         // Signify that the work is done
-        to_run_ = nullptr;
+	has_finished_ = true;
     }};
 }
 
-bool Job::is_finished() const noexcept
+bool Job::has_started() const noexcept
 {
-    return to_run_ == nullptr;
+  return has_started_;
+}
+
+bool Job::has_finished() const noexcept
+{
+  return has_finished_;
 }
 
 const std::unordered_map<TagID, std::span<const std::uint8_t>>&

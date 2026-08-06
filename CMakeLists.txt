@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25.0)
 project(Skywing
-  VERSION 0.2
+  VERSION 0.3
   DESCRIPTION
   "A high-reliability, real-time, decentralized platform for collaborative autonomy."
   HOMEPAGE_URL "https://github.com/LLNL/Skywing"

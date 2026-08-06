@@ -18,26 +18,37 @@ Editable installs are recommended to be run with --no-build-isolation, in which 
 
 A few key classes are defined:
 
-* Agent: This class is the primary Python entry point to
-Skywing. Through an Agent, one can specify a set of neighbors, and can
-pass it a "task", a `__call__` function that will be executed
-continuously. This `to_execute` function defines a set of code to be
-run in a loop. That code can make various calls to Skywing consensus
-objects; each of these spins off a new Skywing "Job" to be run in
-parallel.
+* Agent: Define a local address and neighboring connections
+that will be used for communication during an Iteration.
 
-* Consensus objects: A consensus object defines a particular consensus
-gossip algorithm that can be used in building Python
-executables. There are two main types of Consensus objects:
-  1. CppConsensusOp, a consensus operation whose processor is defined in C++, and
-  2.  PythonConsensusOp, a consensus operation whose processor is defined in Python, but which still leverages the underlying C++ gossip framework.
+* Iteration: An iteration object defines a particular
+iterative algorithm that can be used in building Python executables.
+Iterations must be provided with an Agent object describing the
+local and neighboring addresses for communication and a Processor
+describing the local computation and communication data handling.
+Iterations begin computing and communicating when the `launch()` function
+is called, and will run continuously in their own thread until a user-
+defined stopping criteria (e.g. `max_time`) is reached. The user may
+update data used by the iteration via the `update_data()` function
+or get a current result from the iteration via `query()` (note these
+functions may be called while the iteraiton is running and will not
+interrupt execution).
 
-To define a new consensus operation that can be used in a Python
-executable, one must simply write
-`consensus_op_name = CppConsensusOp(processor_name)`
-or
-`consensus_op_name = PythonConsensusOp(processor_name)`.
-
-If definining a C++ consensus operation, the `processor_name` must
-be an object made available through pybind11 in `skywing_cpp_interface`.
-If defining a Python consensus operation, the `processor_name` must be an object
+PORT:
+We continue to support some cross-compatibility with the legacy C++
+implementation. The C++ implementation of `Iteration` may be used in
+conjunction with Python processors via `CppIteration_PythonProc`,
+which takes the class type of the processor (not the instantiated
+object) as an argument and an `AgentCpp` object for the Skywing agent.
+See `drivers/utils/ls_driver_subprocess.py` for an example.
+Additionally, C++ processors may be used in conjunction with the
+C++ iteration implementation via `CppIteration_CppProc` used with
+specific pybind declarations of iterations with C++ processors, such
+as `CppIterationSumScalar`. See `bindings/skywing_bind_interface.py`.
+The Python implementation of `Iteration` is also compatible with the
+C++ implementation of the core via `IterationCppCore` which takes
+a Python processor object and an `AgentCpp` object as the Skywing
+agent. To summarize:
+1. C++ iteration with Python processor: `CppIteration_PythonProc`
+2. C++ iteration with C++ processor: `CppIteration_CppProc`
+3. Python iteration with Python processor and C++ core: `IterationCppCore`, `AgentCpp`

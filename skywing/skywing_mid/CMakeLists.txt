@@ -28,7 +28,6 @@ target_sources(skywing_mid
   push_flow_processor.hpp
   push_sum_processor.hpp
   push_sum_basic_processor.hpp
-  python_processor.hpp
   quacc_processor.hpp
   sum_processor.hpp
   synchronous_iterative.hpp

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="550" height="120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Agent 1 (Neighbor) - Left -->
+  <circle cx="80" cy="60" r="40" fill="#E8F4F8" stroke="#4A90E2" stroke-width="2"/>
+  <text x="80" y="53" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Neighbor</text>
+  <text x="80" y="66" text-anchor="middle" fill="#333" font-size="10">127.0.0.1</text>
+  <text x="80" y="79" text-anchor="middle" fill="#333" font-size="10">:20001</text>
+
+  <!-- Agent 0 (This Agent) - Middle -->
+  <circle cx="275" cy="60" r="40" fill="#4A90E2" stroke="#2E5C8A" stroke-width="2"/>
+  <text x="275" y="53" text-anchor="middle" fill="white" font-size="12" font-weight="bold">This Agent</text>
+  <text x="275" y="66" text-anchor="middle" fill="white" font-size="10">127.0.0.1</text>
+  <text x="275" y="79" text-anchor="middle" fill="white" font-size="10">:20000</text>
+
+  <!-- Agent 2 (Neighbor) - Right -->
+  <circle cx="470" cy="60" r="40" fill="#E8F4F8" stroke="#4A90E2" stroke-width="2"/>
+  <text x="470" y="53" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Neighbor</text>
+  <text x="470" y="66" text-anchor="middle" fill="#333" font-size="10">127.0.0.1</text>
+  <text x="470" y="79" text-anchor="middle" fill="#333" font-size="10">:20002</text>
+
+  <!-- Connections -->
+  <line x1="120" y1="60" x2="235" y2="60" stroke="#333" stroke-width="3"/>
+  <line x1="315" y1="60" x2="430" y2="60" stroke="#333" stroke-width="3"/>
+</svg>

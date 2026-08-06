@@ -28,9 +28,6 @@ template <typename data_t,
           typename CountProcessor = QUACCProcessor<>>
 class SumProcessor
 {
-    // Compile-time check for floating-point type
-    static_assert(std::is_floating_point<data_t>::value,
-                  "SumProcessor: data_t must be a floating-point type.");
 
 public:
     using ValueType = std::tuple<typename MeanProcessor::ValueType,
@@ -74,9 +71,25 @@ public:
     {
         return count_processor_.get_count() * mean_processor_.get_value();
     }
+
+    data_t get_mean() const
+    {
+        return mean_processor_.get_value();
+    }
+
+    size_t get_count() const
+    {
+        return count_processor_.get_count();
+    }
+
     void set_value(data_t new_val)
     {
         mean_processor_.set_value(std::move(new_val));
+    }
+
+    void set_num_neighbors(size_t new_num_neighbors)
+    {
+        mean_processor_.set_num_neighbors(new_num_neighbors);
     }
 
     size_t get_information_count() const

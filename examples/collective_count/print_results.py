@@ -1,5 +1,6 @@
-import matplotlib.pyplot as plt
 import sys
+
+import matplotlib.pyplot as plt
 
 # Script to plot results of the collective count example.
 # First argument is name of output file.
@@ -7,19 +8,19 @@ import sys
 
 filename = sys.argv[1]
 res_dict = {}
-with open(filename, 'r') as f:
+with open(filename) as f:
     for line in f:
         tokens = line.split()
         time = int(tokens[0][:-3])
         machine_ind = int(tokens[2])
-        count = int(tokens[5].rstrip(','))
+        count = int(tokens[5].rstrip(","))
         if machine_ind not in res_dict:
-            res_dict[machine_ind] = [[],[]]
+            res_dict[machine_ind] = [[], []]
         res_dict[machine_ind][0].append(time)
         res_dict[machine_ind][1].append(count)
 
 
-for ind, results in res_dict.items():
+for _ind, results in res_dict.items():
     plt.plot(results[0], results[1])
 
 plt.ylim([0, 80])

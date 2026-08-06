@@ -209,11 +209,17 @@ void Manager::run() noexcept
             for (auto iter = jobs_.begin(); iter != jobs_.end();) {
                 std::unique_lock lock{iter->second.get_mutex(),
                                       std::try_to_lock};
-                if (lock.owns_lock() && iter->second.is_finished()) {
+                if (lock.owns_lock() && iter->second.has_finished()) {
                     // Need to unlock before deallocation
                     lock.unlock();
                     iter = jobs_.erase(iter);
                 }
+		else if (lock.owns_lock() && !iter->second.has_started()) {
+  		    // Then this job has yet to run, so start it
+    		    lock.unlock();
+		    threads.push_back(iter->second.run());
+		    ++iter;
+		}
                 else {
                     ++iter;
                 }

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="700" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ring Topology (Left) -->
+  <g id="ring">
+    <!-- Background -->
+    <rect x="10" y="10" width="330" height="380" fill="#FFF9E6" stroke="#DDD" stroke-width="1" rx="5"/>
+    <text x="175" y="35" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Ring Topology</text>
+    <text x="175" y="55" text-anchor="middle" font-size="13" fill="#666">(Slower Convergence)</text>
+
+    <!-- Agents in square formation -->
+    <!-- Agent 0 (top) -->
+    <circle cx="175" cy="100" r="38" fill="#FFE6E6" stroke="#CC6666" stroke-width="2"/>
+    <text x="175" y="96" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 0</text>
+    <text x="175" y="111" text-anchor="middle" fill="#333" font-size="11">:20000</text>
+
+    <!-- Agent 1 (right) -->
+    <circle cx="270" cy="200" r="38" fill="#E6F3FF" stroke="#6699CC" stroke-width="2"/>
+    <text x="270" y="196" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 1</text>
+    <text x="270" y="211" text-anchor="middle" fill="#333" font-size="11">:20001</text>
+
+    <!-- Agent 2 (bottom) -->
+    <circle cx="175" cy="300" r="38" fill="#E6FFE6" stroke="#66CC66" stroke-width="2"/>
+    <text x="175" y="296" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 2</text>
+    <text x="175" y="311" text-anchor="middle" fill="#333" font-size="11">:20002</text>
+
+    <!-- Agent 3 (left) -->
+    <circle cx="80" cy="200" r="38" fill="#FFE6F9" stroke="#CC66CC" stroke-width="2"/>
+    <text x="80" y="196" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 3</text>
+    <text x="80" y="211" text-anchor="middle" fill="#333" font-size="11">:20003</text>
+
+    <!-- Ring connections (simple lines, no arrows) -->
+    <line x1="205" y1="120" x2="240" y2="175" stroke="#333" stroke-width="2.5"/>
+    <line x1="245" y1="230" x2="205" y2="280" stroke="#333" stroke-width="2.5"/>
+    <line x1="145" y1="280" x2="110" y2="230" stroke="#333" stroke-width="2.5"/>
+    <line x1="110" y1="170" x2="145" y2="120" stroke="#333" stroke-width="2.5"/>
+  </g>
+
+  <!-- Full Topology (Right) -->
+  <g id="full">
+    <!-- Background -->
+    <rect x="360" y="10" width="330" height="380" fill="#E6F9FF" stroke="#DDD" stroke-width="1" rx="5"/>
+    <text x="525" y="35" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Full Topology</text>
+    <text x="525" y="55" text-anchor="middle" font-size="13" fill="#666">(Faster Convergence)</text>
+
+    <!-- Agents in square formation -->
+    <!-- Agent 0 (top) -->
+    <circle cx="525" cy="100" r="38" fill="#FFE6E6" stroke="#CC6666" stroke-width="2"/>
+    <text x="525" y="96" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 0</text>
+    <text x="525" y="111" text-anchor="middle" fill="#333" font-size="11">:20000</text>
+
+    <!-- Agent 1 (right) -->
+    <circle cx="620" cy="200" r="38" fill="#E6F3FF" stroke="#6699CC" stroke-width="2"/>
+    <text x="620" y="196" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 1</text>
+    <text x="620" y="211" text-anchor="middle" fill="#333" font-size="11">:20001</text>
+
+    <!-- Agent 2 (bottom) -->
+    <circle cx="525" cy="300" r="38" fill="#E6FFE6" stroke="#66CC66" stroke-width="2"/>
+    <text x="525" y="296" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 2</text>
+    <text x="525" y="311" text-anchor="middle" fill="#333" font-size="11">:20002</text>
+
+    <!-- Agent 3 (left) -->
+    <circle cx="430" cy="200" r="38" fill="#FFE6F9" stroke="#CC66CC" stroke-width="2"/>
+    <text x="430" y="196" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">Agent 3</text>
+    <text x="430" y="211" text-anchor="middle" fill="#333" font-size="11">:20003</text>
+
+    <!-- Full connections (all to all, simple lines) -->
+    <!-- 0-1 -->
+    <line x1="555" y1="120" x2="590" y2="180" stroke="#333" stroke-width="2.5"/>
+    <!-- 0-2 -->
+    <line x1="525" y1="138" x2="525" y2="262" stroke="#333" stroke-width="2.5"/>
+    <!-- 0-3 -->
+    <line x1="495" y1="120" x2="460" y2="180" stroke="#333" stroke-width="2.5"/>
+    <!-- 1-2 -->
+    <line x1="590" y1="220" x2="555" y2="280" stroke="#333" stroke-width="2.5"/>
+    <!-- 1-3 -->
+    <line x1="582" y1="200" x2="468" y2="200" stroke="#333" stroke-width="2.5"/>
+    <!-- 2-3 -->
+    <line x1="495" y1="280" x2="460" y2="220" stroke="#333" stroke-width="2.5"/>
+  </g>
+</svg>
