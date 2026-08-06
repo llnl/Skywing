@@ -1,16 +1,31 @@
 [build-system]
 requires = [
   "scikit-build-core>=0.10",
-  "pybind11"
+  "pybind11",
+  "networkx"
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "skywing"
-version = "0.2"
+version = "0.3"
 description = "A high-reliability, real-time, decentralized platform for collaborative autonomy."
+maintainers = [
+  { name = "Tom Benson", email = "benson31@llnl.gov" },
+  { name = "Shayna Kapadia", email = "kapadia2@llnl.gov" },
+  { name = "Annika Mauro", email = "mauro3@llnl.gov" },
+  { name = "Wayne Mitchell", email = "mitchell82@llnl.gov" },
+  { name = "Sarah Osborn", email = "osborn9@llnl.gov" },
+  { name = "Colin Ponce", email = "ponce11@llnl.gov" },
+]
 authors = [
+  { name = "Tom Benson", email = "benson31@llnl.gov" },
+  { name = "Michael Brzustowicz", email = "brzustowicz1@llnl.gov" },
   { name = "Aly Fox", email = "fox33@llnl.gov" },
+  { name = "Kendall Harter", email = "harter8@llnl.gov" },
+  { name = "Shayna Kapadia", email = "kapadia2@llnl.gov" },
+  { name = "Annika Mauro", email = "mauro3@llnl.gov" },
+  { name = "Wayne Mitchell", email = "mitchell82@llnl.gov" },
   { name = "Sarah Osborn", email = "osborn9@llnl.gov" },
   { name = "Colin Ponce", email = "ponce11@llnl.gov" },
   { name = "Rachel Waldon", email = "waldon1@llnl.gov" },
@@ -35,10 +50,20 @@ dependencies=[
   "matplotlib", # For plotting scripts
   "networkx", # For topology_gen.py
   "scipy", # For topology_gen.py
+  "pandas",
+  "sphinx", # docs
+  "pydata-sphinx-theme",
+  "loguru", # For logging
+  "pydantic",
+  "msgpack"
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-mock"]
+dev = ["ruff>=0.3.0","basedpyright"]
+
+[project.scripts]
+skywing_drive = "skywing.drivers.driver:main"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
@@ -54,3 +79,66 @@ make-fallback = false
 [tool.scikit-build.wheel]
 expand-macos-universal-tags = true
 install-dir = "skywing"
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = [
+    "python/tests",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # import sorting
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+#  "C",   # flake8-comprehensions
+#  "D",   # pydocstyle
+# "SIM", # flake8-simplify
+#  "TCH", # flake8-type-checking
+#  "RUF", # Ruff-specific rules
+#  "N",   # pep8-naming
+#  "A",   # flake8-builtins
+#  "ERA", # eradicate
+#  "PL",  # Pylint
+#  "W",   # pycodestyle warnings
+]
+ignore = [
+  "E501",  # Line too long
+  "D100",  # Missing docstring in public module
+  "D104",  # Missing docstring in public package
+  "D203",  # 1 blank line required before class docstring
+  "D213",  # Multi-line docstring summary should start at the second line
+]
+exclude = [
+  ".git",
+  ".venv",
+  "__pycache__",
+  "build",
+  "dist",
+  ".vscode",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+
+[tool.basedpyright]
+include = ["python"]
+exclude = [
+  "**/node_modules",
+  "**/__pycache__",
+  "build",
+  "dist",
+]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+reportAttributeAccessIssue = false
+reportMissingImports = false

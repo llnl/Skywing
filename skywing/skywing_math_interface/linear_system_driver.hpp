@@ -77,7 +77,7 @@ readPartition(const std::string& filename)
  * vector, row and column partitioning, and communication topology. The matrix
  * may be arbitrarily partitioned among agents according to the partition files
  * and the communication topology among agents may also be arbitrary. See
- * python_helpers/matrix_gen.py or python_helpers/topology_gen.py for example
+ * python/skywing/skywing_math_interface/matrix_gen.py for example
  * problem generation scripts that construct the necessary input files. Note
  * that the LinearProcessor used here is expected to conform to some standards
  * described in detail in skywing_mid/linear_system_processors/README.md.

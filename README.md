@@ -177,6 +177,13 @@ requests as well as questions, feature requests, or bug reports via
 issues. Contact any of our team members with any questions. Please
 also refer to our [code of conduct](CODE_OF_CONDUCT.md).
 
+## Code Quality
+
+All Python code in this project is checked for formatting and linting using [Ruff](https://docs.astral.sh/ruff/) and [basedpyright](https://github.com/detachhead/basedpyright) for type checking.
+The GitLab CI pipeline includes checks that will fail if the code doesn't meet the defined standards.
+
+See [LINTING.md](LINTING.md) for details on how to run these checks locally and fix any issues.
+
 If you aren't a Skywing developer at LLNL, you won't have permission
 to push new branches to the repository. First, you should create a
 fork. This will create your copy of the Skywing repository and ensure
@@ -190,14 +197,18 @@ you can push your changes up to GitHub and create PRs.
 * Review existing issues before opening a new one. Your issue might already be under development or discussed by others. Feel free to add to any outstanding issue/bug.
 * Be explicit when opening issues and reporting bugs. What behavior are you expecting? What is your justification or use case for the new feature/enhancement? How can the bug be recreated? What are any environment variables to consider?
 
-# Development team
+# Current development team
  * Tom Benson <benson31@llnl.gov>
- * Michael Brzustowicz <brzustowicz1@llnl.gov>
- * **Aly Fox <fox33@llnl.gov>** (corresponding author)
  * Annika Mauro <mauro3@llnl.gov>
  * Wayne Mitchell <mitchell82@llnl.gov>
  * Sarah Osborn <osborn9@llnl.gov>
- * Colin Ponce <ponce11@llnl.gov>  
+ * Colin Ponce <ponce11@llnl.gov> 
+
+# Previous members
+ * Michael Brzustowicz <brzustowicz1@llnl.gov>
+ * Aly Fox <fox33@llnl.gov>
+ * Kendall Harter <harter8@llnl.gov>
+ * Rachel Waldon <waldon1@llnl.gov>
 
 # License
 

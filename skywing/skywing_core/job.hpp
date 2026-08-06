@@ -293,9 +293,14 @@ public:
         std::apply(apply_to, value_tuple);
     }
 
-    /** \brief Returns true if the job is finished, false if it is not
+    /** \brief Indicates whether or not the job has begun running.
      */
-    bool is_finished() const noexcept;
+    bool has_started() const noexcept;
+
+    /** \brief Indicates whether or not the job has finished running.
+     */
+    bool has_finished() const noexcept;
+
 
     /**
      * @brief Set the buffer type for all subscriptions in this job
@@ -458,6 +463,12 @@ private:
 
     // Temporary variable to hold buffer type until subscription is made
     std::optional<internal::Buffer> tmp_buffer_;
+
+    // Indicates whether or not this job has started running
+    bool has_started_ = false;
+
+    // Indicates whether or not this job has finished running
+    bool has_finished_ = false;
 }; // Class Job
 } // namespace skywing
 

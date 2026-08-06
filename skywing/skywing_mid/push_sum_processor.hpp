@@ -28,21 +28,26 @@ template <typename S = double>
 class PushSumProcessor
 {
 public:
-    using scalar_t = S;
+    using data_t = S;
+    using scalar_t = double;
     using ValueType = std::tuple<S, S, unsigned>;
-    using ValueTag = skywing::Tag<ValueType>;
+    // using ValueTag = skywing::Tag<ValueType>;
 
     /**
      * @param number_of_neighbors Number of neighboring agents.
      * @param starting_values This agent's contribution to the average.
      */
-    PushSumProcessor(scalar_t starting_value, size_t number_of_neighbors)
-        : x_value_(starting_value)
+    PushSumProcessor(data_t starting_value, size_t number_of_neighbors)
+        : x_value_(starting_value),
+          y_value_(starting_value),
+          sigma_x_(starting_value),
+          sigma_y_(starting_value)
     {
         in_nodes_plus_one_ = number_of_neighbors + 1.0;
+        y_value_ = 1.0;
         // Local weights -> This is the information passed to neighbors.
-        sigma_x_ = sigma_x_ + (x_value_ / in_nodes_plus_one_);
-        sigma_y_ = sigma_y_ + (y_value_ / in_nodes_plus_one_);
+        sigma_x_ = x_value_ / in_nodes_plus_one_;
+        sigma_y_ = y_value_ / in_nodes_plus_one_;
     }
 
     ValueType get_init_publish_values()
@@ -61,26 +66,25 @@ public:
     void process_update(const DataHandler<ValueType>& data_handler,
                         const IterMethod& iter_method)
     {
-        for (const auto& pTag : data_handler.get_updated_tags()) {
-            if (*pTag == iter_method.my_tag())
+        for (const auto& pTag : data_handler.recvd_data_tags()) {
+            if (pTag == iter_method.my_tag())
                 continue;
 
-            std::string nbr_tag_id = pTag->id();
-            ValueType nbr_value = data_handler.get_data_unsafe(*pTag);
+            const ValueType& nbr_value = data_handler.get_data(pTag);
 
-            if (rho_x_.count(nbr_tag_id) == 0) {
-                rho_x_[nbr_tag_id] = 0.0;
-                rho_y_[nbr_tag_id] = 0.0;
+            if (rho_x_.count(pTag) == 0) {
+                rho_x_[pTag] = 0.0;
+                rho_y_[pTag] = 0.0;
             }
-            rho_x_previous_[nbr_tag_id] = rho_x_[nbr_tag_id];
-            rho_y_previous_[nbr_tag_id] = rho_y_[nbr_tag_id];
-            rho_x_[nbr_tag_id] = std::get<0>(nbr_value);
-            rho_y_[nbr_tag_id] = std::get<1>(nbr_value);
+            rho_x_previous_[pTag] = rho_x_[pTag];
+            rho_y_previous_[pTag] = rho_y_[pTag];
+            rho_x_[pTag] = std::get<0>(nbr_value);
+            rho_y_[pTag] = std::get<1>(nbr_value);
 
             x_value_ =
-                x_value_ + rho_x_[nbr_tag_id] - rho_x_previous_[nbr_tag_id];
+                x_value_ + rho_x_[pTag] - rho_x_previous_[pTag];
             y_value_ =
-                y_value_ + rho_y_[nbr_tag_id] - rho_y_previous_[nbr_tag_id];
+                y_value_ + rho_y_[pTag] - rho_y_previous_[pTag];
 
             // This is the 'wake up' portion followed by broadcast (push_sum
             // theory relevant)
@@ -107,29 +111,47 @@ public:
 
     /** @brief Returns the current estimate of the global average.
      */
-    scalar_t get_value() const
+    data_t get_value() const
     {
-        scalar_t consensus_value = x_value_ / y_value_;
+        data_t consensus_value = x_value_ / y_value_;
         return consensus_value;
+    }
+
+    void set_value(data_t starting_value)
+    {
+        x_value_ = starting_value;
+        y_value_ = 1.0;
+        sigma_x_ = x_value_ / in_nodes_plus_one_;
+        sigma_y_ = y_value_ / in_nodes_plus_one_;
+        information_count_ = 0;
+        rho_x_.clear();
+        rho_y_.clear();
+        rho_x_previous_.clear();
+        rho_y_previous_.clear();
+    }
+
+    void set_num_neighbors(size_t num_neighbors)
+    {
+        in_nodes_plus_one_ = num_neighbors + 1.0;
     }
 
     unsigned get_information_count() const { return information_count_; }
 
-    scalar_t get_x() const { return x_value_; }
-    scalar_t get_y() const { return y_value_; }
+    data_t get_x() const { return x_value_; }
+    data_t get_y() const { return y_value_; }
 
 private:
     unsigned information_count_ = 0;
-    scalar_t x_value_;
-    scalar_t y_value_ = 1.0;
+    data_t x_value_;
+    data_t y_value_;
     // this is the number of neighbors plus one needed for the update
     // rule
     scalar_t in_nodes_plus_one_;
     // Local weights.
-    scalar_t sigma_x_;
-    scalar_t sigma_y_;
+    data_t sigma_x_;
+    data_t sigma_y_;
     // stores iterate information
-    using data_id_map = std::unordered_map<std::string, scalar_t>;
+    using data_id_map = std::unordered_map<std::string, data_t>;
     data_id_map rho_x_;
     data_id_map rho_y_;
     data_id_map rho_x_previous_;

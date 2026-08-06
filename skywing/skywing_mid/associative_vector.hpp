@@ -294,6 +294,52 @@ public:
         }
         return *this;
     }
+    /**
+    * @brief Multiplies each value in the AssociativeVector component wise by another.
+    * @param b The AssociativeVector by which each value in this AssociativeVector will be multiplied component wise.
+    * @return A reference to the modified AssociativeVector.
+    */
+    AssociativeVector&
+    operator*=(const AssociativeVector<index_t, val_t, isOpen>& b)
+    {
+        for (auto const& [ind, val] : b.data_) {
+            if constexpr (isOpen) {
+                // add key k to data_ if it isn't there already
+                if (!contains(ind))
+                    data_[ind] = default_value_;
+                data_[ind] *= val;
+            }
+            else {
+                // is !isOpen, only add on this index if it's already in data_
+                if (contains(ind))
+                    data_[ind] *= val;
+            }
+        }
+        return *this;
+    }
+    /**
+    * @brief Divides each value in the AssociativeVector component wise by another.
+    * @param b The AssociativeVector by which each value in this AssociativeVector will be divided component wise.
+    * @return A reference to the modified AssociativeVector.
+    */
+    AssociativeVector&
+    operator/=(const AssociativeVector<index_t, val_t, isOpen>& b)
+    {
+        for (auto const& [ind, val] : b.data_) {
+            if constexpr (isOpen)
+            { // add key k to data_ if it isn't there already
+                if (!contains(ind))
+                    data_[ind] = default_value_;
+                data_[ind] /= val;
+            }
+            else {
+                // is !isOpen, only add on this index if it's already in data_
+                if (contains(ind))
+                    data_[ind] /= val;
+            }
+        }
+        return *this;
+    }
 
     /**
     * @brief Multiplies this AssociativeVector by a scalar.
@@ -495,8 +541,26 @@ operator*(float_t f, const AssociativeVector<index_t, val_t, isOpen>& b)
 }
 
 /**
+* @brief Multiplies vector a component wise by another vector b.
+*
+* @param a The AssociativeVector to be multiplied.
+* @param b The AssociativeVector to multiply by.
+* @return A new AssociativeVector with all values multiplied component wise.
+*
+* This operator multiplies the AssociativeVector `a` component wise by `b`.
+*/
+template <typename index_t, typename val_t, bool isOpen>
+AssociativeVector<index_t, val_t, isOpen>
+operator*(const AssociativeVector<index_t, val_t, isOpen>& a,
+          const AssociativeVector<index_t, val_t, isOpen>& b)
+{
+    AssociativeVector<index_t, val_t, isOpen> c = a;
+    return c *= b;
+}
+
+/**
 * @brief Divides all values in the AssociativeVector by a scalar.
-* 
+*
 * @param b The AssociativeVector to be scaled.
 * @param f The scalar value to divide by.
 * @return A new AssociativeVector with all values divided by `f`.
@@ -509,6 +573,24 @@ operator/(const AssociativeVector<index_t, val_t, isOpen>& b, float_t f)
 {
     AssociativeVector<index_t, val_t, isOpen> c = b;
     return c /= f;
+}
+
+/**
+* @brief Divides vector a component wise by another vector b.
+*
+* @param a The AssociativeVector to be divided (numerator).
+* @param b The AssociativeVector to divide by (denominator).
+* @return A new AssociativeVector with all values divided component wise.
+*
+* This operator divides the AssociativeVector `a` component wise by `b`.
+*/
+template <typename index_t, typename val_t, bool isOpen>
+AssociativeVector<index_t, val_t, isOpen>
+operator/(const AssociativeVector<index_t, val_t, isOpen>& a,
+          const AssociativeVector<index_t, val_t, isOpen>& b)
+{
+    AssociativeVector<index_t, val_t, isOpen> c = a;
+    return c /= b;
 }
 
 template <typename index_t, typename val_t, bool isOpen>

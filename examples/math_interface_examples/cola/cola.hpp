@@ -48,46 +48,6 @@ generate_mixing_matrix(std::string comm_topology_file, size_t agent_id)
     return AssociativeVector<tag_t, scalar_t, false>(W_k_data);
 }
 
-// WM: todo - move some of these utilities to a reusable location? Copy/paste
-// from barbell. Variable naming convention? variableName vs. variable_name?
-
-// Utility function: Print machine configurations
-void printConfigurations(
-    const std::unordered_map<std::string, MachineConfig>& configurations)
-{
-    for (const auto& pair : configurations) {
-        std::cout << "Key: " << pair.first << ", Value: " << pair.second
-                  << std::endl;
-    }
-}
-
-// Utility function: Set machine configurations (simple line connectivity
-// between agents)
-std::unordered_map<std::string, MachineConfig>
-setConfigurations(std::uint16_t startingPort, std::uint16_t systemSize)
-{
-    std::unordered_map<std::string, MachineConfig> configurations;
-
-    for (std::uint16_t i = 0; i < systemSize; ++i) {
-        std::string agentName = "agent" + std::to_string(i);
-        std::string localIp = "127.0.0.1";
-        std::vector<std::string> neighborAgents;
-        if (i == systemSize - 1) {
-            neighborAgents = {};
-        }
-        else {
-            neighborAgents = {"agent" + std::to_string(i + 1)};
-        }
-        configurations[agentName] =
-            MachineConfig{agentName,
-                          localIp,
-                          neighborAgents,
-                          static_cast<uint16_t>(startingPort + i)};
-    }
-
-    return configurations;
-}
-
 // Solver function
 void runSolver(
     const std::unordered_map<std::string, MachineConfig>& configurations,
@@ -146,8 +106,7 @@ int drive_COLA(size_t starting_port,
                std::string output_dir)
 {
     // Generate machine configurations
-    auto configurations = setConfigurations(starting_port, num_agents);
-    printConfigurations(configurations);
+    auto configurations = create_default_machine_configurations(starting_port, num_agents);
 
     std::filesystem::path comm_topology_file = data_dir;
     comm_topology_file /= "comm_topology.txt";

@@ -86,9 +86,6 @@ kill_progs() {
   done
 }
 
-rm -rf ${output_dir}
-mkdir -p ${output_dir}
-
 echo "@cola_exe@" ${agent_ind}
 "@cola_exe@" ${agent_ind} -n ${num_agents} -p ${starting_port} -l ${lambda} -s ${shift_scale} -S ${sync} -t ${timeout} -d ${data_dir} -o ${output_dir} &
 declare "erase${agent_ind}=$!"

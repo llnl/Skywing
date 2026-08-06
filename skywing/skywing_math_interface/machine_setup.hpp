@@ -112,6 +112,30 @@ read_machine_configurations_from_file(std::string filename)
     return configurations;
 }
 
+/*
+  Create a default machine configuration suitable for running on a local machine
+*/
+inline std::unordered_map<std::string, MachineConfig>
+create_default_machine_configurations(std::uint16_t starting_port, std::uint16_t system_size)
+{
+    std::unordered_map<std::string, MachineConfig> configurations;
+
+    for (std::uint16_t i = 0; i < system_size; ++i) {
+        std::string const agentName = "agent" + std::to_string(i);
+        std::vector<std::string> neighborAgents;
+        if (i != system_size - 1) {
+            neighborAgents.emplace_back("agent" + std::to_string(i + 1));
+        }
+        configurations[agentName] =
+            MachineConfig{agentName,
+                          "127.0.0.1",
+                          std::move(neighborAgents),
+                          static_cast<uint16_t>(starting_port + i)};
+    }
+
+    return configurations;
+}
+
 /* 
   Given a map of strings to MachineConfigs, returns a vector of address-port pairs for the neighbors of specified machine.
   For example, if the machine config is read in from the example above and agent_name = agent0, this would return

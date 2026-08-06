@@ -30,60 +30,6 @@ using scalar_t = double;
 using ClosedVector = AssociativeVector<index_t, scalar_t, false>;
 using ClosedMatrix = AssociativeMatrix<index_t, scalar_t, false>;
 
-// Utility function: Print machine configurations
-void printConfigurations(
-    const std::unordered_map<std::string, MachineConfig>& configurations)
-{
-    for (const auto& pair : configurations) {
-        std::cout << "Key: " << pair.first << ", Value: " << pair.second
-                  << std::endl;
-    }
-}
-
-// Utility function: Set machine configurations to a simple line topology
-std::unordered_map<std::string, MachineConfig>
-setConfigurations(std::uint16_t startingPort, std::uint16_t systemSize)
-{
-    std::unordered_map<std::string, MachineConfig> configurations;
-
-    for (std::uint16_t i = 0; i < systemSize; ++i) {
-        std::string agentName = "agent" + std::to_string(i);
-        std::string localIp = "127.0.0.1";
-        std::vector<std::string> neighborAgents;
-
-        if (i != systemSize - 1) {
-            neighborAgents.push_back("agent" + std::to_string(i + 1));
-        }
-
-        configurations[agentName] =
-            MachineConfig{agentName,
-                          localIp,
-                          neighborAgents,
-                          static_cast<uint16_t>(startingPort + i)};
-    }
-
-    return configurations;
-}
-
-// Utility function: Print a map
-void printMap(const std::unordered_map<uint32_t, std::vector<uint32_t>>& map)
-{
-    for (const auto& pair : map) {
-        std::cout << "Key: " << pair.first << " -> Values: ";
-        for (const auto& value : pair.second) {
-            std::cout << value << " ";
-        }
-        std::cout << std::endl;
-    }
-}
-
-// Utility function: Check if a file exists
-bool fileExists(const std::string& filename)
-{
-    std::ifstream file(filename);
-    return file.is_open();
-}
-
 // Solver function
 void runSolver(
     const std::unordered_map<std::string, MachineConfig>& configurations,
@@ -124,8 +70,7 @@ int main(int argc, char* argv[])
     uint32_t systemSize = std::stoi(argv[5]);
 
     // Generate configurations
-    auto configurations = setConfigurations(startingPort, systemSize);
-    printConfigurations(configurations);
+    auto configurations = create_default_machine_configurations(startingPort, systemSize);
 
     // Launch solver threads
     std::vector<std::thread> threads;

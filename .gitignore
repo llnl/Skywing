@@ -6,3 +6,12 @@ build*/
 */.backup/
 .backup/
 *~
+**/artifacts/
+**/__pycache__/
+skbuild/*
+**/ls_driver_output/
+**/ls_driver_plots/
+**/sphinx-documentation/
+.venv/*
+docs/_autosummary/
+_build/
