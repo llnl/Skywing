@@ -15,7 +15,6 @@ Usage with driver:
 The driver automatically provides:
     - Agent ID and network configuration
     - Neighbor connections
-    - Backend selection
     - Optional asynchrony settings
 """
 
@@ -40,7 +39,6 @@ def main():
     port = args.port
     nbr_addresses = args.nbr_addresses
     nbr_ports = args.nbr_ports
-    backend = args.backend
     test_async = args.test_async
 
     # Convert kwargs list to dictionary
@@ -55,9 +53,7 @@ def main():
     print(f"Connected to {len(nbr_ports)} neighbors")
 
     # Create Skywing agent with the provided configuration
-    agent = create_skywing_agent(
-        address, port, nbr_addresses, nbr_ports, test_async, backend
-    )
+    agent = create_skywing_agent(address, port, nbr_addresses, nbr_ports, test_async)
 
     # Create a processor with local data
     # In this example, each agent starts with its ID as the initial value

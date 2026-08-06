@@ -14,6 +14,7 @@ import os
 import time
 
 import numpy as np
+
 from skywing.core import Agent
 from skywing.core.types import ProcessorData
 from skywing.mid import Iteration
