@@ -109,7 +109,8 @@ def main():
 
         # Update the distance iteration with the new distance
         distance_iteration.update_data(distance_from_max)
-
+        # allow some time for the iteration to converge
+        time.sleep(0.1)
         # Query the maximum distance (current estimate of the range)
         range_value = distance_iteration.query()
 

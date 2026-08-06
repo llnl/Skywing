@@ -63,7 +63,6 @@ These configure the driver itself and control how agents are launched:
 * ``--starting_port PORT``: Starting port number (default: 20000)
 * ``--comm_topology TOPO``: Network topology: ``full``, ``ring``, or ``line`` (default: full)
 * ``--config FILE``: JSON file with custom collective configuration (default: None, optional if port and topology are provided)
-* ``--backend``: Choose ``python`` or ``cpp`` backend (default: python)
 * ``--print``: Print agent outputs to screen (default: False, disabled)
 * ``--unbuffered or -u``: Stream agent outputs in real-time (default: False, buffered output)
 * ``--test_async PROB ITER_PROB DELAY``: Simulate asynchrony for testing (default: None, no artificial asynchrony)
@@ -88,7 +87,6 @@ When the driver launches your script, it **automatically provides** these argume
 * ``--port``: Agent's port (e.g., 20000)
 * ``--nbr_addresses``: List of neighbor IP addresses
 * ``--nbr_ports``: List of neighbor ports
-* ``--backend``: Backend choice ("python" or "cpp")
 * ``--test_async``: Optional asynchrony test parameters (if specified)
 * ``--kwargs``: Your custom key=value pairs as a dictionary
 
@@ -305,7 +303,6 @@ You can either adapt ``simple_iteration.py`` or write from scratch. Here's the c
        port = args.port
        nbr_addresses = args.nbr_addresses
        nbr_ports = args.nbr_ports
-       backend = args.backend
        test_async = args.test_async
 
        # Convert kwargs list to dictionary
@@ -321,7 +318,7 @@ You can either adapt ``simple_iteration.py`` or write from scratch. Here's the c
 
        # Create Skywing agent with the provided configuration
        agent = create_skywing_agent(
-           address, port, nbr_addresses, nbr_ports, test_async, backend
+           address, port, nbr_addresses, nbr_ports, test_async
        )
 
        # Create a processor with local data
@@ -390,7 +387,6 @@ To make any script work with the driver:
       port = args.port
       nbr_addresses = args.nbr_addresses
       nbr_ports = args.nbr_ports
-      backend = args.backend
       test_async = args.test_async
 
 3. **Convert kwargs list to dictionary:**
@@ -412,7 +408,7 @@ To make any script work with the driver:
    .. code-block:: python
 
       agent = create_skywing_agent(
-          address, port, nbr_addresses, nbr_ports, test_async, backend
+          address, port, nbr_addresses, nbr_ports, test_async
       )
 
 6. **Implement your algorithm** (create processor, iteration, query results, etc.)
