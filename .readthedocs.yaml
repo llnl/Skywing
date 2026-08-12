@@ -1,0 +1,22 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set the OS, Python version, and other tools you might need
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.10"
+
+# Build documentation with Sphinx (conf.py is in the root directory)
+sphinx:
+   configuration: conf.py
+
+# Install the package with pip to get all dependencies from pyproject.toml
+python:
+   install:
+   - method: pip
+     path: .
+        
